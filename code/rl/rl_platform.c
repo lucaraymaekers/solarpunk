@@ -280,7 +280,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
   
   if(!PlatformContext)
   {
-   ErrorLog("Could not initialize graphical context, running in headless mode.");
+   ErrorLog("Could not initialize graphical context, running in headless mode.\n");
   }
   
   // Get ExeDirPath
@@ -344,16 +344,15 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
   font_atlas DebugRenderAtlas = {0};
   font TextFont = {0};
   font IconsFont = {0};
-  s32 GLADVersion = 0;
   ui_box *DebugUIBox = 0;
   {
    char *FontPath = 0;
-   FontPath = PathFromExe(FrameArena, S8("../data/icons.ttf"));
+   FontPath = PathFromExe(FrameArena, S8("../data/muze_icons3.ttf"));
    InitFont(&IconsFont, FontPath);
    FontPath = PathFromExe(FrameArena, S8("../data/font_regular.ttf"));
    InitFont(&TextFont, FontPath);
    
-   GLADVersion = gladLoaderLoadGL();
+   gladLoaderLoadGL();
    RenderInit(&DebugRender);
    arena *FontAtlasArena = PushArena(PermanentArena, MB(150), false);
    // TODO(luca): Building this atlas is slow and tanks our startup time.  So we should speed it up by using a glyph cache.
@@ -953,6 +952,8 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
       Inst->Color3 = WindowBorderColor;
      }
      
+     
+     // TODO(luca): bug here...
      RenderDrawAllRectangles(&DebugRender, V2S32(WindowBuffer.Width, WindowBuffer.Height), &DebugRenderAtlas);
 #endif
      P_UpdateImage(PlatformContext, &WindowBuffer);

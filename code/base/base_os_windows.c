@@ -69,7 +69,6 @@ OS_ReadEntireFileIntoMemory(char *FileName)
     {
      // NOTE(casey): File read successfully
      Result.Size = FileSize32;
-     CloseHandle(FileHandle);
     }
     else
     {                    
@@ -94,6 +93,8 @@ OS_ReadEntireFileIntoMemory(char *FileName)
    Win32Log();
    ErrorLog("Could not open '%s' for reading.\n", FileName);
   }
+  
+  Win32LogIf(!CloseHandle(FileHandle));
  }
  else
  {
@@ -122,15 +123,15 @@ OS_WriteEntireFile(char *FileName, str8 File)
   }
   else
   {
-   ErrorLog("Could not write to '%s'.", FileName);
+   ErrorLog("Could not write to '%s'.\n", FileName);
   }
   
-  CloseHandle(FileHandle);
+  Win32LogIf(!CloseHandle(FileHandle));
  }
  else
  {
   Win32Log();
-  ErrorLog("Could not open '%s' for writing.", FileName);
+  ErrorLog("Could not open '%s' for writing.\n", FileName);
  }
  
  return Result;

@@ -943,7 +943,7 @@ PieceNoteAdd(piece *Piece,
  }
  else
  {
-  ErrorLog("Note out of bounds.");
+  ErrorLog("Note out of bounds.\n");
  }
  
  return Note;
@@ -1645,7 +1645,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      SharpPos.X -= NoteSize;
      SharpPos.Y -= 5.f;
      
-     DrawRectChar(UI_State->Atlas, SharpPos, '#' - ' ', NoteColor);
+     DrawRectChar(UI_State->Atlas, FontKind_Text, SharpPos, '#', NoteColor);
     }
    }
    
@@ -1839,7 +1839,7 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
  Cur.X += HorizontalPadding;
  Cur.Y += RoundF32(.5f*(Box->FixedSize.Y - Box->HeightPx));
  
- f32 EllipsisWidth = Atlas->PackedChars[' ' - Atlas->FirstCodepoint].xadvance;
+ f32 EllipsisWidth = Atlas->PackedChars[' ' - Atlas->TextFont->FirstCodepoint].xadvance;
  
  f32 CurMaxX = (Box->FixedPos.X + Box->FixedSize.X - 
                 (HorizontalPadding + EllipsisWidth));
@@ -1849,8 +1849,8 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
  {
   rune Char = Text.Data[Idx]; 
   
-  DrawRectChar(Atlas, Cur, Char - ' ', Box->TextColor);
-  f32 CharWidth = (Atlas->PackedChars[Char - Atlas->FirstCodepoint].xadvance);
+  DrawRectChar(Atlas, FontKind_Text, Cur, Char - ' ', Box->TextColor);
+  f32 CharWidth = (Atlas->PackedChars[Char - Atlas->TextFont->FirstCodepoint].xadvance);
   Cur.X += CharWidth;
   
   if(Cur.X > CurMaxX)
@@ -2334,12 +2334,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
     InitFont(&App->Font, FontPath);
    }
    {
-    char *FontPath = PathFromExe(FrameArena, S8("../data/muze/muze_icons.ttf"));
+    char *FontPath = PathFromExe(FrameArena, S8("../data/muze_icons3.ttf"));
     InitFont(&App->IconsFont, FontPath);
    }
    
-   App->PreviousHeightPx = DefaultHeightPx + 1.f;
    App->HeightPx = DefaultHeightPx;
+   App->PreviousHeightPx = App->HeightPx + 1.f;
    App->FrameIdx = 0;
   }
   
@@ -2581,17 +2581,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  OS_ProfileAndPrint("Input");
  
- RenderBeginFrame(FrameArena, 0, 0, Buffer->Width, Buffer->Height);
- 
- App->HeightPx = DefaultHeightPx;
- 
  if(App->PreviousHeightPx != App->HeightPx)
  {
+#if 0
+  gl_render_state *Render = &App->Render;
+  glDeleteTextures(ArrayCount(Render->Textures), &Render->Textures[0]);
+  glGenTextures(ArrayCount(Render->Textures), &Render->Textures[0]);
+#endif
+  
   App->PreviousHeightPx = App->HeightPx;
   
   RenderBuildAtlas(App->FontAtlasArena, &App->FontAtlas, &App->Font, &App->IconsFont, 
                    App->HeightPx);
  }
+ 
+ RenderBeginFrame(FrameArena, 0, 0, Buffer->Width, Buffer->Height);
  
  OS_ProfileAndPrint("Atlas");
  
@@ -3037,17 +3041,17 @@ UPDATE_AND_RENDER(UpdateAndRender)
               ui_box *Close;
               UI_BackgroundColor(Color_ButtonBackground)
                UI_SemanticWidth(UI_SizeText(2.f, 1.f))
-               UI_FontKind(FontKind_Icon)
-               UI_Debug(true)
+               UI_FontKind(FontKind_Text)
                Close = UI_AddBox(S8("CloseButton"), (UI_BoxFlag_DrawBackground|
                                                      UI_BoxFlag_DrawBorders|
                                                      UI_BoxFlag_MouseClickable|
+                                                     UI_BoxFlag_CenterTextHorizontally|
+                                                     UI_BoxFlag_CenterTextVertically|
                                                      UI_BoxFlag_DrawHotEffects|
                                                      UI_BoxFlag_DrawActiveEffects|
-                                                     UI_BoxFlag_DrawDisplayString|
-                                                     UI_BoxFlag_CenterTextVertically|
-                                                     UI_BoxFlag_CenterTextHorizontally));
-              Close->DisplayString = S8("a");
+                                                     UI_BoxFlag_DrawDisplayString));
+              Close->DisplayString = UI_Icons[UI_IconKind_Cancel];
+              Close->DisplayString = S8("X");
               
               if(Close->WasClicked)
               {
@@ -3218,7 +3222,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 else
                 {
                  DebugBreak();
-                 ErrorLog("Cannot read file from the future.");
+                 ErrorLog("Cannot read file from the future.\n");
                 }
                 
                 OS_FreeFileMemory(Serializer.Buffer);
@@ -3654,6 +3658,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 {
                  PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_DebugInfo;
                 }
+                
+                App->HeightPx = M_Slider(S8("SetFontSize"), S8("Set Font Size"), Str8Fmt("%.0f", App->HeightPx), App->HeightPx,
+                                         1.f, 40.f, 1.f, false).Value;
                }
                
                // Scrollbar

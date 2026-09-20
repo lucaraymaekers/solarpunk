@@ -9,25 +9,34 @@ RenderBuildAtlas(arena *Arena,
  
  if(TextFont->Initialized)
  {
-  Atlas->FirstCodepoint = ' ';
+  Atlas->TextFont = TextFont;
+  // TODO(luca): Unhardcode with asset pipeline.
+  TextFont->FirstCodepoint = ' ';
   // NOTE(luca): 2 bytes =>small alphabets.
-  Atlas->CodepointCount = (((s32)KB(2) - 1) - Atlas->FirstCodepoint);
-  Atlas->IconsFirstCodepoint = 0xE800;
-  Atlas->IconsCodepointCount = 15;
+  TextFont->CodepointCount = (((s32)KB(2) - 1) - TextFont->FirstCodepoint);
+  TextFont->FirstPackedCharIdx = 0;
+  
+  if(IconsFont->Initialized)
+  {
+   Atlas->IconsFont = IconsFont;
+   IconsFont->FirstCodepoint = 0xE800;
+   IconsFont->CodepointCount = 15;
+   IconsFont->FirstPackedCharIdx = TextFont->CodepointCount;
+   IconsFont->Scale = stbtt_ScaleForPixelHeight(&IconsFont->Info, HeightPx);
+  }
   
   Atlas->Width = 1024;
   Atlas->Height = 1024;
   u64 Size = (u64)(Atlas->Width*Atlas->Height);
   
   ArenaSetPos(Arena, 0);
-  Atlas->Data = PushArray(Arena, u8, Size);
-  s32 CodepointCount = (Atlas->CodepointCount + Atlas->IconsCodepointCount);
+  Atlas->Data = PushArrayZero(Arena, u8, Size);
+  s32 CodepointCount = (TextFont->CodepointCount + IconsFont->CodepointCount);
   Atlas->PackedChars = PushArray(Arena, stbtt_packedchar, (u64)CodepointCount);
   Atlas->AlignedQuads = PushArray(Arena, stbtt_aligned_quad, (u64)CodepointCount);
   
   Atlas->HeightPx = HeightPx;
-  Atlas->FontScale = stbtt_ScaleForPixelHeight(&TextFont->Info, HeightPx);
-  Atlas->Font = TextFont;
+  TextFont->Scale = stbtt_ScaleForPixelHeight(&TextFont->Info, HeightPx);
   
   stbtt_pack_context Ctx;
   {
@@ -37,10 +46,10 @@ RenderBuildAtlas(arena *Arena,
                    0, 1, 0);
    
    stbtt_PackFontRange(&Ctx, TextFont->Info.data, 0, HeightPx, 
-                       Atlas->FirstCodepoint, Atlas->CodepointCount, 
+                       TextFont->FirstCodepoint, TextFont->CodepointCount, 
                        Atlas->PackedChars);
    
-   // Icons
+   if(IconsFont->Initialized)
    {
     // NOTE(luca): We need to scale this so that it matches our font.
     f32 TextEmHeight = (f32)(TextFont->Ascent - TextFont->Descent);
@@ -48,8 +57,11 @@ RenderBuildAtlas(arena *Arena,
     f32 ScaledHeight = HeightPx*(IconsEmHeight/TextEmHeight);
     
     stbtt_PackFontRange(&Ctx, IconsFont->Info.data, 0, ScaledHeight, 
-                        Atlas->IconsFirstCodepoint, Atlas->IconsCodepointCount, 
-                        Atlas->PackedChars + Atlas->CodepointCount);
+                        IconsFont->FirstCodepoint, IconsFont->CodepointCount, 
+                        Atlas->PackedChars + TextFont->CodepointCount);
+    
+    // TODO(luca): Remove this hack
+    IconsFont->FirstCodepoint = UI_IconKind_Record;
    }
    
    stbtt_PackEnd(&Ctx);
@@ -98,13 +110,16 @@ DrawRect(v4 Dest, v4 Color, f32 CornerRadius, f32 BorderThickness, f32 Softness)
 }
 
 internal rect_instance *
-DrawRectChar(font_atlas *Atlas, v2 Pos, s32 PackedCharIdx, v4 Color)
+DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 Color)
 {
  rect_instance *Result = 0;
  v4 Dest = {0};
  
  // NOTE(luca): Evereything happens in pixel coordinates in here.
  // TODO(luca): Proper glyph cache.
+ 
+ font *Font = Atlas->Fonts[FontKind]; 
+ s32 PackedCharIdx = Font->FirstPackedCharIdx + (Codepoint - Font->FirstCodepoint);
  
  {
   stbtt_packedchar *PackedChar = &Atlas->PackedChars[PackedCharIdx];
@@ -113,8 +128,8 @@ DrawRectChar(font_atlas *Atlas, v2 Pos, s32 PackedCharIdx, v4 Color)
   f32 Width = FloorF32(PackedChar->x1 - PackedChar->x0);
   f32 Height = FloorF32(PackedChar->y1 - PackedChar->y0);
   {    
-   f32 Baseline = GetBaseline(Atlas->Font, Atlas->FontScale);
-   f32 Descent = (f32)Atlas->Font->Descent*Atlas->FontScale;
+   f32 Baseline = GetBaseline(Font);
+   f32 Descent = Font->Scale*(f32)Font->Descent;
    
    v2 Min = V2(FloorF32(Pos.X + PackedChar->xoff), 
                FloorF32(Pos.Y + PackedChar->yoff + Baseline + Descent));
@@ -194,7 +209,11 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
                                      S8("../code/rl/generated/rect_frag.glsl"));
   glUseProgram(RectShader);
   
+  // NOTE(luca): This cannot be shared between platform and app.  For now it is used for fonts
+  // so we just make sure that the platform (which is called first) generates the right atlas
+  // font.
   GL_LoadTextureFromImage(Render->Textures[0], Atlas->Width, Atlas->Height, Atlas->Data, GL_RED, RectShader, "Texture");
+  
   // Uniforms
   {
    gl_int UViewport = glGetUniformLocation(RectShader, "Viewport");

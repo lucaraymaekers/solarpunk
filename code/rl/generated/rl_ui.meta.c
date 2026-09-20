@@ -1,3 +1,41 @@
+enum icon_kind
+{
+UI_IconKind_Record,
+ UI_IconKind_Pause,
+ UI_IconKind_Stop,
+ UI_IconKind_Play,
+ UI_IconKind_ToEnd,
+ UI_IconKind_FastForward,
+ UI_IconKind_ToStart,
+ UI_IconKind_FastBackward,
+ UI_IconKind_Volume,
+ UI_IconKind_VolumeDown,
+ UI_IconKind_VolumeUp,
+ UI_IconKind_Gauge,
+ UI_IconKind_Cog,
+ UI_IconKind_Cancel,
+ 
+};
+typedef enum icon_kind icon_kind;
+
+str8 UI_Icons[] = {
+{((u8 []){UI_IconKind_Record}), 1 },
+ {((u8 []){UI_IconKind_Pause}), 1 },
+ {((u8 []){UI_IconKind_Stop}), 1 },
+ {((u8 []){UI_IconKind_Play}), 1 },
+ {((u8 []){UI_IconKind_ToEnd}), 1 },
+ {((u8 []){UI_IconKind_FastForward}), 1 },
+ {((u8 []){UI_IconKind_ToStart}), 1 },
+ {((u8 []){UI_IconKind_FastBackward}), 1 },
+ {((u8 []){UI_IconKind_Volume}), 1 },
+ {((u8 []){UI_IconKind_VolumeDown}), 1 },
+ {((u8 []){UI_IconKind_VolumeUp}), 1 },
+ {((u8 []){UI_IconKind_Gauge}), 1 },
+ {((u8 []){UI_IconKind_Cog}), 1 },
+ {((u8 []){UI_IconKind_Cancel}), 1 },
+ 
+};
+
 enum ui_box_flag
 {
 UI_BoxFlag_None = (0 << 0),

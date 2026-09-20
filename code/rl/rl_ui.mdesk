@@ -48,6 +48,41 @@ LayoutTypes:
  { font_kind }
 }
 
+@table(Name)
+Icons:
+{
+ { Record       }       
+ { Pause        }
+ { Stop         }
+ { Play         }
+ { ToEnd        }
+ { FastForward  }
+ { ToStart      }
+ { FastBackward }
+ { Volume       }
+ { VolumeDown   }
+ { VolumeUp     }
+ { Gauge        }
+ { Cog          }
+ { Cancel       }
+}
+
+@data_enum("icon_kind")
+IconKindEnum:
+{
+ @expand(Icons)
+  ```UI_IconKind_$(Name),
+ ```;
+}
+
+@data_table("str8")
+UI_Icons:
+{
+ @expand(Icons)
+  ```{((u8 []){UI_IconKind_$(Name)}), 1 },
+ ```;
+}
+
 @data_enum("ui_box_flag")
 UI_FlagEnum:
 {

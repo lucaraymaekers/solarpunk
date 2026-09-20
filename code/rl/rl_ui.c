@@ -334,43 +334,19 @@ UI_AddBox(str8 String, s32 Flags)
  return Box;
 }
 
-internal rune 
-UI_GetShiftForFont(font_kind Kind)
-{
- rune Result = 0;
- 
- font_atlas *Atlas = UI_State->Atlas;
- 
- switch(Kind)
- {        
-  case FontKind_Text:
-  {
-   Result = 0;
-  } break;
-  case FontKind_Icon:
-  {        
-   Result = Atlas->IconsFirstCodepoint - (s32)'a';
-  } break;
-  default: break;
- }
- 
- return Result;
-}
-
 internal f32
 UI_MeasureTextWidth(str8 String, font_kind FontKind)
 {
  f32 Result = 0.f;
  
  font_atlas *Atlas = UI_State->Atlas;
- 
- s32 Shift = (FontKind == FontKind_Text ?
-              Atlas->FirstCodepoint :
-              'a' - Atlas->CodepointCount);
+ font *Font = Atlas->Fonts[FontKind];
  
  for EachIndex(Idx, String.Size)
  {
-  rune Char = (rune)(String.Data[Idx]) - Shift;
+  rune Char = (rune)String.Data[Idx];
+  s32 PackedCharIdx = Font->FirstPackedCharIdx + (Char - Font->FirstCodepoint);
+  
   f32 CharWidth = (Atlas->PackedChars[Char].xadvance);
   
   Result += CharWidth;
@@ -938,23 +914,30 @@ UI_DrawBoxes(ui_box *Box)
     Cur.Y += .5f*(Box->FixedSize.Y - TextHeight);
    }
    
-   s32 Shift = (Box->FontKind == FontKind_Text ? 
-                Atlas->FirstCodepoint : 'a' - Atlas->CodepointCount);
+   font *Font = Atlas->Fonts[Box->FontKind];
    
    for EachIndex(Idx, Box->DisplayString.Size)
    {
-    rune Char = (rune)(Box->DisplayString.Data[Idx]);
-    s32 PackedCharIdx = Char - Shift;
+    rune Char = (rune)Box->DisplayString.Data[Idx];
+    s32 PackedCharIdx = Font->FirstPackedCharIdx + (Char - Font->FirstCodepoint);
     
     f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
     f32 CharHeight = (Atlas->HeightPx);
     
     v2 CurMax = V2AddV2(Cur, V2(CharWidth, CharHeight));
-    if(IsInsideRectV2(Cur, Dest) &&
-       IsInsideRectV2(CurMax, Dest))
+    
+    b32 ShouldDraw = true;
+    b32 IsInsideBox = (IsInsideRectV2(Cur, Dest) &&
+                       IsInsideRectV2(CurMax, Dest));
+    if((Box->Flags & UI_BoxFlag_Clip) && 
+       !IsInsideBox)
     {
-     DrawRectChar(Atlas, Cur, PackedCharIdx, Box->TextColor);
-     
+     ShouldDraw = false;
+    }
+    
+    if(ShouldDraw)
+    {
+     DrawRectChar(Atlas, Box->FontKind, Cur, Char, Box->TextColor);
      Cur.X += CharWidth;
     }
    }

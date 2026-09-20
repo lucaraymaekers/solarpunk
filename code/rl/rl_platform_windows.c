@@ -402,7 +402,7 @@ P_INIT()
  
  if(timeBeginPeriod(1) == TIMERR_NOCANDO)
  {
-  ErrorLog("Could not set timer resolution to 1ms");
+  ErrorLog("Could not set timer resolution to 1ms\n");
  }
  
  // MIDI
@@ -880,7 +880,7 @@ P_LOAD_APP_CODE()
     else
     {
      Code->Loaded = false;
-     ErrorLog("Could not find UpdateAndRender or GetAudioSamples.");
+     ErrorLog("Could not find UpdateAndRender or GetAudioSamples.\n");
     }
     Memory->Reloaded = true;
    }

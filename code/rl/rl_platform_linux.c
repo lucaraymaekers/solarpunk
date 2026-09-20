@@ -738,7 +738,7 @@ P_INIT()
      }
      else
      {
-      ErrorLog("Could not create OpenGL context.");
+      ErrorLog("Could not create OpenGL context.\n");
      }
      
      OS_ProfileAndPrint("Create context");
@@ -761,7 +761,7 @@ P_INIT()
   }
   else
   {
-   ErrorLog("Could not find matching visual info");
+   ErrorLog("Could not find matching visual info.\n");
   }
  }
  
@@ -1009,7 +1009,7 @@ P_PROCESS_MESSAGES()
          
          if(Size > Linux->MaxClipboardSize)
          {
-          ErrorLog("Clipboard content exceeded max capacity.");
+          ErrorLog("Clipboard content exceeded max capacity.\n");
           Size = Linux->MaxClipboardSize;
          }
          
@@ -1033,7 +1033,7 @@ P_PROCESS_MESSAGES()
        Window Owner = XGetSelectionOwner(Linux->DisplayHandle, ClipboardAtom);
        if(Owner != None)
        {
-        ErrorLog("X11 clipboard conversion failed.");
+        ErrorLog("X11 clipboard conversion failed.\n");
        }
       }
       
@@ -1493,7 +1493,7 @@ P_LOAD_APP_CODE()
    if(!Code->UpdateAndRender)
    {
     Code->UpdateAndRender = UpdateAndRenderStub;
-    ErrorLog("Could not load UpdateAndRender.");
+    ErrorLog("Could not load UpdateAndRender.\n");
    }
    else
    {
@@ -1503,7 +1503,7 @@ P_LOAD_APP_CODE()
    if(!Code->GetAudioSamples)
    {
     Code->GetAudioSamples = GetAudioSamplesStub;
-    ErrorLog("Could not load GetAudioSamples.");
+    ErrorLog("Could not load GetAudioSamples.\n");
    }
    
    Memory->Reloaded = true;
@@ -1516,7 +1516,7 @@ P_LOAD_APP_CODE()
    Code->LibraryHandle = 0;
    Code->GetAudioSamples = GetAudioSamplesStub;
    Code->UpdateAndRender = UpdateAndRenderStub;
-   ErrorLog("%s", dlerror());
+   ErrorLog("%s\n", dlerror());
   }
  }
  

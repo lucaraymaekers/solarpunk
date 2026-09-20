@@ -79,7 +79,7 @@ OS_ReadEntireFileIntoMemory(char *FileName)
   else
   {
    DebugBreak();
-   ErrorLog("Could not read file '%s', " ERRNO_FMT, FileName, ERRNO_ARG);
+   ErrorLog("Could not read file '%s', " ERRNO_FMT "\n", FileName, ERRNO_ARG);
   }
   
  }
@@ -108,13 +108,13 @@ OS_WriteEntireFile(char *FileName, str8 File)
   }
   else
   {
-   ErrorLog("Could not write to '%s'.", FileName);
+   ErrorLog("Could not write to '%s'.\n", FileName);
   }
   close(Handle);
  }
  else
  {
-  ErrorLog("Could not open '%s' for writing.", FileName);
+  ErrorLog("Could not open '%s' for writing.\n", FileName);
  }
  
  return Result;

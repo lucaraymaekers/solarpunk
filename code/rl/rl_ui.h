@@ -32,13 +32,6 @@ raddbg_type_view(ui_size, rows($,
                                Value, Strictness));
 #endif
 
-enum font_kind
-{
- FontKind_Text,
- FontKind_Icon
-};
-typedef enum font_kind font_kind;
-
 typedef struct ui_size ui_size;
 struct ui_size
 {
