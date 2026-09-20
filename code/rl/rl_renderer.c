@@ -12,7 +12,7 @@ RenderBuildAtlas(arena *Arena,
   Atlas->FirstCodepoint = ' ';
   // NOTE(luca): 2 bytes =>small alphabets.
   Atlas->CodepointCount = (((s32)KB(2) - 1) - Atlas->FirstCodepoint);
-  Atlas->IconsFirstCodepoint = 0xE80A;
+  Atlas->IconsFirstCodepoint = 0xE800;
   Atlas->IconsCodepointCount = 15;
   
   Atlas->Width = 1024;
@@ -98,21 +98,17 @@ DrawRect(v4 Dest, v4 Color, f32 CornerRadius, f32 BorderThickness, f32 Softness)
 }
 
 internal rect_instance *
-DrawRectChar(font_atlas *Atlas, v2 Pos, rune Codepoint, v4 Color)
+DrawRectChar(font_atlas *Atlas, v2 Pos, s32 PackedCharIdx, v4 Color)
 {
  rect_instance *Result = 0;
  v4 Dest = {0};
  
  // NOTE(luca): Evereything happens in pixel coordinates in here.
+ // TODO(luca): Proper glyph cache.
  
- b32 Supported = (Codepoint >= Atlas->FirstCodepoint && 
-                  Codepoint < Atlas->CodepointCount - Atlas->FirstCodepoint);
- // TODO(luca): Proper glyph cache
- if(Supported)
- {        
-  rune CharIdx = Codepoint - Atlas->FirstCodepoint;
-  stbtt_packedchar *PackedChar = &Atlas->PackedChars[CharIdx];
-  stbtt_aligned_quad *Quad = &Atlas->AlignedQuads[CharIdx];
+ {
+  stbtt_packedchar *PackedChar = &Atlas->PackedChars[PackedCharIdx];
+  stbtt_aligned_quad *Quad = &Atlas->AlignedQuads[PackedCharIdx];
   // TODO(luca): Investigate why floorf needed.
   f32 Width = FloorF32(PackedChar->x1 - PackedChar->x0);
   f32 Height = FloorF32(PackedChar->y1 - PackedChar->y0);

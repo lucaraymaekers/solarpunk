@@ -349,7 +349,7 @@ UI_GetShiftForFont(font_kind Kind)
   } break;
   case FontKind_Icon:
   {        
-   Result = Atlas->CodepointCount - (s32)'a';
+   Result = Atlas->IconsFirstCodepoint - (s32)'a';
   } break;
   default: break;
  }
@@ -364,11 +364,13 @@ UI_MeasureTextWidth(str8 String, font_kind FontKind)
  
  font_atlas *Atlas = UI_State->Atlas;
  
- rune Shift = UI_GetShiftForFont(FontKind) - Atlas->FirstCodepoint;
+ s32 Shift = (FontKind == FontKind_Text ?
+              Atlas->FirstCodepoint :
+              'a' - Atlas->CodepointCount);
  
  for EachIndex(Idx, String.Size)
  {
-  rune Char = (rune)(String.Data[Idx]) + Shift;
+  rune Char = (rune)(String.Data[Idx]) - Shift;
   f32 CharWidth = (Atlas->PackedChars[Char].xadvance);
   
   Result += CharWidth;
@@ -913,6 +915,11 @@ UI_DrawBoxes(ui_box *Box)
   
   if(Box->Flags & UI_BoxFlag_DrawDisplayString)
   {
+   if(UI_IsDebugBox(Box))
+   {
+    NoOp();
+   }
+   
    v2 TextPos = Box->AnimatedPos;
    V2Math TextPos.E += Box->BorderThickness;
    
@@ -931,19 +938,22 @@ UI_DrawBoxes(ui_box *Box)
     Cur.Y += .5f*(Box->FixedSize.Y - TextHeight);
    }
    
-   rune Shift = UI_GetShiftForFont(Box->FontKind);
+   s32 Shift = (Box->FontKind == FontKind_Text ? 
+                Atlas->FirstCodepoint : 'a' - Atlas->CodepointCount);
    
    for EachIndex(Idx, Box->DisplayString.Size)
    {
-    rune Char = (rune)(Box->DisplayString.Data[Idx]) + Shift;
-    f32 CharWidth = (Atlas->PackedChars[Char - Atlas->FirstCodepoint].xadvance);
+    rune Char = (rune)(Box->DisplayString.Data[Idx]);
+    s32 PackedCharIdx = Char - Shift;
+    
+    f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
     f32 CharHeight = (Atlas->HeightPx);
     
     v2 CurMax = V2AddV2(Cur, V2(CharWidth, CharHeight));
     if(IsInsideRectV2(Cur, Dest) &&
        IsInsideRectV2(CurMax, Dest))
     {
-     DrawRectChar(Atlas, Cur, Char, Box->TextColor);
+     DrawRectChar(Atlas, Cur, PackedCharIdx, Box->TextColor);
      
      Cur.X += CharWidth;
     }

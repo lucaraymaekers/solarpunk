@@ -1362,35 +1362,12 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
     AddNoteToSelection(&NoteInput, Dest, App, Voice, Sel, Note);
    }
    
+   b32 HasSharp = !NotePianoColors[PitchClass];
+   if(HasSharp)
    {
-#if 0
-    str8 NoteString = NotePitchStrings[PitchClass];
-#else
-    b32 IsBlack = !NotePianoColors[PitchClass];
-    str8 NoteString = (IsBlack ? S8("#") : S8("") );
-#endif
-    
-    font_atlas *Atlas = UI_State->Atlas;
-    
-    rune Shift = UI_GetShiftForFont(Box->FontKind);
-    
-    v2 TextCur = V2(NotePos.X + NoteSize, NotePos.Y - 4.f);
-    for EachIndex(CharIdx, NoteString.Size)
-    {
-     rune Char = (rune)(NoteString.Data[CharIdx]) + Shift;
-     f32 CharWidth = (Atlas->PackedChars[Char - Atlas->FirstCodepoint].xadvance);
-     f32 CharHeight = (Atlas->HeightPx);
-     
-     v2 TextCurMax = V2AddV2(TextCur, V2(CharWidth, CharHeight));
-     if(IsInsideRectV2(TextCur, Box->Rec) &&
-        IsInsideRectV2(TextCurMax, Box->Rec))
-     {
-      DrawRectChar(Atlas, TextCur, Char, Box->TextColor);
-      
-      TextCur.X += CharWidth;
-     }
-    }
+    // TODO(luca): Draw sharp
    }
+   
   }
  }
  
@@ -1668,7 +1645,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      SharpPos.X -= NoteSize;
      SharpPos.Y -= 5.f;
      
-     DrawRectChar(UI_State->Atlas, SharpPos, '#', NoteColor);
+     DrawRectChar(UI_State->Atlas, SharpPos, '#' - ' ', NoteColor);
     }
    }
    
@@ -1872,7 +1849,7 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
  {
   rune Char = Text.Data[Idx]; 
   
-  DrawRectChar(Atlas, Cur, Char, Box->TextColor);
+  DrawRectChar(Atlas, Cur, Char - ' ', Box->TextColor);
   f32 CharWidth = (Atlas->PackedChars[Char - Atlas->FirstCodepoint].xadvance);
   Cur.X += CharWidth;
   
