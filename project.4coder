@@ -21,6 +21,7 @@ blacklist_patterns =
 {
  ".*",
  "gl_core_3_3_debug.h",
+ "gl_core_4_5_debug.h",
  "archived",
 };
 

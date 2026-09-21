@@ -151,6 +151,25 @@ DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 C
  return Result;
 }
 
+internal void 
+GL_DebugCallback(GLenum Source,
+                 GLenum Type,
+                 GLuint Id,
+                 GLenum Severity,
+                 GLsizei Length,
+                 const GLchar *Message,
+                 const void *UserParam)
+{
+ Log("OpenGL DEBUG: source=%u type=%u id=%u severity=%u\n"
+     "    %.*s\n",
+     Source,
+     Type,
+     Id,
+     Severity,
+     Length,
+     Message);
+}
+
 internal void
 RenderInit(gl_render_state *Render)
 {
@@ -159,6 +178,12 @@ RenderInit(gl_render_state *Render)
  glGenBuffers(ArrayCount(Render->VBOs), &Render->VBOs[0]);
  glBindVertexArray(Render->VAOs[0]);
  glBindBuffer(GL_ARRAY_BUFFER, Render->VBOs[0]);
+ glActiveTexture(GL_TEXTURE0);
+ 
+ glEnable(GL_DEBUG_OUTPUT);
+ glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+ 
+ glDebugMessageCallback(GL_DebugCallback, 0);
 }
 
 internal void
@@ -209,11 +234,6 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
                                      S8("../code/rl/generated/rect_frag.glsl"));
   glUseProgram(RectShader);
   
-  // NOTE(luca): This cannot be shared between platform and app.  For now it is used for fonts
-  // so we just make sure that the platform (which is called first) generates the right atlas
-  // font.
-  GL_LoadTextureFromImage(Render->Textures[0], Atlas->Width, Atlas->Height, Atlas->Data, GL_RED, RectShader, "Texture");
-  
   // Uniforms
   {
    gl_int UViewport = glGetUniformLocation(RectShader, "Viewport");
@@ -223,6 +243,11 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
   Render->RectShader = RectShader;
   Render->ShadersCompiled = true;
  }
+ 
+ // NOTE(luca): This cannot be shared between platform and app.  For now it is used for fonts
+ // so we just make sure that the platform (which is called first) generates the right atlas
+ // font.
+ GL_LoadTextureFromImage(Render->Textures[0], Atlas->Width, Atlas->Height, Atlas->Data, GL_RED, Render->RectShader, "Texture");
  
 #if RL_PLATFORM_HOT_RELOAD_SHADERS
  Render->ShadersCompiled = false;
@@ -249,6 +274,7 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
  Assert(TotalSize == (sizeof(rect_instance)/sizeof(f32)));
  
  glEnable(GL_MULTISAMPLE);
+ 
  glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (gl_int)GlobalRectsCount);
 }
 

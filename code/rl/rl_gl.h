@@ -2,9 +2,9 @@
 #pragma once
 
 //~ Types
-typedef GLuint gl_uint;
-typedef GLint gl_int;
-typedef GLenum gl_enum;
+typedef uint gl_uint;
+typedef uint gl_enum;
+typedef int gl_int;
 
 typedef struct gl_render_state gl_render_state;
 struct gl_render_state
@@ -20,6 +20,29 @@ struct gl_render_state
 global_variable arena *GL_FrameArena = 0;
 
 //~ Functions 
+internal void 
+FatalError(const char* message)
+{
+ fprintf(stderr, "%s\n", message);
+ 
+ char cmd[1024];
+ snprintf(cmd, sizeof(cmd), "zenity --error --no-wrap --text=\"%s\"", message);
+ system(cmd);
+ 
+ exit(0);
+}
+
+internal void  
+DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity,
+              GLsizei length, const GLchar* message, const void* user)
+{
+ fprintf(stderr, "%s\n", message);
+ if (severity == GL_DEBUG_SEVERITY_HIGH || severity == GL_DEBUG_SEVERITY_MEDIUM)
+ {
+  Assert(!"OpenGL API usage error! Use debugger to examine call stack!");
+ }
+}
+
 internal void
 GL_ErrorStatus(gl_uint Handle, b32 IsShader)
 {
@@ -104,6 +127,8 @@ GL_LoadFloatsIntoBuffer(gl_uint BufferHandle, gl_uint ShaderHandle, char *Attrib
 internal void
 GL_LoadTextureFromImage(gl_uint Texture, s32 Width, s32 Height, u8 *Image, gl_enum Format, gl_uint ShaderProgram, char *TextureHandle)
 {
+ glUseProgram(ShaderProgram);
+ 
  glActiveTexture(GL_TEXTURE0);
  glBindTexture(GL_TEXTURE_2D, Texture);
  

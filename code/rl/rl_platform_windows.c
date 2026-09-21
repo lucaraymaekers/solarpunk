@@ -8,9 +8,28 @@
 #pragma comment(lib, "User32.lib")
 #pragma comment(lib, "Opengl32.lib")
 
+//~ Globals
 global_variable b32 GlobalSoundLogging = false;
 
+//~ Macros
+#define WGL_CONTEXT_MAJOR_VERSION_ARB    0x2091
+#define WGL_CONTEXT_MINOR_VERSION_ARB    0x2092
+#define WGL_CONTEXT_LAYER_PLANE_ARB      0x2093
+#define WGL_CONTEXT_FLAGS_ARB            0x2094
+#define WGL_CONTEXT_PROFILE_MASK_ARB     0x9126
+
+#define WGL_CONTEXT_DEBUG_BIT_ARB        0x0001
+#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x0002
+
+#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB  0x00000001
+#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+typedef HGLRC WINAPI wglCreateContextAttribsARBProc(HDC hDC,
+                                                    HGLRC hShareContext,
+                                                    const int *Attribs);
+global_variable wglCreateContextAttribsARBProc *wglCreateContextAttribsARB;
+
 //~ Types
+
 typedef struct win32_context win32_context;
 struct win32_context
 {
@@ -475,7 +494,23 @@ P_INIT()
     int ChosenFormat = ChoosePixelFormat(OwnDC, &PixelFormat);
     SetPixelFormat(OwnDC, ChosenFormat, &PixelFormat);
     
-    HGLRC GLContext = wglCreateContext(OwnDC);
+    int Attribs[] =
+    {
+     WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+     WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+     WGL_CONTEXT_FLAGS_ARB, 0|WGL_CONTEXT_DEBUG_BIT_ARB,
+     
+     WGL_CONTEXT_PROFILE_MASK_ARB,
+     WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+     
+     0
+    };
+    
+    wglCreateContextAttribsARB =
+    (wglCreateContextAttribsARBProc *)
+     wglGetProcAddress("wglCreateContextAttribsARB");
+    
+    HGLRC GLContext = wglCreateContextAttribsARB(OwnDC, 0, Attribs);
     wglMakeCurrent(OwnDC, GLContext);
     
     Context->OwnDC = OwnDC;

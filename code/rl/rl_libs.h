@@ -22,7 +22,7 @@ void GLADEnableCallbacks();
 #endif
 
 NO_WARNINGS_BEGIN
-# include "lib/gl_core_3_3_debug.h"
+# include "lib/gl_core_4_5_debug.h"
 # include "lib/stb_image.h"
 # include "lib/stb_image_write.h"
 # include "lib/stb_sprintf.h"
@@ -39,14 +39,14 @@ void GLADNullPostCallback(void *ret, const char *name, GLADapiproc apiproc, int 
 
 void GLADDisableCallbacks()
 {
-    _pre_call_gl_callback = GLADNullPreCallback;
-    _post_call_gl_callback = GLADNullPostCallback;
+ _pre_call_gl_callback = GLADNullPreCallback;
+ _post_call_gl_callback = GLADNullPostCallback;
 }
 
 void GLADEnableCallbacks()
 {
-    _pre_call_gl_callback = _pre_call_gl_callback_default;
-    _post_call_gl_callback = _post_call_gl_callback_default;
+ _pre_call_gl_callback = _pre_call_gl_callback_default;
+ _post_call_gl_callback = _post_call_gl_callback_default;
 }
 
 C_LINKAGE_END

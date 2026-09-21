@@ -8,6 +8,9 @@
 
 //- OpenGL 
 #include <GL/glx.h>
+#include <GL/glcorearb.h>
+#include "lib/gl_core_4_5_debug.h"
+#include "rl/rl_gl.h"
 #define GLX_CONTEXT_MAJOR_VERSION_ARB 0x2091
 #define GLX_CONTEXT_MINOR_VERSION_ARB 0x2092
 #define GLX_CONTEXT_PROFILE_MASK_ARB 0x9126
@@ -692,10 +695,11 @@ P_INIT()
       s32 Attributes[] =
       {
 #if 1
-       GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
-       GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+       GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
+       GLX_CONTEXT_MINOR_VERSION_ARB, 5,
        // Mask
        GLX_CONTEXT_PROFILE_MASK_ARB, 0|GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+       GLX_CONTEXT_FLAGS_ARB, 0|GLX_CONTEXT_DEBUG_BIT_ARB,
 #else
        GLX_CONTEXT_MAJOR_VERSION_ARB, 2,
        GLX_CONTEXT_MINOR_VERSION_ARB, 0,
@@ -704,6 +708,7 @@ P_INIT()
       };
       
       GLContext = glXCreateContextAttribsARB(DisplayHandle, FBConfig, 0, true, Attributes);
+      
       
       // Sync to ensure any errors generated are processed.
       XSync(DisplayHandle, False);
