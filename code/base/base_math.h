@@ -207,15 +207,6 @@ InBounds(v2 A, v2 Min, v2 Max)
 //- 
 
 internal inline v4
-Rect(f32 MinX, f32 MinY, f32 MaxX, f32 MaxY)
-{
- v4 Result = {0};
- Result.Min = V2(MinX, MinY);
- Result.Max = V2(MaxX, MaxY);
- return Result;
-}
-
-internal inline v4
 RectV2(v2 Min, v2 Max)
 {
  v4 Result = {0};

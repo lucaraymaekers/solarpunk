@@ -335,19 +335,18 @@ UI_AddBox(str8 String, s32 Flags)
 }
 
 internal f32
-UI_MeasureTextWidth(str8 String, font_kind FontKind)
+UI_MeasureTextWidth(str8 String, font *Font)
 {
  f32 Result = 0.f;
  
  font_atlas *Atlas = UI_State->Atlas;
- font *Font = Atlas->Fonts[FontKind];
  
  for EachIndex(Idx, String.Size)
  {
   rune Char = (rune)String.Data[Idx];
-  s32 PackedCharIdx = Font->FirstPackedCharIdx + (Char - Font->FirstCodepoint);
+  s32 PackedCharIdx = GetPackedCharIdx(Font, Char);
   
-  f32 CharWidth = (Atlas->PackedChars[Char].xadvance);
+  f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
   
   Result += CharWidth;
  }
@@ -484,7 +483,7 @@ UI_BeginLayout(ui_box *Root, f32 HeightPx)
       {
        if(MouseUp)
        {
-        if(UI_IsHot(Box))
+        if(Box->Hovered)
         {
          Box->Clicked = true;
         }
@@ -585,13 +584,20 @@ UI_CalculateStandaloneSizes(ui_box *Box, axis2 Axis)
   {
    if(Axis == Axis2_X)
    {
+    font *Font = UI_State->Atlas->Fonts[Box->FontKind];
     // NOTE(luca): GPU likes exact pixel coordinates
-    Box->FixedSize.e[Axis] = CeilF32(UI_MeasureTextWidth(Box->DisplayString, Box->FontKind) + 
-                                     2.f*Box->SemanticSize[Axis].Value);
+    if(UI_IsDebugBox(Box))
+    {
+     NoOp();
+    }
+    
+    // NOTE(luca): Assume we always 
+    Box->FixedSize.e[Axis] = CeilF32(UI_MeasureTextWidth(Box->DisplayString, Font) + 
+                                     2.f*(Box->SemanticSize[Axis].Value));
    }
    else
    {
-    Box->FixedSize.e[Axis] = (Box->HeightPx + 
+    Box->FixedSize.e[Axis] = (UI_State->Atlas->Fonts[Box->FontKind]->HeightPx + 
                               2.f*Box->SemanticSize[Axis].Value);
    }
   } break;
@@ -891,38 +897,41 @@ UI_DrawBoxes(ui_box *Box)
   
   if(Box->Flags & UI_BoxFlag_DrawDisplayString)
   {
-   if(UI_IsDebugBox(Box))
-   {
-    NoOp();
-   }
-   
    v2 TextPos = Box->AnimatedPos;
    V2Math TextPos.E += Box->BorderThickness;
    
    v2 Cur = TextPos;
    
+   font *Font = Atlas->Fonts[Box->FontKind];
+   
+   if(UI_IsDebugBox(Box))
+   {
+    NoOp();
+   }
+   
    if(Box->Flags & UI_BoxFlag_CenterTextHorizontally)
    {
     // NOTE(luca): GPU likes exact pixel coordinates
-    f32 TextWidth = CeilF32(UI_MeasureTextWidth(Box->DisplayString, Box->FontKind));
+    f32 TextWidth = CeilF32(UI_MeasureTextWidth(Box->DisplayString, Font));
     Cur.X += .5f*(Box->FixedSize.X - TextWidth);
    }
    
    if(Box->Flags & UI_BoxFlag_CenterTextVertically)
    {
-    f32 TextHeight = Atlas->HeightPx;
-    Cur.Y += .5f*(Box->FixedSize.Y - TextHeight);
+    f32 Descent = Font->Scale*(f32)Font->Descent;
+    f32 Baseline = GetBaseline(Font);
+    f32 CharHeight = CeilF32(Baseline + Descent);
+    
+    Cur.Y += .5f*(Box->FixedSize.Y - CharHeight + Descent);
    }
-   
-   font *Font = Atlas->Fonts[Box->FontKind];
    
    for EachIndex(Idx, Box->DisplayString.Size)
    {
     rune Char = (rune)Box->DisplayString.Data[Idx];
-    s32 PackedCharIdx = Font->FirstPackedCharIdx + (Char - Font->FirstCodepoint);
+    s32 PackedCharIdx = GetPackedCharIdx(Font, Char);
     
     f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
-    f32 CharHeight = (Atlas->HeightPx);
+    f32 CharHeight = (Font->HeightPx);
     
     v2 CurMax = V2AddV2(Cur, V2(CharWidth, CharHeight));
     

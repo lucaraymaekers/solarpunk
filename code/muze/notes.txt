@@ -41,12 +41,30 @@ NoteOn with velocity of 0 = NoteOff.
 
 UTF8
 
+# Tigerbeetle Wookash interview
+1. Always have upper bounds on loops, because then you know if you have crashed
+ - linked list cycle detection.
+   Assert lower bound so you know for sure that logic executed
+2. Bounds on memory, network, disk and compute
+Always handle syscall errors.
+Unbounded file size into streamable 4MB chunks.  "Streaming is how you handle infinite problems"
+Static allocation allows for uncrashable software, which should be the goal.  Because no syscalls and hard limits. 
+Side effect of static allocation is taste, forcing people to think in explicit limits.
+## Questions
+What is a contract?  And what is a breach and detect the breach
+DST fuzzing? 
+Narrow interface(gates) Fault models and buggy gates and simulate?
+ Data space travel?
+Message passing in networking (maybe even other fields)
+Spend time today and make tomorrow easier Vs. Save time today spend time tomorrow.
+
 # Resources
 - https://fgiesen.wordpress.com/2010/12/14/ring-buffers-and-queues/
 - Basic MIDI Input/Output Programming 
 - https://www.ccarh.org/courses/253/lab/midiprog/
 - MSDN MIDI funtions
 - (youtube) javidx9 -  Programming MIDI: https://www.youtube.com/watchv=040BKtnDdg0
+- stb truetype tutorial: https://dev.to/shreyaspranav/how-to-render-truetype-fonts-in-opengl-using-stbtruetypeh-1p5k
 
 
 # Questions

@@ -14,6 +14,7 @@ UI_IconKind_Record,
  UI_IconKind_Gauge,
  UI_IconKind_Cog,
  UI_IconKind_Cancel,
+ UI_IconKind_Close,
  
 };
 typedef enum icon_kind icon_kind;
@@ -33,6 +34,7 @@ str8 UI_Icons[] = {
  {((u8 []){UI_IconKind_Gauge}), 1 },
  {((u8 []){UI_IconKind_Cog}), 1 },
  {((u8 []){UI_IconKind_Cancel}), 1 },
+ {((u8 []){UI_IconKind_Close}), 1 },
  
 };
 

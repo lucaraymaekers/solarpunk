@@ -1,6 +1,5 @@
 #if !defined(RL_FONT_H)
 #define RL_FONT_H
-
 // TODO(luca): UTF8 handling 
 
 enum font_kind
@@ -17,6 +16,7 @@ struct font
  s32 CodepointCount;
  s32 FirstPackedCharIdx;
  f32 Scale;
+ f32 HeightPx;
  
  stbtt_fontinfo Info;
  s32 Ascent;
@@ -32,8 +32,6 @@ struct font_atlas
  s32 Width;
  s32 Height;
  u8 *Data;
- 
- f32 HeightPx;
  
  union
  {
@@ -53,6 +51,13 @@ struct font_atlas
 };
 
 //~ API
+
+internal s32
+GetPackedCharIdx(font *Font, rune Char)
+{
+ s32 PackedCharIdx = Font->FirstPackedCharIdx + (Char - Font->FirstCodepoint);
+ return PackedCharIdx; 
+}
 
 internal f32
 GetBaseline(font *Font)

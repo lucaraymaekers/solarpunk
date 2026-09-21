@@ -177,10 +177,10 @@ Swap(t& A, t& B) { t T = A; A = B; B = T; }
 #define TrapMsg(Format, ...) do { ErrorLog(Format, ##__VA_ARGS__); Trap(); } while(0)
 #define AssertMsg(Expression, Format, ...) \
 do { if(!(Expression)) DebugBreakMsg(Format, ##__VA_ARGS__); } while(0)
-#define Assert(Expression) AssertMsg(Expression, "Hit assertion")
+#define Assert(Expression) AssertMsg(Expression, "Hit assertion\n")
 
-#define NotImplemented() DebugBreakMsg("Not Implemented!")
-#define InvalidPath()    DebugBreakMsg("Invalid Path!")
+#define NotImplemented() DebugBreakMsg("Not Implemented!\n")
+#define InvalidPath()    DebugBreakMsg("Invalid Path!\n")
 #define StaticAssert(C, ID) global_variable u8 Glue(ID, __LINE__)[(C)?1:-1]
 
 //~ Loop macros

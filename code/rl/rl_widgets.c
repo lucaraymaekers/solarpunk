@@ -93,6 +93,8 @@ typedef struct ui_button_params ui_button_params;
 struct ui_button_params
 {
  str8 Text;
+ str8 String;
+ 
  v4 BackgroundColor;
  v4 TextColor;
  b32 CenterText;
@@ -132,6 +134,8 @@ Button_(ui_button_params Params)
 {
  ui_button_result Result = {0};
  
+ str8 String = (Params.String.Size ? Params.String : Params.Text);
+ 
  s32 ButtonFlags = (UI_BoxFlag_MouseClickable|
                     UI_BoxFlag_DrawBackground|
                     UI_BoxFlag_DrawHotEffects|
@@ -148,7 +152,7 @@ Button_(ui_button_params Params)
                     Params.DisabledBackgroundColor : 
                     Params.BackgroundColor)
  {
-  ui_box *Box = UI_AddBox(Params.Text, ButtonFlags);
+  ui_box *Box = UI_AddBox(String, ButtonFlags);
   Result.Pressed = Box->WasClicked;
   Result.Released = Box->Clicked;
  }
@@ -162,8 +166,12 @@ Button_(ui_button_params Params)
    TextFlags |= UI_BoxFlag_CenterTextHorizontally;
   }
   
-  UI_TextColor(Params.TextColor)
-   UI_AddBox(Params.Text, TextFlags);
+  {  
+   ui_box *TextBox;
+   UI_TextColor(Params.TextColor)
+    TextBox = UI_AddBox(String, TextFlags);
+   TextBox->DisplayString = Params.Text;
+  }
   
   if(Params.HasToggle)
   {

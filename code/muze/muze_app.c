@@ -913,7 +913,6 @@ StopRecording(voice *Voice)
 }
 
 //~ Muze - Piece
-
 internal piece_note *
 PieceNoteAdd(piece *Piece, 
              piece_note_kind Kind, s32 Pitch, f32 Length)
@@ -1243,9 +1242,6 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  f32 BarCount = 1.f + FloorF32(Voice->RecordLength/(BarDuration + 1e-6f));
  v2 BarDim = V2(2.f, StaffHeight);
  
- // Input
- custom_draw_note_input_result NoteInput = CustomDrawNoteInput(Box);
- 
  // Draw staff
  {    
   StaffPos.Y += .5f*(BoxSize.Y - StaffHeight);
@@ -1264,6 +1260,9 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
    }
   }
  }
+ 
+ // Input
+ custom_draw_note_input_result NoteInput = CustomDrawNoteInput(Box);
  
  // Draw bars
  {    
@@ -1557,7 +1556,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
       f32 BarStart = BarPadding + BarXIdx*WholeBarWidth;
       
       f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
-      NotePos.X = BarStart + BarPadding + Remainder*BeatWidth;
+      NotePos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
       
       NotePos.Y += (f32)HeightIdx*2.f*StaffHeight;
      }
@@ -1843,14 +1842,16 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
  
  f32 CurMaxX = (Box->FixedPos.X + Box->FixedSize.X - 
                 (HorizontalPadding + EllipsisWidth));
- 
+ font *Font = Atlas->TextFont;
  b32 Overflowed = false;
  for EachIndex(Idx, Text.Size)
  {
   rune Char = Text.Data[Idx]; 
   
-  DrawRectChar(Atlas, FontKind_Text, Cur, Char - ' ', Box->TextColor);
-  f32 CharWidth = (Atlas->PackedChars[Char - Atlas->TextFont->FirstCodepoint].xadvance);
+  s32 PackedCharIdx = GetPackedCharIdx(Font, Char);
+  f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
+  
+  DrawRectChar(Atlas, FontKind_Text, Cur, Char, Box->TextColor);
   Cur.X += CharWidth;
   
   if(Cur.X > CurMaxX)
@@ -2334,7 +2335,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     InitFont(&App->Font, FontPath);
    }
    {
-    char *FontPath = PathFromExe(FrameArena, S8("../data/muze_icons3.ttf"));
+    char *FontPath = PathFromExe(FrameArena, S8("../data/icons.ttf"));
     InitFont(&App->IconsFont, FontPath);
    }
    
@@ -2863,6 +2864,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
            ui_box *Box = UI_AddBox(S8("Items"), UI_BoxFlag_Clip);
            Box->Scroll.Y = App->ListerScroll;
            MinIdx = (s32)(Box->Scroll.Y/ItemHeight);
+           Assert(MinIdx >= 0 && "Negative MinIdx will create Item -1");
           }
           
           UI_FillAll()
@@ -2873,13 +2875,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
            for(s32 Idx = MinIdx; Idx < MaxIdx; Idx += 1)
            {
             lister_item *Item = FilteredItems + Idx;
-            str8 ItemString = Str8Fmt("%S###Item%d", Item->Name, Idx);
+            str8 ItemString = Str8Fmt("Item%d", Idx);
             
             b32 Selected = (SelectedIdx == Item->Idx);
             
             UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
             {
-             if(Button(.Text = ItemString, 
+             if(Button(.String = ItemString,
+                       .Text = Item->Name, 
                        .Disabled = Selected, 
                        .DisabledBackgroundColor = Color_Yellow, 
                        .Padding = ItemPadding,
@@ -2977,10 +2980,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
        {                            
         LayoutAxis = (axis2)Panel->Parent->Axis;
         
-        UI_BorderThickness(2.f)
+        UI_BorderThickness(1.f)
          UI_SemanticSizeOnAxis(LayoutAxis, UI_SizeParent(Panel->ParentPct, 0.f))
          UI_TextColor(Color_Snow2)
-         UI_BorderColor((Panel == App->SelectedPanel ? Color_Black : Color_Night0))
+         UI_BorderColor((Panel == App->SelectedPanel ? Color_Orange : Color_Night0))
          UI_LayoutAxis((axis2)Panel->Axis)
          PanelBox = UI_AddBox(Str8Fmt("%p", Panel), 0);
         
@@ -3012,7 +3015,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
              {                                                    
               ui_box *Type;
               UI_BackgroundColor(Color_ButtonBackground)
-               UI_SemanticWidth(UI_SizeText(2.f, 1.f))
+               UI_SemanticWidth(UI_SizeText(5.f, 1.f))
                Type = UI_AddBox(S8("PanelType"), (UI_BoxFlag_DrawBackground|
                                                   UI_BoxFlag_DrawBorders|
                                                   UI_BoxFlag_MouseClickable|
@@ -3040,20 +3043,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
               rune Codepoint = 0xe80a;
               ui_box *Close;
               UI_BackgroundColor(Color_ButtonBackground)
-               UI_SemanticWidth(UI_SizeText(2.f, 1.f))
-               UI_FontKind(FontKind_Text)
+               UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+               UI_FontKind(FontKind_Icon)
+               //UI_Debug(true)
                Close = UI_AddBox(S8("CloseButton"), (UI_BoxFlag_DrawBackground|
                                                      UI_BoxFlag_DrawBorders|
                                                      UI_BoxFlag_MouseClickable|
-                                                     UI_BoxFlag_CenterTextHorizontally|
-                                                     UI_BoxFlag_CenterTextVertically|
                                                      UI_BoxFlag_DrawHotEffects|
                                                      UI_BoxFlag_DrawActiveEffects|
-                                                     UI_BoxFlag_DrawDisplayString));
-              Close->DisplayString = UI_Icons[UI_IconKind_Cancel];
-              Close->DisplayString = S8("X");
+                                                     UI_BoxFlag_DrawDisplayString|
+                                                     UI_BoxFlag_CenterTextVertically|
+                                                     UI_BoxFlag_CenterTextHorizontally|
+                                                     0));
+              Close->DisplayString = UI_Icons[UI_IconKind_Close];
               
-              if(Close->WasClicked)
+              if(Close->Clicked)
               {
                command *Command = PushCommand(App, Command_ClosePanel);
                Command->Panel = Panel;
@@ -3072,6 +3076,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
            
            //- Panel contents 
            {     
+            ui_size SliderSize = UI_SizePx(250.f, 1.f);
+            
             if(0) {}
             else if(Panel->Kind == PanelKind_Piece)
             {
@@ -3085,6 +3091,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
               arena *PieceArena = ArenaAlloc();
               Piece = Panel->Piece = PushArrayZero(PieceArena, piece, 1);
               Piece->Arena = PieceArena;
+              
+              Piece->Name = S8("lecon_12");
               
               Piece->Preset = 73;
               Piece->Channel = App->NextChannelIdx;
@@ -3109,7 +3117,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
               Piece->StaffLineWidth = 1.f;
               Piece->TailHeight = 24.f;
               
-#if 1             
+#if 0             
               PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/1.f);
               PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/2.f);
               PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/4.f);
@@ -3199,8 +3207,66 @@ UPDATE_AND_RENDER(UpdateAndRender)
               PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
               PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
 #endif
+              
+#if 1
+              
+              Piece->BPM = 60;
+              Piece->TimeSigNum = 3;
+              Piece->TimeSigDen = 4;
+              Piece->Key = Note_As;
+              Piece->Major = true;
+              
+              //- System 1 
+              // Bar 1 
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/1.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/3.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/3.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/3.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
+              
+              // Bar 2
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/1.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Silence, Note_F, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/2.f);
+              
+              // Bar 3 
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 3.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Ds, 1.f/4.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/4.f);
+              
+              // Bar 4
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/1.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Silence, Note_F, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/2.f);
+              
+              //- System 2 
+              // Bar 1
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/1.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D+12, 3.f/2.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C+12, 1.f/4.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/4.f);
+              
+              // Bar 2
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/4.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/4.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/4.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/4.f);
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/1.f);
+              
+              // Bar 3
+              // Bar 4
+#endif
+              
              }
              
+#if 0             
              //- Piece Serialization
              {
               ms_serializer Serializer = {0};
@@ -3240,6 +3306,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                OS_WriteEntireFile(FilePath, Out);
               }
              }
+#endif
              
              ui_box *PieceBox;
              
@@ -3251,12 +3318,41 @@ UPDATE_AND_RENDER(UpdateAndRender)
                UI_Row()
                UI_SemanticWidth(UI_SizePx(150.f, 1))
               {               
-               if(M_SimpleToggleButton(S8("Play"), Piece->IsPlaying, Color_Green))
+               
+               UI_FontKind(FontKind_Icon)
+                UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                {
-                tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-                Piece->IsPlaying ^= true;
-                if(Piece->IsPlaying) Piece->PlayPos = 0.f;
+                if(Button(.String = S8("PlayButton"), .Text = UI_Icons[UI_IconKind_Play],
+                          .CenterText = true, .TextColor = (!Piece->IsPlaying ? Color_Green : Color_ButtonText),
+                          .BackgroundColor = Color_Night0).Pressed)
+                {
+                 if(!Piece->IsPlaying)
+                 {
+                  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+                  Piece->IsPlaying = true;
+                 }
+                }
+                
+                if(Button(.String = S8("PauseButton"), .Text = UI_Icons[UI_IconKind_Pause],
+                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Yellow : Color_ButtonText),
+                          .BackgroundColor = Color_Night0).Pressed)
+                {
+                 tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+                 Piece->IsPlaying = false;
+                }
+                
+                if(Button(.String = S8("StopButton"), .Text = UI_Icons[UI_IconKind_Stop],
+                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Red : Color_ButtonText),
+                          .BackgroundColor = Color_Night0).Pressed)
+                {
+                 tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+                 
+                 Piece->PlayPos = 0.f;
+                 Piece->IsPlaying = false;
+                }
+                
                }
+               
                
                Piece->Metronome ^= 
                 M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta);
@@ -3315,7 +3411,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  f32 StaffHeight = (f32)(StaffLineCount-1)*Piece->NoteSize + StaffLineWidth;
                  
                  f32 Height = PieceBox->FixedSize.Y;
-                 s32 Rows = BarCount/BarsPerWidth + 1;
+                 s32 Rows = BarCount/BarsPerWidth + 2;
                  Rows *= 2;
                  f32 HeightForRows = (f32)Rows*StaffHeight; 
                  
@@ -3402,6 +3498,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                b32 PieceEnded = (Piece->PlayPos > Piece->RecordLength);
                if(PieceEnded)
                {
+                tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
                 Piece->PlayPos = 0.f;
                 if(!Loop) Piece->IsPlaying = false;
                }
@@ -3506,8 +3603,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   }
                  }
                 }
-                
-                ui_size SliderSize = UI_SizePx(250.f, 1.f);
                 
                 //- Song 
                 {
@@ -3660,7 +3755,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 }
                 
                 App->HeightPx = M_Slider(S8("SetFontSize"), S8("Set Font Size"), Str8Fmt("%.0f", App->HeightPx), App->HeightPx,
-                                         1.f, 40.f, 1.f, false).Value;
+                                         11.f, 64.f, 1.f, false,
+                                         .SliderSize = SliderSize).Value;
+                
+                
                }
                
                // Scrollbar
@@ -3713,7 +3811,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  
                  if((u64)NewIdx != Idx)
                  {
-                  Log("Setting voice.\n");
                   voice *NewVoice = App->Voices + (u64)NewIdx;
                   PushCommand(App, Command_SetPanelVoice)->Voice = NewVoice;
                  }
@@ -3938,6 +4035,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
   switch(Command->Kind)
   {
    default: InvalidPath(); break;
+   
+   //- App commands 
+   {
+    case Command_SetFontSize:
+    {
+     App->HeightPx = Command->Size;
+    } break;
+   } 
    
    //- Device commands 
    {   
@@ -4492,6 +4597,52 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  //- Rendering 
  
+#if 0
+ // Debug text rendering
+ {
+  font_atlas *Atlas = &App->FontAtlas;
+  v2 Pos = V2(500.f, 500.f);
+  
+  font *Font = Atlas->IconsFont;
+  s32 Char = UI_IconKind_Cancel;
+  
+  s32 PackedCharIdx = GetPackedCharIdx(Font, char);
+  stbtt_packedchar PackedChar = Atlas->PackedChars[PackedCharIdx];
+  f32 CharWidth = CeilF32(PackedChar.xadvance);
+  
+  f32 CharHeight = (PackedChar.y1 - PackedChar.y0);
+  
+  f32 Descent = Font->Scale*(f32)Font->Descent;
+  f32 Baseline = GetBaseline(Font);
+  
+  // Background
+  {  
+   v4 Dest = RectFromSize(Pos, V2(CharWidth, CharHeight));
+   DrawRect(RectFromSize(Pos, V2(CharWidth, Font->HeightPx)), Color_Blue, 0.f, 0.f, 0.f);
+  }
+  
+  // Icon
+  DrawRectChar(Atlas, FontKind_Icon, 
+               Pos, Char, Color_Black);
+  
+  // Baseline
+  {
+   v2 NewPos = Pos;
+   NewPos.Y += FloorF32(Baseline);
+   v4 Dest = RectFromSize(NewPos, V2(CharWidth, 1.f));
+   DrawRect(Dest, V4(0.f, 0.f, 1.f, 1.f), 0.f, 0.f, 0.f);
+  }
+  
+  // Bounding box
+  {
+   v2 NewPos = Pos;
+   NewPos.Y += FloorF32(PackedChar.yoff + Baseline + Descent);
+   v4 Dest = RectFromSize(NewPos, V2(CharWidth, CharHeight));
+   DrawRect(Dest, Color_Green, 0.f, 1.f, 0.f);
+  }
+ }
+#endif
+ 
  // Render rectangles
  if(!Input->SkipRendering)
  {
@@ -4507,7 +4658,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  Memory->Initialized = true;
  Memory->Reloaded = false;
  
-#if  MUZE_STARTUP_PROFILE
+#if MUZE_STARTUP_PROFILE
  ShouldQuit = true;
 #endif
  

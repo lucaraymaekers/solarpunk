@@ -1513,7 +1513,7 @@ P_LOAD_APP_CODE()
    
    Memory->Reloaded = true;
    Code->LibraryHandle = (u64)Library;
-   Log("\nLibrary reloaded.\n");
+   Log("Library reloaded.\n");
    
   }
   else

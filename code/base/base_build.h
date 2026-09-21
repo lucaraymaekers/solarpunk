@@ -60,6 +60,9 @@
 #if !defined(EDITOR_INTERNAL)
 # define EDITOR_INTERNAL 0
 #endif
+#if !defined(EDITOR_STARTUP_PROFILE)
+# define EDITOR_STARTUP_PROFILE 0
+#endif
 
 //- Muze
 #if !defined(MUZE_INTERNAL)

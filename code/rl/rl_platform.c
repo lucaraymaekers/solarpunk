@@ -27,9 +27,6 @@
 #include "rl/rl_ui.c"
 #include "rl/rl_widgets.c"
 
-//- Third party 
-
-
 //~ Recording 
 typedef struct platform_replay platform_replay;
 struct platform_replay
@@ -347,12 +344,20 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
   ui_box *DebugUIBox = 0;
   {
    char *FontPath = 0;
-   FontPath = PathFromExe(FrameArena, S8("../data/muze_icons3.ttf"));
+   FontPath = PathFromExe(FrameArena, S8("../data/icons.ttf"));
    InitFont(&IconsFont, FontPath);
    FontPath = PathFromExe(FrameArena, S8("../data/font_regular.ttf"));
    InitFont(&TextFont, FontPath);
    
    gladLoaderLoadGL();
+   
+#if 1
+   GLint Major, Minor;
+   glGetIntegerv(GL_MAJOR_VERSION, &Major);
+   glGetIntegerv(GL_MINOR_VERSION, &Minor);
+   Log("Loaded OpenGL %d.%d\n", Major, Minor);
+#endif
+   
    RenderInit(&DebugRender);
    arena *FontAtlasArena = PushArena(PermanentArena, MB(150), false);
    // TODO(luca): Building this atlas is slow and tanks our startup time.  So we should speed it up by using a glyph cache.

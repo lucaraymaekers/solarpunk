@@ -494,24 +494,33 @@ P_INIT()
     int ChosenFormat = ChoosePixelFormat(OwnDC, &PixelFormat);
     SetPixelFormat(OwnDC, ChosenFormat, &PixelFormat);
     
+#if 1
+    // TODO(luca): Able to switch between 3.3 and 4.5
     int Attribs[] =
     {
      WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
      WGL_CONTEXT_MINOR_VERSION_ARB, 5,
      WGL_CONTEXT_FLAGS_ARB, 0|WGL_CONTEXT_DEBUG_BIT_ARB,
      
-     WGL_CONTEXT_PROFILE_MASK_ARB,
-     WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+     WGL_CONTEXT_PROFILE_MASK_ARB, 0|WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
      
      0
     };
     
+    HGLRC DummyContext = wglCreateContext(OwnDC);
+    wglMakeCurrent(OwnDC, DummyContext);
+    
     wglCreateContextAttribsARB =
     (wglCreateContextAttribsARBProc *)
      wglGetProcAddress("wglCreateContextAttribsARB");
+    wglDeleteContext(DummyContext);
     
     HGLRC GLContext = wglCreateContextAttribsARB(OwnDC, 0, Attribs);
     wglMakeCurrent(OwnDC, GLContext);
+#else
+    HGLRC GLContext = wglCreateContext(OwnDC);
+    wglMakeCurrent(OwnDC, GLContext);
+#endif
     
     Context->OwnDC = OwnDC;
     Context->Window = Window;
@@ -724,7 +733,7 @@ P_PROCESS_MESSAGES()
        Trap();
       }
       
-      // Skip 0 to use as nil value
+      // Use first as nil
       app_key_id Id = Input->Text.Count + 1;
       app_key *Key = Input->Text.Buffer + Id;
       Input->Text.Count += 1;
@@ -813,6 +822,7 @@ P_PROCESS_MESSAGES()
        
        if(Handled)
        {
+        // Append key
         if(Input->Text.First == 0) Input->Text.First = Id;
         if(Input->Text.Last  != 0) Input->Text.Buffer[Input->Text.Last].Next = Id;
         Key->Prev = Input->Text.Last;

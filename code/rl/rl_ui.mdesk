@@ -65,6 +65,7 @@ Icons:
  { Gauge        }
  { Cog          }
  { Cancel       }
+ { Close        }
 }
 
 @data_enum("icon_kind")

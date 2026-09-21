@@ -19,7 +19,7 @@ RenderBuildAtlas(arena *Arena,
   if(IconsFont->Initialized)
   {
    Atlas->IconsFont = IconsFont;
-   IconsFont->FirstCodepoint = 0xE800;
+   IconsFont->FirstCodepoint = ' ';
    IconsFont->CodepointCount = 15;
    IconsFont->FirstPackedCharIdx = TextFont->CodepointCount;
    IconsFont->Scale = stbtt_ScaleForPixelHeight(&IconsFont->Info, HeightPx);
@@ -35,7 +35,7 @@ RenderBuildAtlas(arena *Arena,
   Atlas->PackedChars = PushArray(Arena, stbtt_packedchar, (u64)CodepointCount);
   Atlas->AlignedQuads = PushArray(Arena, stbtt_aligned_quad, (u64)CodepointCount);
   
-  Atlas->HeightPx = HeightPx;
+  TextFont->HeightPx = HeightPx;
   TextFont->Scale = stbtt_ScaleForPixelHeight(&TextFont->Info, HeightPx);
   
   stbtt_pack_context Ctx;
@@ -45,18 +45,21 @@ RenderBuildAtlas(arena *Arena,
                    Atlas->Width, Atlas->Height,
                    0, 1, 0);
    
-   stbtt_PackFontRange(&Ctx, TextFont->Info.data, 0, HeightPx, 
+   stbtt_PackFontRange(&Ctx, TextFont->Info.data, 0, TextFont->HeightPx, 
                        TextFont->FirstCodepoint, TextFont->CodepointCount, 
                        Atlas->PackedChars);
    
    if(IconsFont->Initialized)
    {
+#if 0
     // NOTE(luca): We need to scale this so that it matches our font.
     f32 TextEmHeight = (f32)(TextFont->Ascent - TextFont->Descent);
     f32 IconsEmHeight = (f32)(IconsFont->Ascent - IconsFont->Descent);
-    f32 ScaledHeight = HeightPx*(IconsEmHeight/TextEmHeight);
+    IconsFont->HeightPx = HeightPx*(IconsEmHeight/TextEmHeight);
+#endif
+    IconsFont->HeightPx = HeightPx;
     
-    stbtt_PackFontRange(&Ctx, IconsFont->Info.data, 0, ScaledHeight, 
+    stbtt_PackFontRange(&Ctx, IconsFont->Info.data, 0, IconsFont->HeightPx, 
                         IconsFont->FirstCodepoint, IconsFont->CodepointCount, 
                         Atlas->PackedChars + TextFont->CodepointCount);
     
@@ -119,7 +122,7 @@ DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 C
  // TODO(luca): Proper glyph cache.
  
  font *Font = Atlas->Fonts[FontKind]; 
- s32 PackedCharIdx = Font->FirstPackedCharIdx + (Codepoint - Font->FirstCodepoint);
+ s32 PackedCharIdx = GetPackedCharIdx(Font, Codepoint);
  
  {
   stbtt_packedchar *PackedChar = &Atlas->PackedChars[PackedCharIdx];
@@ -135,10 +138,10 @@ DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 C
                FloorF32(Pos.Y + PackedChar->yoff + Baseline + Descent));
    v2 Max = V2(Min.X + Width, Min.Y + Height);
    
-   Dest = Rect(Min.X, Min.Y, Max.X, Max.Y);
+   Dest = RectV2(Min, Max);
    
    Result = DrawRect(Dest, Color, 0.f, 0.f, 0.f);
-   Result->TexSrc = Rect(Quad->s0, Quad->t0, Quad->s1, Quad->t1);
+   Result->TexSrc = V4(Quad->s0, Quad->t0, Quad->s1, Quad->t1);
   }
   
   Result->HasTexture = true;

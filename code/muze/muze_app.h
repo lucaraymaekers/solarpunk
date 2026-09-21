@@ -27,6 +27,7 @@ typedef struct piece piece;
 struct piece 
 {
  arena *Arena;
+ str8 Name;
  
  s32 Channel;
  s32 Preset;
@@ -179,6 +180,8 @@ enum command_kind
 {
  Command_None,
  
+ Command_SetFontSize,
+ 
  Command_SelectInputDevice,
  Command_SelectOutputDevice,
  Command_SelectInstrument,
@@ -245,6 +248,7 @@ struct command
  lister_kind ListerKind;
  f32 Length;
  axis2 Axis;
+ f32 Size; 
 };
 
 typedef struct app_state app_state;
