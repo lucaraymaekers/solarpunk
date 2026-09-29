@@ -26,7 +26,8 @@ struct piece_note
 typedef struct piece piece; 
 struct piece 
 {
- arena *Arena;
+ piece *NextFree;
+ 
  str8 Name;
  
  s32 Channel;
@@ -38,9 +39,8 @@ struct piece
  note_pitch Key;
  b32 Major;
  
- u64 NoteMaxCount;
  u64 NoteCount;
- piece_note *Notes;
+ piece_note Notes[KB(1)];
  
  b32 IsRecording;
  b32 IsPlaying;
@@ -309,6 +309,10 @@ struct app_state
  s64 VoiceCount;
  voice *Voices;
  voice *SelectedVoice;
+ 
+ piece *Pieces;
+ u64 PieceCount;
+ u64 MaxPieceCount;
  
  s32 TimeSig;
  f32 BPM;

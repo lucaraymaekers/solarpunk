@@ -919,7 +919,7 @@ PieceNoteAdd(piece *Piece,
 {
  piece_note *Note = NilPieceNote;
  
- if(Piece->NoteCount < Piece->NoteMaxCount)
+ if(Piece->NoteCount < ArrayCount(Piece->Notes))
  { 
   Note = Piece->Notes + Piece->NoteCount;
   
@@ -1418,7 +1418,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  
  f32 BarPadding = Piece->BarPadding;
  f32 BeatWidth = Piece->BeatWidth;
- f32 WholeBarWidth = BeatWidth*Piece->TimeSigNum + 2.f*BarPadding;
+ // 1 for beginning, 1 for end and 1 for last note pad
+ f32 WholeBarWidth = BeatWidth*Piece->TimeSigNum + 3.f*BarPadding;
  
  f32 NoteSize = Piece->NoteSize;
  v2 NoteDim = V2(NoteSize, NoteSize);
@@ -1491,7 +1492,29 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
    }
   }
+ }
+ 
+ // Draw playing marker 
+ {
+  v2 MarkerPos = Pos;
+  f32 Start = Piece->PlayPos;
   
+  if(Piece->BarWrapping)
+  {
+   s32 BarIdx = (s32)FloorF32(Start/Piece->TimeSigNum);
+   s32 HeightIdx = BarIdx/BarsPerWidth;
+   
+   f32 BarXIdx = (f32)(BarIdx%BarsPerWidth);
+   f32 BarStart = BarPadding + BarXIdx*WholeBarWidth;
+   
+   f32 Remainder = ModF32(Start, Piece->TimeSigNum);
+   MarkerPos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
+   
+   MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
+  }
+  
+  v4 Dest = RectFromSize(MarkerPos, V2(StaffLineWidth, StaffHeight));
+  DrawRect(Dest, Color_Green, 0.f, 0.f, 0.f);
  }
  
  // Draw notes
@@ -2090,6 +2113,12 @@ M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
  return Result;
 }
 
+internal void
+M_ControlLabel(str8 Name)
+{
+ UI_BackgroundColor(Color_Frost2) Label(Name);
+}
+
 //~ Serialization
 /*
 - Serialize() Function for every type
@@ -2146,7 +2175,7 @@ MS_Ser(Serializer, &Dummy); \
 } while(0)
 
 internal void
-MS_Piece(ms_serializer *Serializer, piece *Piece)
+MS_Piece(ms_serializer *Serializer, app_state *App, piece *Piece)
 {
  MS_Add(MSV_Initial, &Piece->BPM);
  MS_Add(MSV_Initial, &Piece->TimeSigNum);
@@ -2158,11 +2187,6 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  
  if(Serializer->Version >= MSV_Initial)
  {
-  if(Serializer->IsReading)
-  {
-   Piece->NoteMaxCount = KB(1);
-   Piece->Notes = PushArrayZero(Piece->Arena, piece_note, Piece->NoteMaxCount);
-  }
   MS_Struct(Serializer, Piece->Notes, sizeof(piece_note)*Piece->NoteCount);
  }
  
@@ -2324,6 +2348,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
      }
     }
    }
+   
+   App->MaxPieceCount = KB(1);
+   App->PieceCount = 0;
+   App->Pieces = PushArray(App->Arena, piece, App->MaxPieceCount);
   }
   
   OS_ProfileAndPrint("Muze init");
@@ -3010,12 +3038,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
                        UI_BoxFlag_DrawBorders);
             
             UI_Push()
+             UI_BackgroundColor(Color_Frost3)
             {
              // Type button
              {                                                    
               ui_box *Type;
-              UI_BackgroundColor(Color_ButtonBackground)
-               UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+              UI_SemanticWidth(UI_SizeText(5.f, 1.f))
                Type = UI_AddBox(S8("PanelType"), (UI_BoxFlag_DrawBackground|
                                                   UI_BoxFlag_DrawBorders|
                                                   UI_BoxFlag_MouseClickable|
@@ -3036,14 +3064,16 @@ UPDATE_AND_RENDER(UpdateAndRender)
               }
              }
              
-             UI_Spacer(UI_SizeParent(1.f, 0.f));
+             
+             UI_FillWidth()
+              UI_AddBox(S8(""), UI_BoxFlag_DrawBackground|
+                        UI_BoxFlag_DrawBorders);
              
              // Close button 
              {
               rune Codepoint = 0xe80a;
               ui_box *Close;
-              UI_BackgroundColor(Color_ButtonBackground)
-               UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+              UI_SemanticWidth(UI_SizeText(5.f, 1.f))
                UI_FontKind(FontKind_Icon)
                //UI_Debug(true)
                Close = UI_AddBox(S8("CloseButton"), (UI_BoxFlag_DrawBackground|
@@ -3075,6 +3105,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                                  UI_BoxFlag_DrawBackground);
            
            //- Panel contents 
+           UI_BackgroundColor(Color_Night2)
            {     
             ui_size SliderSize = UI_SizePx(250.f, 1.f);
             
@@ -3083,14 +3114,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
             {
              b32 Loop = true;
              piece *Piece = Panel->Piece;
-             local_persist b32 DoItOnce = false;
-             if(Panel->Piece == 0 || !DoItOnce)
+             if(Panel->Piece == 0)
              {
-              DoItOnce = true;
-              
-              arena *PieceArena = ArenaAlloc();
-              Piece = Panel->Piece = PushArrayZero(PieceArena, piece, 1);
-              Piece->Arena = PieceArena;
+              Piece = Panel->Piece = GetP(App->Pieces, App->MaxPieceCount, App->PieceCount);
+              App->PieceCount += 1;
               
               Piece->Name = S8("lecon_12");
               
@@ -3105,9 +3132,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
               Piece->Key = Note_D;
               Piece->Major = true;
               
-              Piece->NoteMaxCount = KB(1);
               Piece->NoteCount = 0;
-              Piece->Notes = PushArrayZero(Piece->Arena, piece_note, Piece->NoteMaxCount);
               Piece->Octave = 4;
               
               Piece->BarWrapping = true;
@@ -3117,9 +3142,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
               Piece->StaffLineWidth = 1.f;
               Piece->TailHeight = 24.f;
               
-#if 0             
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/2.f);
+#if 1    
+              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 3.f/2.f);
               PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/4.f);
               PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_E, 1.f/4.f);
               
@@ -3206,10 +3230,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
               PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
               PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
               PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
-#endif
-              
-#if 1
-              
+#elif 1
               Piece->BPM = 60;
               Piece->TimeSigNum = 3;
               Piece->TimeSigDen = 4;
@@ -3272,7 +3293,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
               ms_serializer Serializer = {0};
               Serializer.IsReading = !Memory->Initialized;
               
-              str8 FileName = S8("../data/muze/lecon_11.muze_piece");
+              str8 FileName = Str8Fmt("../data/muze/%S.muze_piece", Piece->Name);
               char *FilePath = PathFromExe(FrameArena, FileName);
               
               if(Serializer.IsReading)
@@ -3318,13 +3339,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
                UI_Row()
                UI_SemanticWidth(UI_SizePx(150.f, 1))
               {               
-               
                UI_FontKind(FontKind_Icon)
                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                {
                 if(Button(.String = S8("PlayButton"), .Text = UI_Icons[UI_IconKind_Play],
-                          .CenterText = true, .TextColor = (!Piece->IsPlaying ? Color_Green : Color_ButtonText),
-                          .BackgroundColor = Color_Night0).Pressed)
+                          .CenterText = true, .TextColor = (!Piece->IsPlaying ? Color_Green : Color_ButtonText)).Pressed)
                 {
                  if(!Piece->IsPlaying)
                  {
@@ -3334,16 +3353,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 }
                 
                 if(Button(.String = S8("PauseButton"), .Text = UI_Icons[UI_IconKind_Pause],
-                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Yellow : Color_ButtonText),
-                          .BackgroundColor = Color_Night0).Pressed)
+                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Yellow : Color_ButtonText)).Pressed)
                 {
                  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
                  Piece->IsPlaying = false;
                 }
                 
                 if(Button(.String = S8("StopButton"), .Text = UI_Icons[UI_IconKind_Stop],
-                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Red : Color_ButtonText),
-                          .BackgroundColor = Color_Night0).Pressed)
+                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Red : Color_ButtonText)).Pressed)
                 {
                  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
                  
@@ -3538,8 +3555,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
                {             
                 
-                UI_BackgroundColor(Color_Night0)
-                 Label(S8("Devices"));
+                M_ControlLabel(S8("Devices"));
                 
                 //- Input
                 {
@@ -3618,7 +3634,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  
                  //- Song 
                  {
-                  UI_BackgroundColor(Color_Night0) Label(S8("Song"));
+                  M_ControlLabel(S8("Song"));
                   
                   if(UI_ButtonWithToggle(S8("Record"), App->SelectedVoice->IsRecording, ItemPadding, Color_Red).OneClicked)
                   {
@@ -3645,7 +3661,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 
                 //- Notes 
                 {
-                 UI_BackgroundColor(Color_Night0) Label(S8("Notes"));
+                 M_ControlLabel(S8("Notes"));
                  
                  if(M_ControlButton(S8("Round notes' length"))) PushCommand(App, Command_Round);
                  if(M_ControlButton(S8("Sync notes to the beat"))) PushCommand(App, Command_Sync);
@@ -3676,7 +3692,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 
                 //- Voice
                 {
-                 UI_BackgroundColor(Color_Night0) Label(S8("Voice"));
+                 M_ControlLabel(S8("Voice"));
                  
                  if(M_ControlButton(S8("Delete voice"))) PushCommand(App, Command_DeleteVoice);
                  if(M_ControlButton(S8("New voice"))) PushCommand(App, Command_AddVoice);
@@ -3777,6 +3793,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
             else if(Panel->Kind == PanelKind_Sheet)
             {
              voice *Voice = Panel->Voice;
+             
              UI_FillAll()
               UI_Push()
               UI_Column()
@@ -3787,14 +3804,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_Row()
                 UI_SemanticWidth(UI_SizePx(150.f, 1.f))
                {
-                if(UI_ButtonWithToggle(S8("Record"), Panel->Voice->IsRecording, ItemPadding, Color_Red).OneClicked)
-                {
-                 PushCommand(App, Command_ToggleRecording);
-                }
-                
-                if(M_SimpleToggleButton(S8("Play"), Voice->IsPlaying, Color_Green))
-                {
-                 PushCommand(App, Command_TogglePlaying);
+                UI_SemanticWidth(UI_SizePx(30.f, 1.f))
+                 UI_FontKind(FontKind_Icon)
+                {                 
+                 if(Button(.String = S8("Record"), .Text = UI_Icons[UI_IconKind_Record], .CenterText = true,
+                           .TextColor = (Voice->IsRecording ? Color_Red : Color_ButtonText)).OneClicked)
+                 {
+                  PushCommand(App, Command_ToggleRecording);
+                 }
+                 
+                 
+                 if(Button(.String = S8("Play"), .Text = UI_Icons[UI_IconKind_Play], .CenterText = true,
+                           .TextColor = (Voice->IsPlaying ? Color_Green : Color_ButtonText)).OneClicked)
+                 {
+                  PushCommand(App, Command_TogglePlaying);
+                 }
                 }
                 
                 // Voice select

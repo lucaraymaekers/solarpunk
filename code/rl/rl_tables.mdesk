@@ -21,13 +21,17 @@ Colors:
  { Cyan     0xff81a1c1 }
  { Blue     0xff5e81ac }
  { Black    0xff000000 }
+ 
+ { Primary   0xffFFCE00 }
+ { Secondary 0xff3016B0 }
+ { Contrast  0xff282525 }
 }
 
 @data
 ColorsU32:
 {
  @expand(Colors)
-  ```u32 ColorU32_$(Name) = $(Value);
+  ```#define ColorU32_$(Name) $(Value)
  ```;
 }
 
@@ -35,7 +39,7 @@ ColorsU32:
 ColorsV4:
 {
  @expand(Colors)
-  ```v4 Color_$(Name) = {U32ToV4Arg($(Value))};
+  ```v4 Color_$(Name) = Color($(Name));
  ```;
 }
 

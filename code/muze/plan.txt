@@ -22,7 +22,7 @@ Bugs:
 - bug: ui: The lister sometimes has an "empty" element and selected.
        Happens when typing "sn", when not enough elements to show the old scroll gets negative
        somehow.
-x bug: ui: Releasing outside the box still clicks
+- bug: ui: When changing the BPM too fast it can skip over the ending of the note and never stop playing the note.
 
 Demo:
 - Use showkey
@@ -205,3 +205,5 @@ x bug: When adjusting BPM in piece it can time travel.
 x bug: Double line not drawn
 x Metronome
 x SelectPanel() function that sets selectedvoice etc.
+
+x bug: ui: Releasing outside the box still clicks

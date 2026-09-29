@@ -190,11 +190,11 @@ global_variable ui_state *UI_State = 0;
 
 global_variable ui_box *UI_NilBox = 0;
 
-global_variable v4 Color_Background = {U32ToV4Arg(0xff4c566a)};
-global_variable v4 Color_Foreground = {U32ToV4Arg(0xffeceff4)};
-global_variable v4 Color_ButtonBorder = {U32ToV4Arg(0xff3b4252)};
-global_variable v4 Color_ButtonBackground = {U32ToV4Arg(0xFF81A1C1)};
-global_variable v4 Color_ButtonText = {U32ToV4Arg(0xff000000)};
+global_variable v4 Color_Background = Color(Night3);
+global_variable v4 Color_Foreground = Color(Snow0);
+global_variable v4 Color_ButtonBorder = Color(Night2);
+global_variable v4 Color_ButtonBackground = Color(Night0);
+global_variable v4 Color_ButtonText = Color(Black);
 
 #define UI_SizePx(Value, Strictness) UI_Size(UI_SizeKind_Pixels, Value, Strictness)
 #define UI_SizeText(Value, Strictness) UI_Size(UI_SizeKind_TextContent, Value, Strictness)

@@ -1,42 +1,48 @@
-u32 ColorU32_Frost0 = 0xff8fbcbb;
- u32 ColorU32_Frost1 = 0xff88c0d0;
- u32 ColorU32_Frost2 = 0xff81a1c1;
- u32 ColorU32_Frost3 = 0xff5e81ac;
- u32 ColorU32_Snow0 = 0xffeceff4;
- u32 ColorU32_Snow1 = 0xffe5e9f0;
- u32 ColorU32_Snow2 = 0xffd8dee9;
- u32 ColorU32_Night0 = 0xff4c566a;
- u32 ColorU32_Night1 = 0xff434c5e;
- u32 ColorU32_Night2 = 0xff3b4252;
- u32 ColorU32_Night3 = 0xff2e3440;
- u32 ColorU32_Red = 0xffbf616a;
- u32 ColorU32_Orange = 0xffd08770;
- u32 ColorU32_Yellow = 0xffebcb8b;
- u32 ColorU32_Green = 0xffa3be8c;
- u32 ColorU32_Magenta = 0xffb48ead;
- u32 ColorU32_Cyan = 0xff81a1c1;
- u32 ColorU32_Blue = 0xff5e81ac;
- u32 ColorU32_Black = 0xff000000;
+#define ColorU32_Frost0 0xff8fbcbb
+ #define ColorU32_Frost1 0xff88c0d0
+ #define ColorU32_Frost2 0xff81a1c1
+ #define ColorU32_Frost3 0xff5e81ac
+ #define ColorU32_Snow0 0xffeceff4
+ #define ColorU32_Snow1 0xffe5e9f0
+ #define ColorU32_Snow2 0xffd8dee9
+ #define ColorU32_Night0 0xff4c566a
+ #define ColorU32_Night1 0xff434c5e
+ #define ColorU32_Night2 0xff3b4252
+ #define ColorU32_Night3 0xff2e3440
+ #define ColorU32_Red 0xffbf616a
+ #define ColorU32_Orange 0xffd08770
+ #define ColorU32_Yellow 0xffebcb8b
+ #define ColorU32_Green 0xffa3be8c
+ #define ColorU32_Magenta 0xffb48ead
+ #define ColorU32_Cyan 0xff81a1c1
+ #define ColorU32_Blue 0xff5e81ac
+ #define ColorU32_Black 0xff000000
+ #define ColorU32_Primary 0xffFFCE00
+ #define ColorU32_Secondary 0xff3016B0
+ #define ColorU32_Contrast 0xff282525
  
-v4 Color_Frost0 = {U32ToV4Arg(0xff8fbcbb)};
- v4 Color_Frost1 = {U32ToV4Arg(0xff88c0d0)};
- v4 Color_Frost2 = {U32ToV4Arg(0xff81a1c1)};
- v4 Color_Frost3 = {U32ToV4Arg(0xff5e81ac)};
- v4 Color_Snow0 = {U32ToV4Arg(0xffeceff4)};
- v4 Color_Snow1 = {U32ToV4Arg(0xffe5e9f0)};
- v4 Color_Snow2 = {U32ToV4Arg(0xffd8dee9)};
- v4 Color_Night0 = {U32ToV4Arg(0xff4c566a)};
- v4 Color_Night1 = {U32ToV4Arg(0xff434c5e)};
- v4 Color_Night2 = {U32ToV4Arg(0xff3b4252)};
- v4 Color_Night3 = {U32ToV4Arg(0xff2e3440)};
- v4 Color_Red = {U32ToV4Arg(0xffbf616a)};
- v4 Color_Orange = {U32ToV4Arg(0xffd08770)};
- v4 Color_Yellow = {U32ToV4Arg(0xffebcb8b)};
- v4 Color_Green = {U32ToV4Arg(0xffa3be8c)};
- v4 Color_Magenta = {U32ToV4Arg(0xffb48ead)};
- v4 Color_Cyan = {U32ToV4Arg(0xff81a1c1)};
- v4 Color_Blue = {U32ToV4Arg(0xff5e81ac)};
- v4 Color_Black = {U32ToV4Arg(0xff000000)};
+v4 Color_Frost0 = Color(Frost0);
+ v4 Color_Frost1 = Color(Frost1);
+ v4 Color_Frost2 = Color(Frost2);
+ v4 Color_Frost3 = Color(Frost3);
+ v4 Color_Snow0 = Color(Snow0);
+ v4 Color_Snow1 = Color(Snow1);
+ v4 Color_Snow2 = Color(Snow2);
+ v4 Color_Night0 = Color(Night0);
+ v4 Color_Night1 = Color(Night1);
+ v4 Color_Night2 = Color(Night2);
+ v4 Color_Night3 = Color(Night3);
+ v4 Color_Red = Color(Red);
+ v4 Color_Orange = Color(Orange);
+ v4 Color_Yellow = Color(Yellow);
+ v4 Color_Green = Color(Green);
+ v4 Color_Magenta = Color(Magenta);
+ v4 Color_Cyan = Color(Cyan);
+ v4 Color_Blue = Color(Blue);
+ v4 Color_Black = Color(Black);
+ v4 Color_Primary = Color(Primary);
+ v4 Color_Secondary = Color(Secondary);
+ v4 Color_Contrast = Color(Contrast);
  
 enum base_note
 {
