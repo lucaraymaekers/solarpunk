@@ -19,7 +19,7 @@ RenderBuildAtlas(arena *Arena,
   if(IconsFont->Initialized)
   {
    Atlas->IconsFont = IconsFont;
-   IconsFont->FirstCodepoint = ' ';
+   IconsFont->FirstCodepoint = 0x31;
    IconsFont->CodepointCount = 15;
    IconsFont->FirstPackedCharIdx = TextFont->CodepointCount;
    IconsFont->Scale = stbtt_ScaleForPixelHeight(&IconsFont->Info, HeightPx);
