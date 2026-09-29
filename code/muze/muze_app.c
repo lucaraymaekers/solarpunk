@@ -1499,19 +1499,19 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   v2 MarkerPos = Pos;
   f32 Start = Piece->PlayPos;
   
+  s32 BarIdx = (s32)FloorF32(Start/Piece->TimeSigNum);
+  s32 HeightIdx = BarIdx/BarsPerWidth;
+  
   if(Piece->BarWrapping)
   {
-   s32 BarIdx = (s32)FloorF32(Start/Piece->TimeSigNum);
-   s32 HeightIdx = BarIdx/BarsPerWidth;
-   
-   f32 BarXIdx = (f32)(BarIdx%BarsPerWidth);
-   f32 BarStart = BarPadding + BarXIdx*WholeBarWidth;
-   
-   f32 Remainder = ModF32(Start, Piece->TimeSigNum);
-   MarkerPos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
-   
+   BarIdx = (BarIdx%BarsPerWidth);
    MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
   }
+  
+  f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
+  
+  f32 Remainder = ModF32(Start, Piece->TimeSigNum);
+  MarkerPos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
   
   v4 Dest = RectFromSize(MarkerPos, V2(StaffLineWidth, StaffHeight));
   DrawRect(Dest, Color_Green, 0.f, 0.f, 0.f);
@@ -1570,19 +1570,20 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      
      NotePos.Y = Pos.Y + StaffLineWidth/2.f + StepSize*(f32)StepCount;
      
+     s32 BarIdx = (s32)FloorF32(Note->Start/Piece->TimeSigNum);
+     s32 HeightIdx = BarIdx/BarsPerWidth;
+     
      if(Piece->BarWrapping)
      {
-      s32 BarIdx = (s32)FloorF32(Note->Start/Piece->TimeSigNum);
-      s32 HeightIdx = BarIdx/BarsPerWidth;
-      
-      f32 BarXIdx = (f32)(BarIdx%BarsPerWidth);
-      f32 BarStart = BarPadding + BarXIdx*WholeBarWidth;
-      
-      f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
-      NotePos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
-      
+      BarIdx = (BarIdx%BarsPerWidth);
       NotePos.Y += (f32)HeightIdx*2.f*StaffHeight;
      }
+     
+     f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
+     
+     f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
+     NotePos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
+     
     }
     
     // Find out if is dotted

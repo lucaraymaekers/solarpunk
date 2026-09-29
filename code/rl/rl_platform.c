@@ -464,6 +464,18 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
     OS_ProfileAndPrint("Messages");
     
 #if RL_PLATFORM_DEBUG_UI
+    
+    if(Replay.IsStepping)
+    {
+     // NOTE(luca): Draw a Shadow cursor
+     app_input *AppInput = (app_input *)((u8 *)Replay.Buffer + Replay.PlayingPos);
+     
+     v4 Dest = RectFromCenterDim(V2V2S32(AppInput->Mouse.Pos), V2(5.f, 5.f)); 
+     DrawRect(Dest, V4F32(1.f), 0.f, 0.f, 0.f);
+     DrawRect(Dest, Color_Black, 0.f, 1.f, 0.f);
+    }
+    
+    
     for EachTextButton(Key, Id, NewInput)
     {
      b32 Alt = (Key->Modifiers == PlatformKeyModifier_Alt);
@@ -870,6 +882,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
       
       if(Replay.IsStepping)
       {
+       
        b32 HasReachedStepTarget = false;
        
        if(Replay.StepTarget < Replay.StepIdx)
@@ -924,6 +937,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
       AppInput->PlatformWindowIsFocused = PlatformWindowIsFocused;
       AppInput->SkipRendering = Replay.IsSkipping;
      }
+     
      if(Code.UpdateAndRender)
      {
       b32 ShouldQuit = Code.UpdateAndRender(&AppMemory, &WindowBuffer, AppInput);
