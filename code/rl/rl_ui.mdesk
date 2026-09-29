@@ -55,16 +55,10 @@ Icons:
  { Pause        }
  { Stop         }
  { Play         }
- { ToEnd        }
- { FastForward  }
- { ToStart      }
- { FastBackward }
- { Volume       }
- { VolumeDown   }
- { VolumeUp     }
  { Gauge        }
  { Cog          }
- { Cancel       }
+ { Save         }
+ { File         }
  { Close        }
 }
 

@@ -3009,7 +3009,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
        {                            
         LayoutAxis = (axis2)Panel->Parent->Axis;
         
-        UI_BorderThickness(1.f)
+        UI_BorderThickness(2.f)
          UI_SemanticSizeOnAxis(LayoutAxis, UI_SizeParent(Panel->ParentPct, 0.f))
          UI_TextColor(Color_Snow2)
          UI_BorderColor((Panel == App->SelectedPanel ? Color_Orange : Color_Night0))
@@ -3072,9 +3072,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
              
              // Close button 
              {
-              rune Codepoint = 0xe80a;
               ui_box *Close;
-              UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+              UI_BackgroundColor(Color_ButtonBackground)
+               UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                UI_FontKind(FontKind_Icon)
                //UI_Debug(true)
                Close = UI_AddBox(S8("CloseButton"), (UI_BoxFlag_DrawBackground|
