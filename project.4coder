@@ -32,11 +32,12 @@ paths =
  { .path = "code/base",    .recursive = true,  .relative = true, },
  { .path = "code/lib",     .recursive = true,  .relative = true, },
  { .path = "code/shaders", .recursive = true,  .relative = true, },
- { .path = "code/cling/",  .recursive = true, .relative = true, },
  { .path = "code/rl/",     .recursive = true,  .relative = true, },
- { .path = "code/muze/",   .recursive = true,  .relative = true, },
- //{ .path = "code/editor/", .recursive = true,  .relative = true, },
+ { .path = "code/cling/",  .recursive = true, .relative = true, },
+ //{ .path = "code/muze/",        .recursive = true,  .relative = true, },
+ //{ .path = "code/editor/",      .recursive = true,  .relative = true, },
  //{ .path = "code/compenhance/", .recursive = true,  .relative = true, },
+ { .path = "code/school/",      .recursive = true,  .relative = true, },
 };
 
 load_paths =

@@ -2,9 +2,10 @@
 
 #include <stdio.h>
 
-#if RL_LIBS_IMPLEMENTATION
+#if !BASE_EXTERNAL_LIBS || RL_LIBS_IMPLEMENTATION
 // NOTE(luca): RL_LIBS_IMPLEMENTATION is set when everything is to be compiled statically.
 # define STB_SPRINTF_STATIC
+# define STB_SPRINTF_IMPLEMENTATION
 #endif 
 #include "lib/stb_sprintf.h"
 

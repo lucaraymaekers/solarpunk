@@ -273,9 +273,8 @@ ENTRY_POINT(ThreadInitEntryPoint)
  ThreadInit(&Params->Context);
  DEBUGThreadContext = ThreadContext;
 #if !BASE_NO_ENTRYPOINT
- EntryPoint(Params);
+ OS_EntryPoint(Params);
 #endif
- 
  return 0;
 }
 
@@ -354,7 +353,7 @@ LinuxSetDebuggerAttached()
 }
 
 internal void 
-LinuxMainEntryPoint(int ArgsCount, char **Args, char **Env)
+LinuxMainEntryPoint(int ArgCount, char **Args, char **Env)
 {
  arena *Arena = ArenaAlloc();
  SetStringsScratch(Arena);
@@ -397,9 +396,9 @@ LinuxMainEntryPoint(int ArgsCount, char **Args, char **Env)
  Ret = pthread_barrier_init((pthread_barrier_t *)Barrier, 0, (u32)ThreadsCount);
  Assert(Ret == 0);
  
- char **ArgsParam = PushArray(Arena, char *, (u64)ArgsCount);
+ char **ArgsParam = PushArray(Arena, char *, (u64)ArgCount);
  {            
-  MemoryCopy(ArgsParam, Args, sizeof(char *)*(u64)ArgsCount);
+  MemoryCopy(ArgsParam, Args, sizeof(char *)*(u64)ArgCount);
   char *Path = PushArray(Arena, char, PATH_MAX);
   smm Size = readlink("/proc/self/exe", Path, (PATH_MAX - 1));
   Path[Size] = 0;
@@ -416,7 +415,7 @@ LinuxMainEntryPoint(int ArgsCount, char **Args, char **Env)
   Params->Context.SharedStorage = &SharedStorage;
   Params->Args = ArgsParam;
   Params->Env = Env;
-  Params->ArgsCount = ArgsCount;
+  Params->ArgCount = ArgCount;
   
   pthread_t Handle;
   Ret = pthread_create(&Handle, 0, (pthread_entry_point_func *)ThreadInitEntryPoint, Params);
@@ -433,10 +432,10 @@ LinuxMainEntryPoint(int ArgsCount, char **Args, char **Env)
 }
 
 internal void 
-AndroidMainEntryPoint(int ArgsCount, char **Args)
+AndroidMainEntryPoint(int ArgCount, char **Args)
 {
  entry_point_params Params = {0};
- Params.ArgsCount = ArgsCount;
+ Params.ArgCount = ArgCount;
  Params.Args = Args;
  Params.Context.LaneIndex = 0;
  Params.Context.LaneCount = 1;
@@ -445,12 +444,12 @@ AndroidMainEntryPoint(int ArgsCount, char **Args)
 }
 
 #if !BASE_NO_ENTRYPOINT
-int main(int ArgsCount, char **Args, char **Env)
+int main(int ArgCount, char **Args, char **Env)
 {
 #if OS_ANDROID
- AndroidMainEntryPoint(ArgsCount, Args);
+ AndroidMainEntryPoint(ArgCount, Args);
 #else
- LinuxMainEntryPoint(ArgsCount, Args, Env);
+ LinuxMainEntryPoint(ArgCount, Args, Env);
 #endif
  return 0;
 }

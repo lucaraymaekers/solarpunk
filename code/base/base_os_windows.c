@@ -4,7 +4,6 @@ global_variable f64 GlobalPerfCountFrequency;
 global_variable thread_context *DEBUGThreadContext; 
 
 //- Helpers 
-
 internal inline u32
 SafeTruncateU64(u64 Value)
 {
@@ -315,7 +314,7 @@ ThreadInitEntryPoint(LPVOID FuncParams)
  DEBUGThreadContext = ThreadContext;
  
 #if !BASE_NO_ENTRYPOINT
- EntryPoint(Params);
+ OS_EntryPoint(Params);
 #endif
  return 0;
 }
@@ -324,7 +323,7 @@ ThreadInitEntryPoint(LPVOID FuncParams)
 
 #if BASE_CONSOLE_APPLICATION
 int
-main(int ArgsCount, char **Args, char **Env)
+main(int ArgCount, char **Args, char **Env)
 #else
 int CALLBACK
 WinMain(HINSTANCE Instance,
@@ -377,7 +376,7 @@ WinMain(HINSTANCE Instance,
  
 #if !BASE_CONSOLE_APPLICATION    
  // TODO(luca): Real command line parsing
- int ArgsCount = 2;
+ int ArgCount = 2;
  char *Args[2] = {0};
  
  str8 ExePath = PushS8(Arena, MAX_PATH);
@@ -396,7 +395,7 @@ WinMain(HINSTANCE Instance,
   Params->Context.Barrier = (barrier)&Barrier;
   Params->Context.SharedStorage = &SharedStorage;
   Params->Args = Args;
-  Params->ArgsCount = ArgsCount;
+  Params->ArgCount = ArgCount;
   
   Params->Context.Handle = (thread_handle)CreateThread(0, 0, ThreadInitEntryPoint, Params, 0, 0);
   

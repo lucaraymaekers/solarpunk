@@ -4,6 +4,7 @@
 //~ Libaries
 #define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
+
 #include "base/base.h"
 #include "base/base.c"
 
@@ -24,7 +25,7 @@ global_variable MD_Arena *GlobalMDArena = 0;
 internal void
 RunCommand(void)
 {
- str8 BuildCommand = Cng_Str8ArrayJoin(' ');
+ str8 BuildCommand = Cng_S8ArrayJoin(' ');
  if(0)
  {
   Log("%S\n", BuildCommand);
@@ -56,31 +57,30 @@ internal void
 WindowsBuild(str8 Source, str8_array *ExtraCompilerFlags, str8 ExtraLinkerFlags, 
              b32 Debug, b32 Asan)
 {
- str8_array *Command = Cng_PushStr8Array(256);
- Cng_SetSelectedArray(Command);
+ Cng_Scratch();
  
- Cng_Str8ArrayAppend(S8("cmd /c \"C:\\msvc\\setup_x64.bat"));
- Cng_Str8ArrayAppend(S8("&&"));
+ Cng_S8ArrayAppend(S8("cmd /c \"C:\\msvc\\setup_x64.bat"));
+ Cng_S8ArrayAppend(S8("&&"));
  
- Cng_Str8ArrayAppend(S8("cl"));
- Cng_Str8ArrayAppend(S8("-MTd -Gm- -nologo -GR- -EHa- -Oi -FC -Z7"));
+ Cng_S8ArrayAppend(S8("cl"));
+ Cng_S8ArrayAppend(S8("-MTd -Gm- -nologo -GR- -EHa- -Oi -FC -Z7"));
  
  if(Asan)
  {
-  Cng_Str8ArrayAppend(S8("/fsanitize=address"));
+  Cng_S8ArrayAppend(S8("/fsanitize=address"));
  }
  
  if(!Debug)
  {
-  Cng_Str8ArrayAppend(S8("-O2"));
+  Cng_S8ArrayAppend(S8("-O2"));
  }
  
- Cng_Str8ArrayAppend(S8("-Zc:strictStrings-"));
- Cng_Str8ArrayAppend(S8("-WX -W4 -wd4459 -wd4201 -wd4100 -wd4101 -wd4189 -wd4505 -wd4996 -wd4389 -wd4244 -wd5287 -wd4063 -wd4127"));
+ Cng_S8ArrayAppend(S8("-Zc:strictStrings-"));
+ Cng_S8ArrayAppend(S8("-WX -W4 -wd4459 -wd4201 -wd4100 -wd4101 -wd4189 -wd4505 -wd4996 -wd4389 -wd4244 -wd5287 -wd4063 -wd4127"));
  
- Cng_Str8ArrayAppend(Cng_Str8ArrayJoinFrom(ExtraCompilerFlags, ' '));
- Cng_Str8ArrayAppend(Source);
- Cng_Str8ArrayAppend(ExtraLinkerFlags);
+ Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraCompilerFlags, ' '));
+ Cng_S8ArrayAppend(Source);
+ Cng_S8ArrayAppend(ExtraLinkerFlags);
  
  RunCommand();
 }
@@ -94,12 +94,11 @@ LinuxBuildCommand(str8 Source,
 {
  Log("%S\n", Cng_GetBaseFileName(Source));
  
- str8_array *Command = Cng_PushStr8Array(256);
- Cng_SetSelectedArray(Command);
+ Cng_Scratch();
  Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
- Cng_Str8ArrayAppendMultiple(Cng_Str8ArrayJoinFrom(ExtraFlags, ' '),
-                             S8("-o"), OutputName,
-                             Source);
+ Cng_S8ArrayAppendMultiple(Cng_S8ArrayJoinFrom(ExtraFlags, ' '),
+                           S8("-o"), OutputName,
+                           Source);
  
  if(Run)
  {
@@ -122,18 +121,18 @@ BuildAndRun(str8 Source,
   if(0) {}
   else if(IsObject)
   {
-   Cng_Str8ArrayAppendTo(ExtraFlags, S8("-fPIC -x c++ -c"));
+   Cng_S8ArrayAppendTo(ExtraFlags, S8("-fPIC -x c++ -c"));
    OutputName = Str8Fmt("%S.o", OutputName);
   }
   else if(IsDLL)
   {
-   Cng_Str8ArrayAppendTo(ExtraFlags, S8("-fPIC --shared"));
+   Cng_S8ArrayAppendTo(ExtraFlags, S8("-fPIC --shared"));
    OutputName = Str8Fmt("%S.so", OutputName);
   }
   
-  Cng_Str8ArrayAppendTo(ExtraFlags, ExtraLinkerFlags);
+  Cng_S8ArrayAppendTo(ExtraFlags, ExtraLinkerFlags);
   LinuxBuildCommand(Source, OutputName, GCC, Clang, Asan, Debug, ExtraFlags, false);
-  Cng_Str8ArrayAppend(ExtraSource);
+  Cng_S8ArrayAppend(ExtraSource);
   RunCommand();
  }
  else if(Cng_IsOs(CngOS_Windows))
@@ -141,24 +140,24 @@ BuildAndRun(str8 Source,
   if(0) {}
   else if(IsObject)
   {
-   Cng_Str8ArrayAppendTo(ExtraFlags, S8("-c /TP"));
-   Cng_Str8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fo" "%S.obj", OutputName));
+   Cng_S8ArrayAppendTo(ExtraFlags, S8("-c /TP"));
+   Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fo" "%S.obj", OutputName));
   }
   else if(IsDLL)
   {
-   Cng_Str8ArrayAppendTo(ExtraFlags, S8("/LD"));
+   Cng_S8ArrayAppendTo(ExtraFlags, S8("/LD"));
    ExtraLinkerFlags = Str8Fmt("%S /DLL /OUT:%S.dll",
                               ExtraLinkerFlags, OutputName);
   }
   else
   {
-   Cng_Str8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fe%S.exe", OutputName));
+   Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fe%S.exe", OutputName));
   }
   
   ExtraLinkerFlags = Str8Fmt("/link -opt:ref -incremental:no %S ", ExtraLinkerFlags);
   
-  Cng_Str8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fm" "%S.map", OutputName));
-  Cng_Str8ArrayAppendTo(ExtraFlags, ExtraSource);
+  Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fm" "%S.map", OutputName));
+  Cng_S8ArrayAppendTo(ExtraFlags, ExtraSource);
   WindowsBuild(Source, ExtraFlags, ExtraLinkerFlags, Debug, Asan);
  }
 }
@@ -231,12 +230,12 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
  
  // Compile
  {            
-  str8_array *CommonFlags = Cng_PushStr8Array(256);
-  Cng_Str8ArrayAppendTo(CommonFlags, 
-                        Str8Fmt("-I" CLING_CODE_PATH " "
-                                "-DRL_PLATFORM_APP_NAME=%S "
-                                "-DRL_PLATFORM_WINDOW_NAME=%S",
-                                AppName, WindowName));
+  str8_array *CommonFlags = Cng_PushS8Array(256);
+  Cng_S8ArrayAppendTo(CommonFlags, 
+                      Str8Fmt("-I" CLING_CODE_PATH " "
+                              "-DRL_PLATFORM_APP_NAME=%S "
+                              "-DRL_PLATFORM_WINDOW_NAME=%S",
+                              AppName, WindowName));
   
   char *LibsFileName = (Cng_IsOs(CngOS_Windows) ? 
                         CLING_BUILD_PATH "rl_libs.obj" :
@@ -246,9 +245,9 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
   
   if(!Slow && !OS_FileExists(LibsFileName))
   {
-   Cng_Str8ArrayPushCount(CommonFlags)
+   Cng_S8ArrayTemp(CommonFlags)
    {
-    Cng_Str8ArrayAppendTo(CommonFlags, S8("-DRL_LIBS_IMPLEMENTATION=1"));
+    Cng_S8ArrayAppendTo(CommonFlags, S8("-DRL_LIBS_IMPLEMENTATION=1"));
     
     BuildAndRun(S8("../code/rl/rl_libs.h"), 
                 S8("rl_libs"), 
@@ -260,13 +259,13 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
   
   str8 LibsName = Slow ?  S8("") : S8FromCString(LibsFileName);
   
-  Cng_Str8ArrayPushCount(CommonFlags)
+  Cng_S8ArrayTemp(CommonFlags)
   {
    str8 ExtraLinkerFlags = {0};
    
-   Cng_Str8ArrayAppendTo(CommonFlags, (Slow ? 
-                                       S8("-DRL_LIBS_IMPLEMENTATION=1") :
-                                       S8("-DRL_LIBS_IMPLEMENTATION=0")));
+   Cng_S8ArrayAppendTo(CommonFlags, (Slow ? 
+                                     S8("-DRL_LIBS_IMPLEMENTATION=1") :
+                                     S8("-DRL_LIBS_IMPLEMENTATION=0")));
    
    BuildAndRun(AppSource, 
                AppName,
@@ -275,12 +274,12 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
                true, false);
   }
   
-  Cng_Str8ArrayPushCount(CommonFlags)
+  Cng_S8ArrayTemp(CommonFlags)
   {
    str8 ExtraLinkerFlags = {0};
-   Cng_Str8ArrayAppendTo(CommonFlags, (Slow ? 
-                                       S8("-DRL_LIBS_IMPLEMENTATION=1") :
-                                       S8("-DRL_LIBS_IMPLEMENTATION=0")));
+   Cng_S8ArrayAppendTo(CommonFlags, (Slow ? 
+                                     S8("-DRL_LIBS_IMPLEMENTATION=1") :
+                                     S8("-DRL_LIBS_IMPLEMENTATION=0")));
    
    if(0) {}
    else if(Cng_IsOs(CngOS_Linux))
@@ -312,7 +311,7 @@ ENTRY_POINT(EntryPoint)
 {
  if(LaneIndex() == 0)
  {
-  Cng_InitAndRebuildSelf(Params->ArgsCount, Params->Args, Params->Env);
+  Cng_InitAndRebuildSelf(Params->ArgCount, Params->Args, Params->Env);
   
   // Change to build directory
   {        
@@ -657,15 +656,15 @@ ENTRY_POINT(EntryPoint)
   {
    LogBuildMode(S8("Haversine generator"), Debug);
    
-   Cng_SetSelectedArray(Cng_PushStr8Array(256));
+   Cng_Scratch();
    
    Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
    if(Cng_IsOs(CngOS_Linux))
    {
-    Cng_Str8ArrayAppend(S8("-I" CLING_CODE_PATH));
+    Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
    }
    
-   Cng_Str8ArrayAppend(S8("../code/compenhance/haversine_generator/haversine_generator.c"));
+   Cng_S8ArrayAppend(S8("../code/compenhance/haversine_generator/haversine_generator.c"));
    
    RunCommand();
    
@@ -676,15 +675,15 @@ ENTRY_POINT(EntryPoint)
   {
    LogBuildMode(S8("Haversine processor"), Debug);
    
-   Cng_SetSelectedArray(Cng_PushStr8Array(256));
+   Cng_Scratch();
    
    Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
    if(Cng_IsOs(CngOS_Linux))
    {
-    Cng_Str8ArrayAppend(S8("-I" CLING_CODE_PATH));
+    Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
    }
    
-   Cng_Str8ArrayAppend(S8("../code/compenhance/haversine_processor/haversine_processor.c"));
+   Cng_S8ArrayAppend(S8("../code/compenhance/haversine_processor/haversine_processor.c"));
    
    RunCommand();
   }
@@ -696,9 +695,9 @@ ENTRY_POINT(EntryPoint)
    
    if(Cng_IsOs(CngOS_Linux))
    {            
-    str8_array *ExtraFlags = Cng_PushStr8Array(256);
-    Cng_Str8ArrayAppendTo(ExtraFlags, S8("-I" CLING_CODE_PATH));
-    Cng_Str8ArrayAppendTo(ExtraFlags, S8("-Wno-sign-conversion"));
+    str8_array *ExtraFlags = Cng_PushS8Array(256);
+    Cng_S8ArrayAppendTo(ExtraFlags, S8("-I" CLING_CODE_PATH));
+    Cng_S8ArrayAppendTo(ExtraFlags, S8("-Wno-sign-conversion"));
     
     LinuxBuildCommand(S8("../code/compenhance/sim86/sim86.cpp"), 
                       S8("sim86"),
@@ -725,6 +724,124 @@ ENTRY_POINT(EntryPoint)
                     S8("../code/muze/muze_app.c"), S8("Muze"),
                     GCC, Clang, Asan, Debug, Slow);
   }
+  
+  //~ School
+  if(School)
+  {
+   Cng_Scratch();
+   
+   LogBuildMode(S8("Les1"), Debug);
+   
+   cmd_line *CmdLine = &Params->CmdLine;
+   
+   b32 Compile = (CmdLineGetEntry(CmdLine, S8("compile")) != NilCmdLineEntry);
+   b32 Run = (CmdLineGetEntry(CmdLine, S8("run")) != NilCmdLineEntry);
+   b32 Last = (CmdLineGetEntry(CmdLine, S8("last")) != NilCmdLineEntry);
+   b32 Template = (CmdLineGetEntry(CmdLine, S8("template")) != NilCmdLineEntry);
+   b32 Print = (CmdLineGetEntry(CmdLine, S8("print")) != NilCmdLineEntry);
+   
+   str8 TemplateText = S8(
+                          "#include <stdio.h>\n"
+                          "#define _CRT_SECURE_NO_WARNINGS\n"
+                          "\n"
+                          "int main(int ArgCount, char **Args)\n"
+                          "{\n"
+                          " printf(\"Hello, world!\\n\");\n"
+                          " return 0;\n"
+                          "}\n"
+                          );
+   
+   // Sanitization
+   {
+    b32 Error = false;
+    if(Template)
+    {
+     if(Compile) { Log("ERROR: -compile is incompatible with -template.\n"); Error = true; } 
+     if(Run)     { Log("ERROR: -run is incompatible with -template.\n"); Error = true; }
+    }
+    
+    if(Error)
+    {
+     Compile = false;
+     Run = false;
+     Template = false;
+     Last = false;
+    }
+   }
+   
+   str8_node *First = CmdLine->FirstFile;
+   
+   str8 NamePrefix = S8("raymaekersLuca");
+   
+   if(Last)
+   {
+    // 1. Find last file
+    u64 Max = 512;
+    u64 LastIdx = 0;
+    while(LastIdx < Max)
+    {
+     str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%llu.c", NamePrefix, LastIdx + 1);
+     if(!OS_FileExists((char *)Path.Data))
+     {
+      break;
+     }
+     
+     LastIdx += 1;
+    }
+    Assert(LastIdx < Max);
+    
+    // 2. Add it to the files 
+    str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
+    DLLAppend(Node, CmdLine->FirstFile, CmdLine->LastFile);
+    if(Template) LastIdx += 1;
+    Node->V = Str8Fmt("%llu", LastIdx);
+    
+    // 3. Start iteration at this node
+    First = Node;
+   }
+   
+   for EachNode(Node, str8_node, First)
+   {
+    if(Print)
+    {
+     Log("../code/school/les1_4_8/%S_4_%S.c\n", NamePrefix, Node->V);
+    }
+    
+    if(Template)
+    {
+     str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%S.c", NamePrefix, Node->V);
+     
+     OS_WriteEntireFile((char *)Path.Data, TemplateText);
+    }
+    
+    if(Compile)
+    {
+     Cng_S8ArrayTemp(GlobalSelectedArray)
+     {
+      str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%S.c", NamePrefix, Node->V);
+      
+      Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
+      Cng_S8ArrayAppend(Path);
+      RunCommand();
+     }
+    }
+    
+    if(Run)
+    {
+     Cng_S8ArrayTemp(GlobalSelectedArray)
+     {
+      str8 Path = Str8Fmt("../build/%S_4_%S.exe", NamePrefix, Node->V);
+      
+      Cng_S8ArrayAppend(Path);
+      RunCommand();
+     }
+    }
+    
+   }
+   
+  }
+  
+  //~ End
   
   Log("Done.\n");
  }

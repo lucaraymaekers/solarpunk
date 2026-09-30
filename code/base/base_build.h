@@ -51,6 +51,9 @@
 #if !defined(RL_PLATFORM_FORCE_UPDATE_HZ)
 # define RL_PLATFORM_FORCE_UPDATE_HZ 60
 #endif
+#if !defined(RL_LIBS_IMPLEMENTATION)
+# define RL_LIBS_IMPLEMENTATION 0
+#endif
 
 //- Cling 
 // NOTE(luca): Default is not defined

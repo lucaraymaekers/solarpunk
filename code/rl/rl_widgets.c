@@ -71,14 +71,17 @@ UI_Checkbox(b32 Toggled, v4 EnabledColor)
      }
      
      //- Draw actual circle
-     UI_BackgroundColor(Color_Black)
-      UI_SemanticWidth(UI_SizePx(CircleWidth, 1.f))
+     {
+      UI_BackgroundColor(Color_Black)
+       UI_SemanticWidth(UI_SizePx(CircleWidth, 1.f))
 #if 1
-     UI_CornerRadii(V4F32(CircleWidth/2.f - 3.f))
+      UI_CornerRadii(V4F32(CircleWidth/2.f - 3.f))
 #endif
-     UI_AddBox(S8("Circle"), (UI_BoxFlag_Clip|
-                              UI_BoxFlag_DrawBackground|
-                              UI_BoxFlag_AnimatePosX));
+      
+      UI_AddBox(S8("Circle"), (UI_BoxFlag_Clip|
+                               UI_BoxFlag_DrawBackground|
+                               UI_BoxFlag_AnimatePosX));
+     }
     }
    }
   }
@@ -95,8 +98,10 @@ struct ui_button_params
  str8 Text;
  str8 String;
  
+ // TODO(luca): Why, remove.
  v4 BackgroundColor;
  v4 TextColor;
+ 
  b32 CenterText;
  
  b32 DisableBorder;

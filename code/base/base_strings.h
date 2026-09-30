@@ -14,6 +14,14 @@ struct str8
 };
 raddbg_type_view(str8, no_addr(array(Data, Size)));
 
+typedef struct str8_node str8_node;
+struct str8_node
+{
+ str8 V;
+ str8_node *Next;
+ str8_node *Prev;
+};
+
 internal b32 IsPrintable(u8 Char);
 internal b32 IsRuneDigit(rune Char);
 internal b32 IsRuneAlpha(rune Char);
@@ -23,7 +31,7 @@ internal b32 IsWhiteSpace(u8 Char);
 internal u8  ToLowercase(u8 Char);
 
 internal str8 S8SkipLastSlash(str8 String);
-internal b32  S8Match(str8 A, str8 B, b32 AIsPrefix);
+internal b32  S8Match(str8 A, str8 B, b32 BIsPrefix);
 internal u64  StringLength(char *String);
 internal str8 S8Cat(str8 Prefix, str8 Suffix);
 internal str8 Str8DupCString(arena *Arena, char *String);

@@ -530,6 +530,8 @@ UI_InitState(arena *Arena)
  UI_State->FrameArenaFront = PushArena(UI_State->Arena, MB(16), false);
  UI_State->FrameArenaBack = PushArena(UI_State->Arena, MB(16), false);
  //UI_State->FrameArenaStrings = PushArena(UI_State->Arena, KB(64), false);
+ 
+ UI_State->AnimSpeedCoeff = 60.f;
 }
 
 internal void
@@ -566,7 +568,8 @@ This keeps the pointers stable.
  Swap(UI_State->FrameArenaFront, UI_State->FrameArenaBack);
  ArenaSetPos(UI_State->FrameArenaFront, 0);
  
- UI_State->AnimSpeed = (1.f - PowF32(2.f, -60.f*UI_State->Input->dtForFrame));
+ UI_State->IsAnimating = true;
+ UI_State->AnimSpeed = (1.f - PowF32(2.f, -UI_State->AnimSpeedCoeff*UI_State->Input->dtForFrame));
 }
 
 //~ Calculations Start 
@@ -813,8 +816,10 @@ UI_CalculatePositions(ui_box *Root)
   // Update animated position
   {    
    for UI_EachAxis(Axis)
-   {    
-    if(Box->Flags & UI_BoxFlag_AnimatePosX << Axis)
+   {
+    b32 Animate = (UI_State->IsAnimating && 
+                   (Box->Flags & UI_BoxFlag_AnimatePosX << Axis));
+    if(Animate)
     {
      Box->AnimatedPos.e[Axis] += (Box->FixedPos.e[Axis] - Box->AnimatedPos.e[Axis])*UI_State->AnimSpeed;
     }

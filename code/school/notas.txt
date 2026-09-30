@@ -1,0 +1,99 @@
+In te halen:
+
+projectmanagement en communicatie (21/09, 23/09)
+electronics - basics (22/09, 24/09, 25/09
+interface technology (25/09)
+
+
+# Embedded fundamentals 30/09/2026
+
+## Todo
+AduC condensed
+-> afprinten
+50eur cash menemen voor bordje.
+
+# Projectmanagement en communicatie 30/09/2026
+"PMBok" Guide
+- book
+- internationaal certificaat
+
+Agidens
+- automatisering voor klanten
+- brouwerij, fabrieken, ... (multi-sector)
+- vb. Uitbreiding van hectoliter in Westmalle
+
+Lijst van onderwerpen als projectteam.
+
+Als we iets veranderen kan het meer kosten of minder goed worden.
+
+Knowledge areas = thema's
+
+Process groups (groep van activeiten)
+- Initiating
+  - Begint altijd bij een probleem of opportuniteit
+  - Denken over de scope
+  - Stakeholders, geven allemaal hun zeg en dit bepaalt de scope
+    (betrokke partijen)
+    kan ook negatief zijn (buren & klachten)
+
+  - Oplijsten->Identificeren->Analyseren/beheersen
+  - Invloed vs. Interest van stakeholders
+
+  - Succes definitie bepaalt break-even point
+    - nice-to-have
+  - een objectief/doel = SMART is een samenvatting van de noden van de stakeholders
+  - Hoe concreter deliverables hoe makkelijker de rest is, zoals specialisten, etc.
+  - Beperkingen (bv. Vergunning)
+  - Projectfasen bepalen (vb. 1. isoleren, 2. douche zetten, ...)
+
+
+Business Communication
+Business IT
+Software Design Essentials
+Software Design & Quality Assurance
+
+
+# Embedded fundamentals labo 30/09/2026
+
+2KB nuttig programma = 20/20
+
+Vraag
+- veel iot embedded jobs zijn nu Linux ? Gaan we dit ook leren, yocto
+ -> neen / Linux
+- kan het zijn dat in sommige toestanden er geen updates mogelijk zijn ? (bv. fabrieklijn 24/24)
+ -> ja
+- Immediates hoe gaan die op de databus en instructies
+  - instruction decoding
+ -> gewoon met wiskunde
+- Hoeveel verschillende GPRs zijn er
+- Waarom User RAM 256 + 128
+
+Embedded = goedkoper
+Alle functionaliteit = code
+
+grootte van componenten <-> embedded device
+
+16bit adressable memory 8bit databus
+Assembly instructie families: mov, cmp, jmp, add
+
+Conversie is altijd in 1024
+
+RAM/ROM kan ingekort worden door fabrikant.
+
+druk rst, druk bt, los rst, los bt
+
+movc = rom
+movc = ram
+mov = reg to reg
+
+Sommige mov instructies werken enkel met Ri (i=0,i=1)
+
+register banks
+- registers zijn genummerd van 0 7
+- je kunt selecteren
+- psw 
+
+A letter = Accumulator
+sommige instructies A/ACC
+
+NOOIT EEN NUL schrijven naar een pin

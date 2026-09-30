@@ -203,7 +203,7 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 #define EachIndex(Index, Count)           EachIndexType(TypeOf((Count)), Index, Count)
 #define EachElement(Index, Array)         EachIndexType(umm, Index, ArrayCount(Array))
 #define EachInRange(Index, Range)         (TypeOf((Range).Min) Index = (Range).Min; Index < (Range).Max; Index += 1)
-#define EachNode(Index, t, First)      (t *Index = First; Index != 0; Index = Index->Next)
+#define EachNode(Node, t, First)      (t *Node = First; Node != 0; Node = Node->Next)
 #define EachCount(Count) EachIndex(Glue(_i_, __COUNTER__), Count)
 
 #define MemoryCopy(Dest, Source, Count) memmove(Dest, Source, Count)
@@ -211,6 +211,14 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 #define MemoryZero(Value) MemorySet((Value), 0, sizeof((*Value)));
 #define MemoryCopyArray(Dest, Source) MemoryCopy((Dest), (Source), sizeof((Dest)))
 #define MemoryCopyStruct(Dest, Source) MemoryCopy((Dest), (Source), sizeof(*(Dest)))
+
+//~ List macros
+#define DLLAppend(Node, First, Last) \
+((!First ? First = Node : 0), \
+(Last ? Last->Next = Node : 0), \
+Node->Prev = Last, \
+Last = Node)
+
 
 //~ Attributes
 #define internal static

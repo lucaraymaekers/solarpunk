@@ -16,7 +16,7 @@
 #define CLING_ARG_NOREBUILD "CLING_NOREBUILD"
 #define CLING_ARG_PARENTPID "CLING_PARENTPID"
 
-#include "base/base.h"
+#define CLING_DEFAULT_S8ARRAY_CAPACITY 256
 
 //~ Types
 struct str8_array
@@ -60,7 +60,7 @@ global_variable cng_os_kind GlobalCurrentOS = 0;
 
 //~ Platform API
 // NOTE(luca): Implement these when adding a new platform.
-internal void Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[]);
+internal void Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[]);
 internal void Cng_RunCommand(str8 Command);
 
 //~ Functions
@@ -85,7 +85,7 @@ Cng_SetSelectedArray(str8_array *Array)
 }
 
 internal str8_array *
-Cng_PushStr8Array(u64 Capacity)
+Cng_PushS8Array(u64 Capacity)
 {
  str8_array *Result = PushArray(GlobalClingArena, str8_array, 1);
  Result->Capacity = Capacity;
@@ -93,12 +93,15 @@ Cng_PushStr8Array(u64 Capacity)
  return Result;
 }
 
-#define Cng_Str8ArrayPushCount(Array) for(u64 _Count_ = Array->Count, _i_ = 0; \
+#define Cng_Scratch() \
+Cng_SetSelectedArray(Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY))
+
+#define Cng_S8ArrayTemp(Array) for(u64 _Count_ = Array->Count, _i_ = 0; \
 _i_ == 0; \
 _i_ = _i_ + 1, Array->Count = _Count_)
 
 internal void 
-Cng_Str8ArrayAppendTo(str8_array *Array, str8 String)
+Cng_S8ArrayAppendTo(str8_array *Array, str8 String)
 {
  if(String.Size > 0)
  {
@@ -109,29 +112,29 @@ Cng_Str8ArrayAppendTo(str8_array *Array, str8 String)
 }
 
 internal void
-Cng_Str8ArrayAppend(str8 String)
+Cng_S8ArrayAppend(str8 String)
 {
- Cng_Str8ArrayAppendTo(GlobalSelectedArray, String);
+ Cng_S8ArrayAppendTo(GlobalSelectedArray, String);
 }
 
-#define Cng_Str8ArrayAppendMultipleTo(Array, ...) \
+#define Cng_S8ArrayAppendMultipleTo(Array, ...) \
 do \
 { \
 str8 Strings[] = {__VA_ARGS__}; \
-_Cng_Str8ArrayAppendMultiple(Array, ArrayCount(Strings), Strings); \
+_Cng_S8ArrayAppendMultiple(Array, ArrayCount(Strings), Strings); \
 } while(0);
-void _Cng_Str8ArrayAppendMultiple(str8_array *Array, u64 Count, str8 *Strings)
+void _Cng_S8ArrayAppendMultiple(str8_array *Array, u64 Count, str8 *Strings)
 {
  for EachIndex(At, Count)
  {
-  Cng_Str8ArrayAppendTo(Array, Strings[At]);
+  Cng_S8ArrayAppendTo(Array, Strings[At]);
  }
 }
 
-#define Cng_Str8ArrayAppendMultiple(...) Cng_Str8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__) 
+#define Cng_S8ArrayAppendMultiple(...) Cng_S8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__) 
 
 internal str8 
-Cng_Str8ArrayJoinFrom(str8_array *Array, u8 Char)
+Cng_S8ArrayJoinFrom(str8_array *Array, u8 Char)
 {
  str8 Result = {0};
  
@@ -176,9 +179,9 @@ Cng_Str8ArrayJoinFrom(str8_array *Array, u8 Char)
 }
 
 internal str8 
-Cng_Str8ArrayJoin(u8 Char)
+Cng_S8ArrayJoin(u8 Char)
 {
- str8 Result = Cng_Str8ArrayJoinFrom(GlobalSelectedArray, Char);
+ str8 Result = Cng_S8ArrayJoinFrom(GlobalSelectedArray, Char);
  return Result;
 }
 
@@ -227,60 +230,60 @@ Cng_CommonBuildCommand(b32 GCC, b32 Clang, b32 Debug, b32 Asan)
  
  if(Asan)
  {
-  Cng_Str8ArrayAppend(S8("-fsanitize=undefined,address"));
+  Cng_S8ArrayAppend(S8("-fsanitize=undefined,address"));
  }
  
  if(0) {}
  else if(Clang)
  {
   Compiler = S8("clang");
-  Cng_Str8ArrayAppend(Compiler);
+  Cng_S8ArrayAppend(Compiler);
   if(Debug)
   {
-   Cng_Str8ArrayAppend(S8("-g -ggdb -g3"));
+   Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
   }
   else if(Release)
   {
-   Cng_Str8ArrayAppend(S8("-O3"));
+   Cng_S8ArrayAppend(S8("-O3"));
   }
-  Cng_Str8ArrayAppend(CommonCompilerFlags);
-  Cng_Str8ArrayAppend(S8("-fdiagnostics-absolute-paths -ftime-trace"));
-  Cng_Str8ArrayAppend(CommonWarningFlags);
-  Cng_Str8ArrayAppend(S8("-Wno-null-dereference -Wno-missing-braces -Wno-vla-cxx-extension -Wno-writable-strings -Wno-missing-designated-field-initializers -Wno-address-of-temporary -Wno-int-to-void-pointer-cast"));
+  Cng_S8ArrayAppend(CommonCompilerFlags);
+  Cng_S8ArrayAppend(S8("-fdiagnostics-absolute-paths -ftime-trace"));
+  Cng_S8ArrayAppend(CommonWarningFlags);
+  Cng_S8ArrayAppend(S8("-Wno-null-dereference -Wno-missing-braces -Wno-vla-cxx-extension -Wno-writable-strings -Wno-missing-designated-field-initializers -Wno-address-of-temporary -Wno-int-to-void-pointer-cast"));
  }
  else if(GCC)
  {
   Compiler = S8("g++");
-  Cng_Str8ArrayAppend(Compiler);
+  Cng_S8ArrayAppend(Compiler);
   
-  Cng_Str8ArrayAppend(S8("-Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
+  Cng_S8ArrayAppend(S8("-Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
   
   if(Debug)
   {
-   Cng_Str8ArrayAppend(S8("-g -ggdb -g3"));
+   Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
   }
   else if(Release)
   {
-   Cng_Str8ArrayAppend(S8("-O3"));
+   Cng_S8ArrayAppend(S8("-O3"));
   }
-  Cng_Str8ArrayAppend(CommonCompilerFlags);
-  Cng_Str8ArrayAppend(CommonWarningFlags);
-  Cng_Str8ArrayAppend(S8("-Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
+  Cng_S8ArrayAppend(CommonCompilerFlags);
+  Cng_S8ArrayAppend(CommonWarningFlags);
+  Cng_S8ArrayAppend(S8("-Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
  }
  
- Cng_Str8ArrayAppend(LinuxLinkerFlags);
+ Cng_S8ArrayAppend(LinuxLinkerFlags);
 #elif OS_WINDOWS    
  
 #if defined(CLING_MSVC_SETUP)
- Cng_Str8ArrayAppend(S8("cmd /c \"" CLING_MSVC_SETUP));
- Cng_Str8ArrayAppend(S8("&&"));
+ Cng_S8ArrayAppend(S8("cmd /c \"" CLING_MSVC_SETUP));
+ Cng_S8ArrayAppend(S8("&&"));
 #endif
  
- Cng_Str8ArrayAppend(S8("cl"));
- Cng_Str8ArrayAppend(S8("-MTd -Gm- -nologo -GR- -EHa- -Oi -FC -Z7"));
- Cng_Str8ArrayAppend(S8("-Zc:strictStrings-"));
- Cng_Str8ArrayAppend(S8("-WX -W4 -wd4459 -wd4456 -wd4201 -wd4100 -wd4101 -wd4189 -wd4505 -wd4996 -wd4389 -wd4244 -wd5287"));
- Cng_Str8ArrayAppend(S8("-I" CLING_CODE_PATH));
+ Cng_S8ArrayAppend(S8("cl"));
+ Cng_S8ArrayAppend(S8("-MTd -Gm- -nologo -GR- -EHa- -Oi -FC -Z7"));
+ Cng_S8ArrayAppend(S8("-Zc:strictStrings-"));
+ Cng_S8ArrayAppend(S8("-WX -W4 -wd4459 -wd4456 -wd4201 -wd4100 -wd4101 -wd4189 -wd4505 -wd4996 -wd4389 -wd4244 -wd5287"));
+ Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
 #endif
 }
 
@@ -401,7 +404,7 @@ Win32GetEnvironmentVar(char *Name)
 }
 
 internal void
-Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
+Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
 {
  // Globals
  {
@@ -482,16 +485,16 @@ Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
     // NOTE(luca): So that build artifacts end up in the right directory.
     OS_ChangeDirectory((char *)BuildDirPath.Data);
     
-    Cng_SetSelectedArray(Cng_PushStr8Array(256));
+    Cng_SetSelectedArray(Cng_PushS8Array(256));
     Cng_CommonBuildCommand(false, true, true, false);
     
-    Cng_Str8ArrayAppendMultiple(S8("-I"), ClingCodePath);
+    Cng_S8ArrayAppendMultiple(S8("-I"), ClingCodePath);
     
-    Cng_Str8ArrayAppend(ClingSourcePath);
+    Cng_S8ArrayAppend(ClingSourcePath);
     
-    Cng_Str8ArrayAppend(S8Cat(S8("/link -opt:ref -incremental:no /out:"), NewPath));
+    Cng_S8ArrayAppend(S8Cat(S8("/link -opt:ref -incremental:no /out:"), NewPath));
     
-    str8 BuildCommand = Cng_Str8ArrayJoin(' ');
+    str8 BuildCommand = Cng_S8ArrayJoin(' ');
     Cng_RunCommand(BuildCommand);
    }
    
@@ -523,7 +526,18 @@ Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
     if(IsTemp) SetEnvironmentVariableA(CLING_ARG_NOREBUILD, "1");
    }
    
-   Cng_RunCommandAsync(RunPath, true);
+   // Run new executable and pass passed flags to it.
+   {   
+    Cng_Scratch();
+    Cng_S8ArrayAppend(RunPath);
+    for(int Idx = 1; Idx < ArgCount; Idx += 1)
+    {
+     Cng_S8ArrayAppend(S8FromCString(Args[Idx]));
+    }
+    str8 Command = Cng_S8ArrayJoin(' ');
+    
+    Cng_RunCommandAsync(Command, true);
+   }
    
    ExitProcess(0);
   }
@@ -703,7 +717,7 @@ Cng_RunCommand(str8 Command)
  
  // 1. split on whitespace into null-terminated strings.
  //    TODO: skip quotes
- s32 ArgsCount = 0;
+ s32 ArgCount = 0;
  
  for(u64 At = 0; At < Command.Size;)
  {
@@ -714,9 +728,9 @@ Cng_RunCommand(str8 Command)
   
   // Set pointer to ArgsBuffer into Args
   {            
-   Args[ArgsCount] = (char *)(ArgsBuffer + ArgsBufferIndex);
-   ArgsCount += 1;
-   Assert(ArgsCount < (s32)ArrayCount(Args));
+   Args[ArgCount] = (char *)(ArgsBuffer + ArgsBufferIndex);
+   ArgCount += 1;
+   Assert(ArgCount < (s32)ArrayCount(Args));
   }
   
   // Create null terminated string and copy it into ArgsBuffer
@@ -747,7 +761,7 @@ Cng_RunCommand(str8 Command)
 }
 
 internal void
-Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
+Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
 {
  // Globals
  {
@@ -768,7 +782,7 @@ Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
  str8 CommandName = S8FromCString(Args[0]);
  b32 Rebuild = true;
  for(int ArgsIndex = 1;
-     ArgsIndex < ArgsCount;
+     ArgsIndex < ArgCount;
      ArgsIndex++)
  {
   if(!strcmp(Args[ArgsIndex], "norebuild"))
@@ -781,7 +795,7 @@ Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
  {
   Log("[self build]\n");
   
-  Cng_SetSelectedArray(Cng_PushStr8Array(256));
+  Cng_SetSelectedArray(Cng_PushS8Array(256));
   Cng_CommonBuildCommand(false, true, true, false);
   
   str8 ClingSourcePath = Cng_PathFromExe(CommandName, S8(CLING_SOURCE_PATH));
@@ -789,10 +803,10 @@ Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
   
   Log("%S\n", Cng_GetBaseFileName(ClingSourcePath));
   
-  Cng_Str8ArrayAppendMultiple(S8("-o"), CommandName,
-                              S8("-I"), ClingCodePath,
-                              ClingSourcePath);
-  str8 BuildCommand = Cng_Str8ArrayJoin(' ');
+  Cng_S8ArrayAppendMultiple(S8("-o"), CommandName,
+                            S8("-I"), ClingCodePath,
+                            ClingSourcePath);
+  str8 BuildCommand = Cng_S8ArrayJoin(' ');
   
   //Log("%*s\n", (int)BuildCommand.Size, BuildCommand.Data);
   
@@ -802,7 +816,7 @@ Cng_InitAndRebuildSelf(int ArgsCount, char *Args[], char *Env[])
   char *Arguments[64] = {0};
   s32 At;
   for(At = 1;
-      At < ArgsCount;
+      At < ArgCount;
       At++)
   {
    if(strcmp(Args[At], "rebuild"))

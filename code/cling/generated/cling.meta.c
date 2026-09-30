@@ -12,7 +12,8 @@ if(0) {} \
   else if(ConfigMatch(Name, S8("HaversineGenerator"), Value)) HaversineGenerator = 1; \
   else if(ConfigMatch(Name, S8("Sim86"), Value)) Sim86 = 1; \
   else if(ConfigMatch(Name, S8("Editor"), Value)) Editor = 1; \
-  else if(ConfigMatch(Name, S8("Muze"), Value)) Muze = 1;
+  else if(ConfigMatch(Name, S8("Muze"), Value)) Muze = 1; \
+  else if(ConfigMatch(Name, S8("School"), Value)) School = 1;
 #define Cng_ConfigBools \
  \
   b32 Asan = false; \
@@ -27,7 +28,8 @@ if(0) {} \
   b32 HaversineGenerator = false; \
   b32 Sim86 = false; \
   b32 Editor = false; \
-  b32 Muze = false;
+  b32 Muze = false; \
+  b32 School = false;
 
   internal field_hash_node *
   GetFieldHashNode(str8 String, u64 Seed, u64 ArraySize, field_hash_node *Array)

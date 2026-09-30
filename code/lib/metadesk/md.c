@@ -707,7 +707,9 @@ MD_GetScratchDefault(MD_Arena **conflicts, MD_u64 count)
 ////////////////////////////////////////////////////////////////////////////////
 
 #if MD_DEFAULT_SPRINTF
-#define STB_SPRINTF_IMPLEMENTATION
+# if defined(STB_SPRINTF_IMPLEMENTATION)
+#  undef STB_SPRINTF_IMPLEMENTATION
+# endif
 // NOTE(luca): Removed because included elesewhere
 //#define STB_SPRINTF_DECORATE(name) md_stbsp_##name
 #include "lib/stb_sprintf.h"

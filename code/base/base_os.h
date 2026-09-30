@@ -4,13 +4,38 @@
 #define OS_H
 
 //~ Types
+typedef struct cmd_line_entry cmd_line_entry;
+struct cmd_line_entry
+{
+ str8 Name;
+ 
+ str8_node *First;
+ str8_node *Last;
+};
+
+typedef struct cmd_line cmd_line;
+struct cmd_line
+{
+ str8 ExePath;
+ 
+ u64 EntryCapacity;
+ u64 EntryCount;
+ cmd_line_entry *Entries;
+ 
+ str8_node *FirstFile;
+ str8_node *LastFile;
+};
+raddbg_type_view(cmd_line, rows($, ExePath, array(Entries, EntryCount), Files));
+
 typedef struct entry_point_params entry_point_params;
 struct entry_point_params
 {
  thread_context Context;
- int ArgsCount;
+ int ArgCount;
  char **Args;
  char **Env;
+ 
+ cmd_line CmdLine;
 };
 
 typedef struct os_profiler os_profiler;
@@ -69,6 +94,9 @@ global_variable b32 GlobalIsProfiling = true;
 #else
 global_variable b32 GlobalIsProfiling = false;
 #endif
+
+read_only cmd_line_entry _NilCmdLineEntry;
+read_only cmd_line_entry *NilCmdLineEntry = &_NilCmdLineEntry;
 
 //~ Functions
 #define ENTRY_POINT(Name) void *Name(entry_point_params *Params)

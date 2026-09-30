@@ -1215,6 +1215,8 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  
  DrawRect(Box->Rec, BackgroundColor, 0.f, 0.f, 0.f);
  
+ f32 Padding = 16.f;
+ 
  f32 NoteSize = 11.f;
  v2 NoteDim = V2(NoteSize, NoteSize);
  v2 TailDim = V2(2.f, 24.f);
@@ -1230,6 +1232,8 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  
  // Staff Lines
  v2 StaffPos = BoxPos;
+ StaffPos.X += Padding;
+ 
  s32 StaffLineCount = 5;
  f32 StaffLineWidth = 2.f;
  f32 StaffHeight = (f32)(StaffLineCount-1)*NoteSize + StaffLineWidth;
@@ -1270,6 +1274,7 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
   {
    v2 BarPos = V2(BoxPos.X + ((f32)(Idx + 1) * WholeBarWidth),
                   StaffPos.Y);
+   BarPos.X += Padding;
    
    v4 Dest = RectIntersect(RectFromSize(BarPos, BarDim), Box->Rec);
    DrawRect(Dest, BarColor, 0.f, 0.f, 0.f); 
@@ -1319,7 +1324,7 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
    f32 StepHeight = .5f*NoteSize;
    
    f32 NoteYOffset = ((f32)(Steps - 1)*StepHeight);
-   v2 NotePos = V2(BoxPos.X + NoteX, StaffPos.Y + NoteYOffset + .5f*StaffLineWidth);
+   v2 NotePos = V2(Padding + BoxPos.X + NoteX, StaffPos.Y + NoteYOffset + .5f*StaffLineWidth);
    
    if(NoteLength < 4.f)
    {
@@ -1372,8 +1377,8 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  
  // Draw the roll and markers
  {
-  f32 X = (Box->FixedPos.X - Box->Scroll.X);
-  f32 Y = (Box->FixedPos.Y - Box->Scroll.Y);
+  v2 MarkerPos = V2SubV2(BoxPos, Box->Scroll);
+  MarkerPos.X += Padding;
   f32 Height = Box->FixedSize.Y;
   
   f32 Zoom = (BPS/(f32)App->TimeSig*100.f);
@@ -1383,21 +1388,21 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
   {
    f32 Timestamp = Max(Voice->RecordLength, 0.f);
    f32 ZoomedTimestamp = Timestamp*Zoom;
-   RecordMarkerX = X + RoundF32(ZoomedTimestamp);
+   RecordMarkerX = MarkerPos.X + RoundF32(ZoomedTimestamp);
   }
   
   f32 PlayMarkerX;
   {
    f32 Timestamp = Voice->PlayPos;
    f32 ZoomedTimestamp = Timestamp*Zoom;
-   PlayMarkerX = X + RoundF32(ZoomedTimestamp); 
+   PlayMarkerX = MarkerPos.X + RoundF32(ZoomedTimestamp); 
   }
   
-  v4 RecDest = RectFromSize(V2(PlayMarkerX, Y), 
+  v4 RecDest = RectFromSize(V2(PlayMarkerX, MarkerPos.Y), 
                             V2(2.f, Height));
-  v4 RecordDest = RectFromSize(V2(RecordMarkerX, Y), 
+  v4 RecordDest = RectFromSize(V2(RecordMarkerX, MarkerPos.Y), 
                                V2(2.f, Height));
-  v4 PlayDest = RectFromSize(V2(PlayMarkerX, Y), 
+  v4 PlayDest = RectFromSize(V2(PlayMarkerX, MarkerPos.Y), 
                              V2(2.f, Height));
   
   DrawRect(RectIntersect(RecordDest, Box->Rec), Color_Red, 0.f, 0.f, 0.f);
@@ -1921,11 +1926,14 @@ DebugStringAdd(app_state *App, char *Format, ...)
 #define M_Button(ButtonText, ...) \
 Button(.Text = ButtonText, .CenterText = true, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
 
+#define M_IconButton(Kind, Name, ...) \
+M_Button(UI_Icons[Kind], .String = Name, ##__VA_ARGS__)
+
 #define M_ControlButton(ButtonText, ...) \
 Button(.Text = ButtonText, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
 
-#define M_SimpleToggleButton(ButtonText, Toggled, Color) \
-Button(.Text = ButtonText, .Padding = GlobalItemPadding, .HasToggle = true, .ToggleToggled = Toggled, Color_Green, .ToggleToggledColor = Color).OneClicked
+#define M_SimpleToggleButton(ButtonText, Toggled, Color, ...) \
+Button(.Text = ButtonText, .Padding = GlobalItemPadding, .HasToggle = true, .ToggleToggled = Toggled, Color_Green, .ToggleToggledColor = Color, ##__VA_ARGS__).OneClicked
 
 typedef struct m_slider_result m_slider_result;
 struct m_slider_result
@@ -2072,7 +2080,6 @@ M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
   {                                                    
    f32 ScrollableSize = Scrollbar->FixedSize.e[Axis] - ThumbSize;
    f32 Factor = TotalSize/ScrollableSize;
-   //Factor = 1.f;
    
    Spacer = UI_AddBox(S8("Spacer"), 0);
    
@@ -2103,7 +2110,7 @@ M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
    
    Result = ScrollP;
    
-   f32 SpaceBeforeThumb = ScrollP/Factor;
+   f32 SpaceBeforeThumb = (Factor > 0.f ? ScrollP/Factor : 0.f);
    
    Spacer->SemanticSize[Axis] = UI_SizePx(SpaceBeforeThumb, 1.f);
    Spacer->SemanticSize[1 - Axis] = UI_SizeParent(1.f, 0.f);
@@ -2812,8 +2819,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
     }
    }
    
-   f32 PctOnYAxis_ = App->ListerScroll;
-   
    v2 ListerDim = V2(600.f, (f32)ShowItemCount*ItemHeight);
    V2Math ListerDim.E += 2.f*ListerBorderSize;
    ListerDim.Y += ItemHeight + ListerBorderSize;
@@ -2954,11 +2959,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
           }
          }
          
-         f32 TotalElementSize = (f32)FilteredItemCount*ItemHeight;
-         TotalElementSize -= ItemHeight;
+         
+         FilteredItemCount = Max(FilteredItemCount, 1);
+         f32 TotalElementSize = (f32)(FilteredItemCount - 1)*ItemHeight;
          
          App->ListerScroll = M_Scrollbar(Axis2_Y, TotalElementSize, App->ListerScroll);  
-         
+         Assert(App->ListerScroll >= 0.f);
         }
        }
       }
@@ -3073,8 +3079,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
              // Close button 
              {
               ui_box *Close;
-              UI_BackgroundColor(Color_ButtonBackground)
-               UI_SemanticWidth(UI_SizePx(30.f, 1.f))
+              UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                UI_FontKind(FontKind_Icon)
                //UI_Debug(true)
                Close = UI_AddBox(S8("CloseButton"), (UI_BoxFlag_DrawBackground|
@@ -3343,8 +3348,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
                UI_FontKind(FontKind_Icon)
                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                {
-                if(Button(.String = S8("PlayButton"), .Text = UI_Icons[UI_IconKind_Play],
-                          .CenterText = true, .TextColor = (!Piece->IsPlaying ? Color_Green : Color_ButtonText)).Pressed)
+                
+                if(2)
+                {
+                 UI_SemanticWidth(UI_SizeText(1.f, 1.f))
+                  UI_AddBox(S8("Hello"), UI_BoxFlag_DrawDisplayString);
+                }
+                
+                if(M_IconButton(UI_IconKind_Play, S8("Play"), .TextColor = (Piece->IsPlaying ? Color_Green : Color_ButtonText)))
                 {
                  if(!Piece->IsPlaying)
                  {
@@ -3353,24 +3364,20 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  }
                 }
                 
-                if(Button(.String = S8("PauseButton"), .Text = UI_Icons[UI_IconKind_Pause],
-                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Yellow : Color_ButtonText)).Pressed)
+                if(M_IconButton(UI_IconKind_Pause, S8("Pause")))
                 {
                  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
                  Piece->IsPlaying = false;
                 }
                 
-                if(Button(.String = S8("StopButton"), .Text = UI_Icons[UI_IconKind_Stop],
-                          .CenterText = true, .TextColor = (Piece->IsPlaying ? Color_Red : Color_ButtonText)).Pressed)
+                if(M_IconButton(UI_IconKind_Stop, S8("Stop")))
                 {
                  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
                  
                  Piece->PlayPos = 0.f;
                  Piece->IsPlaying = false;
                 }
-                
                }
-               
                
                Piece->Metronome ^= 
                 M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta);
@@ -3771,7 +3778,15 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_DebugInfo;
                 }
                 
-                App->HeightPx = M_Slider(S8("SetFontSize"), S8("Set Font Size"), Str8Fmt("%.0f", App->HeightPx), App->HeightPx,
+                {                
+                 f32 Speed = UI_State->AnimSpeedCoeff;
+                 Speed = M_Slider(S8("SetAnimSpeed"), S8("Set animation speed"), 
+                                  Str8Fmt("%.0f", Speed),
+                                  Speed, 0.f, 120.f, 1.f, false).Value;
+                 UI_State->AnimSpeedCoeff = Speed;
+                }
+                
+                App->HeightPx = M_Slider(S8("SetFontSize"), S8("Set font size"), Str8Fmt("%.0f", App->HeightPx), App->HeightPx,
                                          11.f, 64.f, 1.f, false,
                                          .SliderSize = SliderSize).Value;
                 
@@ -3808,15 +3823,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                  UI_FontKind(FontKind_Icon)
                 {                 
-                 if(Button(.String = S8("Record"), .Text = UI_Icons[UI_IconKind_Record], .CenterText = true,
-                           .TextColor = (Voice->IsRecording ? Color_Red : Color_ButtonText)).OneClicked)
+                 if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Voice->IsRecording ? Color_Red : Color_ButtonText)))
                  {
                   PushCommand(App, Command_ToggleRecording);
                  }
                  
-                 
-                 if(Button(.String = S8("Play"), .Text = UI_Icons[UI_IconKind_Play], .CenterText = true,
-                           .TextColor = (Voice->IsPlaying ? Color_Green : Color_ButtonText)).OneClicked)
+                 if(M_IconButton(UI_IconKind_Play, S8("Play"), .TextColor = (Voice->IsPlaying ? Color_Green : Color_ButtonText)))
                  {
                   PushCommand(App, Command_TogglePlaying);
                  }
@@ -3973,6 +3985,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
           {                                    
            if(UI_IsActive(GapBox))
            {
+            // NOTE(luca): Since this will change the position of the elements, they will 
+            // want to animate from their FixedPos to their AnimatedPos.  To reset their 
+            // AnimatedPos we disable animations while dragging.
+            UI_State->IsAnimating = false;
+            
             s32 PosOnAxis = Input->Mouse.Pos.e[LayoutAxis];
             
             if(GapBox->WasClicked)

@@ -159,7 +159,9 @@ struct ui_state
  ui_box *BoxTable;
  
  // Constants
+ f32 AnimSpeedCoeff;
  f32 AnimSpeed;
+ b32 IsAnimating;
  
  ui_key Active;
  ui_key Hot;
