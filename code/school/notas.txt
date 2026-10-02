@@ -1,16 +1,10 @@
-In te halen:
+# In te halen:
 
 projectmanagement en communicatie (21/09, 23/09)
 electronics - basics (22/09, 24/09, 25/09
+-> p1-23
+ 
 interface technology (25/09)
-
-
-# Embedded fundamentals 30/09/2026
-
-## Todo
-AduC condensed
--> afprinten
-50eur cash menemen voor bordje.
 
 # Projectmanagement en communicatie 30/09/2026
 "PMBok" Guide
@@ -53,8 +47,13 @@ Software Design Essentials
 Software Design & Quality Assurance
 
 
-# Embedded fundamentals labo 30/09/2026
+# Embedded fundamentals 30/09/2026
+## Todo
+AduC condensed
+-> afprinten
+50eur cash menemen voor bordje.
 
+## Nota's
 2KB nuttig programma = 20/20
 
 Vraag

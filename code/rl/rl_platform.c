@@ -1,4 +1,5 @@
 //~ Libraries 
+#define BASE_EXTERNAL_LIBS 1
 #if RL_PLATFORM_INTERNAL
 # define BASE_CONSOLE_APPLICATION 0
 #endif

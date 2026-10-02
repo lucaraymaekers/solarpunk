@@ -32,12 +32,24 @@ NO_WARNINGS_END
 # pragma comment(linker, "/export:UpdateAndRender")
 #endif
 
+//~ 
+#define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
+#define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
+#define IsNilNote(Note) CheckNil(Note, NilNote)
+#define IsNilPieceNote(Note) CheckNil(Note, NilPieceNote)
+
 //~ Globals
 global_variable tsf *GlobalTSF;
 global_variable tsf *NilTSF;
 global_variable panel *NilPanel;
 global_variable drag_data *DragData;
 global_variable ui_size GlobalItemPadding;
+
+global_variable rec_note *NilNote;
+global_variable piece_note *NilPieceNote;
+global_variable piece *NilPiece;
+
+global_variable f32 dtForFrame;
 
 global_variable b32 NotePianoColors[] =
 {
@@ -61,16 +73,10 @@ InitReadOnlyGlobals(arena *Arena)
  NilPanel = PushArray(Arena, panel, 1);
  NilNote = PushArray(Arena, rec_note, 1);
  NilPieceNote = PushArray(Arena, piece_note, 1);
+ NilPiece = PushArray(Arena, piece, 1);
 }
 
 //~ Panels
-
-internal b32
-IsNilPanel(panel *Panel)
-{
- b32 Result = (!Panel || Panel == NilPanel);
- return Result;
-}
 
 global_variable arena *PanelArena = 0;
 global_variable b32 PanelAppendToParent = false;
@@ -540,14 +546,6 @@ PanelSelect(app_state *App, panel *Panel)
  }
 }
 
-//~ Muze - Notes 
-internal b32
-IsNilNote(rec_note *Note)
-{
- b32 Result = (Note == NilNote || Note == 0);
- return Result;
-}
-
 //~ Muze - Voices 
 internal void
 VoiceReset(voice *Voice)
@@ -981,6 +979,74 @@ PieceWasTimestampPlayed(piece *Piece, f32 Timestamp)
  return Result;
 }
 
+internal piece *
+PieceAlloc(app_state *App)
+{
+ piece *Result = NilPiece;
+ 
+ if(App->PieceCount < App->MaxPieceCount)
+ { 
+  if(!IsNilPiece(App->NextFreePiece))
+  {
+   Result = App->NextFreePiece;
+   App->NextFreePiece = Result->Next;
+  }
+  else
+  {
+   Result = PushArray(App->PieceArena, piece, 1);
+   
+   // Allocate channel
+   {   
+    Result->Preset = 73;
+    Result->Channel = App->NextChannelIdx;
+    App->NextChannelIdx += 1;
+    tsf_channel_set_presetindex(GlobalTSF, Result->Channel, Result->Preset);
+   }
+  }
+  
+  // Defaults
+  if(!IsNilPiece(Result))
+  {
+   Result->BPM = 60;
+   Result->TimeSigNum = 2;
+   Result->TimeSigDen = 4;
+   Result->Key = Note_C;
+   Result->Major = true;
+   
+   Result->NoteCount = 0;
+   Result->Octave = 4;
+   
+   Result->BarWrapping = true;
+   Result->BarPadding = 16.f;
+   Result->BeatWidth = 64.f;
+   Result->NoteSize = 11.f;
+   Result->StaffLineWidth = 1.f;
+   Result->TailHeight = 24.f;
+  }
+  
+  DLLAppend(Result, App->FirstPiece, App->LastPiece);
+  App->PieceCount += 1;
+ }
+ else
+ {
+  ErrorLog("Max piece countreached.\n");
+ }
+ 
+ return Result;
+}
+
+internal void
+PieceStopPlaying(piece *Piece)
+{
+ if(Piece->IsPlaying)
+ {
+  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+  Piece->IsPlaying = false;
+ }
+}
+
+#include "../data/muze/muze_pieces.c"
+
 //~ UI 
 internal ui_box *
 Label(str8 String)
@@ -1225,7 +1291,7 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  
  v4 BarColor = ForegroundColor;
  
- v2 BoxPos = V2(Box->FixedPos.X - Box->Scroll.X, Box->FixedPos.Y);
+ v2 BoxPos = V2SubV2(Box->FixedPos, Box->Scroll);
  v2 BoxSize = Box->FixedSize;
  
  f32 BPS = (App->BPM/60.f);
@@ -1235,7 +1301,7 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  StaffPos.X += Padding;
  
  s32 StaffLineCount = 5;
- f32 StaffLineWidth = 2.f;
+ f32 StaffLineWidth = 1.f;
  f32 StaffHeight = (f32)(StaffLineCount-1)*NoteSize + StaffLineWidth;
  
  // Bars
@@ -1265,14 +1331,11 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
   }
  }
  
- // Input
- custom_draw_note_input_result NoteInput = CustomDrawNoteInput(Box);
- 
  // Draw bars
  {    
-  for EachIndex(Idx, (s32)BarCount)
+  for EachIndex(Idx, (s32)BarCount + 1)
   {
-   v2 BarPos = V2(BoxPos.X + ((f32)(Idx + 1) * WholeBarWidth),
+   v2 BarPos = V2(BoxPos.X + ((f32)(Idx) * WholeBarWidth),
                   StaffPos.Y);
    BarPos.X += Padding;
    
@@ -1280,6 +1343,9 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
    DrawRect(Dest, BarColor, 0.f, 0.f, 0.f); 
   }
  }
+ 
+ // Input
+ custom_draw_note_input_result NoteInput = CustomDrawNoteInput(Box);
  
  for EachNote(Note, Voice->FirstNote)
  {        
@@ -1377,7 +1443,7 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  
  // Draw the roll and markers
  {
-  v2 MarkerPos = V2SubV2(BoxPos, Box->Scroll);
+  v2 MarkerPos = BoxPos;
   MarkerPos.X += Padding;
   f32 Height = Box->FixedSize.Y;
   
@@ -1499,11 +1565,25 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   }
  }
  
- // Draw playing marker 
+ // Draw playing and recording marker 
+ for EachIndex(Idx, 2)
  {
-  v2 MarkerPos = Pos;
-  f32 Start = Piece->PlayPos;
+  v4 Color = {0};
+  f32 Start = 0.f;
   
+  if(Idx == 0)
+  {
+   Color = Color_Green;
+   Start = Piece->PlayPos;
+  }
+  
+  if(Idx == 1)
+  {
+   Color = Color_Red;
+   Start = Piece->RecordLength;
+  }
+  
+  v2 MarkerPos = Pos;
   s32 BarIdx = (s32)FloorF32(Start/Piece->TimeSigNum);
   s32 HeightIdx = BarIdx/BarsPerWidth;
   
@@ -1519,7 +1599,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   MarkerPos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
   
   v4 Dest = RectFromSize(MarkerPos, V2(StaffLineWidth, StaffHeight));
-  DrawRect(Dest, Color_Green, 0.f, 0.f, 0.f);
+  DrawRect(Dest, Color, 0.f, 0.f, 0.f);
  }
  
  // Draw notes
@@ -2183,7 +2263,7 @@ MS_Ser(Serializer, &Dummy); \
 } while(0)
 
 internal void
-MS_Piece(ms_serializer *Serializer, app_state *App, piece *Piece)
+MS_Piece(ms_serializer *Serializer, piece *Piece)
 {
  MS_Add(MSV_Initial, &Piece->BPM);
  MS_Add(MSV_Initial, &Piece->TimeSigNum);
@@ -2199,6 +2279,50 @@ MS_Piece(ms_serializer *Serializer, app_state *App, piece *Piece)
  }
  
  MS_Add(MSV_Initial, &Piece->BarWrapping);
+}
+
+internal void
+M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
+{
+ ms_serializer Serializer = {0};
+ Serializer.IsReading = Read;
+ 
+ char *FilePath = PathFromExe(FrameArena, Path);
+ 
+ if(Serializer.IsReading)
+ {
+  Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
+  if(Serializer.Buffer.Size)
+  {               
+   MS_Ser(&Serializer, &Serializer.Version);
+   if(Serializer.Version <= MSV_Latest)
+   {
+    MS_Piece(&Serializer, Piece);
+   }
+   else
+   {
+    DebugBreak();
+    ErrorLog("Cannot read file from the future.\n");
+   }
+   
+   OS_FreeFileMemory(Serializer.Buffer);
+  }
+ }
+ else
+ {
+  u64 MaxMemorySize = KB(64);
+  Serializer.Buffer = PushS8(Arena, MaxMemorySize);
+  Serializer.Version = MSV_Latest;
+  
+  MS_Ser(&Serializer, &Serializer.Version);
+  MS_Piece(&Serializer, Piece);
+  
+  str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
+  
+  ArenaFree(Arena, (MaxMemorySize - Out.Size));
+  
+  OS_WriteEntireFile(FilePath, Out);
+ }
 }
 
 //~ EntryPoint
@@ -2250,6 +2374,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    App->TSFArena = PushArena(PermanentArena, MB(500), false);
    App->ReadOnlyArena = PushArray(PermanentArena, arena, 1);
    App->PanelArena = PushArena(PermanentArena, MB(64), false);
+   App->PieceArena = PushArena(PermanentArena, MB(16), false);
   }
   
   // Globals
@@ -2357,9 +2482,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
     }
    }
    
-   App->MaxPieceCount = KB(1);
+   App->MaxPieceCount = (App->PieceArena->Size/sizeof(piece));
    App->PieceCount = 0;
-   App->Pieces = PushArray(App->Arena, piece, App->MaxPieceCount);
   }
   
   OS_ProfileAndPrint("Muze init");
@@ -2412,7 +2536,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
     *RecNote = (rec_note){RecNote, RecNote};
     
     piece_note *PieceNote = PushArray(Arena, piece_note, 1);
-    MemoryZero(PieceNote);
+    
+    piece *Piece = PushArray(Arena, piece, 1);
+    *Piece = (piece){Piece};
    }
    
    OS_MarkReadonly(Arena->Base, Arena->Size);
@@ -3119,221 +3245,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
             else if(Panel->Kind == PanelKind_Piece)
             {
              b32 Loop = true;
-             piece *Piece = Panel->Piece;
-             if(Panel->Piece == 0)
-             {
-              Piece = Panel->Piece = GetP(App->Pieces, App->MaxPieceCount, App->PieceCount);
-              App->PieceCount += 1;
-              
-              Piece->Name = S8("lecon_12");
-              
-              Piece->Preset = 73;
-              Piece->Channel = App->NextChannelIdx;
-              App->NextChannelIdx += 1;
-              tsf_channel_set_presetindex(GlobalTSF, Piece->Channel, Piece->Preset);
-              
-              Piece->BPM = 60;
-              Piece->TimeSigNum = 2;
-              Piece->TimeSigDen = 4;
-              Piece->Key = Note_D;
-              Piece->Major = true;
-              
-              Piece->NoteCount = 0;
-              Piece->Octave = 4;
-              
-              Piece->BarWrapping = true;
-              Piece->BarPadding = 16.f;
-              Piece->BeatWidth = 64.f;
-              Piece->NoteSize = 11.f;
-              Piece->StaffLineWidth = 1.f;
-              Piece->TailHeight = 24.f;
-              
-#if 1    
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 3.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_E, 1.f/4.f);
-              
-              PiecePart1(Piece, Note_Fs, Note_Fs, Note_E);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_E, 1.f/1.f);
-              
-              PiecePart1Silence(Piece, Note_Fs, Note_Fs, Note_E);
-              PiecePart1Silence(Piece, Note_Fs, Note_Fs, Note_E);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Fs, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D, 1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0,      1.f/1.f);
-              
-              // Double repeat
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D  + 0,  1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_B  - 12, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Cs + 0,  1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D  + 0,  1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_E  + 0,  1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Fs + 0,  3.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_B  + 0,  1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Cs + 12, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D  + 12, 1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Cs + 12, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_B  + 0,  1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Fs + 0,  1.f/2.f);
-              
-              PiecePart1Silence(Piece, Note_E, Note_E,  Note_Fs);
-              PiecePart1(       Piece, Note_G, Note_Fs, Note_E);
-              PiecePart1Silence(Piece, Note_D, Note_E,  Note_D);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Cs + 0,  1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Cs + 0, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Cs + 0,  1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_D  + 0,  1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_E  + 0,  1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Note_Fs + 0,  1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0,            1.f/1.f);
-              
-              PiecePart1(       Piece, Note_Fs, Note_Fs, Note_E);
-              PiecePart1Silence(Piece, Note_Fs, Note_E,  Note_Fs);
-              PiecePart1(       Piece, Note_G,  Note_G,  Note_Fs);
-              PiecePart1Silence(Piece, Note_G,  Note_Fs, Note_G);
-              PiecePart1(       Piece, Note_A,  Note_A,  Note_G);
-              PiecePart1Silence(Piece, Note_A,  Note_G,  Note_A);
-              PiecePart1(       Piece, Note_B,  Note_A,  Note_B);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Cs + 12, 1.f/1.f); 
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 1.f/2.f); 
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/2.f); 
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_B, 3.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_B, 1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A,  1.f/3.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G,  1.f/3.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Fs, 1.f/3.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_E,  1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D,  1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Cs, 3.f/1.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0,  1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_B - 12,  1.f/2.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_B - 12,  4.f/1.f);
-              
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, 0, 2.f/1.f);
-#elif 1
-              Piece->BPM = 60;
-              Piece->TimeSigNum = 3;
-              Piece->TimeSigDen = 4;
-              Piece->Key = Note_As;
-              Piece->Major = true;
-              
-              //- System 1 
-              // Bar 1 
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/3.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/3.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/3.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
-              
-              // Bar 2
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, Note_F, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/2.f);
-              
-              // Bar 3 
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 3.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_Ds, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/4.f);
-              
-              // Bar 4
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Silence, Note_F, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/2.f);
-              
-              //- System 2 
-              // Bar 1
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/1.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_D+12, 3.f/2.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C+12, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_As, 1.f/4.f);
-              
-              // Bar 2
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_F, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_G, 1.f/4.f);
-              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_A, 1.f/1.f);
-              
-              // Bar 3
-              // Bar 4
-#endif
-              
-             }
+             piece *Piece = (Panel->Piece ? Panel->Piece : PieceAlloc(App));
+             Panel->Piece = Piece;
              
-#if 0             
-             //- Piece Serialization
-             {
-              ms_serializer Serializer = {0};
-              Serializer.IsReading = !Memory->Initialized;
-              
-              str8 FileName = Str8Fmt("../data/muze/%S.muze_piece", Piece->Name);
-              char *FilePath = PathFromExe(FrameArena, FileName);
-              
-              if(Serializer.IsReading)
-              {
-               Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
-               if(Serializer.Buffer.Size)
-               {               
-                MS_Ser(&Serializer, &Serializer.Version);
-                if(Serializer.Version <= MSV_Latest)
-                {
-                 MS_Piece(&Serializer, Piece);
-                }
-                else
-                {
-                 DebugBreak();
-                 ErrorLog("Cannot read file from the future.\n");
-                }
-                
-                OS_FreeFileMemory(Serializer.Buffer);
-               }
-              }
-              else
-              {
-               Serializer.Buffer = PushS8(FrameArena, MB(8));
-               Serializer.Version = MSV_Latest;
-               
-               MS_Ser(&Serializer, &Serializer.Version);
-               MS_Piece(&Serializer, Piece);
-               
-               str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
-               OS_WriteEntireFile(FilePath, Out);
-              }
-             }
-#endif
+             //PieceLecon11(Piece);
              
              ui_box *PieceBox;
              
@@ -3348,11 +3263,30 @@ UPDATE_AND_RENDER(UpdateAndRender)
                UI_FontKind(FontKind_Icon)
                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                {
+                str8 PieceFilePath = S8("../data/muze/lecon_11.muze_piece");
                 
-                if(2)
+                if(M_IconButton(UI_IconKind_File, S8("Open")))
                 {
-                 UI_SemanticWidth(UI_SizeText(1.f, 1.f))
-                  UI_AddBox(S8("Hello"), UI_BoxFlag_DrawDisplayString);
+                 M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
+                }
+                
+                if(M_IconButton(UI_IconKind_Save, S8("Save")))
+                {
+                 M_SerializePiece(FrameArena, false, PieceFilePath, Piece);
+                }
+                
+                if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
+                {
+                 PieceStopPlaying(Piece);
+                 
+                 if(Piece->IsRecording)
+                 {
+                  Piece->IsRecording = false;
+                 }
+                 else
+                 {
+                  Piece->IsRecording = true;
+                 }
                 }
                 
                 if(M_IconButton(UI_IconKind_Play, S8("Play"), .TextColor = (Piece->IsPlaying ? Color_Green : Color_ButtonText)))
@@ -3366,17 +3300,16 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 
                 if(M_IconButton(UI_IconKind_Pause, S8("Pause")))
                 {
-                 tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-                 Piece->IsPlaying = false;
+                 PieceStopPlaying(Piece);
                 }
                 
                 if(M_IconButton(UI_IconKind_Stop, S8("Stop")))
                 {
-                 tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-                 
+                 PieceStopPlaying(Piece);
                  Piece->PlayPos = 0.f;
-                 Piece->IsPlaying = false;
                 }
+                
+                
                }
                
                Piece->Metronome ^= 
@@ -3461,72 +3394,78 @@ UPDATE_AND_RENDER(UpdateAndRender)
               PieceBox->CustomDraw = CustomDrawPiece;
               f32 BPS = Piece->BPM/60.f;
               
-              for EachIndex(Idx, Piece->NoteCount)
+              if(Piece->IsPlaying)
               {
-               piece_note *Note = Piece->Notes + Idx;
-               
-               if(Note->Kind == PieceNoteKind_Pitch)
+               // Play notes
                {
-                if(Piece->IsPlaying)
-                 
+                for EachIndex(Idx, Piece->NoteCount)
                 {
-                 if(Piece->Metronome)
-                 {
-                  f32 Duration = 0.2f; 
-                  f32 Start = FloorF32(Piece->PlayPos);
-                  f32 End = Start + Duration*BPS;
-                  b32 HasPlayed = PieceWasTimestampPlayed(Piece, Start);
-                  b32 HasStopped = PieceWasTimestampPlayed(Piece, End);
-                  
-                  s32 Pitch = Note_A + 6*12;
-                  
-                  if(HasPlayed)
-                  {
-                   tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
-                  }
-                  
-                  if(HasStopped)
-                  {
-                   tsf_channel_note_off(GlobalTSF, App->MetronomeChannel, Pitch);
-                  }
-                 }
+                 piece_note *Note = Piece->Notes + Idx;
                  
-                 // Piece notes
-                 {                 
-                  f32 Start = Note->Start;
-                  f32 End = Start + Note->Length;
-                  
-                  b32 NoteIsPlaying = PieceWasTimestampPlayed(Piece, Start);
-                  b32 NoteHasEnded = PieceWasTimestampPlayed(Piece, End);
-                  
-                  s32 Pitch = Note->Pitch + 1*12;
-                  
-                  if(NoteIsPlaying)
+                 if(Note->Kind == PieceNoteKind_Pitch)
+                 {
+                  if(Piece->Metronome)
                   {
-                   tsf_channel_note_on(GlobalTSF, Piece->Channel, Pitch, .5f);
+                   f32 Duration = 0.2f; 
+                   f32 Start = FloorF32(Piece->PlayPos);
+                   f32 End = Start + Duration*BPS;
+                   b32 HasPlayed = PieceWasTimestampPlayed(Piece, Start);
+                   b32 HasStopped = PieceWasTimestampPlayed(Piece, End);
+                   
+                   s32 Pitch = Note_A + 6*12;
+                   
+                   if(HasPlayed)
+                   {
+                    tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
+                   }
+                   
+                   if(HasStopped)
+                   {
+                    tsf_channel_note_off(GlobalTSF, App->MetronomeChannel, Pitch);
+                   }
                   }
                   
-                  if(NoteHasEnded)
-                  {
-                   tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
+                  // Piece notes
+                  {                 
+                   f32 Start = Note->Start;
+                   f32 End = Start + Note->Length;
+                   
+                   b32 NoteIsPlaying = PieceWasTimestampPlayed(Piece, Start);
+                   b32 NoteHasEnded = PieceWasTimestampPlayed(Piece, End);
+                   
+                   s32 Pitch = Note->Pitch + 1*12;
+                   
+                   if(NoteIsPlaying)
+                   {
+                    tsf_channel_note_on(GlobalTSF, Piece->Channel, Pitch, .5f);
+                   }
+                   
+                   if(NoteHasEnded)
+                   {
+                    tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
+                   }
                   }
                  }
                 }
+               }
+               
+               // Increment playpos
+               {               
+                Piece->PlayPos += BPS*Input->dtForFrame;
                 
+                b32 PieceEnded = (Piece->PlayPos > Piece->RecordLength);
+                if(PieceEnded)
+                {
+                 tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+                 Piece->PlayPos = 0.f;
+                 if(!Loop) Piece->IsPlaying = false;
+                }
                }
               }
               
-              if(Piece->IsPlaying)
+              if(Piece->IsRecording)
               {
-               Piece->PlayPos += BPS*Input->dtForFrame;
-               
-               b32 PieceEnded = (Piece->PlayPos > Piece->RecordLength);
-               if(PieceEnded)
-               {
-                tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-                Piece->PlayPos = 0.f;
-                if(!Loop) Piece->IsPlaying = false;
-               }
+               Piece->RecordLength += BPS*dtForFrame;
               }
               
               // Scrollbar

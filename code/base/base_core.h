@@ -219,6 +219,7 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 Node->Prev = Last, \
 Last = Node)
 
+#define CheckNil(Datum, Nil) (Datum == 0 || Datum == Nil)
 
 //~ Attributes
 #define internal static

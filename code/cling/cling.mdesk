@@ -16,8 +16,8 @@ Config:
  { HaversineGenerator 0 }
  { Sim86              0 }
  { Editor             0 }
- { Muze               0 }
- { School             1 }
+ { Muze               1 }
+ { School             0 }
 }
 
 //~ Config

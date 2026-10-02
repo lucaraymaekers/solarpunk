@@ -1,3 +1,4 @@
+#if !BASE_NO_ENTRYPOINT
 ENTRY_POINT(OS_EntryPoint)
 {
  arena *Arena = GetScratch();
@@ -80,6 +81,7 @@ ENTRY_POINT(OS_EntryPoint)
  
  return EntryPoint(Params);
 }
+#endif
 
 internal cmd_line_entry *
 CmdLineGetEntry(cmd_line *CmdLine, str8 Search)

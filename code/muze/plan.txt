@@ -1,4 +1,9 @@
 # Now
+
+- Use piece view for both input and representation
+  -> just convert on the fly
+     -> if we want to replay we can just convert back.
+
 X Serialization
   - Implement Undo for commands.
   - Serialize state along commands.
@@ -8,7 +13,7 @@ X Serialization
 - Implement key sharps and steps accordingly
   - We will want to force a sharp in the future
 - Merge bpm in both sheet & piece
-- Timeline marker for playing position in piece
+x Timeline marker for playing position in piece
 
 Bugs:
 - bug: when doing sliders and toggles at different sizes they end up looking wrong.
@@ -16,7 +21,6 @@ Bugs:
 - bug: win32: MIDI devices are not getting selected correctly
 - bug: win32?: When clicking it only focuses the window and does not click the elements
        maybe there is a frame of delay?
-- bug: ui: Text with 0 horizontal padding will be clipped, fix this.
 - bug: ui: When changing the BPM too fast it can skip over the ending of the note and never stop playing the note.
 
 Demo:
@@ -204,4 +208,4 @@ x SelectPanel() function that sets selectedvoice etc.
 x bug: ui: Releasing outside the box still clicks (wrong logic in UI_BeginLayout)
 x bug: ui: When moving panels it animates the buttons (introducec IsAnimating ui state)
 x bug: ui: The lister sometimes has an "empty" element and selected. (division by 0)
-
+x bug: ui: Text with 0 horizontal padding will be clipped, fix this.

@@ -58,7 +58,7 @@ union v4
 };
 #define V4Arg(Value) (Value).X, (Value).Y, (Value).Z, (Value).W
 
-#define Color(Name) {U32ToV4Arg(ColorU32_##Name)}
+#define ColorU32(Name) {U32ToV4Arg(ColorU32_##Name)}
 
 #define U32ToV4Arg(Value) \
 ((f32)(((Value) >> 8*2) & 0xFF)/255.0f), \

@@ -26,7 +26,8 @@ struct piece_note
 typedef struct piece piece; 
 struct piece 
 {
- piece *NextFree;
+ piece *Next;
+ piece *Prev;
  
  str8 Name;
  
@@ -51,6 +52,7 @@ struct piece
  
  // UI
  b32 BarWrapping;
+ b32 PageWrapping;
  f32 BarPadding;
  f32 BeatWidth;
  f32 NoteSize;
@@ -310,9 +312,12 @@ struct app_state
  voice *Voices;
  voice *SelectedVoice;
  
- piece *Pieces;
+ arena *PieceArena;
+ piece *FirstPiece;
+ piece *LastPiece;
  u64 PieceCount;
  u64 MaxPieceCount;
+ piece *NextFreePiece;
  
  s32 TimeSig;
  f32 BPM;
@@ -368,9 +373,5 @@ struct custom_draw__single_line_text_input_params
 
 //~ Globals
 #define DefaultHeightPx 20
-
-global_variable rec_note *NilNote;
-global_variable piece_note *NilPieceNote;
-global_variable f32 dtForFrame;
 
 #endif //MUZE_APP_H

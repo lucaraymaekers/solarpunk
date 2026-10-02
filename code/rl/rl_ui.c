@@ -19,13 +19,6 @@ UI_ConsumeInput(app_input *Input, ui_box *Box)
 }
 
 internal b32
-UI_IsNilBox(ui_box *Box)
-{
- b32 Result = (Box == 0) || (Box == UI_NilBox);
- return Result;
-}
-
-internal b32
 UI_IsDebugBox(ui_box *Box)
 {
  b32 Result = Box->Debug;

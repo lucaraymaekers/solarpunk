@@ -21,28 +21,28 @@
  #define ColorU32_Secondary 0xff3016B0
  #define ColorU32_Contrast 0xff282525
  
-v4 Color_Frost0 = Color(Frost0);
- v4 Color_Frost1 = Color(Frost1);
- v4 Color_Frost2 = Color(Frost2);
- v4 Color_Frost3 = Color(Frost3);
- v4 Color_Snow0 = Color(Snow0);
- v4 Color_Snow1 = Color(Snow1);
- v4 Color_Snow2 = Color(Snow2);
- v4 Color_Night0 = Color(Night0);
- v4 Color_Night1 = Color(Night1);
- v4 Color_Night2 = Color(Night2);
- v4 Color_Night3 = Color(Night3);
- v4 Color_Red = Color(Red);
- v4 Color_Orange = Color(Orange);
- v4 Color_Yellow = Color(Yellow);
- v4 Color_Green = Color(Green);
- v4 Color_Magenta = Color(Magenta);
- v4 Color_Cyan = Color(Cyan);
- v4 Color_Blue = Color(Blue);
- v4 Color_Black = Color(Black);
- v4 Color_Primary = Color(Primary);
- v4 Color_Secondary = Color(Secondary);
- v4 Color_Contrast = Color(Contrast);
+v4 Color_Frost0 = ColorU32(Frost0);
+ v4 Color_Frost1 = ColorU32(Frost1);
+ v4 Color_Frost2 = ColorU32(Frost2);
+ v4 Color_Frost3 = ColorU32(Frost3);
+ v4 Color_Snow0 = ColorU32(Snow0);
+ v4 Color_Snow1 = ColorU32(Snow1);
+ v4 Color_Snow2 = ColorU32(Snow2);
+ v4 Color_Night0 = ColorU32(Night0);
+ v4 Color_Night1 = ColorU32(Night1);
+ v4 Color_Night2 = ColorU32(Night2);
+ v4 Color_Night3 = ColorU32(Night3);
+ v4 Color_Red = ColorU32(Red);
+ v4 Color_Orange = ColorU32(Orange);
+ v4 Color_Yellow = ColorU32(Yellow);
+ v4 Color_Green = ColorU32(Green);
+ v4 Color_Magenta = ColorU32(Magenta);
+ v4 Color_Cyan = ColorU32(Cyan);
+ v4 Color_Blue = ColorU32(Blue);
+ v4 Color_Black = ColorU32(Black);
+ v4 Color_Primary = ColorU32(Primary);
+ v4 Color_Secondary = ColorU32(Secondary);
+ v4 Color_Contrast = ColorU32(Contrast);
  
 enum base_note
 {

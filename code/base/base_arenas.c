@@ -71,7 +71,7 @@ ArenaSetPos(arena *Arena, u64 Pos)
 internal void
 ArenaFree(arena *Arena, u64 Size)
 {
- //Assert(Size >= Arena->Pos);
+ Assert(Size <= Arena->Pos);
  
  Arena->Pos -= Size;
  

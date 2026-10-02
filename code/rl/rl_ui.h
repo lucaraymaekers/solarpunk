@@ -192,11 +192,11 @@ global_variable ui_state *UI_State = 0;
 
 global_variable ui_box *UI_NilBox = 0;
 
-global_variable v4 Color_Background = Color(Night3);
-global_variable v4 Color_Foreground = Color(Snow0);
-global_variable v4 Color_ButtonBorder = Color(Night2);
-global_variable v4 Color_ButtonBackground = Color(Night0);
-global_variable v4 Color_ButtonText = Color(Black);
+global_variable v4 Color_Background = ColorU32(Night3);
+global_variable v4 Color_Foreground = ColorU32(Snow0);
+global_variable v4 Color_ButtonBorder = ColorU32(Night2);
+global_variable v4 Color_ButtonBackground = ColorU32(Night0);
+global_variable v4 Color_ButtonText = ColorU32(Black);
 
 #define UI_SizePx(Value, Strictness) UI_Size(UI_SizeKind_Pixels, Value, Strictness)
 #define UI_SizeText(Value, Strictness) UI_Size(UI_SizeKind_TextContent, Value, Strictness)
@@ -267,3 +267,5 @@ UI_SemanticHeight(UI_SizeParent(1.f, 1.f)) \
 UI_SemanticWidth(UI_SizeParent(1.f, 1.f))
 
 #define UI_FillOnAxis(Axis) UI_SemanticSizeOnAxis(Axis, UI_SizeParent(1.f, 0.f))
+
+#define UI_IsNilBox(Box) CheckNil(Box, UI_NilBox)

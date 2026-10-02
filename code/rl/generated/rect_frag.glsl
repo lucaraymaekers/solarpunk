@@ -88,7 +88,8 @@
   if(VS_HasTexture > 0)
   {
    f32 Alpha = texture(Texture, VS_TexCoord).r;
-   Color.a *= Alpha;;
+   
+   Color.a *= Alpha;
   }
   
   Color.a *= tBorder;

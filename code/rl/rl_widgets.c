@@ -44,7 +44,7 @@ UI_Checkbox(b32 Toggled, v4 EnabledColor)
 #endif
  UI_Softness(1.f)
  {         
-  UI_BackgroundColor(Toggled ? EnabledColor : (v4)Color(Night2)) 
+  UI_BackgroundColor(Toggled ? EnabledColor : (v4)ColorU32(Night2)) 
    UI_SemanticWidth(UI_SizePx(50.f, 1.f))
   {
    Box = UI_AddBox(S8("Checkbox"), (UI_BoxFlag_Clip|

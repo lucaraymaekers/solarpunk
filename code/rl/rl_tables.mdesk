@@ -39,7 +39,7 @@ ColorsU32:
 ColorsV4:
 {
  @expand(Colors)
-  ```v4 Color_$(Name) = Color($(Name));
+  ```v4 Color_$(Name) = ColorU32($(Name));
  ```;
 }
 
