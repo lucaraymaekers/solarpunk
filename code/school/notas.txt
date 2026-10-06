@@ -96,3 +96,26 @@ A letter = Accumulator
 sommige instructies A/ACC
 
 NOOIT EEN NUL schrijven naar een pin
+
+
+# Embedded fundamentals 10/02/2026
+schakeling = alles
+
+maas = mesh -> gesloting kring van stroom-takken
+knooppunt -> waar meerder takken toekomen
+
+Altijd referenties eerst kiezen en dan oplossen
+-> referentie = stroomzin naar een knooppunt
+
+Som van alle spaningsvallen in een lus = 0
+Som van stromen in een knooppunt = 0 (geen oplading mogelijk.)
+
+Fout bij Theorema van Millman
+-> spelling om in
+-> Uv1 moet Uv3 zijn
+
+P.40 
+Inhoudsopgave opnieuw
+
+# PAL 01/05/2026
+<

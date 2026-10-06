@@ -1,35 +1,35 @@
 #define Cng_ConfigMatchers \
 if(0) {} \
-  else if(ConfigMatch(Name, S8("Asan"), Value)) Asan = 1; \
-  else if(ConfigMatch(Name, S8("Debug"), Value)) Debug = 1; \
-  else if(ConfigMatch(Name, S8("Clean"), Value)) Clean = 1; \
-  else if(ConfigMatch(Name, S8("Clang"), Value)) Clang = 1; \
-  else if(ConfigMatch(Name, S8("GCC"), Value)) GCC = 1; \
-  else if(ConfigMatch(Name, S8("Slow"), Value)) Slow = 1; \
-  else if(ConfigMatch(Name, S8("Wine"), Value)) Wine = 1; \
-  else if(ConfigMatch(Name, S8("Meta"), Value)) Meta = 1; \
-  else if(ConfigMatch(Name, S8("HaversineProcessor"), Value)) HaversineProcessor = 1; \
-  else if(ConfigMatch(Name, S8("HaversineGenerator"), Value)) HaversineGenerator = 1; \
-  else if(ConfigMatch(Name, S8("Sim86"), Value)) Sim86 = 1; \
-  else if(ConfigMatch(Name, S8("Editor"), Value)) Editor = 1; \
-  else if(ConfigMatch(Name, S8("Muze"), Value)) Muze = 1; \
-  else if(ConfigMatch(Name, S8("School"), Value)) School = 1;
-#define Cng_ConfigBools \
+  else if(ConfigMatch(Name, S8("Asan"), Value)) Asan = true; \
+  else if(ConfigMatch(Name, S8("Debug"), Value)) Debug = true; \
+  else if(ConfigMatch(Name, S8("Clean"), Value)) Clean = true; \
+  else if(ConfigMatch(Name, S8("Clang"), Value)) Clang = true; \
+  else if(ConfigMatch(Name, S8("GCC"), Value)) GCC = true; \
+  else if(ConfigMatch(Name, S8("Slow"), Value)) Slow = true; \
+  else if(ConfigMatch(Name, S8("Wine"), Value)) Wine = true; \
+  else if(ConfigMatch(Name, S8("Meta"), Value)) Meta = true; \
+  else if(ConfigMatch(Name, S8("HaversineProcessor"), Value)) HaversineProcessor = true; \
+  else if(ConfigMatch(Name, S8("HaversineGenerator"), Value)) HaversineGenerator = true; \
+  else if(ConfigMatch(Name, S8("Sim86"), Value)) Sim86 = true; \
+  else if(ConfigMatch(Name, S8("Editor"), Value)) Editor = true; \
+  else if(ConfigMatch(Name, S8("Muze"), Value)) Muze = true; \
+  else if(ConfigMatch(Name, S8("School"), Value)) School = true;
+#define Cng_ConfigBools(CmdLine) \
  \
-  b32 Asan = false; \
-  b32 Debug = false; \
-  b32 Clean = false; \
-  b32 Clang = false; \
-  b32 GCC = false; \
-  b32 Slow = false; \
-  b32 Wine = false; \
-  b32 Meta = false; \
-  b32 HaversineProcessor = false; \
-  b32 HaversineGenerator = false; \
-  b32 Sim86 = false; \
-  b32 Editor = false; \
-  b32 Muze = false; \
-  b32 School = false;
+  b32 Asan = CmdLineHasEntry(CmdLine, S8("Asan")); \
+  b32 Debug = CmdLineHasEntry(CmdLine, S8("Debug")); \
+  b32 Clean = CmdLineHasEntry(CmdLine, S8("Clean")); \
+  b32 Clang = CmdLineHasEntry(CmdLine, S8("Clang")); \
+  b32 GCC = CmdLineHasEntry(CmdLine, S8("GCC")); \
+  b32 Slow = CmdLineHasEntry(CmdLine, S8("Slow")); \
+  b32 Wine = CmdLineHasEntry(CmdLine, S8("Wine")); \
+  b32 Meta = CmdLineHasEntry(CmdLine, S8("Meta")); \
+  b32 HaversineProcessor = CmdLineHasEntry(CmdLine, S8("HaversineProcessor")); \
+  b32 HaversineGenerator = CmdLineHasEntry(CmdLine, S8("HaversineGenerator")); \
+  b32 Sim86 = CmdLineHasEntry(CmdLine, S8("Sim86")); \
+  b32 Editor = CmdLineHasEntry(CmdLine, S8("Editor")); \
+  b32 Muze = CmdLineHasEntry(CmdLine, S8("Muze")); \
+  b32 School = CmdLineHasEntry(CmdLine, S8("School"));
 
   internal field_hash_node *
   GetFieldHashNode(str8 String, u64 Seed, u64 ArraySize, field_hash_node *Array)

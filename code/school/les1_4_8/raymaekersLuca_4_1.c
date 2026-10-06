@@ -3,12 +3,12 @@
 
 int main(void)
 {
- 
- printf("Enter an integer: ");
- 
- short int Number = 0;
- scanf("%hd%*c", &Number);
- 
- printf("Input: %hd\n", Number);
- return 0;
+	
+	printf("Enter an integer: ");
+	
+	short int Number = 0;
+	scanf("%hd%*c", &Number);
+	
+	printf("Input: %hd\n", Number);
+	return 0;
 }

@@ -325,7 +325,7 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ Config 
-  Cng_ConfigBools;
+  Cng_ConfigBools(&Params->CmdLine);
   
   MD_String8 FileName = S8("../code/cling/cling.mdesk");
   MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
@@ -516,81 +516,83 @@ ENTRY_POINT(EntryPoint)
               u64 RowCount = 0;
               for(MD_EachNode(TableRow, TableHash->Table->first_child))
               {
-               u64 MaxSize = KB(4);
-               str8 String = PushS8(Arena, MaxSize);
-               u64 StringIdx = 0;
                
-               str8 RowString = Row->string;
+               str8 String;
                
-               for EachIndex(Idx, Row->string.Size)
+               S8OverPush(Arena, String, KB(4), String.Size)
                {
-                if(RowString.Data[Idx] == '$')
+                u64 StringIdx = 0;
+                
+                str8 RowString = Row->string;
+                
+                for EachIndex(Idx, Row->string.Size)
                 {
-                 Idx += 1;
-                 
-                 if(RowString.Data[Idx] == '(')
+                 if(RowString.Data[Idx] == '$')
                  {
                   Idx += 1;
                   
-                  u64 Start = Idx;
-                  
-                  while(RowString.Data[Idx] != ')') Idx += 1;
-                  
-                  str8 FieldName = S8FromTo(RowString, Start, Idx); 
-                  str8 OutString = {0};
-                  
-                  if(S8Match(FieldName, S8("_Idx"), false))
+                  if(RowString.Data[Idx] == '(')
                   {
-                   OutString = Str8Fmt("%llu", RowCount);
-                  }
-                  else
-                  {
-                   field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
-                   MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
+                   Idx += 1;
                    
-                   if(GenStrings)
+                   u64 Start = Idx;
+                   
+                   while(RowString.Data[Idx] != ')') Idx += 1;
+                   
+                   str8 FieldName = S8FromTo(RowString, Start, Idx); 
+                   str8 OutString = {0};
+                   
+                   if(S8Match(FieldName, S8("_Idx"), false))
                    {
-                    OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
-                                        Field->string, Field->string.Size);
+                    OutString = Str8Fmt("%llu", RowCount);
                    }
                    else
                    {
-                    OutString = Field->string;
+                    field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
+                    MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
+                    
+                    if(GenStrings)
+                    {
+                     OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
+                                         Field->string, Field->string.Size);
+                    }
+                    else
+                    {
+                     OutString = Field->string;
+                    }
+                    
+                   }
+                   
+                   // Output that string
+                   {                 
+                    for EachIndex(CharIdx, OutString.Size)
+                    {
+                     u8 Char = OutString.Data[CharIdx];
+                     if(ToLower)
+                     {
+                      Char = ToLowercase(Char);
+                     }
+                     String.Data[StringIdx] = Char;
+                     StringIdx += 1;
+                    }
+                   }
+                   
+                   if(OutString.Size == 0)
+                   {
+                    Log("ERROR: field \"%S\" not found\n", FieldName);
                    }
                    
                   }
-                  
-                  // Output that string
-                  {                 
-                   for EachIndex(CharIdx, OutString.Size)
-                   {
-                    u8 Char = OutString.Data[CharIdx];
-                    if(ToLower)
-                    {
-                     Char = ToLowercase(Char);
-                    }
-                    String.Data[StringIdx] = Char;
-                    StringIdx += 1;
-                   }
-                  }
-                  
-                  if(OutString.Size == 0)
-                  {
-                   Log("ERROR: field \"%S\" not found\n", FieldName);
-                  }
-                  
+                 }
+                 else
+                 {
+                  String.Data[StringIdx] = RowString.Data[Idx];
+                  StringIdx += 1;
                  }
                 }
-                else
-                {
-                 String.Data[StringIdx] = RowString.Data[Idx];
-                 StringIdx += 1;
-                }
+                
+                String.Size = StringIdx;
                }
-               
-               String.Size = StringIdx;
-               
-               ArenaFree(Arena, MaxSize - String.Size);
                
                S8ListPush(String);
                
@@ -734,11 +736,22 @@ ENTRY_POINT(EntryPoint)
    
    cmd_line *CmdLine = &Params->CmdLine;
    
-   b32 Compile = (CmdLineGetEntry(CmdLine, S8("compile")) != NilCmdLineEntry);
-   b32 Run = (CmdLineGetEntry(CmdLine, S8("run")) != NilCmdLineEntry);
-   b32 Last = (CmdLineGetEntry(CmdLine, S8("last")) != NilCmdLineEntry);
-   b32 Template = (CmdLineGetEntry(CmdLine, S8("template")) != NilCmdLineEntry);
-   b32 Print = (CmdLineGetEntry(CmdLine, S8("print")) != NilCmdLineEntry);
+   // NOTE(luca): Compile the source file.
+   b32 Compile  = CmdLineHasEntry(CmdLine, S8("compile"));
+   // NOTE(luca): Run the built program.
+   b32 Run      = CmdLineHasEntry(CmdLine, S8("run"));
+   // NOTE(luca): Use the last file as input.
+   b32 Last     = CmdLineHasEntry(CmdLine, S8("last"));
+   // NOTE(luca): Use all files as input.
+   b32 All      = CmdLineHasEntry(CmdLine, S8("all"));
+   // NOTE(luca): Create a template source file.
+   b32 Template = CmdLineHasEntry(CmdLine, S8("template"));
+   // NOTE(luca): Print the source file path.
+   b32 Print    = CmdLineHasEntry(CmdLine, S8("print"));
+   // NOTE(luca): Convert spaces to tabs in the source file.
+   b32 Convert  = CmdLineHasEntry(CmdLine, S8("convert"));
+   
+   if(All) Last = true;
    
    str8 TemplateText = S8(
                           "#include <stdio.h>\n"
@@ -746,8 +759,8 @@ ENTRY_POINT(EntryPoint)
                           "\n"
                           "int main(int ArgCount, char **Args)\n"
                           "{\n"
-                          " printf(\"Hello, world!\\n\");\n"
-                          " return 0;\n"
+                          "\tprintf(\"Hello, world!\\n\");\n"
+                          "\treturn 0;\n"
                           "}\n"
                           );
    
@@ -769,57 +782,77 @@ ENTRY_POINT(EntryPoint)
     }
    }
    
-   str8_node *First = CmdLine->FirstFile;
-   
    str8 NamePrefix = S8("raymaekersLuca");
    
    if(Last)
    {
-    // 1. Find last file
-    u64 Max = 512;
-    u64 LastIdx = 0;
-    while(LastIdx < Max)
+    u64 MaxLastIdx = 512;
+    for (u64 LastIdx = 1; LastIdx < MaxLastIdx; LastIdx += 1)
     {
-     str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%llu.c", NamePrefix, LastIdx + 1);
-     if(!OS_FileExists((char *)Path.Data))
+     str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%llu.c", NamePrefix, LastIdx);
+     if(OS_FileExists((char *)Path.Data))
+     {
+      str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
+      DLLAppend(Node, CmdLine->FirstFile, CmdLine->LastFile);
+      Node->V = Str8Fmt("%llu", LastIdx);
+     }
+     else
      {
       break;
      }
      
-     LastIdx += 1;
+     Assert(LastIdx < MaxLastIdx);
     }
-    Assert(LastIdx < Max);
-    
-    // 2. Add it to the files 
-    str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
-    DLLAppend(Node, CmdLine->FirstFile, CmdLine->LastFile);
-    if(Template) LastIdx += 1;
-    Node->V = Str8Fmt("%llu", LastIdx);
-    
-    // 3. Start iteration at this node
-    First = Node;
    }
+   
+   b32 StartAtLast = (Last && !All);
+   str8_node *First = (!StartAtLast ? CmdLine->FirstFile : CmdLine->LastFile);
    
    for EachNode(Node, str8_node, First)
    {
+    str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%S.c", NamePrefix, Node->V);
+    
     if(Print)
     {
-     Log("../code/school/les1_4_8/%S_4_%S.c\n", NamePrefix, Node->V);
+     Log("%S\n", Path);
     }
     
     if(Template)
     {
-     str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%S.c", NamePrefix, Node->V);
-     
      OS_WriteEntireFile((char *)Path.Data, TemplateText);
+    }
+    
+    if(Convert)
+    {
+     str8 File = OS_ReadEntireFileIntoMemory((char *)Path.Data);
+     
+     str8 Out = PushS8(GlobalClingArena, File.Size);
+     
+     // Convert tab to spaces.
+     b32 OnStartOfLine = true;
+     for EachIndex(Idx, File.Size)
+     {
+      u8 Char = File.Data[Idx];
+      
+      if(0) {}
+      else if(Char == '\n') OnStartOfLine = true;
+      else if(Char != ' ') OnStartOfLine = false;
+      else
+      {
+       if(OnStartOfLine) Char = '\t';
+      }
+      
+      Out.Data[Idx] = Char;
+     }
+     
+     OS_WriteEntireFile((char *)Path.Data, Out);
+     OS_FreeFileMemory(File);
     }
     
     if(Compile)
     {
      Cng_S8ArrayTemp(GlobalSelectedArray)
      {
-      str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%S.c", NamePrefix, Node->V);
-      
       Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
       Cng_S8ArrayAppend(Path);
       RunCommand();
@@ -830,9 +863,9 @@ ENTRY_POINT(EntryPoint)
     {
      Cng_S8ArrayTemp(GlobalSelectedArray)
      {
-      str8 Path = Str8Fmt("../build/%S_4_%S.exe", NamePrefix, Node->V);
+      str8 BuildPath = Str8Fmt("../build/%S_4_%S.exe", NamePrefix, Node->V);
       
-      Cng_S8ArrayAppend(Path);
+      Cng_S8ArrayAppend(BuildPath);
       RunCommand();
      }
     }
@@ -840,8 +873,6 @@ ENTRY_POINT(EntryPoint)
    }
    
   }
-  
-  //~ End
   
   Log("Done.\n");
  }

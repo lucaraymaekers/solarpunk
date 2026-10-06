@@ -49,25 +49,16 @@ load_paths =
 
 commands =
 {
- .build_editor = 
+ .build_muze = 
  {
   .out = "*compilation*", 
-  .linux = "sh ./code/build.sh norebuild",
-  .win = ".\\code\\build.bat",
+  .linux = "sh ./code/build.sh norebuild -Meta -Muze",
+  .win = ".\\code\\build.bat -Meta -Muze",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
  },
- .build_lexer = 
- {
-  .out = "*compilation*", 
-  .linux = "sh ./code/test.sh",
-  .win = ".\\code\\build.bat",
-  .save_dirty_files = true,
-  .footer_panel = false,
-  .cursor_at_end = false,
- },
- .run_editor = 
+ .run = 
  {
   .out = "*compilation*", 
   .linux = "./build/editor",
@@ -79,7 +70,7 @@ commands =
  .cling = 
  {
   .out = "*compilation*", 
-  .linux = "cling",
+  .linux = "./build/cling",
   .win = ".\build\cling.exe",
   .save_dirty_files = true,
   .footer_panel = false,
@@ -99,8 +90,8 @@ commands =
 
 fkey_command =
 {
- .F1 = "build_editor",
- .F2 = "run_editor",
+ .F1 = "build_muze",
+ .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",
 };

@@ -84,7 +84,7 @@ ENTRY_POINT(OS_EntryPoint)
 #endif
 
 internal cmd_line_entry *
-CmdLineGetEntry(cmd_line *CmdLine, str8 Search)
+CmdLineGetEntry(cmd_line *CmdLine, str8 Flag)
 {
  cmd_line_entry *Result = NilCmdLineEntry;
  
@@ -92,13 +92,21 @@ CmdLineGetEntry(cmd_line *CmdLine, str8 Search)
  {
   cmd_line_entry *Entry = CmdLine->Entries + Idx;
   
-  if(S8Match(Entry->Name, Search, false))
+  if(S8Match(Entry->Name, Flag
+             , false))
   {
    Result = Entry;
    break;
   }
  }
  
+ return Result;
+}
+
+internal b32
+CmdLineHasEntry(cmd_line *CmdLine, str8 Flag)
+{
+ b32 Result = (CmdLineGetEntry(CmdLine, Flag) != NilCmdLineEntry);
  return Result;
 }
 

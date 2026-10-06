@@ -392,13 +392,13 @@ Cng_RunCommand(str8 Command)
 internal str8
 Win32GetEnvironmentVar(char *Name)
 {
- u64 MaxSize = KB(2);
- str8 Result = PushS8(GlobalClingArena, MaxSize);
+ str8 Result;
  
- DWORD Size = GetEnvironmentVariableA(Name, (char *)Result.Data, Result.Size);
- Result.Size = Size;
- 
- ArenaFree(GlobalClingArena, MaxSize - Size);
+ S8OverPush(GlobalClingArena, Result, KB(64), Result.Size)
+ { 
+  DWORD Size = GetEnvironmentVariableA(Name, (char *)Result.Data, Result.Size);
+  Result.Size = Size;
+ }
  
  return Result;
 }

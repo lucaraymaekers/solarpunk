@@ -11,12 +11,12 @@ Config:
  { Slow  0 }
  { Wine  0 }
  // Targets
- { Meta               1 }
+ { Meta               0 }
  { HaversineProcessor 0 }
  { HaversineGenerator 0 }
  { Sim86              0 }
  { Editor             0 }
- { Muze               1 }
+ { Muze               0 }
  { School             0 }
 }
 
@@ -29,17 +29,17 @@ ConfigMatchers:
  `if(0) {}`;
  @expand(Config)
   ``` \
-  else if(ConfigMatch(Name, S8("$(Name)"), Value)) $(Name) = 1;```
+  else if(ConfigMatch(Name, S8("$(Name)"), Value)) $(Name) = true;```
 }
 
 @data
 ConfigBools:
 {
- ```#define Cng_ConfigBools \
+ ```#define Cng_ConfigBools(CmdLine) \
 ```;
  @expand(Config)
   ``` \
-  b32 $(Name) = false;```
+  b32 $(Name) = CmdLineHasEntry(CmdLine, S8("$(Name)"));```
 }
 
 //~ Hash functions
