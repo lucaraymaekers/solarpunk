@@ -260,11 +260,11 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
   
   s32 WindowBorderSize = 2;
   app_offscreen_buffer WindowBuffer = {0};
-  WindowBuffer.Width = 1600;
-  WindowBuffer.Height = 900 ;
+  WindowBuffer.Dim.X = 1600;
+  WindowBuffer.Dim.Y = 900 ;
   WindowBuffer.BytesPerPixel = 4;
-  WindowBuffer.Pitch = WindowBuffer.BytesPerPixel*WindowBuffer.Width;
-  WindowBuffer.Pixels = PushArray(PermanentArena, u8, (u64)(WindowBuffer.Pitch*WindowBuffer.Height));
+  WindowBuffer.Pitch = WindowBuffer.BytesPerPixel*WindowBuffer.Dim.X;
+  WindowBuffer.Pixels = PushArray(PermanentArena, u8, (u64)(WindowBuffer.Pitch*WindowBuffer.Dim.Y));
   
   app_sound_buffer SoundBuffer = {0};
   
@@ -336,6 +336,8 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
   
   //- Debug UI 
 #if RL_PLATFORM_DEBUG_UI
+  v2 DebugUIOffset = {0};
+  v2 DebugUIDragOffset = {0};
   b32 ShowDebugUI = false;
   f32 DebugHeightPx = 20.f;
   gl_render_state DebugRender = {0};
@@ -408,7 +410,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
    Scratch(FrameArena)
    {
 #if RL_PLATFORM_DEBUG_UI
-    RenderBeginFrame(FrameArena, 0, 0, WindowBuffer.Width, WindowBuffer.Height);
+    RenderBeginFrame(FrameArena, 0, 0, WindowBuffer.Dim.X, WindowBuffer.Dim.Y);
     OS_ProfileAndPrint("Render Setup");
 #endif
     
@@ -595,7 +597,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
     {
      if(DebugUIBox == 0) DebugUIBox = UI_BoxAlloc(UI_State->Arena);
      ui_box *Root = DebugUIBox;
-     Root->FixedSize = V2S32(WindowBuffer.Width, WindowBuffer.Height);
+     Root->FixedSize = V2V2S32(WindowBuffer.Dim);
      Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
      
      UI_BeginFrame(&DebugRenderAtlas, FrameIdx, NewInput);
@@ -619,215 +621,271 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
      b32 RecordingIsEmpty = (Replay.RecordingSize == 0);
      b32 RecordingHasNoSteps = (Replay.StepCount == 0);
      
-     UI_SemanticWidth(UI_SizePx(ListWidth, 1.f))
-      UI_SemanticHeight(UI_SizeChildren(1.f))
-      UI_BorderThickness(2.f)
-      UI_BorderColor(Color_Snow2)
-      UI_BackgroundColor(Color_Night0)
-      UI_AddBox(S8("List"), 
-                UI_BoxFlag_Clip|
-                UI_BoxFlag_DrawBackground|
-                UI_BoxFlag_DrawBorders);
-     UI_Push()
-      UI_FillWidth()
-      UI_SemanticHeight(UI_SizeChildren(1.f))
-      UI_Row() UI_Padding(UI_SizePx(2.f, 1.f))
-      UI_Column() UI_Padding(UI_SizePx(2.f, 1.f))
-      UI_SemanticWidth(UI_SizePx(ListWidth, 1.f))
-      UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
+     ui_box *List;
+     
+     UI_Column()
      {
-      if(ToggleButton("Record", Replay.IsRecording, Color_Red))
-      {
-       ReplayToggleRecording(&Replay, &AppMemory, true);
+      // For dragging Debug UI box
+      {     
+       f32 Size = DebugUIOffset.Y + DebugUIDragOffset.Y;
+       UI_Spacer(UI_SizePx(Size, 1.f));
       }
       
-      if(ToggleButton("Looping", Replay.IsLooping, Color_Yellow, 
-                      .Disabled = RecordingHasNoSteps))
+      UI_Row()
       {
-       if(!RecordingHasNoSteps)
-       {
-        ReplayToggleLooping(&Replay, &AppMemory);
-       }
-      }
-      
-      if(ToggleButton("Stepping", Replay.IsStepping, Color_Yellow,
-                      .Disabled = RecordingHasNoSteps))
-      {
-       if(!RecordingHasNoSteps && !RecordingIsEmpty)
-       {
-        Replay.IsStepping = !Replay.IsStepping;
-        if(!Replay.IsStepping) Replay.IsLooping = false;
-       }
-      }
-      
-      DebugSpacer();
-      
-      // Stepping sliders
-      {                        
-       s32 MaxDigits = (s32)(Replay.StepCount > 0 ? 
-                             log10f((f32)Replay.StepCount) :
-                             0);
-       MaxDigits = Max(3, MaxDigits + 1);
-       u64 MaxStepCount = (Replay.StepCount ? Replay.StepCount - 1 : 0);
-       
-       // StepTarget
-       {                            
-        UI_BackgroundColor(Color_Disabled)
-         UI_AddBox(S8("StepTarget"), 
-                   UI_BoxFlag_Clip|
-                   UI_BoxFlag_DrawBorders|
-                   UI_BoxFlag_DrawBackground);
-        UI_PaddingAround(ItemPadding)
-        {
-         ui_box *Box;
-         UI_SemanticWidth(UI_SizeText(1.f, 1.f))
-          Box = UI_AddBox(S8("StepTarget"), 
-                          UI_BoxFlag_DrawDisplayString|
-                          UI_BoxFlag_CenterTextVertically|
-                          UI_BoxFlag_CenterTextHorizontally);
-         
-         str8 FormatString = Str8Fmt("Target: %%%dllu/%%-%dllu", MaxDigits, MaxDigits);
-         
-         Box->DisplayString = Str8Fmt((char *)FormatString.Data, Replay.StepTarget, MaxStepCount);
-         
-         UI_BackgroundColor(Color_Orange)
-          UI_BorderColor(Color_Black)
-          Replay.StepTarget = (u64)UI_Slider((f32)Replay.StepTarget, 0.f, (f32)MaxStepCount, 1.f, 0, true);
-        }
+       // For dragging Debug UI box
+       {     
+        f32 Size = DebugUIOffset.X + DebugUIDragOffset.X;
+        UI_Spacer(UI_SizePx(Size, 1.f));
        }
        
-       // StepIdx
+       UI_SemanticWidth(UI_SizePx(ListWidth, 1.f))
+        UI_SemanticHeight(UI_SizeChildren(1.f))
+        UI_BorderThickness(2.f)
+        UI_BorderColor(Color_Snow2)
+        UI_BackgroundColor(Color_Night0)
+        List = UI_AddBox(S8("List"), 
+                         UI_BoxFlag_Clip|
+                         UI_BoxFlag_DrawBackground|
+                         UI_BoxFlag_DrawBorders);
+       
+       UI_Push()
+        UI_FillWidth()
+        UI_SemanticHeight(UI_SizeChildren(1.f))
+        UI_Row() UI_Padding(UI_SizePx(2.f, 1.f))
+        UI_Column() UI_Padding(UI_SizePx(2.f, 1.f))
+        UI_SemanticWidth(UI_SizePx(ListWidth, 1.f))
+        UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
        {
-        UI_BackgroundColor(Color_Disabled)
-         UI_AddBox(S8("StepIdx"), 
-                   UI_BoxFlag_Clip|
-                   UI_BoxFlag_DrawBorders|
-                   UI_BoxFlag_DrawBackground);
-        UI_PaddingAround(ItemPadding)
-        {
-         {                                
-          ui_box *Box;
-          UI_SemanticWidth(UI_SizeText(1.f, 1.f))
-           Box = UI_AddBox(S8("StepIdx"), 
-                           UI_BoxFlag_DrawDisplayString|
-                           UI_BoxFlag_CenterTextVertically|
-                           UI_BoxFlag_CenterTextHorizontally);
-          
-          str8 FormatString = Str8Fmt("StepAt: %%%dllu/%%-%dllu", MaxDigits, MaxDigits);
-          Box->DisplayString = Str8Fmt((char *)FormatString.Data, Replay.StepIdx, MaxStepCount);
+        
+        {      
+         ui_box *TopBar;
+         UI_BackgroundColor(Color_Blue)
+          UI_SemanticHeight(UI_SizePx(ItemHeight/2.f, 1.f))
+          TopBar = UI_AddBox(S8("TopBar"), 
+                             UI_BoxFlag_Clip|
+                             UI_BoxFlag_MouseClickable|
+                             UI_BoxFlag_DrawBorders|
+                             UI_BoxFlag_DrawBackground|
+                             UI_BoxFlag_DrawHotEffects|
+                             UI_BoxFlag_DrawActiveEffects);
+         
+         for EachIndex(Axis, Axis2_Count)
+         {
+          if(UI_IsActive(TopBar))
+          {
+           DebugUIDragOffset.e[Axis] = (NewInput->Mouse.Pos.e[Axis] - NewInput->Mouse.Start.e[Axis]);
+           UI_State->IsAnimating = false;
+          }
+          else if(TopBar->Released)
+          {
+           DebugUIOffset.e[Axis] += DebugUIDragOffset.e[Axis];
+           DebugUIOffset.e[Axis] = Clamp(0.f, DebugUIOffset.e[Axis], (f32)WindowBuffer.Dim.e[Axis] - List->FixedSize.e[Axis]);
+           DebugUIDragOffset.e[Axis] = 0.f;
+          }
          }
          
-         UI_BackgroundColor(Color_Yellow)
-          UI_BorderColor(Color_Black)
-          UI_Slider((f32)Replay.StepIdx, 0.f, (f32)MaxStepCount, 1.f, 0, false);
+         UI_BackgroundColor(Color_Snow0)
+          UI_SemanticHeight(UI_SizePx(2.f, 1.f))
+          UI_AddBox(S8(""), 
+                    UI_BoxFlag_Clip|
+                    UI_BoxFlag_DrawBackground);
         }
-       }
-      }
-      
-      DebugSpacer();
-      
-      UI_Row()
-       UI_SemanticWidth(UI_SizeParent(.5f, 1.f))
-      {                            
-       if(DisabledButton(S8("Step"), RecordingHasNoSteps))
-       {
-        ReplayStep(&Replay, &AppMemory);
-        if(Replay.StepCount)
+        
+        if(ToggleButton("Record", Replay.IsRecording, Color_Red))
         {
-         Replay.StepTarget = (Replay.StepIdx + 1)%Replay.StepCount;
+         ReplayToggleRecording(&Replay, &AppMemory, true);
         }
-       }
-       
-       if(DisabledButton(S8("Skip"), RecordingHasNoSteps))
-       {
-        if(Replay.RecordingSize)
+        
+        if(ToggleButton("Looping", Replay.IsLooping, Color_Yellow, 
+                        .Disabled = RecordingHasNoSteps))
         {
-         ReplayStep(&Replay, &AppMemory);
-         Replay.IsSkipping = true;
+         if(!RecordingHasNoSteps)
+         {
+          ReplayToggleLooping(&Replay, &AppMemory);
+         }
         }
-       }
-      }
-      
-      UI_Row()
-       UI_SemanticWidth(UI_SizeParent(.5f, 1.f))
-      {                            
-       if(DisabledButton(S8("Load record"), RecordingIsEmpty))
-       {
-        if(Replay.RecordingSize)
+        
+        if(ToggleButton("Stepping", Replay.IsStepping, Color_Yellow,
+                        .Disabled = RecordingHasNoSteps))
         {
-         ReplayLoadMemory(&Replay, &AppMemory);
+         if(!RecordingHasNoSteps && !RecordingIsEmpty)
+         {
+          Replay.IsStepping = !Replay.IsStepping;
+          if(!Replay.IsStepping) Replay.IsLooping = false;
+         }
+        }
+        
+        DebugSpacer();
+        
+        // Stepping sliders
+        {                        
+         s32 MaxDigits = (s32)(Replay.StepCount > 0 ? 
+                               log10f((f32)Replay.StepCount) :
+                               0);
+         MaxDigits = Max(3, MaxDigits + 1);
+         u64 MaxStepCount = (Replay.StepCount ? Replay.StepCount - 1 : 0);
+         
+         // StepTarget
+         {                            
+          UI_BackgroundColor(Color_Disabled)
+           UI_AddBox(S8("StepTarget"), 
+                     UI_BoxFlag_Clip|
+                     UI_BoxFlag_DrawBorders|
+                     UI_BoxFlag_DrawBackground);
+          UI_PaddingAround(ItemPadding)
+          {
+           ui_box *Box;
+           UI_SemanticWidth(UI_SizeText(1.f, 1.f))
+            Box = UI_AddBox(S8("StepTarget"), 
+                            UI_BoxFlag_DrawDisplayString|
+                            UI_BoxFlag_CenterTextVertically|
+                            UI_BoxFlag_CenterTextHorizontally);
+           
+           str8 FormatString = Str8Fmt("Target: %%%dllu/%%-%dllu", MaxDigits, MaxDigits);
+           
+           Box->DisplayString = Str8Fmt((char *)FormatString.Data, Replay.StepTarget, MaxStepCount);
+           
+           UI_BackgroundColor(Color_Orange)
+            UI_BorderColor(Color_Black)
+            Replay.StepTarget = (u64)UI_Slider((f32)Replay.StepTarget, 0.f, (f32)MaxStepCount, 1.f, 0, true);
+          }
+         }
+         
+         // StepIdx
+         {
+          UI_BackgroundColor(Color_Disabled)
+           UI_AddBox(S8("StepIdx"), 
+                     UI_BoxFlag_Clip|
+                     UI_BoxFlag_DrawBorders|
+                     UI_BoxFlag_DrawBackground);
+          UI_PaddingAround(ItemPadding)
+          {
+           {                                
+            ui_box *Box;
+            UI_SemanticWidth(UI_SizeText(1.f, 1.f))
+             Box = UI_AddBox(S8("StepIdx"), 
+                             UI_BoxFlag_DrawDisplayString|
+                             UI_BoxFlag_CenterTextVertically|
+                             UI_BoxFlag_CenterTextHorizontally);
+            
+            str8 FormatString = Str8Fmt("StepAt: %%%dllu/%%-%dllu", MaxDigits, MaxDigits);
+            Box->DisplayString = Str8Fmt((char *)FormatString.Data, Replay.StepIdx, MaxStepCount);
+           }
+           
+           UI_BackgroundColor(Color_Yellow)
+            UI_BorderColor(Color_Black)
+            UI_Slider((f32)Replay.StepIdx, 0.f, (f32)MaxStepCount, 1.f, 0, false);
+          }
+         }
+        }
+        
+        DebugSpacer();
+        
+        UI_Row()
+         UI_SemanticWidth(UI_SizeParent(.5f, 1.f))
+        {                            
+         if(DisabledButton(S8("Step"), RecordingHasNoSteps))
+         {
+          ReplayStep(&Replay, &AppMemory);
+          if(Replay.StepCount)
+          {
+           Replay.StepTarget = (Replay.StepIdx + 1)%Replay.StepCount;
+          }
+         }
+         
+         if(DisabledButton(S8("Skip"), RecordingHasNoSteps))
+         {
+          if(Replay.RecordingSize)
+          {
+           ReplayStep(&Replay, &AppMemory);
+           Replay.IsSkipping = true;
+          }
+         }
+        }
+        
+        UI_Row()
+         UI_SemanticWidth(UI_SizeParent(.5f, 1.f))
+        {                            
+         if(DisabledButton(S8("Load record"), RecordingIsEmpty))
+         {
+          if(Replay.RecordingSize)
+          {
+           ReplayLoadMemory(&Replay, &AppMemory);
+          }
+         }
+         
+         if(DisabledButton(S8("Save record"), false))
+         {
+          ReplayToggleRecording(&Replay, &AppMemory, false);
+         }
+        }
+        
+        DebugSpacer();
+        
+        if(DisabledButton(S8("Load from disk"), false))
+        {
+         char *FileName = PathFromExe(FrameArena, Str8Fmt("replay_%lu.edr", ReplaySlot));
+         
+         str8 ReplayBuffer = OS_ReadEntireFileIntoMemory(FileName);
+         
+         Assert(ReplayBuffer.Size < ReplayMaxBufferSize);
+         
+         if(ReplayBuffer.Size)
+         {                                            
+          MemoryCopy(Replay.Buffer, ReplayBuffer.Data, ReplayBuffer.Size);
+          Replay.RecordingSize = ReplayBuffer.Size;
+          Replay.StepIdx = 0;
+          Replay.StepTarget = 0;
+          ReplayLoadMemory(&Replay, &AppMemory);
+         }
+         
+         OS_FreeFileMemory(ReplayBuffer);
+        }
+        
+        if(DisabledButton(S8("Save to disk"), RecordingIsEmpty))
+        {
+         if(Replay.RecordingSize)
+         {
+          char *FileName = PathFromExe(FrameArena, Str8Fmt("replay_%lu.edr", ReplaySlot));
+          str8 ReplayBuffer = {0};
+          ReplayBuffer.Data = Replay.Buffer;
+          ReplayBuffer.Size = Replay.RecordingSize;
+          OS_WriteEntireFile(FileName, ReplayBuffer);
+         }
+        }
+        
+        DebugSpacer();
+        
+        if(GlobalDebuggerIsAttached)
+        {
+         if(DisabledButton(S8("DebugBreak"), false))
+         {
+          DebugBreak();
+         }
+         
+         DebugSpacer();
+        }
+        
+        
+        Logging ^= ToggleButton("Logging", Logging, Color_Red);
+        Paused  ^= ToggleButton("Pause",   Paused,  Color_Red);
+        GlobalIsProfiling ^= ToggleButton("Profiling", GlobalIsProfiling, Color_Red);
+        
+        DebugSpacer();
+        UI_State->RectDebugMode ^= ToggleButton("UI Rects", UI_State->RectDebugMode, Color_Red);
+        DebugSpacer();
+        
+        UI_BackgroundColor(Color_Disabled)
+         UI_AddBox(S8("CPU"), UI_BoxFlag_Clip|
+                   UI_BoxFlag_DrawBorders|
+                   UI_BoxFlag_DrawBackground);
+        UI_PaddingAround(ItemPadding)
+        {
+         ui_box *Box = UI_AddBox(S8("CPU"), UI_BoxFlag_DrawDisplayString|UI_BoxFlag_CenterTextVertically);
+         Box->DisplayString = Str8Fmt("cpu: %.2fms/f", LastWorkMSPerFrame);
         }
        }
-       
-       if(DisabledButton(S8("Save record"), false))
-       {
-        ReplayToggleRecording(&Replay, &AppMemory, false);
-       }
-      }
-      
-      DebugSpacer();
-      
-      if(DisabledButton(S8("Load from disk"), false))
-      {
-       char *FileName = PathFromExe(FrameArena, Str8Fmt("replay_%lu.edr", ReplaySlot));
-       
-       str8 ReplayBuffer = OS_ReadEntireFileIntoMemory(FileName);
-       
-       Assert(ReplayBuffer.Size < ReplayMaxBufferSize);
-       
-       if(ReplayBuffer.Size)
-       {                                            
-        MemoryCopy(Replay.Buffer, ReplayBuffer.Data, ReplayBuffer.Size);
-        Replay.RecordingSize = ReplayBuffer.Size;
-        Replay.StepIdx = 0;
-        Replay.StepTarget = 0;
-        ReplayLoadMemory(&Replay, &AppMemory);
-       }
-       
-       OS_FreeFileMemory(ReplayBuffer);
-      }
-      
-      if(DisabledButton(S8("Save to disk"), RecordingIsEmpty))
-      {
-       if(Replay.RecordingSize)
-       {
-        char *FileName = PathFromExe(FrameArena, Str8Fmt("replay_%lu.edr", ReplaySlot));
-        str8 ReplayBuffer = {0};
-        ReplayBuffer.Data = Replay.Buffer;
-        ReplayBuffer.Size = Replay.RecordingSize;
-        OS_WriteEntireFile(FileName, ReplayBuffer);
-       }
-      }
-      
-      DebugSpacer();
-      
-      if(GlobalDebuggerIsAttached)
-      {
-       if(DisabledButton(S8("DebugBreak"), false))
-       {
-        DebugBreak();
-       }
-       
-       DebugSpacer();
-      }
-      
-      
-      Logging ^= ToggleButton("Logging", Logging, Color_Red);
-      Paused  ^= ToggleButton("Pause",   Paused,  Color_Red);
-      GlobalIsProfiling ^= ToggleButton("Profiling", GlobalIsProfiling, Color_Red);
-      
-      DebugSpacer();
-      UI_State->RectDebugMode ^= ToggleButton("UI Rects", UI_State->RectDebugMode, Color_Red);
-      DebugSpacer();
-      
-      UI_BackgroundColor(Color_Disabled)
-       UI_AddBox(S8("CPU"), UI_BoxFlag_Clip|
-                 UI_BoxFlag_DrawBorders|
-                 UI_BoxFlag_DrawBackground);
-      UI_PaddingAround(ItemPadding)
-      {
-       ui_box *Box = UI_AddBox(S8("CPU"), UI_BoxFlag_DrawDisplayString|UI_BoxFlag_CenterTextVertically);
-       Box->DisplayString = Str8Fmt("cpu: %.2fms/f", LastWorkMSPerFrame);
       }
      }
      
@@ -883,7 +941,6 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
       
       if(Replay.IsStepping)
       {
-       
        b32 HasReachedStepTarget = false;
        
        if(Replay.StepTarget < Replay.StepIdx)
@@ -911,6 +968,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
         MemoryZero(ReplayInput);
         ReplayInput->Consumed = true;
         Replay.IsSkipping = false;
+        ReplayInput->dtForFrame = 0.f;
        }
        else
        {
@@ -964,7 +1022,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
       else if(NewInput->PlatformIsStepping) WindowBorderColor = Color_Yellow;
       else WindowBorderColor = Color_Black;
       
-      v4 Dest = {.Max = V2S32(WindowBuffer.Width, WindowBuffer.Height)};
+      v4 Dest = {.Max = V2V2S32(WindowBuffer.Dim)};
       rect_instance *Inst = DrawRect(Dest, WindowBorderColor, 0.f, (f32)WindowBorderSize, 0.f);
       Inst->Color0 = WindowBorderColor;
       Inst->Color1 = (NewInput->PlatformWindowIsFocused ? Color_Snow2 : V4(V3Arg(Color_Snow2), 0.2f));
@@ -972,9 +1030,8 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
       Inst->Color3 = WindowBorderColor;
      }
      
-     
      // TODO(luca): bug here...
-     RenderDrawAllRectangles(&DebugRender, V2S32(WindowBuffer.Width, WindowBuffer.Height), &DebugRenderAtlas);
+     RenderDrawAllRectangles(&DebugRender, V2V2S32(WindowBuffer.Dim), &DebugRenderAtlas);
 #endif
      P_UpdateImage(PlatformContext, &WindowBuffer);
      OS_ProfileAndPrint("UpdateImage");

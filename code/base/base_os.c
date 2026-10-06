@@ -149,7 +149,7 @@ OS_PrintFormat(char *Format, ...)
  va_list Args;
  va_start(Args, Format);
  
- // NOTE(luca): Writing to stderr to have no line buffering.
+ // NOTE(luca): Writing to stderr disables line buffering.
  str8 String = Str8VFmt(Format, Args);
  fwrite(String.Data, 1, String.Size, stderr);
 }

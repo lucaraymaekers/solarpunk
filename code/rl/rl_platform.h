@@ -16,8 +16,7 @@ typedef SAMPLE_FORMAT sample_format;
 typedef struct app_offscreen_buffer app_offscreen_buffer;
 struct app_offscreen_buffer
 {
- s32 Width;
- s32 Height;
+ v2s32 Dim;
  u8 *Pixels;
  s32 Pitch;
  s32 BytesPerPixel;

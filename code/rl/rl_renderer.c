@@ -113,6 +113,17 @@ DrawRect(v4 Dest, v4 Color, f32 CornerRadius, f32 BorderThickness, f32 Softness)
 }
 
 internal rect_instance *
+DrawFilledRect(v2 Pos, v2 Size, v4 Color)
+{
+ rect_instance *Result = 0;
+ 
+ v4 Dest = RectFromSize(Pos, Size);
+ Result = DrawRect(Dest, Color, 0.f, 0.f, 0.f);
+ 
+ return Result;
+}
+
+internal rect_instance *
 DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 Color)
 {
  rect_instance *Result = 0;

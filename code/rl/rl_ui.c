@@ -439,6 +439,7 @@ UI_BeginLayout(ui_box *Root, f32 HeightPx)
    Box->Hovered = false;
    Box->Pressed = false;
    Box->WasClicked = false;
+   Box->Released = false;
    
    {
     v4 ClippedRec = RectIntersect(Box->Rec, Box->Clip);
@@ -480,6 +481,8 @@ UI_BeginLayout(ui_box *Root, f32 HeightPx)
         {
          Box->Clicked = true;
         }
+        
+        Box->Released = true;
         UI_SetActive(UI_KeyNull());
        }
       }

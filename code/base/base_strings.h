@@ -56,6 +56,9 @@ internal u64  U64HashFromStr8(str8 String);
 #define PushS8_(Arena, Count) S8Cast{.Data = (PushArray((Arena), u8, (Count))), .Size = (Count)} 
 #define PushS8(Arena, Size) PushS8_(Arena, Size)
 
+#define S8OverPush(Arena, Result, MaxSize, EndSize) \
+DeferLoop(Result = PushS8(Arena, MaxSize), ArenaFree(Arena, MaxSize - EndSize))
+
 #define StringsScratchTemp(Arena) \
 StringsScratchTemp_(Arena, Glue(Counter, __COUNTER__), Glue(Temp, __COUNTER__))
 #define StringsScratchTemp_(Arena, Counter, Temp) \

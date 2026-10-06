@@ -455,7 +455,7 @@ P_INIT()
   WindowClass.lpszClassName = "RLWindowClass";
   if(RegisterClassA(&WindowClass))
   {
-   RECT WindowRect = { 0, 0, Buffer->Width, Buffer->Height };
+   RECT WindowRect = { 0, 0, Buffer->Dim.X, Buffer->Dim.Y };
    DWORD Style = WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
    
    AdjustWindowRect(&WindowRect, Style, FALSE);

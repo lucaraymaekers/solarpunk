@@ -13,6 +13,6 @@ IF NOT EXIST .\cling.exe (
 )
 
 SET CLING_NOREBUILD=1
-.\cling.exe
+.\cling.exe %*
 
 REM ----------------------------------------------------------

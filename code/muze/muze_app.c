@@ -21,8 +21,10 @@ NO_WARNINGS_END
 #include "rl/rl_midi.h"
 
 #include "muze/generated/muze.meta.c"
+#include "muze/muze_serialize.h"
 #include "muze/muze_app.h"
 
+#include "muze/muze_serialize.c"
 #include "rl/rl_renderer.c"
 #include "rl/rl_ui.c"
 #include "rl/rl_widgets.c"
@@ -49,7 +51,7 @@ global_variable rec_note *NilNote;
 global_variable piece_note *NilPieceNote;
 global_variable piece *NilPiece;
 
-global_variable f32 dtForFrame;
+global_variable f32 *dtForFrame;
 
 global_variable b32 NotePianoColors[] =
 {
@@ -689,8 +691,8 @@ IsNotePlaying(rec_note *Note, voice *Voice)
   f32 NoteStart = (Note->Timestamp);
   f32 NoteEnd = (NoteStart + Note->Duration);
   
-  Result = (Voice->PlayPos >= NoteStart - dtForFrame &&
-            Voice->PlayPos < NoteEnd + dtForFrame);
+  Result = (Voice->PlayPos >= NoteStart - *dtForFrame &&
+            Voice->PlayPos < NoteEnd + *dtForFrame);
  }
  
  if(Voice->IsRecording)
@@ -946,23 +948,6 @@ PieceNoteAdd(piece *Piece,
  return Note;
 }
 
-internal void 
-PiecePart1(piece *Piece, s32 Pitch1, s32 Pitch2, s32 Pitch3)
-{
- PieceNoteAdd(Piece, PieceNoteKind_Pitch, Pitch1, 3.f/2.f);
- PieceNoteAdd(Piece, PieceNoteKind_Pitch, Pitch2, 1.f/4.f);
- PieceNoteAdd(Piece, PieceNoteKind_Pitch, Pitch3, 1.f/4.f);
-}
-
-internal void 
-PiecePart1Silence(piece *Piece, s32 Pitch1, s32 Pitch2, s32 Pitch3)
-{
- PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Pitch1, 1.f/1.f);
- PieceNoteAdd(Piece, PieceNoteKind_Silence, 0,      1.f/2.f);
- PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Pitch2, 1.f/4.f);
- PieceNoteAdd(Piece, PieceNoteKind_Pitch,   Pitch3, 1.f/4.f);
-}
-
 internal b32
 PieceWasTimestampPlayed(piece *Piece, f32 Timestamp)
 {
@@ -971,7 +956,7 @@ PieceWasTimestampPlayed(piece *Piece, f32 Timestamp)
  f32 BPS = Piece->BPM/60.f;
  
  f32 Now = Piece->PlayPos;
- f32 Before = Piece->PlayPos - BPS*dtForFrame;
+ f32 Before = Piece->PlayPos - BPS*(*dtForFrame);
  
  Result = (Timestamp > Before && 
            Timestamp <= Now);
@@ -1490,7 +1475,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  f32 BarPadding = Piece->BarPadding;
  f32 BeatWidth = Piece->BeatWidth;
  // 1 for beginning, 1 for end and 1 for last note pad
- f32 WholeBarWidth = BeatWidth*Piece->TimeSigNum + 3.f*BarPadding;
+ f32 WholeBarWidth = BarPadding + BeatWidth*Piece->TimeSigNum + BarPadding;
  
  f32 NoteSize = Piece->NoteSize;
  v2 NoteDim = V2(NoteSize, NoteSize);
@@ -1520,6 +1505,24 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   // Draw bars
   { 
    v2 BarPos = StaffPos;
+   
+#if MUZE_INTERNAL
+   {
+    v2 P = BarPos;
+    
+    DrawFilledRect(P, V2(BarPadding, 4.f), Color_Orange);
+    P.X += BarPadding;
+    
+    DrawFilledRect(P, V2(BeatWidth, 4.f), Color_Blue);
+    P.X += BeatWidth;
+    
+    DrawFilledRect(P, V2(BeatWidth, 4.f), Color_Yellow);
+    P.X += BeatWidth;
+    
+    DrawFilledRect(P, V2(BarPadding, 4.f), Color_Orange);
+   }
+#endif
+   
    for EachIndex(Idx, (s32)BarCount)
    {
     v4 Dest = RectFromSize(BarPos, V2(2.f, StaffHeight));
@@ -1565,41 +1568,78 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   }
  }
  
- // Draw playing and recording marker 
- for EachIndex(Idx, 2)
+ enum piece_marker_kind
  {
-  v4 Color = {0};
-  f32 Start = 0.f;
-  
-  if(Idx == 0)
+  PieceMarkerKind_Record,
+  PieceMarkerKind_PrevPlay,
+  PieceMarkerKind_Play,
+  PieceMarkerKind_Count
+ };
+ 
+ // Draw playing and recording marker 
+ {
+  for EachIndex(Kind, PieceMarkerKind_Count)
   {
-   Color = Color_Green;
-   Start = Piece->PlayPos;
+   v4 Color = {0};
+   f32 Start = 0.f;
+   
+   if(0) {}
+   else if(Kind == PieceMarkerKind_Play)
+   {
+    Color = Color_Green;
+    Start = Piece->PlayPos;
+   }
+   else if(Kind == PieceMarkerKind_PrevPlay)
+   {
+    Color = Color_Yellow;
+    Start = Piece->PlayPos;
+   }
+   else if(Kind == PieceMarkerKind_Record)
+   {
+    Color = Color_Red;
+    Start = Piece->RecordLength;
+   }
+   else
+   {
+    InvalidPath();
+   }
+   
+   f32 BeatsPerBar = Piece->TimeSigNum;
+   
+   v2 MarkerPos = Pos;
+   s32 BarIdx = (Start == 0.f ? 0 :
+                 (s32)CeilF32(Start/BeatsPerBar) - 1);
+   
+   s32 HeightIdx = BarIdx/BarsPerWidth;
+   
+   f32 Remainder = Start - BeatsPerBar*(f32)BarIdx;
+   
+   if(Piece->BarWrapping)
+   {
+    BarIdx = (BarIdx%BarsPerWidth);
+    MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
+   }
+   
+   f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
+   MarkerPos.X = Pos.X + BarStart + Remainder*BeatWidth;
+   
+   f32 Width = StaffLineWidth;
+   if(Kind == PieceMarkerKind_PrevPlay)
+   {
+    // NOTE(luca): By updating position afterwards we ensure that the first rectangle
+    // will be the full distance.  We swap in case Width would have been negative.
+    Width = AbsF32(Piece->PrevPlayPos.X - MarkerPos.X); 
+    if(MarkerPos.X > Piece->PrevPlayPos.X) Swap(Piece->PrevPlayPos.X, MarkerPos.X); 
+    if(*dtForFrame > 0.f)
+    {
+     Piece->PrevPlayPos.X += (MarkerPos.X - Piece->PrevPlayPos.X)*UI_State->AnimSpeed;
+     Log("Update.\n");
+    }
+    
+   }
+   
+   DrawFilledRect(MarkerPos, V2(Width, StaffHeight), Color);
   }
-  
-  if(Idx == 1)
-  {
-   Color = Color_Red;
-   Start = Piece->RecordLength;
-  }
-  
-  v2 MarkerPos = Pos;
-  s32 BarIdx = (s32)FloorF32(Start/Piece->TimeSigNum);
-  s32 HeightIdx = BarIdx/BarsPerWidth;
-  
-  if(Piece->BarWrapping)
-  {
-   BarIdx = (BarIdx%BarsPerWidth);
-   MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
-  }
-  
-  f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
-  
-  f32 Remainder = ModF32(Start, Piece->TimeSigNum);
-  MarkerPos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
-  
-  v4 Dest = RectFromSize(MarkerPos, V2(StaffLineWidth, StaffHeight));
-  DrawRect(Dest, Color, 0.f, 0.f, 0.f);
  }
  
  // Draw notes
@@ -1611,6 +1651,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   
   // Used to see when a new bar begins and we should add padding.
   f32 LengthSum = 0.f;
+  
+  s32 DebugColorCounter = 0;
   
   for EachIndex(Idx, Piece->NoteCount)
   {
@@ -1667,7 +1709,15 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
      
      f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
-     NotePos.X = Pos.X + BarStart + BarPadding + Remainder*BeatWidth;
+     NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
+     
+#if MUZE_INTERNAL && 1
+     {
+      v4 Colors[] = {Color_Blue, Color_Yellow};
+      DrawFilledRect(NotePos, V2(BeatWidth, 4.f), Colors[DebugColorCounter%2]);
+      DebugColorCounter += 1;
+     }
+#endif
      
     }
     
@@ -2207,124 +2257,6 @@ M_ControlLabel(str8 Name)
  UI_BackgroundColor(Color_Frost2) Label(Name);
 }
 
-//~ Serialization
-/*
-- Serialize() Function for every type
-- Leafiest functions have if(IsReading) read(); else write();
-- When writing you set the version to the current latest version
-
-we wrap this in a macro called ADD, #define ADD(revision, field) if (r.version>=revision) Serialise(r, d.field);
-*/
-
-typedef struct ms_serializer ms_serializer;
-struct ms_serializer
-{
- u64 At;
- str8 Buffer;
- 
- b32 IsReading;
- u64 Version;
-};
-
-enum ms_version
-{
- MSV_Initial,
- MSV_Count,
-};
-typedef enum serializer_version serializer_version;
-#define MSV_Latest (MSV_Count - 1)
-
-internal void
-MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
-{
- u8 *Dest = Serializer->Buffer.Data + Serializer->At;
- 
- if(Serializer->IsReading) MemoryCopy(Value, Dest, Size);
- else                      MemoryCopy(Dest, Value, Size);
- 
- Assert(Serializer->At + Size <= Serializer->Buffer.Size);
- Serializer->At += Size;
-}
-
-#define MS_Ser(Serializer, Value) \
-MS_Struct(Serializer, Value, (sizeof(*Value)))
-
-#define MS_Add(VersionAdded, Value) \
-if(Serializer->Version >= VersionAdded) MS_Ser(Serializer, Value)
-
-#define MS_Rem(VersionAdded, VersionRemoved, Value) \
-do { \
-TypeOf(*Value) Dummy = {0}; \
-if(Serializer->Version >= VersionAdded && \
-Serializer->Version < VersionRemoved) \
-{ \
-MS_Ser(Serializer, &Dummy); \
-} \
-} while(0)
-
-internal void
-MS_Piece(ms_serializer *Serializer, piece *Piece)
-{
- MS_Add(MSV_Initial, &Piece->BPM);
- MS_Add(MSV_Initial, &Piece->TimeSigNum);
- MS_Add(MSV_Initial, &Piece->TimeSigDen);
- MS_Add(MSV_Initial, &Piece->Key);
- MS_Add(MSV_Initial, &Piece->Major);
- MS_Add(MSV_Initial, &Piece->RecordLength);
- MS_Add(MSV_Initial, &Piece->NoteCount);
- 
- if(Serializer->Version >= MSV_Initial)
- {
-  MS_Struct(Serializer, Piece->Notes, sizeof(piece_note)*Piece->NoteCount);
- }
- 
- MS_Add(MSV_Initial, &Piece->BarWrapping);
-}
-
-internal void
-M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
-{
- ms_serializer Serializer = {0};
- Serializer.IsReading = Read;
- 
- char *FilePath = PathFromExe(FrameArena, Path);
- 
- if(Serializer.IsReading)
- {
-  Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
-  if(Serializer.Buffer.Size)
-  {               
-   MS_Ser(&Serializer, &Serializer.Version);
-   if(Serializer.Version <= MSV_Latest)
-   {
-    MS_Piece(&Serializer, Piece);
-   }
-   else
-   {
-    DebugBreak();
-    ErrorLog("Cannot read file from the future.\n");
-   }
-   
-   OS_FreeFileMemory(Serializer.Buffer);
-  }
- }
- else
- {
-  u64 MaxMemorySize = KB(64);
-  Serializer.Buffer = PushS8(Arena, MaxMemorySize);
-  Serializer.Version = MSV_Latest;
-  
-  MS_Ser(&Serializer, &Serializer.Version);
-  MS_Piece(&Serializer, Piece);
-  
-  str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
-  
-  ArenaFree(Arena, (MaxMemorySize - Out.Size));
-  
-  OS_WriteEntireFile(FilePath, Out);
- }
-}
-
 //~ EntryPoint
 C_LINKAGE
 UPDATE_AND_RENDER(UpdateAndRender)
@@ -2344,8 +2276,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  //- Some constants 
  Input->PlatformCursor = PlatformCursorShape_Arrow;
- v2 BufferDim = V2S32(Buffer->Width, Buffer->Height);
- dtForFrame = Input->dtForFrame;
+ v2 BufferDim = V2V2S32(Buffer->Dim);
+ dtForFrame = &Input->dtForFrame;
  
  //- Init state 
  OS_ProfileInit(" G");
@@ -2746,7 +2678,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  if(App->PreviousHeightPx != App->HeightPx)
  {
-#if 0
+#if MUZE_INTERNAL && 0
   gl_render_state *Render = &App->Render;
   glDeleteTextures(ArrayCount(Render->Textures), &Render->Textures[0]);
   glGenTextures(ArrayCount(Render->Textures), &Render->Textures[0]);
@@ -2758,7 +2690,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                    App->HeightPx);
  }
  
- RenderBeginFrame(FrameArena, 0, 0, Buffer->Width, Buffer->Height);
+ RenderBeginFrame(FrameArena, 0, 0, Buffer->Dim.X, Buffer->Dim.Y);
  
  OS_ProfileAndPrint("Atlas");
  
@@ -2787,7 +2719,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     ui_box *Box;
     
-#if 1                
+#if MUZE_INTERNAL && 1
     StringsScratchTemp(UI_State->FrameArenaBack)
     {
      DebugStringAdd(App, "(ui) Active: %S", ActiveString);
@@ -3248,7 +3180,37 @@ UPDATE_AND_RENDER(UpdateAndRender)
              piece *Piece = (Panel->Piece ? Panel->Piece : PieceAlloc(App));
              Panel->Piece = Piece;
              
-             //PieceLecon11(Piece);
+#if MUZE_INTERNAL && 1
+             Piece->RecordLength = 0.f;
+             Piece->NoteCount = 0;
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
+             
+#if 1
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 7.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 8.f);
+#elif 1
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
+#elif 1
+             
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+#endif
+             
+#endif
              
              ui_box *PieceBox;
              
@@ -3268,6 +3230,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 if(M_IconButton(UI_IconKind_File, S8("Open")))
                 {
                  M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
+                 Piece->IsRecording = false;
+                 PieceStopPlaying(Piece);
                 }
                 
                 if(M_IconButton(UI_IconKind_Save, S8("Save")))
@@ -3295,6 +3259,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  {
                   tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
                   Piece->IsPlaying = true;
+                  
+                  Piece->IsRecording = false;
                  }
                 }
                 
@@ -3312,10 +3278,28 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 
                }
                
+#if MUZE_INTERNAL     
+               UI_FontKind(FontKind_Text)
+                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                if(M_Button(S8("Set to end")))
+               {
+                Piece->PlayPos = Piece->RecordLength;
+                PieceStopPlaying(Piece);
+               }
+#endif
+               
                Piece->Metronome ^= 
                 M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta);
-               Piece->BarWrapping ^= 
-                M_SimpleToggleButton(S8("Wrapping"), Piece->BarWrapping, Color_Magenta);
+               
+               UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                if(M_Button(S8("Clear")))
+               {
+                PieceStopPlaying(Piece);
+                Piece->IsRecording = false;
+                Piece->NoteCount = 0;
+                Piece->RecordLength = 0.f;
+                Piece->PlayPos = 0.f;
+               }
                
                UI_SemanticWidth(UI_SizePx(200.f, 1))
                 Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
@@ -3465,7 +3449,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
               
               if(Piece->IsRecording)
               {
-               Piece->RecordLength += BPS*dtForFrame;
+               Piece->RecordLength += BPS*Input->dtForFrame;
               }
               
               // Scrollbar
@@ -3712,7 +3696,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                                                                UI_State->RectDebugMode, 
                                                                ItemPadding, V4(1.f, 0.f, 1.f, 1.f)).OneClicked;
                 
-                if(M_Button(S8("Info")))
+                if(M_Button(S8("Debug Info"), .CenterText = false))
                 {
                  PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_DebugInfo;
                 }
@@ -3720,7 +3704,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 {                
                  f32 Speed = UI_State->AnimSpeedCoeff;
                  Speed = M_Slider(S8("SetAnimSpeed"), S8("Set animation speed"), 
-                                  Str8Fmt("%.0f", Speed),
+                                  Str8Fmt("%3.0f", Speed),
                                   Speed, 0.f, 120.f, 1.f, false).Value;
                  UI_State->AnimSpeedCoeff = Speed;
                 }
@@ -3728,6 +3712,37 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 App->HeightPx = M_Slider(S8("SetFontSize"), S8("Set font size"), Str8Fmt("%.0f", App->HeightPx), App->HeightPx,
                                          11.f, 64.f, 1.f, false,
                                          .SliderSize = SliderSize).Value;
+                
+                UI_BackgroundColor(Color_Night0)
+                {
+                 local_persist u32 Scale = 0;
+                 local_persist b32 IsMajor = false;
+                 local_persist random_series Series = {0};
+                 
+                 {
+                  DoOnce()
+                  {
+                   RandomSeed(&Series, (u64)&Series);
+                   Scale = RandomNext(&Series)%Note_Count;
+                   IsMajor = (RandomNext(&Series)%1);
+                  }
+                  str8 Text = Str8Fmt("Random scale is: %S %S\n", NotePitchStrings[Scale], (IsMajor ? S8("Major") : S8("Minor")));
+                  if(M_Button(Text, .String = S8("RandomScale")))
+                  {
+                   Scale = RandomNext(&Series)%Note_Count;
+                   IsMajor = (RandomNext(&Series)%1);
+                  }
+                 }
+                 
+                 piece *Piece = (!IsNilPiece(App->FirstPiece) ? App->FirstPiece : NilPiece);
+                 UI_BackgroundColor(Color_ButtonBackground)
+                  UI_AddBox(S8("PlayPos"), 
+                            UI_BoxFlag_DrawBackground|
+                            UI_BoxFlag_DrawDisplayString|
+                            UI_BoxFlag_CenterTextHorizontally|
+                            UI_BoxFlag_CenterTextVertically)->DisplayString =
+                  Str8Fmt("Pos: %.2f PrevPos: %.2f", Piece->PlayPos, Piece->PrevPlayPos);
+                }
                 
                 
                }
@@ -4485,13 +4500,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
     // TODO(luca): If a note is shorter than dtForFrame it could skip it.
     
     if(NoteStart <= Voice->PlayPos &&
-       NoteStart > (Voice->PlayPos - dtForFrame))
+       NoteStart > (Voice->PlayPos - Input->dtForFrame))
     {
      PlayNote(Memory, App, Voice, Note);
     }
     
     if(NoteEnd <= Voice->PlayPos &&
-       NoteEnd > (Voice->PlayPos - dtForFrame))
+       NoteEnd > (Voice->PlayPos - Input->dtForFrame))
     {
      rec_note OffNote = *Note;
      OffNote.Velocity = 0;
@@ -4499,7 +4514,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     }
    }
    
-   Voice->PlayPos += dtForFrame;
+   Voice->PlayPos += Input->dtForFrame;
    if(Voice->PlayPos >= Voice->RecordLength)
    {
     StopAllPlayingNotes(Memory, App, Voice);

@@ -181,17 +181,15 @@ Str8VFmt(char *Format, va_list Args)
  
  arena *Arena = StringsScratch;
  
- u64 MaxSize = KB(2);
- Result.Data = PushArray(Arena, u8, MaxSize);
- Result.Size = (u64)stbsp_vsprintf((char *)Result.Data, Format, Args);
- 
- // Null terminate just in case.
- Result.Data[Result.Size] = 0;
- 
- Assert(Result.Size > 0);
- Assert(Result.Size < MaxSize); 
- 
- ArenaFree(Arena, (MaxSize - Result.Size - 1));
+ S8OverPush(Arena, Result, KB(64), Result.Size - 1)
+ {  
+  Result.Size = (u64)stbsp_vsprintf((char *)Result.Data, Format, Args);
+  
+  // Null terminate just in case.
+  Result.Data[Result.Size] = 0;
+  
+  Assert(Result.Size > 0);
+ }
  
  return Result;
 }

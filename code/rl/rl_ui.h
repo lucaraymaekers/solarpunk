@@ -111,6 +111,7 @@ struct ui_box
  b32 WasClicked;
  b32 Hovered;
  b32 Pressed;
+ b32 Released;
  
  v2 Scroll;
  

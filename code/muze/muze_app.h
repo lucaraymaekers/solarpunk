@@ -47,6 +47,7 @@ struct piece
  b32 IsPlaying;
  f32 RecordLength;
  f32 PlayPos;
+ v2 PrevPlayPos;
  b32 Metronome;
  s32 Octave;
  
@@ -177,7 +178,7 @@ struct drag_data
  f32 NextStartPct;
 };
 
-//- State 
+//~ State 
 enum command_kind
 {
  Command_None,
@@ -192,6 +193,7 @@ enum command_kind
  Command_ToggleVirtualKeyboardInput,
  Command_ToggleSynthOutput,
  
+ //- Voice 
  Command_AddVoice,
  Command_DeleteVoice,
  Command_SetPanelVoice,
@@ -217,6 +219,7 @@ enum command_kind
  Command_SetLength,
  Command_ClearSelection,
  Command_DeleteSelection,
+ //-
  
  Command_CloseLister,
  Command_OpenLister,
@@ -224,6 +227,17 @@ enum command_kind
  Command_ClosePanel,
  Command_SplitPanel,
  Command_SetPanelType,
+ 
+ //- Piece 
+ Command_PieceRecord,
+ Comamnd_PiecePlay,
+ Command_PiecePause,
+ Command_PieceStop,
+ Command_PieceClear,
+ Command_PieceToggleMetronome,
+ Command_PieceToggleBarWrapping,
+ Command_PieceSetBPM,
+ //-
 };
 typedef enum command_kind command_kind;
 
@@ -251,6 +265,9 @@ struct command
  f32 Length;
  axis2 Axis;
  f32 Size; 
+ 
+ // TODO(luca): For undo and redo
+ ms_serializer Serializer;
 };
 
 typedef struct app_state app_state;
