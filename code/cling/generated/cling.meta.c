@@ -1,35 +1,19 @@
 #define Cng_ConfigMatchers \
 if(0) {} \
   else if(ConfigMatch(Name, S8("Asan"), Value)) Asan = true; \
-  else if(ConfigMatch(Name, S8("Debug"), Value)) Debug = true; \
-  else if(ConfigMatch(Name, S8("Clean"), Value)) Clean = true; \
+  else if(ConfigMatch(Name, S8("Release"), Value)) Release = true; \
+  else if(ConfigMatch(Name, S8("Slow"), Value)) Slow = true; \
   else if(ConfigMatch(Name, S8("Clang"), Value)) Clang = true; \
   else if(ConfigMatch(Name, S8("GCC"), Value)) GCC = true; \
-  else if(ConfigMatch(Name, S8("Slow"), Value)) Slow = true; \
-  else if(ConfigMatch(Name, S8("Wine"), Value)) Wine = true; \
-  else if(ConfigMatch(Name, S8("Meta"), Value)) Meta = true; \
-  else if(ConfigMatch(Name, S8("HaversineProcessor"), Value)) HaversineProcessor = true; \
-  else if(ConfigMatch(Name, S8("HaversineGenerator"), Value)) HaversineGenerator = true; \
-  else if(ConfigMatch(Name, S8("Sim86"), Value)) Sim86 = true; \
-  else if(ConfigMatch(Name, S8("Editor"), Value)) Editor = true; \
-  else if(ConfigMatch(Name, S8("Muze"), Value)) Muze = true; \
-  else if(ConfigMatch(Name, S8("School"), Value)) School = true;
-#define Cng_ConfigBools(CmdLine) \
+  else if(ConfigMatch(Name, S8("Wine"), Value)) Wine = true;
+#define Cng_ConfigBools(CmdLine, Help) \
  \
-  b32 Asan = CmdLineHasEntry(CmdLine, S8("Asan")); \
-  b32 Debug = CmdLineHasEntry(CmdLine, S8("Debug")); \
-  b32 Clean = CmdLineHasEntry(CmdLine, S8("Clean")); \
-  b32 Clang = CmdLineHasEntry(CmdLine, S8("Clang")); \
-  b32 GCC = CmdLineHasEntry(CmdLine, S8("GCC")); \
-  b32 Slow = CmdLineHasEntry(CmdLine, S8("Slow")); \
-  b32 Wine = CmdLineHasEntry(CmdLine, S8("Wine")); \
-  b32 Meta = CmdLineHasEntry(CmdLine, S8("Meta")); \
-  b32 HaversineProcessor = CmdLineHasEntry(CmdLine, S8("HaversineProcessor")); \
-  b32 HaversineGenerator = CmdLineHasEntry(CmdLine, S8("HaversineGenerator")); \
-  b32 Sim86 = CmdLineHasEntry(CmdLine, S8("Sim86")); \
-  b32 Editor = CmdLineHasEntry(CmdLine, S8("Editor")); \
-  b32 Muze = CmdLineHasEntry(CmdLine, S8("Muze")); \
-  b32 School = CmdLineHasEntry(CmdLine, S8("School"));
+  b32 Asan = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Asan"), S8("Enable adress sanitizer")); \
+  b32 Release = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Release"), S8("Enable optimizations and remove debug tooling")); \
+  b32 Slow = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Slow"), S8("When building applications, rebuild all libraries every time")); \
+  b32 Clang = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Clang"), S8("Use Clang (Linux only)")); \
+  b32 GCC = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("GCC"), S8("Use GCC (Linux only)")); \
+  b32 Wine = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Wine"), S8("Build with wine (Linux only)"));
 
   internal field_hash_node *
   GetFieldHashNode(str8 String, u64 Seed, u64 ArraySize, field_hash_node *Array)

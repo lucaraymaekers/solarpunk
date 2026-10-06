@@ -1,23 +1,16 @@
 //~ Build options
-@table(Name, Default)
+@table(Name, Default, Help)
 Config:
 {
  // Build Params
- { Asan  0 }
- { Debug 1 }
- { Clean 0 }
- { Clang 1 }
- { GCC   0 }
- { Slow  0 }
- { Wine  0 }
- // Targets
- { Meta               0 }
- { HaversineProcessor 0 }
- { HaversineGenerator 0 }
- { Sim86              0 }
- { Editor             0 }
- { Muze               0 }
- { School             0 }
+ { Asan    0 "Enable adress sanitizer" }
+ { Release 0 "Enable optimizations and remove debug tooling" }
+ // TODO(luca):
+ //{ Clean   0 "Clear out the build directoryr to get a clean build" }
+ { Slow    0 "When building applications, rebuild all libraries every time"}
+ { Clang   1 "Use Clang (Linux only)" }
+ { GCC     0 "Use GCC (Linux only)" }
+ { Wine    0 "Build with wine (Linux only)" }
 }
 
 //~ Config
@@ -35,11 +28,11 @@ ConfigMatchers:
 @data
 ConfigBools:
 {
- ```#define Cng_ConfigBools(CmdLine) \
+ ```#define Cng_ConfigBools(CmdLine, Help) \
 ```;
  @expand(Config)
   ``` \
-  b32 $(Name) = CmdLineHasEntry(CmdLine, S8("$(Name)"));```
+  b32 $(Name) = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("$(Name)"), S8("$(Help)"));```
 }
 
 //~ Hash functions

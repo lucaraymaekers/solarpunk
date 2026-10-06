@@ -306,6 +306,20 @@ ConfigMatch(MD_String8 Name, MD_String8 Match, MD_String8 Value)
  return Result;
 }
 
+internal b32
+CmdLineHasEntryAndAddHelp(cmd_line *CmdLine, str8_array *Array, str8 Flag, str8 Help)
+{
+ b32 Result = false;
+ 
+ str8 Pad = S8("                        ");
+ if(Flag.Size < Pad.Size) Pad.Size -= Flag.Size;
+ 
+ Cng_S8ArrayAppendTo(Array, Str8Fmt("-%S %S: %S", Flag, Pad, Help));
+ Result = CmdLineHasEntry(CmdLine, Flag);
+ 
+ return Result;
+}
+
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
 {
@@ -324,8 +338,14 @@ ENTRY_POINT(EntryPoint)
    GlobalMDArena = MD_ArenaAlloc();
   }
   
+  //~ Help
+  str8_array *Help = Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY);
+  Cng_S8ArrayAppendTo(Help, S8("Build parameters:"));
+  
   //~ Config 
-  Cng_ConfigBools(&Params->CmdLine);
+  Cng_ConfigBools(&Params->CmdLine, Help);
+  
+  Cng_S8ArrayAppendTo(Help, S8("\nTargets:"));
   
   MD_String8 FileName = S8("../code/cling/cling.mdesk");
   MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
@@ -355,11 +375,18 @@ ENTRY_POINT(EntryPoint)
    }
   }
   
+  b32 DidWork = false;
+  b32 Debug = !Release;
   Slow |= Asan;
+  if(GCC) Clang = false;
+  
+  cmd_line *CmdLine = &Params->CmdLine;
   
   //~ Metaprogram
-  if(Meta)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Meta"), S8("Search all .mdesk files and generate code accordingly")))
   {
+   DidWork = true;
+   
    Log("Generating code...\n");
    
    arena *Arena = GlobalClingArena;
@@ -654,8 +681,10 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ Haversine Generator
-  if(HaversineGenerator)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("HaversineGenerator"), S8("Target")))
   {
+   DidWork = true;
+   
    LogBuildMode(S8("Haversine generator"), Debug);
    
    Cng_Scratch();
@@ -673,8 +702,10 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ Haversine Processor
-  if(HaversineProcessor)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("HaversineProcessor"), S8("Target")))
   {
+   DidWork = true;
+   
    LogBuildMode(S8("Haversine processor"), Debug);
    
    Cng_Scratch();
@@ -691,8 +722,10 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ Sim86
-  if(Sim86)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Sim86"), S8("Target")))
   {
+   DidWork = true;
+   
    LogBuildMode(S8("sim86"), Debug);
    
    if(Cng_IsOs(CngOS_Linux))
@@ -712,44 +745,46 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ Editor
-  if(Editor)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Editor"), S8("Target")))
   {
+   DidWork = true;
+   
    ApplicationBuild(S8("editor"), S8("editor_app"), 
                     S8("../code/editor/editor_app.c"), S8("Editor"),
                     GCC, Clang, Asan, Debug, Slow);
   }
   
   //~ Muze
-  if(Muze)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Muze"), S8("Target")))
   {
+   DidWork = true;
+   
    ApplicationBuild(S8("muze"), S8("muze_app"), 
                     S8("../code/muze/muze_app.c"), S8("Muze"),
                     GCC, Clang, Asan, Debug, Slow);
   }
   
   //~ School
-  if(School)
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(see subcommands with -School)")))
   {
    Cng_Scratch();
    
-   LogBuildMode(S8("Les1"), Debug);
-   
    cmd_line *CmdLine = &Params->CmdLine;
    
-   // NOTE(luca): Compile the source file.
-   b32 Compile  = CmdLineHasEntry(CmdLine, S8("compile"));
-   // NOTE(luca): Run the built program.
-   b32 Run      = CmdLineHasEntry(CmdLine, S8("run"));
-   // NOTE(luca): Use the last file as input.
-   b32 Last     = CmdLineHasEntry(CmdLine, S8("last"));
-   // NOTE(luca): Use all files as input.
-   b32 All      = CmdLineHasEntry(CmdLine, S8("all"));
-   // NOTE(luca): Create a template source file.
-   b32 Template = CmdLineHasEntry(CmdLine, S8("template"));
-   // NOTE(luca): Print the source file path.
-   b32 Print    = CmdLineHasEntry(CmdLine, S8("print"));
-   // NOTE(luca): Convert spaces to tabs in the source file.
-   b32 Convert  = CmdLineHasEntry(CmdLine, S8("convert"));
+   Cng_S8ArrayAppendTo(Help, S8("\nSchool:"));
+   
+   b32 Compile  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile the source file"));
+   b32 Run      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run the built program"));
+   b32 Last     = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("last"), S8("Use the last found source file as input"));
+   b32 All      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("all"), S8("Use all source files as input"));
+   b32 Template = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("template"), S8("Create a template source file"));
+   b32 Print    = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("print"), S8("Print the source file path"));
+   b32 Convert  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("convert"), S8("Convert spaces to tabs in the source file"));
+   
+   if(Compile)
+   {
+    LogBuildMode(S8("Les1"), Debug);
+   }
    
    if(All) Last = true;
    
@@ -870,11 +905,20 @@ ENTRY_POINT(EntryPoint)
      }
     }
     
+    DidWork = true;
    }
    
   }
   
-  Log("Done.\n");
+  if(DidWork)
+  {
+   Log("Done.\n");
+  }
+  else
+  {
+   str8 HelpText = Cng_S8ArrayJoinFrom(Help, '\n');
+   Log("\nNo target provided.\n\n%S\n", HelpText);
+  }
  }
  
  return 0;
