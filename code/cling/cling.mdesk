@@ -17,7 +17,7 @@ Config:
 @data
 ConfigMatchers:
 {
- ```#define Cng_ConfigMatchers \
+ ```#define Cng_ConfigMatchers(Name, Value) \
 ```;
  `if(0) {}`;
  @expand(Config)

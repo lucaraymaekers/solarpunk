@@ -1030,7 +1030,9 @@ PieceStopPlaying(piece *Piece)
  }
 }
 
+#if 0
 #include "../data/muze/muze_pieces.c"
+#endif
 
 //~ UI 
 internal ui_box *
@@ -1620,7 +1622,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
    }
    
-   f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
+   f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
    MarkerPos.X = Pos.X + BarStart + Remainder*BeatWidth;
    
    f32 Width = StaffLineWidth;
@@ -1706,7 +1708,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
       NotePos.Y += (f32)HeightIdx*2.f*StaffHeight;
      }
      
-     f32 BarStart = BarPadding + BarIdx*WholeBarWidth;
+     f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
      
      f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
      NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;

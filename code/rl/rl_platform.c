@@ -674,7 +674,7 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
          {
           if(UI_IsActive(TopBar))
           {
-           DebugUIDragOffset.e[Axis] = (NewInput->Mouse.Pos.e[Axis] - NewInput->Mouse.Start.e[Axis]);
+           DebugUIDragOffset.e[Axis] = (f32)(NewInput->Mouse.Pos.e[Axis] - NewInput->Mouse.Start.e[Axis]);
            UI_State->IsAnimating = false;
           }
           else if(TopBar->Released)

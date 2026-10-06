@@ -1196,7 +1196,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  OS_ProfileAndPrint("Init");
  
  f32 WindowBorderSize = 2.f;
- v2 BufferDim = V2S32(Buffer->Width, Buffer->Height);
+ v2 BufferDim = V2V2S32(Buffer->Dim);
  
  if(!Memory->Initialized)
  {
@@ -1656,7 +1656,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  OS_ProfileAndPrint("Input");
  
- RenderBeginFrame(FrameArena, 0, 0, Buffer->Width, Buffer->Height);
+ RenderBeginFrame(FrameArena, 0, 0, Buffer->Dim.X, Buffer->Dim.Y);
  
  OS_ProfileAndPrint("Misc setup");
  

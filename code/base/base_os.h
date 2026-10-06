@@ -87,7 +87,7 @@ struct os_dir
 //~ Globals
 global_variable u8 LogBuffer[KB(64)];
 global_variable os_profiler GlobalProfiler = {0}; 
-global_variable char *GlobalProfilerPrefix = ""; 
+global_variable char *GlobalProfilerPrefix; 
 
 #if BASE_PROFILE
 global_variable b32 GlobalIsProfiling = true;

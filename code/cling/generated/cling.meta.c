@@ -1,4 +1,4 @@
-#define Cng_ConfigMatchers \
+#define Cng_ConfigMatchers(Name, Value) \
 if(0) {} \
   else if(ConfigMatch(Name, S8("Asan"), Value)) Asan = true; \
   else if(ConfigMatch(Name, S8("Release"), Value)) Release = true; \

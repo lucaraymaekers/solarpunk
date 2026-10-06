@@ -15,7 +15,7 @@ SafeTruncateU64(u64 Value)
 #define Win32Log() Win32Log_(__FILE__, __LINE__)
 #define Win32LogIf(Expression) do { if(Expression) Win32Log(); } while(0)
 internal void 
-Win32Log_(char *File, s32 Line)
+Win32Log_(const char *File, s32 Line)
 {
  LPVOID ErrorMessage = 0;
  DWORD ErrorCode = GetLastError();

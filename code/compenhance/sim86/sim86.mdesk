@@ -28,7 +28,7 @@ Sim86Enum:
  `Sim86_Count`
 }
 
-@data_table("char *")
+@data_table("const char *")
 flags_8086_strings:
 {
  @expand(sim86_flags_mapping)

@@ -35,8 +35,8 @@ paths =
  { .path = "code/rl/",     .recursive = true,  .relative = true, },
  { .path = "code/cling/",  .recursive = true, .relative = true, },
  { .path = "code/muze/",        .recursive = true,  .relative = true, },
- //{ .path = "code/editor/",      .recursive = true,  .relative = true, },
- //{ .path = "code/compenhance/", .recursive = true,  .relative = true, },
+ { .path = "code/editor/",      .recursive = true,  .relative = true, },
+ { .path = "code/compenhance/", .recursive = true,  .relative = true, },
  { .path = "code/school/",      .recursive = true,  .relative = true, },
 };
 
@@ -49,10 +49,10 @@ load_paths =
 
 commands =
 {
- .build_muze = 
+ .build = 
  {
   .out = "*compilation*", 
-  .linux = "sh ./code/build.sh norebuild -Meta -Muze",
+  .linux = "./code/build.sh norebuild -Meta -Muze",
   .win = ".\\code\\build.bat -Meta -Muze",
   .save_dirty_files = true,
   .footer_panel = false,
@@ -85,12 +85,11 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
- 
 };
 
 fkey_command =
 {
- .F1 = "build_muze",
+ .F1 = "build",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",

@@ -596,12 +596,12 @@ P_INIT()
    s32 ScreenWidth = 1920;
    s32 ScreenHeight = 1080;
    
-   s32 X = ScreenWidth - Buffer->Width; 
+   s32 X = ScreenWidth - Buffer->Dim.X; 
    s32 Y = 0; 
    
    // NOTE(luca): Align window with the right edge of the screen.
    Window WindowHandle = XCreateWindow(DisplayHandle, RootWindow,
-                                       X, Y, (u32)Buffer->Width, (u32)Buffer->Height,
+                                       X, Y, (u32)Buffer->Dim.X, (u32)Buffer->Dim.Y,
                                        0,
                                        WindowVisualInfo.depth, InputOutput,
                                        WindowVisualInfo.visual, WindowAttributeMask, &WindowAttributes);
@@ -612,7 +612,7 @@ P_INIT()
     {            
      XRet = XStoreName(DisplayHandle, WindowHandle, WindowName);
      
-     LinuxSetSizeHint(DisplayHandle, WindowHandle, Buffer->Width, Buffer->Height, Buffer->Width, Buffer->Height);
+     LinuxSetSizeHint(DisplayHandle, WindowHandle, Buffer->Dim.X, Buffer->Dim.Y, Buffer->Dim.X, Buffer->Dim.Y);
      
      b32 DisableWindowDecorations = false;
      // Disable window decorations
@@ -669,7 +669,7 @@ P_INIT()
     if(!OpenGLMode)
     {            
      s32 BitsPerPixel = Buffer->BytesPerPixel*8;
-     Linux->WindowImage = XCreateImage(DisplayHandle, WindowVisualInfo.visual, (u32)WindowVisualInfo.depth, ZPixmap, 0, (char *)Buffer->Pixels, (u32)Buffer->Width, (u32)Buffer->Height, BitsPerPixel, 0);
+     Linux->WindowImage = XCreateImage(DisplayHandle, WindowVisualInfo.visual, (u32)WindowVisualInfo.depth, ZPixmap, 0, (char *)Buffer->Pixels, (u32)Buffer->Dim.X, (u32)Buffer->Dim.Y, BitsPerPixel, 0);
     }
     
     if(OpenGLMode)
@@ -1416,8 +1416,8 @@ P_UPDATE_IMAGE()
              Linux->WindowHandle, 
              Linux->DefaultGC, 
              Linux->WindowImage, 0, 0, 0, 0, 
-             (u32)Buffer->Width, 
-             (u32)Buffer->Height);
+             (u32)Buffer->Dim.X, 
+             (u32)Buffer->Dim.Y);
   }
   
   // NOTE(luca): This will only map the window once we are ready to render.

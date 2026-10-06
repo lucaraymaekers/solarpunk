@@ -7,14 +7,16 @@
 # define STB_SPRINTF_STATIC
 # define STB_SPRINTF_IMPLEMENTATION
 #endif 
+NO_WARNINGS_BEGIN
 #include "lib/stb_sprintf.h"
+NO_WARNINGS_END
 
 global_variable arena *StringsScratch = 0;
 
 #define SetStringsScratch(Arena) SetStringsScratch_(Arena, #Arena, __FILE__, __LINE__) 
 
 internal void
-SetStringsScratch_(arena *Arena, char *Name, char *FileName, s32 Line)
+SetStringsScratch_(arena *Arena, const char *Name, const char *FileName, s32 Line)
 {
  Assert(Arena);
  StringsScratch = Arena;
@@ -175,7 +177,7 @@ Str8DupCString(arena *Arena, char *String)
 }
 
 internal str8
-Str8VFmt(char *Format, va_list Args)
+Str8VFmt(const char *Format, va_list Args)
 {
  str8 Result = {0};
  
@@ -195,7 +197,7 @@ Str8VFmt(char *Format, va_list Args)
 }
 
 internal str8
-Str8Fmt(char *Format, ...)
+Str8Fmt(const char *Format, ...)
 {
  str8 Result = {0};
  

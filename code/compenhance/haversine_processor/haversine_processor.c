@@ -1,14 +1,9 @@
 //~ Libraries
-#define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
 #include "base/base.h"
 #include "base/base.c"
 
 //- External  
-NO_WARNINGS_BEGIN
-#define STB_SPRINTF_IMPLEMENTATION
-#include "lib/stb_sprintf.h"
-NO_WARNINGS_END
 #include "listing.c"
 //- Project 
 #include "haversine_processor.h"
@@ -28,16 +23,16 @@ ENTRY_POINT(EntryPoint)
   u64 OSStart = ReadOSTimer();
   
   char **Args = Params->Args;
-  s32 ArgsCount = Params->ArgsCount;
+  s32 ArgCount = Params->ArgCount;
   
   // Parse command line
   {    
-   if(ArgsCount >= 2)
+   if(ArgCount >= 2)
    {
     JSONFileName = Args[1];
    }
    
-   if(ArgsCount >= 3)
+   if(ArgCount >= 3)
    {
     AnswersFileName = Args[2];
    }

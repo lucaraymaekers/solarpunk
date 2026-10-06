@@ -1,13 +1,10 @@
 //~ Libraries
-#define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
 #include "base/base.h"
 #include "base/base.c"
 
 NO_WARNINGS_BEGIN
 #include "reference_decoder/sim86_lib.cpp"
-#define STB_SPRINTF_IMPLEMENTATION
-#include "lib/stb_sprintf.h"
 NO_WARNINGS_END
 #include "clocks_table.inl"
 
@@ -99,8 +96,8 @@ s32 GetCompleteDisplacement(s32 *Registers, instruction_operand *Operand)
  u32 Count = Operand->Address.Terms[0].Register.Count;
  u32 Mask = ((u32)((-1)) >> (16 + (16 - Count*8)));
  CompleteDisplacement += 
- (Registers[Operand->Address.Terms[0].Register.Index] & Mask) +
- (Registers[Operand->Address.Terms[1].Register.Index] & Mask);
+ (Registers[Operand->Address.Terms[0].Register.Index] & (s32)Mask) +
+ (Registers[Operand->Address.Terms[1].Register.Index] & (s32)Mask);
  
  return CompleteDisplacement;
 }
@@ -390,14 +387,14 @@ Run8086(umm MemorySize, u8 *Memory)
    {
     if(!(FlagsRegister & Flag_Zero))
     {
-     IPRegister += *Destination;
+     IPRegister += (u32)*Destination;
     }
    }
    else if(Decoded.Op == Op_je)
    {
     if((FlagsRegister & Flag_Zero))
     {
-     IPRegister += *Destination;
+     IPRegister += (u32)*Destination;
     }
    }
    else
@@ -434,7 +431,7 @@ Run8086(umm MemorySize, u8 *Memory)
   Register.Offset = 0;
   Register.Count = 2;
   
-  u32 Value = Registers[RegisterIndex];
+  u32 Value = (u32)Registers[RegisterIndex];
   if(Value > 0)
   {
    printf("     %s: 0x%0x (%d)\n", 
@@ -489,8 +486,8 @@ ENTRY_POINT(EntryPoint)
   b32 Dump = false;
   char *FileName = 0;
   for(s32 ArgsIndex = 1;
-      ArgsIndex < Params->ArgsCount;
-      ArgsIndex++)
+      ArgsIndex < Params->ArgCount;
+      ArgsIndex += 1)
   {
    char *Command = Params->Args[ArgsIndex];
    if(0) {}

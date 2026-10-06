@@ -1,15 +1,9 @@
 //~ Libraries
-#define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
 #include "base/base.h"
 #include "base/base.c"
 
-NO_WARNINGS_BEGIN
-#define STB_SPRINTF_IMPLEMENTATION
-#include "lib/stb_sprintf.h"
-#include <math.h>
 #include "listing.c"
-NO_WARNINGS_END
 
 #include "haversine_random.h"
 #include "generated/haversine.meta.c"
@@ -81,7 +75,7 @@ ENTRY_POINT(EntryPoint)
   
   char **Args = Params->Args;
   
-  if(Params->ArgsCount >= 4)
+  if(Params->ArgCount >= 4)
   {
    u32 Method = 0;
    u64 Seed = 0;;

@@ -35,8 +35,8 @@ internal b32  S8Match(str8 A, str8 B, b32 BIsPrefix);
 internal u64  StringLength(char *String);
 internal str8 S8Cat(str8 Prefix, str8 Suffix);
 internal str8 Str8DupCString(arena *Arena, char *String);
-internal str8 Str8VFmt(char *Format, va_list Args);
-internal str8 Str8Fmt(char *Format, ...);
+internal str8 Str8VFmt(const char *Format, va_list Args);
+internal str8 Str8Fmt(const char *Format, ...);
 internal u64  U64HashFromSeedStr8(u64 Seed, str8 String);
 internal u64  U64HashFromStr8(str8 String);
 
@@ -57,7 +57,7 @@ internal u64  U64HashFromStr8(str8 String);
 #define PushS8(Arena, Size) PushS8_(Arena, Size)
 
 #define S8OverPush(Arena, Result, MaxSize, EndSize) \
-DeferLoop(Result = PushS8(Arena, MaxSize), ArenaFree(Arena, MaxSize - EndSize))
+DeferLoop((Result = PushS8(Arena, MaxSize)), ArenaFree(Arena, MaxSize - EndSize))
 
 #define StringsScratchTemp(Arena) \
 StringsScratchTemp_(Arena, Glue(Counter, __COUNTER__), Glue(Temp, __COUNTER__))

@@ -367,7 +367,7 @@ ENTRY_POINT(EntryPoint)
      {      
       MD_String8 Name = MD_NodeAtIndex(Node->first_child, 0)->string;
       MD_String8 Value = MD_NodeAtIndex(Node->first_child, 1)->string;
-      Cng_ConfigMatchers;
+      Cng_ConfigMatchers(Name, Value);
      }
      break;
     }
@@ -728,6 +728,22 @@ ENTRY_POINT(EntryPoint)
    
    LogBuildMode(S8("sim86"), Debug);
    
+   Cng_Scratch();
+   Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
+   if(Cng_IsOs(CngOS_Linux))
+   {
+    Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
+   }
+   else if(Cng_IsOs(CngOS_Windows))
+   {
+    Cng_S8ArrayAppend(S8("/std:c++20"));
+   }
+   
+   Cng_S8ArrayAppend(S8("../code/compenhance/sim86/sim86.cpp"));
+   
+   RunCommand();
+   
+#if 0   
    if(Cng_IsOs(CngOS_Linux))
    {            
     str8_array *ExtraFlags = Cng_PushS8Array(256);
@@ -742,6 +758,11 @@ ENTRY_POINT(EntryPoint)
     
     RunCommand();
    }
+   else
+   {
+    Log("Error: OS not supported.\n");
+   }
+#endif
   }
   
   //~ Editor
@@ -768,8 +789,6 @@ ENTRY_POINT(EntryPoint)
   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(see subcommands with -School)")))
   {
    Cng_Scratch();
-   
-   cmd_line *CmdLine = &Params->CmdLine;
    
    Cng_S8ArrayAppendTo(Help, S8("\nSchool:"));
    

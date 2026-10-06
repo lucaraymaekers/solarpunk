@@ -28,7 +28,7 @@ Sim86_Carry,
 };
 typedef enum sim86_enum sim86_enum;
 
-char * flags_8086_strings[] = {
+const char * flags_8086_strings[] = {
 "C","P","A","Z","S","O","I","D","T",
 };
 
