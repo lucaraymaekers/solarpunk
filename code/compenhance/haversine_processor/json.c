@@ -45,23 +45,26 @@ internal b32
 MatchString(str8 Buffer, str8 Match, u64 Offset)
 {
  b32 Result = true;
+ 
  Assert(Offset < Buffer.Size);
  Buffer.Data += Offset;
  Buffer.Size -= Offset;
  
  if(Buffer.Size < Match.Size)
  {
-  return false;
+  Result =false;
  }
- 
- for(u64 At = 0;
-     At < Match.Size;
-     At += 1)
- {
-  if(Buffer.Data[At] != Match.Data[At])
+ else
+ { 
+  for(u64 At = 0;
+      At < Match.Size;
+      At += 1)
   {
-   Result = false;
-   break;
+   if(Buffer.Data[At] != Match.Data[At])
+   {
+    Result = false;
+    break;
+   }
   }
  }
  
@@ -138,110 +141,113 @@ void JSON_ParseList(str8 Buffer, json_token *Token, json_token_type Type, u64 *P
 json_token *JSON_ParseElement(str8 Buffer, u64 *Pos)
 {
  json_token *Token = (json_token *)malloc(sizeof(json_token));
- Assert(Token);
  
- MemoryZero(Token);
- 
- if(*Pos < Buffer.Size)
+ Prof_TimeScopeFunc()
  {
-  while(*Pos < Buffer.Size && IsWhiteSpace(Buffer.Data[*Pos])) *Pos += 1;
-  Assert(*Pos < Buffer.Size);
+  Assert(Token);
+  MemoryZero(Token);
   
-  u64 TokenStart = *Pos;
-  
-  str8 Keyword = {};
-  
-  switch(Buffer.Data[*Pos])
+  if(*Pos < Buffer.Size)
   {
-   case '{': JSON_ParseList(Buffer, Token, JSON_TokenType_Object, Pos, '}'); break;
-   case '[': JSON_ParseList(Buffer, Token, JSON_TokenType_Array,  Pos, ']'); break;
+   while(*Pos < Buffer.Size && IsWhiteSpace(Buffer.Data[*Pos])) *Pos += 1;
+   Assert(*Pos < Buffer.Size);
    
-   case ':': Token->Type = JSON_TokenType_Colon; break;
-   case ',': Token->Type = JSON_TokenType_Comma; break;
+   u64 TokenStart = *Pos;
    
-   case 't': Keyword = S8("true");  Token->Type = JSON_TokenType_True;  break;
-   case 'f': Keyword = S8("false"); Token->Type = JSON_TokenType_False; break;
-   case 'n': Keyword = S8("null");  Token->Type = JSON_TokenType_Null;  break;
+   str8 Keyword = {};
    
-   case '"':
+   switch(Buffer.Data[*Pos])
    {
-    Token->Type = JSON_TokenType_String;
+    case '{': JSON_ParseList(Buffer, Token, JSON_TokenType_Object, Pos, '}'); break;
+    case '[': JSON_ParseList(Buffer, Token, JSON_TokenType_Array,  Pos, ']'); break;
     
-    u64 At = *Pos;
-    Token->Value.Data = Buffer.Data + At;
-    while(*Pos < Buffer.Size)
-    {
-     *Pos += 1;
-     if(Buffer.Data[*Pos] == '\\') continue;
-     if(Buffer.Data[*Pos] == '"')  break;
-    }
+    case ':': Token->Type = JSON_TokenType_Colon; break;
+    case ',': Token->Type = JSON_TokenType_Comma; break;
     
-    if(*Pos >= Buffer.Size)
+    case 't': Keyword = S8("true");  Token->Type = JSON_TokenType_True;  break;
+    case 'f': Keyword = S8("false"); Token->Type = JSON_TokenType_False; break;
+    case 'n': Keyword = S8("null");  Token->Type = JSON_TokenType_Null;  break;
+    
+    case '"':
     {
-     Token->Type = JSON_TokenType_Error;
-     Token->ErrorAt = At;
-    }
-   } break;
-   
-   default:
-   {
-    if(Buffer.Data[*Pos] == '-' ||
-       (Buffer.Data[*Pos] >= '0' && Buffer.Data[*Pos] <= '9'))
-    {
-     Token->Type = JSON_TokenType_Number;
+     Token->Type = JSON_TokenType_String;
      
-     f64 Number = 0;
-     
-     if(Buffer.Data[*Pos] == '-')
-     {
-      *Pos += 1;
-     }
-     
+     u64 At = *Pos;
+     Token->Value.Data = Buffer.Data + At;
      while(*Pos < Buffer.Size)
      {
-      if(0) {}
-      else if(IsDigit(Buffer.Data[*Pos]))
-      {
-      }
-      else if(Buffer.Data[*Pos] == '.')
-      {
-       *Pos += 1;
-       while(*Pos < Buffer.Size && IsDigit(Buffer.Data[*Pos])) *Pos += 1;
-       break;
-      }
-      
       *Pos += 1;
+      if(Buffer.Data[*Pos] == '\\') continue;
+      if(Buffer.Data[*Pos] == '"')  break;
      }
      
-     // TODO(luca): 
-     if(Buffer.Data[*Pos] == 'e' || Buffer.Data[*Pos] == 'E') *Pos += 1;
-     if(Buffer.Data[*Pos] == '+' || Buffer.Data[*Pos] == '-') *Pos += 1;
-     while(*Pos < Buffer.Size && IsDigit(Buffer.Data[*Pos]))  *Pos += 1;
-     
-     *Pos -= 1;
-     
+     if(*Pos >= Buffer.Size)
+     {
+      Token->Type = JSON_TokenType_Error;
+      Token->ErrorAt = At;
+     }
+    } break;
+    
+    default:
+    {
+     if(Buffer.Data[*Pos] == '-' ||
+        (Buffer.Data[*Pos] >= '0' && Buffer.Data[*Pos] <= '9'))
+     {
+      Token->Type = JSON_TokenType_Number;
+      
+      f64 Number = 0;
+      
+      if(Buffer.Data[*Pos] == '-')
+      {
+       *Pos += 1;
+      }
+      
+      while(*Pos < Buffer.Size)
+      {
+       if(0) {}
+       else if(IsDigit(Buffer.Data[*Pos]))
+       {
+       }
+       else if(Buffer.Data[*Pos] == '.')
+       {
+        *Pos += 1;
+        while(*Pos < Buffer.Size && IsDigit(Buffer.Data[*Pos])) *Pos += 1;
+        break;
+       }
+       
+       *Pos += 1;
+      }
+      
+      // TODO(luca): 
+      if(Buffer.Data[*Pos] == 'e' || Buffer.Data[*Pos] == 'E') *Pos += 1;
+      if(Buffer.Data[*Pos] == '+' || Buffer.Data[*Pos] == '-') *Pos += 1;
+      while(*Pos < Buffer.Size && IsDigit(Buffer.Data[*Pos]))  *Pos += 1;
+      
+      *Pos -= 1;
+      
+     }
+    } break;
+   }
+   
+   
+   if(Keyword.Size)
+   {
+    if(MatchString(Buffer, Keyword, *Pos))
+    {
+     *Pos += Keyword.Size - 1;
     }
-   } break;
-  }
-  
-  
-  if(Keyword.Size)
-  {
-   if(MatchString(Buffer, Keyword, *Pos))
-   {
-    *Pos += Keyword.Size - 1;
+    else
+    {
+     Token->Type = JSON_TokenType_Error;
+     Token->ErrorAt = *Pos;
+    }
    }
-   else
-   {
-    Token->Type = JSON_TokenType_Error;
-    Token->ErrorAt = *Pos;
-   }
+   
+   *Pos += 1;
+   
+   Token->Value.Data = Buffer.Data + TokenStart;
+   Token->Value.Size = *Pos - TokenStart;
   }
-  
-  *Pos += 1;
-  
-  Token->Value.Data = Buffer.Data + TokenStart;
-  Token->Value.Size = *Pos - TokenStart;
  }
  
  return Token;

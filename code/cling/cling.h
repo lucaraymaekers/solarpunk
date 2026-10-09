@@ -194,7 +194,8 @@ Cng_CommonBuildCommand(b32 GCC, b32 Clang, b32 Debug, b32 Asan)
  b32 Release = !Debug;
  
 #if OS_LINUX
- str8 CommonCompilerFlags = S8("-fno-threadsafe-statics -nostdinc++ -D_GNU_SOURCE=1 -fno-exceptions -fno-rtti");
+ str8 CommonCompilerFlags = S8("-I" CLING_CODE_PATH 
+                               " -fno-threadsafe-statics -nostdinc++ -D_GNU_SOURCE=1 -fno-exceptions -fno-rtti");
  str8 CommonWarningFlags = S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow " 
                               "-Wno-double-promotion -Wno-unused-but-set-variable -Wno-write-strings -Wno-string-conversion -Wno-pointer-arith "
                               "-Wno-missing-field-initializers "
@@ -280,6 +281,7 @@ Cng_CommonBuildCommand(b32 GCC, b32 Clang, b32 Debug, b32 Asan)
 #endif
  
  Cng_S8ArrayAppend(S8("cl"));
+ //Cng_S8ArrayAppend(S8("/P /C"));
  Cng_S8ArrayAppend(S8("-MTd -Gm- -nologo -GR- -EHa- -Oi -FC -Z7"));
  Cng_S8ArrayAppend(S8("-Zc:strictStrings-"));
  Cng_S8ArrayAppend(S8("-WX -W4 -wd4459 -wd4456 -wd4201 -wd4100 -wd4101 -wd4189 -wd4505 -wd4996 -wd4389 -wd4244 -wd5287"));

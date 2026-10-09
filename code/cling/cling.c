@@ -688,17 +688,9 @@ ENTRY_POINT(EntryPoint)
    LogBuildMode(S8("Haversine generator"), Debug);
    
    Cng_Scratch();
-   
    Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
-   if(Cng_IsOs(CngOS_Linux))
-   {
-    Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
-   }
-   
    Cng_S8ArrayAppend(S8("../code/compenhance/haversine_generator/haversine_generator.c"));
-   
    RunCommand();
-   
   }
   
   //~ Haversine Processor
@@ -709,14 +701,13 @@ ENTRY_POINT(EntryPoint)
    LogBuildMode(S8("Haversine processor"), Debug);
    
    Cng_Scratch();
-   
    Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
-   if(Cng_IsOs(CngOS_Linux))
-   {
-    Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
-   }
-   
    Cng_S8ArrayAppend(S8("../code/compenhance/haversine_processor/haversine_processor.c"));
+   
+   if(Cng_IsOs(CngOS_Windows))
+   {
+    Cng_S8ArrayAppend(S8("/link -opt:ref -incremental:no"));
+   }
    
    RunCommand();
   }
@@ -730,11 +721,7 @@ ENTRY_POINT(EntryPoint)
    
    Cng_Scratch();
    Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
-   if(Cng_IsOs(CngOS_Linux))
-   {
-    Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
-   }
-   else if(Cng_IsOs(CngOS_Windows))
+   if(Cng_IsOs(CngOS_Windows))
    {
     Cng_S8ArrayAppend(S8("/std:c++20"));
    }
@@ -743,26 +730,6 @@ ENTRY_POINT(EntryPoint)
    
    RunCommand();
    
-#if 0   
-   if(Cng_IsOs(CngOS_Linux))
-   {            
-    str8_array *ExtraFlags = Cng_PushS8Array(256);
-    Cng_S8ArrayAppendTo(ExtraFlags, S8("-I" CLING_CODE_PATH));
-    Cng_S8ArrayAppendTo(ExtraFlags, S8("-Wno-sign-conversion"));
-    
-    LinuxBuildCommand(S8("../code/compenhance/sim86/sim86.cpp"), 
-                      S8("sim86"),
-                      GCC, Clang, Asan, Debug,
-                      ExtraFlags,
-                      false);
-    
-    RunCommand();
-   }
-   else
-   {
-    Log("Error: OS not supported.\n");
-   }
-#endif
   }
   
   //~ Editor
@@ -837,22 +804,27 @@ ENTRY_POINT(EntryPoint)
    }
    
    str8 NamePrefix = S8("raymaekersLuca");
+   str8 Hoofdstuk = S8("6");
+   
+   char *PathFormat = (char *)Str8Fmt("../code/school/les1_%S/%S_%S_%%S.c", 
+                                      Hoofdstuk, NamePrefix, Hoofdstuk).Data;
    
    if(Last)
    {
-    u64 MaxLastIdx = 512;
-    for (u64 LastIdx = 1; LastIdx < MaxLastIdx; LastIdx += 1)
+    u64 MaxLastIdx = 64;
+    u64 LastIdx = 1;
+    for(u64 Idx = LastIdx; Idx < MaxLastIdx; Idx += 1)
     {
-     str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%llu.c", NamePrefix, LastIdx);
+     str8 LastIdxString = Str8Fmt("%llu", Idx);
+     
+     str8 Path = Str8Fmt(PathFormat, LastIdxString);
      if(OS_FileExists((char *)Path.Data))
      {
       str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
       DLLAppend(Node, CmdLine->FirstFile, CmdLine->LastFile);
-      Node->V = Str8Fmt("%llu", LastIdx);
-     }
-     else
-     {
-      break;
+      Node->V = LastIdxString; 
+      
+      LastIdx = Idx;
      }
      
      Assert(LastIdx < MaxLastIdx);
@@ -864,7 +836,7 @@ ENTRY_POINT(EntryPoint)
    
    for EachNode(Node, str8_node, First)
    {
-    str8 Path = Str8Fmt("../code/school/les1_4_8/%S_4_%S.c", NamePrefix, Node->V);
+    str8 Path = Str8Fmt(PathFormat, Node->V);
     
     if(Print)
     {
@@ -917,7 +889,7 @@ ENTRY_POINT(EntryPoint)
     {
      Cng_S8ArrayTemp(GlobalSelectedArray)
      {
-      str8 BuildPath = Str8Fmt("../build/%S_4_%S.exe", NamePrefix, Node->V);
+      str8 BuildPath = Str8Fmt("../build/%S_%S_%S.exe", NamePrefix, Hoofdstuk, Node->V);
       
       Cng_S8ArrayAppend(BuildPath);
       RunCommand();

@@ -67,7 +67,7 @@ Python had 180x instructions and was 130x slower.
 ```c
 for (i = 0; i < count; i +=1)
 {
-    sum += input[i];
+ sum += input[i];
 }
 ```
 - more instructions than only "adds"
@@ -79,8 +79,8 @@ Reducing ratio of loop overhead / work
 ```c
 for (i = 0; i < count; i +=2)
 {
-    sum += input[i];
-    sum += input[i + 1];
+ sum += input[i];
+ sum += input[i + 1];
 }
 ```
 Weird that it would go until to 1x add per cycle.
@@ -893,21 +893,46 @@ __COUNTER__ is not related to slots.  You can still use another method to do slo
 int __Prof_ID == __COUNTER__;
 
 # 59. [Profiling Nested Blocks](https://www.computerenhance.com/p/profiling-nested-blocks)
+Ease-of-use is very important.
 A good profiler needs to be easy to deploy, accurate and have low overhead.
+Good visualisation also important
 
 - A marker has a hitcount
 - Profiler global with start and end (and marker array)
 
 You can track in which block you are so you can subtract that time from the outer block.
 
+
 # 60. [Monday Q&A #19 (2023-07-10)](https://www.computerenhance.com/p/monday-q-and-a-19-2023-07-10)
+For multithreading you will have a profiler per thread.
+
+Profiler code can affect the alignment of your code.  So if you switch profilers you could
+be observing that.
+-> *stabilizer* that randomizes code and data layout. 
+
+Reading assembly is a question of practice and experience.
+
 # 61. [Profiling Recursive Blocks](https://www.computerenhance.com/p/profiling-recursive-blocks)
+Not handling recursion forces you to always be aware of recursion in your code.
+
+Trick is to overwrite the last block's total time when closing it.  This will be correct since
+it will be closed as last since it's outer most block.
+
+gdmag (blowJ) & gprof (gnu) -> iprof (stb)
+
+iprof, more accurate attribution (e.g., profile call only when called from someplace)
+
 # 62. [Monday Q&A #20 (2023-07-17)](https://www.computerenhance.com/p/monday-q-and-a-20-2023-07-17)
+
+7:18
+
+
+
 # 63. [A First Look at Profiling Overhead](https://www.computerenhance.com/p/a-first-look-at-profiling-overhead)
 # 64. [New Q&A Process](https://www.computerenhance.com/p/new-q-and-a-process)
 # 65. [A Tale of Two Radio Shacks](https://www.computerenhance.com/p/a-tale-of-two-radio-shacks)
 # 66. [Comparing the Overhead of RDTSC and QueryPerformanceCounter](https://www.computerenhance.com/p/comparing-the-overhead-of-rdtsc-and)
-# 67. [Monday Q&A #21 (2023-07-31)](https://www.computerenhance.com/p/monday-q-and-a-21-2023-07-31)
+# 67. [Monday Q&A #21 (2023-07-31)](https://www.computerenhance.com/p/monday-q-and-a-21-2023-07-31) 
 # 68. [The Four Programming Questions from My 1994 Microsoft Internship Interview](https://www.computerenhance.com/p/the-four-programming-questions-from)
 # 69. [Microsoft Intern Interview Question #1: Rectangle Copy](https://www.computerenhance.com/p/microsoft-intern-interview-question)
 # 70. [Microsoft Intern Interview Question #2: String Copy](https://www.computerenhance.com/p/microsoft-intern-interview-question-ab7)

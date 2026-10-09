@@ -1,4 +1,5 @@
 //~ Libraries
+#define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
 #include "base/base.h"
 #include "base/base.c"
@@ -10,7 +11,20 @@
 #include "profiler.c"
 #include "json.c"
 
-//- Main 
+internal void B(void)
+{
+ Prof_TimeScopeFunc();
+}
+
+internal void A(void)
+{
+ Prof_TimeScopeFunc()
+ {
+  B();
+ }
+}
+
+//- Main
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
 {
@@ -19,11 +33,16 @@ ENTRY_POINT(EntryPoint)
   char *JSONFileName = 0;
   char *AnswersFileName = 0;
   u64 PairCount = 0;
-  u64 OSFreq = GetOSTimerFreq();
-  u64 OSStart = ReadOSTimer();
   
   char **Args = Params->Args;
   s32 ArgCount = Params->ArgCount;
+  
+  // Profiler start code
+  Prof.OSStart = ReadOSTimer();
+  Prof.StartTSC = ReadCPUTimer();
+  Prof.MarkerCount = 1;
+  
+  A();
   
   // Parse command line
   {    
@@ -43,7 +62,6 @@ ENTRY_POINT(EntryPoint)
   {
    AnswersFile = OS_ReadEntireFileIntoMemory(AnswersFileName);
   }
-  
   
   if(JSONFileName)
   {
@@ -93,48 +111,65 @@ ENTRY_POINT(EntryPoint)
        Pair = Pair->Next;
       }
      }
+     JSON_FreeTokens(JSON);
     }
-    JSON_FreeTokens(JSON);
     
+    f64 AverageSum = 0;
     // Compute the sum
     Prof_TimeScope("Sum")
     {
-     f64 AverageSum = 0;
      f64 AverageCoefficient = (1.0/(f64)PairCount);
+     
      
      for EachIndex(Idx, PairCount)
      {
       haversine_pair *HaversinePair = HaversinePairs + Idx;
       
       f64 EarthRadius = 6372.8;
-      f64 Sum = ReferenceHaversine(HaversinePair->X0, HaversinePair->Y0, 
-                                   HaversinePair->X1, HaversinePair->Y1,
-                                   EarthRadius);
+      
+      f64 Sum;
+      Prof_TimeScope("ReferenceHaversine")
+      {
+       Sum = ReferenceHaversine(HaversinePair->X0, HaversinePair->Y0, 
+                                HaversinePair->X1, HaversinePair->Y1,
+                                EarthRadius);
+      }
       
       AverageSum += AverageCoefficient*Sum;
      }
-     
-     Prof_TimeScope("MiscOutput")
-     {                    
-      Log("Average: %.16f\n", AverageSum);
-     }
+    }
+    
+    Prof_TimeScope("MiscOutput")
+    {
+     Log("Average: %.16f\n", AverageSum);
      
      if(AnswersFile.Size)
      {
-      Prof_TimeScope("Answer")
-      {
-       f64 AnswerSum = 0.f;
-       u64 AnswersPairCount = AnswersFile.Size/sizeof(f64) - 1;
-       AnswerSum = ((f64 *)AnswersFile.Data)[AnswersPairCount];
-       
-       Log("Answer Diff: %.16f\n", AnswerSum - AverageSum); 
-      }
+      f64 AnswerSum = 0.f;
+      u64 AnswersPairCount = AnswersFile.Size/sizeof(f64) - 1;
+      AnswerSum = ((f64 *)AnswersFile.Data)[AnswersPairCount];
+      
+      Log("Answer Diff: %.16f\n", AnswerSum - AverageSum); 
      }
-     
     }
     
     free(HaversinePairs);
     
+    // Profiler end code
+    {    
+     Prof.EndTSC = ReadCPUTimer();
+     u64 OSEnd = ReadOSTimer();
+     u64 OSElapsed = OSEnd - Prof.OSStart;
+     
+     u64 TotalCPUElapsed = Prof.EndTSC - Prof.StartTSC;
+     
+     u64 OSFreq = GetOSTimerFreq();
+     u64 CPUFreq = Prof_GuessCPUFreq(OSElapsed, TotalCPUElapsed, OSFreq);
+     
+     Log("\nTotal time: %0.4fms (CPU freq %llu)\n", 1000.0*((f64)TotalCPUElapsed/(f64)CPUFreq), CPUFreq);
+     
+     
+    }
    }
    else
    {
@@ -146,6 +181,9 @@ ENTRY_POINT(EntryPoint)
    Log("ERROR: No file provided.\n");
    Log("Usage: %s <data.json> [data.f64]\n", Args[0]); 
   }
+  
+  NoOp();
+  
  }
  
  return 0;
