@@ -1,3 +1,4 @@
+
 //~ Defines
 #define CLING_BUILD_PATH "../build/"
 
@@ -16,6 +17,26 @@ NO_WARNINGS_END
 #define CLING_CODE_PATH "../code/"
 #define CLING_SOURCE_PATH CLING_CODE_PATH "cling/cling.c"
 #include "cling/cling.h"
+
+//~ Types
+typedef struct table_hash_node table_hash_node;
+struct table_hash_node
+{
+ MD_Node *Table;
+ 
+ u64 Key;
+ table_hash_node *Next;
+};
+
+typedef struct field_hash_node field_hash_node;
+struct field_hash_node
+{
+ u64 Idx;
+ 
+ u64 Key;
+ field_hash_node *Next;
+};
+
 #include "cling/generated/cling.meta.c"
 
 //~ Globals
@@ -88,14 +109,14 @@ WindowsBuild(str8 Source, str8_array *ExtraCompilerFlags, str8 ExtraLinkerFlags,
 internal void
 LinuxBuildCommand(str8 Source, 
                   str8 OutputName, 
-                  b32 GCC, b32 Clang, b32 Asan, b32 Debug,
+                  cng_build_options *BuildOptions,
                   str8_array *ExtraFlags,
                   b32 Run)
 {
  Log("%S\n", Cng_GetBaseFileName(Source));
  
  Cng_Scratch();
- Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
+ Cng_CommonBuildCommand(BuildOptions);
  Cng_S8ArrayAppendMultiple(Cng_S8ArrayJoinFrom(ExtraFlags, ' '),
                            S8("-o"), OutputName,
                            Source);
@@ -109,7 +130,7 @@ LinuxBuildCommand(str8 Source,
 internal void
 BuildAndRun(str8 Source, 
             str8 OutputName, 
-            b32 GCC, b32 Clang, b32 Asan, b32 Debug,
+            cng_build_options *BuildOptions,
             str8_array *ExtraFlags,
             str8 ExtraLinkerFlags,
             str8 ExtraSource,
@@ -131,7 +152,7 @@ BuildAndRun(str8 Source,
   }
   
   Cng_S8ArrayAppendTo(ExtraFlags, ExtraLinkerFlags);
-  LinuxBuildCommand(Source, OutputName, GCC, Clang, Asan, Debug, ExtraFlags, false);
+  LinuxBuildCommand(Source, OutputName, BuildOptions, ExtraFlags, false);
   Cng_S8ArrayAppend(ExtraSource);
   RunCommand();
  }
@@ -158,7 +179,7 @@ BuildAndRun(str8 Source,
   
   Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fm" "%S.map", OutputName));
   Cng_S8ArrayAppendTo(ExtraFlags, ExtraSource);
-  WindowsBuild(Source, ExtraFlags, ExtraLinkerFlags, Debug, Asan);
+  WindowsBuild(Source, ExtraFlags, ExtraLinkerFlags, !BuildOptions->Release, BuildOptions->Asan);
  }
 }
 
@@ -224,9 +245,9 @@ LogBuildMode(str8 Name, b32 Debug)
 
 internal void
 ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
-                 b32 GCC, b32 Clang, b32 Asan, b32 Debug, b32 Slow)
+                 cng_build_options *BuildOptions)
 {
- LogBuildMode(ExeName,  Debug);
+ LogBuildMode(ExeName, !BuildOptions->Release);
  
  // Compile
  {            
@@ -243,33 +264,30 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
                          CLING_BUILD_PATH "rl_libs.o" :
                          0));
   
-  if(!Slow && !OS_FileExists(LibsFileName))
+  if(!BuildOptions->Slow && !OS_FileExists(LibsFileName))
   {
    Cng_S8ArrayTemp(CommonFlags)
    {
     Cng_S8ArrayAppendTo(CommonFlags, S8("-DRL_LIBS_IMPLEMENTATION=1"));
     
-    BuildAndRun(S8("../code/rl/rl_libs.h"), 
-                S8("rl_libs"), 
-                GCC, Clang, Asan, Debug,
+    BuildAndRun(S8("../code/rl/rl_libs.h"), S8("rl_libs"), 
+                BuildOptions,
                 CommonFlags, S8(""), S8(""),
                 false, true);
    }
   }
   
-  str8 LibsName = Slow ?  S8("") : S8FromCString(LibsFileName);
+  str8 LibsName = BuildOptions->Slow ?  S8("") : S8FromCString(LibsFileName);
   
   Cng_S8ArrayTemp(CommonFlags)
   {
    str8 ExtraLinkerFlags = {0};
    
-   Cng_S8ArrayAppendTo(CommonFlags, (Slow ? 
+   Cng_S8ArrayAppendTo(CommonFlags, (BuildOptions->Slow ? 
                                      S8("-DRL_LIBS_IMPLEMENTATION=1") :
                                      S8("-DRL_LIBS_IMPLEMENTATION=0")));
    
-   BuildAndRun(AppSource, 
-               AppName,
-               GCC, Clang, Asan, Debug,
+   BuildAndRun(AppSource, AppName, BuildOptions,
                CommonFlags, ExtraLinkerFlags, LibsName,
                true, false);
   }
@@ -277,7 +295,7 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
   Cng_S8ArrayTemp(CommonFlags)
   {
    str8 ExtraLinkerFlags = {0};
-   Cng_S8ArrayAppendTo(CommonFlags, (Slow ? 
+   Cng_S8ArrayAppendTo(CommonFlags, (BuildOptions->Slow ? 
                                      S8("-DRL_LIBS_IMPLEMENTATION=1") :
                                      S8("-DRL_LIBS_IMPLEMENTATION=0")));
    
@@ -287,9 +305,8 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
     ExtraLinkerFlags = S8("-lasound -lX11 -lGL -lGLX");
    }
    
-   BuildAndRun(S8("../code/rl/rl_platform.c"),
-               ExeName,
-               GCC, Clang, Asan, Debug,
+   BuildAndRun(S8("../code/rl/rl_platform.c"), ExeName, 
+               BuildOptions,
                CommonFlags, ExtraLinkerFlags, LibsName, 
                false, false);
   }
@@ -320,6 +337,23 @@ CmdLineHasEntryAndAddHelp(cmd_line *CmdLine, str8_array *Array, str8 Flag, str8 
  return Result;
 }
 
+internal void
+SimpleBuildAndRun(cng_build_options *BuildOptions, str8 BuildName, str8 Source)
+{
+ LogBuildMode(BuildName, !BuildOptions->Release);
+ 
+ Cng_Scratch();
+ Cng_CommonBuildCommand(BuildOptions);
+ Cng_S8ArrayAppend(Source);
+ 
+ if(Cng_IsOs(CngOS_Windows))
+ {
+  Cng_S8ArrayAppend(S8("/link -opt:ref -incremental:no"));
+ }
+ 
+ RunCommand();
+}
+
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
 {
@@ -343,43 +377,52 @@ ENTRY_POINT(EntryPoint)
   Cng_S8ArrayAppendTo(Help, S8("Build parameters:"));
   
   //~ Config 
-  Cng_ConfigBools(&Params->CmdLine, Help);
-  
-  Cng_S8ArrayAppendTo(Help, S8("\nTargets:"));
-  
-  MD_String8 FileName = S8("../code/cling/cling.mdesk");
-  MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
-  
-  for(MD_Message *Message = Parse.errors.first; Message; Message = Message->next)
+  cng_build_options BuildOptions = {0};
   {
-   MD_CodeLoc Loc = MD_CodeLocFromNode(Message->node);
-   MD_PrintMessage(stderr, Loc, Message->kind, Message->string);
-  }
-  
-  if(Parse.errors.max_message_kind < MD_MessageKind_Error)
-  {
-   MD_Node *Root = Parse.node->first_child;
-   for(MD_EachNode(Table, Root))
+   Cng_ConfigBools(&Params->CmdLine, Help);
+   
+   Cng_S8ArrayAppendTo(Help, S8("\nTargets:"));
+   
+   MD_String8 FileName = S8("../code/cling/cling.mdesk");
+   MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
+   
+   for(MD_Message *Message = Parse.errors.first; Message; Message = Message->next)
    {
-    if(S8Match(Table->string, S8("Config"), false))
-    {
-     for(MD_EachNode(Node, Table->first_child))
-     {      
-      MD_String8 Name = MD_NodeAtIndex(Node->first_child, 0)->string;
-      MD_String8 Value = MD_NodeAtIndex(Node->first_child, 1)->string;
-      Cng_ConfigMatchers(Name, Value);
-     }
-     break;
-    }
-    
+    MD_CodeLoc Loc = MD_CodeLocFromNode(Message->node);
+    MD_PrintMessage(stderr, Loc, Message->kind, Message->string);
    }
+   
+   if(Parse.errors.max_message_kind < MD_MessageKind_Error)
+   {
+    MD_Node *Root = Parse.node->first_child;
+    for(MD_EachNode(Table, Root))
+    {
+     if(S8Match(Table->string, S8("Config"), false))
+     {
+      for(MD_EachNode(Node, Table->first_child))
+      {      
+       MD_String8 Name = MD_NodeAtIndex(Node->first_child, 0)->string;
+       MD_String8 Value = MD_NodeAtIndex(Node->first_child, 1)->string;
+       Cng_ConfigMatchers(Name, Value);
+      }
+      break;
+     }
+     
+    }
+   }
+   
+   Slow |= Asan;
+   if(GCC) Clang = false;
+   
+   BuildOptions.Asan = Asan;
+   BuildOptions.Release = Release;
+   BuildOptions.Slow = Slow;
+   BuildOptions.Clang = Clang;
+   BuildOptions.GCC = GCC;
+   BuildOptions.Wine = Wine;
   }
   
   b32 DidWork = false;
-  b32 Debug = !Release;
-  Slow |= Asan;
-  if(GCC) Clang = false;
-  
   cmd_line *CmdLine = &Params->CmdLine;
   
   //~ Metaprogram
@@ -685,12 +728,7 @@ ENTRY_POINT(EntryPoint)
   {
    DidWork = true;
    
-   LogBuildMode(S8("Haversine generator"), Debug);
-   
-   Cng_Scratch();
-   Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
-   Cng_S8ArrayAppend(S8("../code/compenhance/haversine_generator/haversine_generator.c"));
-   RunCommand();
+   SimpleBuildAndRun(&BuildOptions, S8("Haversine Generator"), S8("../code/compenhance/haversine_generator/haversine_generator.c"));
   }
   
   //~ Haversine Processor
@@ -698,18 +736,7 @@ ENTRY_POINT(EntryPoint)
   {
    DidWork = true;
    
-   LogBuildMode(S8("Haversine processor"), Debug);
-   
-   Cng_Scratch();
-   Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
-   Cng_S8ArrayAppend(S8("../code/compenhance/haversine_processor/haversine_processor.c"));
-   
-   if(Cng_IsOs(CngOS_Windows))
-   {
-    Cng_S8ArrayAppend(S8("/link -opt:ref -incremental:no"));
-   }
-   
-   RunCommand();
+   SimpleBuildAndRun(&BuildOptions, S8("Haversine Processor"), S8("../code/compenhance/haversine_processor/haversine_processor.c"));
   }
   
   //~ Sim86
@@ -717,10 +744,10 @@ ENTRY_POINT(EntryPoint)
   {
    DidWork = true;
    
-   LogBuildMode(S8("sim86"), Debug);
+   LogBuildMode(S8("sim86"), !BuildOptions.Release);
    
    Cng_Scratch();
-   Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
+   Cng_CommonBuildCommand(&BuildOptions);
    if(Cng_IsOs(CngOS_Windows))
    {
     Cng_S8ArrayAppend(S8("/std:c++20"));
@@ -739,7 +766,7 @@ ENTRY_POINT(EntryPoint)
    
    ApplicationBuild(S8("editor"), S8("editor_app"), 
                     S8("../code/editor/editor_app.c"), S8("Editor"),
-                    GCC, Clang, Asan, Debug, Slow);
+                    &BuildOptions);
   }
   
   //~ Muze
@@ -749,15 +776,45 @@ ENTRY_POINT(EntryPoint)
    
    ApplicationBuild(S8("muze"), S8("muze_app"), 
                     S8("../code/muze/muze_app.c"), S8("Muze"),
-                    GCC, Clang, Asan, Debug, Slow);
+                    &BuildOptions);
+  }
+  
+  //~ WSDCOM
+  Cng_S8ArrayAppendTo(Help, S8(" "));
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("WSD"), S8("(See subcommands with -WSD)")))
+  {
+   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile wsdcom")))
+   {   
+    DidWork = true;
+    SimpleBuildAndRun(&BuildOptions, S8("wsdcom"), S8("../code/wsdcom/wsdcom.c"));
+   }
+   
+   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("copy"), S8("Copy configuration files.")))
+   {
+    DidWork = true;
+    OS_MakeDirectory("Configuration");
+    Cng_RunCommand(S8("cmd.exe /c copy ..\\code\\wsdcom\\Configuration Configuration"));
+   }
+   
+  }
+  Cng_S8ArrayAppendTo(Help, S8(" "));
+  
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("M51"), S8("Target")))
+  {
+   DidWork = true;
+   
+   LogBuildMode(S8("main.asm"), !BuildOptions.Release);
+   
+   Cng_RunCommand(S8("sdas8051 -plosgff main.rel ../code/school/aduc832v4/main.asm"));
+   Cng_RunCommand(S8("sdld -n -i main.ihx main.rel"));
+   Cng_RunCommand(S8("wsdcom /C:4 /R:0000 main.ihx"));
   }
   
   //~ School
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(see subcommands with -School)")))
+  Cng_S8ArrayAppendTo(Help, S8(" "));
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(See subcommands with -School)")))
   {
    Cng_Scratch();
-   
-   Cng_S8ArrayAppendTo(Help, S8("\nSchool:"));
    
    b32 Compile  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile the source file"));
    b32 Run      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run the built program"));
@@ -769,7 +826,7 @@ ENTRY_POINT(EntryPoint)
    
    if(Compile)
    {
-    LogBuildMode(S8("Les1"), Debug);
+    LogBuildMode(S8("Les1"), !BuildOptions.Release);
    }
    
    if(All) Last = true;
@@ -879,7 +936,7 @@ ENTRY_POINT(EntryPoint)
     {
      Cng_S8ArrayTemp(GlobalSelectedArray)
      {
-      Cng_CommonBuildCommand(GCC, Clang, Debug, Asan);
+      Cng_CommonBuildCommand(&BuildOptions);
       Cng_S8ArrayAppend(Path);
       RunCommand();
      }
@@ -900,6 +957,7 @@ ENTRY_POINT(EntryPoint)
    }
    
   }
+  Cng_S8ArrayAppendTo(Help, S8(" "));
   
   if(DidWork)
   {

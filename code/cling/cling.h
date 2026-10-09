@@ -34,22 +34,15 @@ enum cng_os_kind
 };
 typedef enum cng_os_kind cng_os_kind;
 
-typedef struct table_hash_node table_hash_node;
-struct table_hash_node
+typedef struct cng_build_options cng_build_options;
+struct cng_build_options
 {
- MD_Node *Table;
- 
- u64 Key;
- table_hash_node *Next;
-};
-
-typedef struct field_hash_node field_hash_node; 
-struct field_hash_node
-{
- u64 Idx;
- 
- u64 Key;
- field_hash_node *Next;
+ b32 GCC;
+ b32 Clang;
+ b32 Asan;
+ b32 Release;
+ b32 Slow;
+ b32 Wine;
 };
 
 //~ Globals
@@ -187,11 +180,11 @@ Cng_S8ArrayJoin(u8 Char)
 
 //~ Helpers
 internal void 
-Cng_CommonBuildCommand(b32 GCC, b32 Clang, b32 Debug, b32 Asan)
+Cng_CommonBuildCommand(cng_build_options *Options)
 {
  // Exclusive arguments
- if(GCC) Clang = false;
- b32 Release = !Debug;
+ if(Options->GCC) Options->Clang = false;
+ b32 Debug = !Options->Release;
  
 #if OS_LINUX
  str8 CommonCompilerFlags = S8("-I" CLING_CODE_PATH 
@@ -487,8 +480,11 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
     // NOTE(luca): So that build artifacts end up in the right directory.
     OS_ChangeDirectory((char *)BuildDirPath.Data);
     
+    cng_build_options BuildOptions = {0};
+    BuildOptions.Clang = true;
+    
     Cng_SetSelectedArray(Cng_PushS8Array(256));
-    Cng_CommonBuildCommand(false, true, true, false);
+    Cng_CommonBuildCommand(&BuildOptions);
     
     Cng_S8ArrayAppendMultiple(S8("-I"), ClingCodePath);
     

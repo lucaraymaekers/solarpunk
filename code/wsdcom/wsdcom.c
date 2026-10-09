@@ -8,9 +8,15 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
-// Module       : Download.cpp
-// Description  : Download to AduCxxx parts
-// Date         : 06-Mar-2006
+// NOTE(luca): I have modified this code to fit my needs.
+// - Ported to c
+// - Added pragma for libraries
+
+// TODO(luca):
+// x Build with cling
+// x Find configuration folder as path next to exe
+// - Change terminal output in favor of line prints
+// - Remove standard libraries and replace it with base layer
 
 #pragma comment(lib, "User32.lib")
 
@@ -19,32 +25,28 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>  //for copying parameter strings
 #include <stdlib.h>  //for exit() function
 #include <time.h>    //for clock() and clock_t (timeouts)
-#include <conio.h>   //for reading/writing the UART hardware ports
 #include <ctype.h>   //for toupper() function
-//#include <iostream>
-#define bool int
-#define false 0
-#define true 1
+#include <conio.h>   //for reading/writing the UART hardware ports
 
-#include <math.h>
-#include "download.h"
+#define BASE_NO_ENTRYPOINT 1
+#include "base/base.h"
+#include "base/base.c"
 
-/* Constants              */
+#include "wsdcom/wsdcom.h"
+
+//~ Constants            
 #define TIMEOUT         1
 #define DEFAULTTIMEOUT  250  //about a quarter of a second
 #define ERASETIMEOUT    4000   //about 4 seconds
 #define VER             " 7.05 "
 #define DATE            "03rd September, 2007  "
 
-
 // The maximum flash size on the ADuC702x parts is 62K
 #define MAX_HEX_DATA   0xF800
-
 
 // Buad Rates
 #define ADUC_BAUD_9600    9600
 #define ADUC_BAUD_115200  115200
-
 
 // Intel Hex constants
 #define IHEX_DATA_RECORD                        0x000
@@ -64,13 +66,11 @@ POSSIBILITY OF SUCH DAMAGE.
 #define OP_OK                                   0x0
 #define NOT_RESET                               0x1
 #define TGT_NOT_COMPT                           0x2
-#define FAILED_TO_DO                          0x3
+#define FAILED_TO_DO                            0x3
 #define FILE_NOT_FOUND                          0x4
 #define INVALID_FILE                            0x5
 #define OP_FAILED                               0x6
 #define INVALID_CSUM                            0x7
-
-
 
 #define Success                                         0  
 #define Too_many_retries                                1  
@@ -82,7 +82,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #define Write_error                                     7  
 #define Verify_error                                    8  
 #define Protection_error                                9  
-
 
 // Serial Download Protocol Definitions
 
@@ -110,27 +109,27 @@ void CommClose
 (
  void
  );
-bool ChangeBaudrate
+b32 ChangeBaudrate
 (
  unsigned long     Baudrate,
  TyCmdLineOpts  *  pCmdOpts,
  TyCfgFileOpt   *  pCfg,
  TyBaudRates    *  pBauds
  );
-bool DoBootloadOption
+b32 DoBootloadOption
 (
  TyCmdLineOpts  *  pCmdOpts
  );
-bool DoSecurity
+b32 DoSecurity
 (
  TyCmdLineOpts  * pCmdOpts
  );
-bool UpdateCfgData
+b32 UpdateCfgData
 (
  char        *     pszPart,
  TyCfgFileOpt   *  pCfg
  );
-bool DoSendSimpleCmd
+b32 DoSendSimpleCmd
 (
  unsigned char *  pCmd,
  TyCmdLineOpts  * pCmdOpts
@@ -149,7 +148,7 @@ void UpdateCS
  unsigned char *pucCmd
  );
 
-bool ReadChar
+b32 ReadChar
 (
  unsigned char *   ch
  );
@@ -204,7 +203,7 @@ int  waitForSignature
  char *            pcVMid,
  char *            pcVLo
  );
-bool  EraseFlash
+b32  EraseFlash
 (
  TyCmdLineOpts  *  pCmdOpts
  );
@@ -219,13 +218,13 @@ int  downloadRev2QuickMode
  TyCfgFileOpt   *  pCfg,
  TyCmdLineOpts  *  pCmdOpts
  );
-bool  DoDownloadCodeFlash
+b32  DoDownloadCodeFlash
 (
  TyCfgFileOpt   *  pCfg,
  TyCmdLineOpts  *  pCmdOpts
  );
 
-bool DoDownloadDataFlash
+b32 DoDownloadDataFlash
 (
  TyCmdLineOpts  *  pCmdOpts
  );
@@ -245,21 +244,9 @@ int  VerifyAfterDownload
  char *            program,
  TyCmdLineOpts *   pCmdOpts
  );
-bool  verifyfile
+b32  verifyfile
 (
  TyCmdLineOpts *   pCmdOpts
- );
-
-void PrepareConsole
-(
- void
- );
-void UpdateTxt
-(
- char *         pszText,
- SHORT          XOffset,
- SHORT          YOffset,
- SHORT          FieldLen
  );
 
 char * FieldCrop
@@ -268,39 +255,21 @@ char * FieldCrop
  int      iFldLen
  );
 
-
-
-/* Global Variables */
-static HANDLE hCom = INVALID_HANDLE_VALUE;        // Handle to the serial port
-
-
+//~ Global Variables
+global_variable HANDLE hCom = INVALID_HANDLE_VALUE;        // Handle to the serial port
 
 // Hex file contents
-static unsigned char ucHexFileData[MAX_HEX_DATA];
-static unsigned long ulNumHexBytes = 0x0;
+global_variable unsigned char ucHexFileData[MAX_HEX_DATA];
+global_variable unsigned long ulNumHexBytes = 0x0;
 
-HANDLE                     hConsoleOut; // Handle to the console
-CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo; // Information on the console window
-char *                     pszConsoleLine = NULL;
+global_variable char                szCurOpText        [0x80];
+global_variable char                szCurStatText      [0x80];
+global_variable char                szCurStageText     [0x80];
 
-
-static char                szCurOpText        [0x80];
-static char                szCurStatText      [0x80];
-static char                szCurStageText     [0x80];
-
-char * StageStrings[] = 
+global_variable char *StageStrings_[] = 
 {
- "<Connect>  Erase   Download   Verify   Bootload   Secure   Run   Complete ",
- " Connect  <Erase>  Download   Verify   Bootload   Secure   Run   Complete ",
- " Connect   Erase  <Download>  Verify   Bootload   Secure   Run   Complete ",
- " Connect   Erase   Download  <Verify>  Bootload   Secure   Run   Complete ",
- " Connect   Erase   Download   Verify  <Bootload>  Secure   Run   Complete ",
- " Connect   Erase   Download   Verify   Bootload  <Secure>  Run   Complete ",
- " Connect   Erase   Download   Verify   Bootload   Secure  <Run>  Complete ",
- " Connect   Erase   Download   Verify   Bootload   Secure   Run  <Complete>",
+ "Connect", "Erase", "Download", "Verify", "Bootload", "Secure", "Run", "Complete"
 };
-
-
 
 #if 0
 0         1         2         3         4         5         6         7
@@ -329,6 +298,7 @@ char * StageStrings[] =
 1 Download Completed Successfully
 #endif
 
+#if 0
 void cls( HANDLE hConsole )
 {
  COORD coordScreen = { 0, 0};    // home for the cursor 
@@ -363,244 +333,65 @@ void cls( HANDLE hConsole )
  
  SetConsoleCursorPosition( hConsole, coordScreen );
 }
-
-#ifndef NOCONSOLE
-// Function     : UpdateTxt
-// Description  : Update the field
-void UpdateTxt(char * pszText,SHORT XOffset,SHORT YOffset,SHORT FieldLen)
-{
- DWORD                      Unused;
- COORD                      CurPos;      // New position
- CONSOLE_SCREEN_BUFFER_INFO CurConsole;  
- 
- // Remember the original cursor position so that it can be restored
- GetConsoleScreenBufferInfo( hConsoleOut, &CurConsole);
- CurPos = CurConsole.dwCursorPosition;
- 
- // Current Status Line
- CurPos.Y = ConsoleInfo.dwCursorPosition.Y + YOffset;
- CurPos.X = XOffset;
- memset(pszConsoleLine,0x0,ConsoleInfo.dwMaximumWindowSize.X);
- strncpy(pszConsoleLine,
-         pszText,
-         FieldLen);
- SetConsoleCursorPosition(hConsoleOut, CurPos);
- WriteFile(hConsoleOut, 
-           pszConsoleLine, 
-           FieldLen, 
-           &Unused, 
-           NULL);
- // Restore the original position
- SetConsoleCursorPosition(hConsoleOut, CurConsole.dwCursorPosition);
-}
 #endif
+
 // Function     : SetStage
 // Description  : Set the stage indicator
-void SetStage(int iStage)
+void SetStage(int Stage)
 {
- UpdateTxt(StageStrings[iStage]    ,
-           0x0,
-           CUR_STAGE_IND,
-           ConsoleInfo.dwMaximumWindowSize.X);
-}
-
-// Function     : UpdateCurOpTxt
-// Description  : Update the field
-void UpdateCurOpTxt(char * pszText)
-{
- strncpy(szCurOpText,pszText,sizeof(szCurOpText));
- szCurOpText[sizeof(szCurOpText)-1] = '\0';
- UpdateTxt(pszText,
-           COL_1_X_FLD_ST,
-           CUR_OP_Y,
-           ConsoleInfo.dwMaximumWindowSize.X - COL_1_X_FLD_ST);
-}
-// Function     : UpdateCurStatTxt
-// Description  : Update the field
-void UpdateCurStatTxt(char * pszText)
-{
- strncpy(szCurStatText,pszText,sizeof(szCurStatText));
- szCurStatText[sizeof(szCurStatText)-1] = '\0';
- UpdateTxt(pszText,
-           COL_1_X_FLD_ST,
-           CUR_STAT_Y,
-           ConsoleInfo.dwMaximumWindowSize.X - COL_1_X_FLD_ST);
-}
-// Function     : UpdateCurStageTxt
-// Description  : Update the field
-void UpdateCurStageTxt(char * pszText)
-{
- strncpy(szCurStageText,pszText,sizeof(szCurStageText));
- szCurStageText[sizeof(szCurStageText)-1] = '\0';
- UpdateTxt(pszText,
-           COL_1_X_FLD_ST,
-           CUR_STAGE_Y,
-           ConsoleInfo.dwMaximumWindowSize.X - COL_1_X_FLD_ST);
-}
-
-// Function     : PrepareConsole
-// Description  : Prepare the console for outputting messages
-void PrepareConsole(void)
-{
-#ifndef NOCONSOLE
- COORD                      CurPos;      // New position
- 
- //
- // Console initialistaion
- hConsoleOut = GetStdHandle( STD_OUTPUT_HANDLE );
- 
- // Clear the console
- cls(hConsoleOut);
- GetConsoleScreenBufferInfo( hConsoleOut, &ConsoleInfo);
-#else
- // Clear the console
- ConsoleInfo.dwMaximumWindowSize.X = DEFAULT_CONSOLE_LEN;
-#endif
- pszConsoleLine = (char *)malloc(ConsoleInfo.dwMaximumWindowSize.X);
- // CurPos = ConsoleInfo.dwCursorPosition;
- UpdateTxt("WSD.COM: ADuC8xx Program Downloader Ver" VER,
-           0x0,
-           PROG_TITLE_1_Y,
-           ConsoleInfo.dwMaximumWindowSize.X);
- UpdateTxt(DATE"Analog Devices Inc.",
-           0x0,
-           PROG_TITLE_2_Y,
-           ConsoleInfo.dwMaximumWindowSize.X);
- 
- // Stage indicator
- UpdateTxt(STAGE_BAR     ,COL_1_X_LBL_ST,STAGE_BAR_1_Y,sizeof(STAGE_BAR));
- UpdateTxt(STAGE_BAR     ,COL_1_X_LBL_ST,STAGE_BAR_2_Y,sizeof(STAGE_BAR));
- UpdateTxt(STAGE_LABEL   ,COL_1_X_LBL_ST,CUR_STAGE_Y,sizeof(STAGE_LABEL));
- UpdateTxt(OP_LABEL      ,COL_1_X_LBL_ST,CUR_OP_Y,sizeof(OP_LABEL));
- UpdateTxt(STAT_LABEL    ,COL_1_X_LBL_ST,CUR_STAT_Y,sizeof(STAT_LABEL));
- UpdateTxt(COMMS_LABEL   ,COL_1_X_LBL_ST,COMM_Y,sizeof(COMMS_LABEL));
- UpdateTxt(PART_LABEL    ,COL_1_X_LBL_ST,PART_Y,sizeof(PART_LABEL));
- UpdateTxt(CODE_LABEL    ,COL_1_X_LBL_ST,CODE_Y,sizeof(CODE_LABEL));
- UpdateTxt(DATA_LABEL    ,COL_1_X_LBL_ST,DATA_Y,sizeof(DATA_LABEL));
- UpdateTxt(CRYSTAL_LABEL ,COL_1_X_LBL_ST,CRYSTAL_Y,sizeof(CRYSTAL_LABEL));
- UpdateTxt(BAUD_ERR_LABEL,COL_1_X_LBL_ST,BAUD_ERR_Y,sizeof(BAUD_ERR_LABEL));
- 
- UpdateTxt(DWN_MD_LABEL  ,COL_1_X_LBL_ST,DWN_MD_Y,sizeof(DWN_MD_LABEL));
- UpdateTxt(XMIT_SZ_LABEL  ,COL_1_X_LBL_ST,XMIT_SZ_Y,sizeof(XMIT_SZ_LABEL));
- 
- UpdateTxt(BOOTLOAD_LABEL  ,COL_2_X_LBL_ST,BOOTLOAD_Y,sizeof(BOOTLOAD_LABEL));
- UpdateTxt(ERASE_LABEL  ,COL_2_X_LBL_ST,ERASE_Y,sizeof(ERASE_LABEL));
- UpdateTxt(RUN_LABEL  ,COL_2_X_LBL_ST,RUN_Y,sizeof(RUN_LABEL));
- UpdateTxt(VERIFY_LABEL  ,COL_2_X_LBL_ST,VERIFY_Y,sizeof(VERIFY_LABEL));
- UpdateTxt(SECURITY_LABEL  ,COL_2_X_LBL_ST,SECURITY_Y,sizeof(SECURITY_LABEL));
- UpdateTxt(SUCCESS_LABEL  ,COL_2_X_LBL_ST,SUCCESS_Y,sizeof(SUCCESS_LABEL));
- 
- // Completion Line
- UpdateTxt("",COL_1_X_LBL_ST,COMPLETE_Y,ConsoleInfo.dwMaximumWindowSize.X);
- 
-#ifndef NOCONSOLE
- // Finally set the cursor position to after the modifiable area
- CurPos = ConsoleInfo.dwCursorPosition;
- CurPos.Y = ConsoleInfo.dwCursorPosition.Y + CONSOLE_END;
- CurPos.X = 0;
- SetConsoleCursorPosition(hConsoleOut, CurPos);
-#endif
+ Log("Stage: %s\n", StageStrings_[Stage]);
 }
 
 // Function     : UpdateScreenInfo
 // Description  : Update some fields on the screen
 void UpdateScreenInfo(TyCmdLineOpts *CmdOpts,TyBaudRates *Bauds)
 {
- char           szMessage[0x80];
  unsigned long  ulDiff;
  double         Percentage ;
  
- UpdateTxt(FieldCrop(CmdOpts->szCodeHexF,COL_1_FLD_LEN_EX),COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
- UpdateTxt(FieldCrop(CmdOpts->szDataHexF,COL_1_FLD_LEN_EX),COL_1_X_FLD_ST,DATA_Y,COL_1_FLD_LEN_EX);
+ Log(" Code hex file: %s\n", CmdOpts->szCodeHexF);
+ Log(" Data hex file: %s\n", CmdOpts->szDataHexF);
+ Log(" Bootload option:       %s\n", CmdOpts->bBootLoad ? "true":"false");
+ Log(" Erase data:            %s\n", CmdOpts->bEraseData ? "true":"false");
+ Log(" Verify after download: %s\n", CmdOpts->bVerify ? "true":"false");
  
- UpdateTxt(CmdOpts->bBootLoad ? "true":"false",
-           COL_2_X_FLD_ST,BOOTLOAD_Y,
-           COL_2_FLD_LEN);
+ str8 SafeMode = {0};
  
- UpdateTxt(CmdOpts->bEraseData ? "true":"false",
-           COL_2_X_FLD_ST,ERASE_Y,
-           COL_2_FLD_LEN);
- 
- UpdateTxt(CmdOpts->bVerify ? "true":"false",
-           COL_2_X_FLD_ST,VERIFY_Y,
-           COL_2_FLD_LEN);
- 
- strcpy(szMessage,"");
- 
- if(!CmdOpts->SecurityLockMode && !CmdOpts->SecuritySecureMode && !CmdOpts->SecuritySerialSafeMode)
- {
-  strcpy(szMessage,"None");
- }
- else
  {
   if(CmdOpts->SecurityLockMode)
-   strcat(szMessage," (Lock)");
-  
+   SafeMode = S8Cat(SafeMode, S8(" (Lock)"));
   if(CmdOpts->SecuritySecureMode) 
-   strcat(szMessage," (Secure)");
-  
+   SafeMode = S8Cat(SafeMode, S8(" (Secure)"));
   if(CmdOpts->SecuritySerialSafeMode)
-   strcat(szMessage," (Serial Safe)");
+   SafeMode = S8Cat(SafeMode, S8(" (Serial Safe)"));
+  if(SafeMode.Size == 0) 
+   SafeMode = S8(" None");
  }
  
- 
- UpdateTxt(szMessage,
-           COL_2_X_FLD_ST,SECURITY_Y,
-           COL_2_FLD_LEN);
+ Log(" Safe mode:%S\n", SafeMode);
  
  // Run address
  if(CmdOpts->bRun)
  {
-  sprintf(szMessage,"0x%04lX",CmdOpts->ulRunAdr);
-  UpdateTxt(szMessage,
-            COL_2_X_FLD_ST,
-            RUN_Y,
-            COL_2_FLD_LEN);
+  Log(" Run from address: 0x%04lX\n",CmdOpts->ulRunAdr);
  }
- else
-  UpdateTxt("------",
-            COL_2_X_FLD_ST,
-            RUN_Y,
-            COL_2_FLD_LEN);
  
  // XMit Sz
- sprintf(szMessage,"%d",CmdOpts->iXMITBytes);
- UpdateTxt(szMessage,
-           COL_1_X_FLD_ST,
-           XMIT_SZ_Y,
-           COL_1_FLD_LEN);
+ Log(" iXMITBytes: %d\n", CmdOpts->iXMITBytes);
+ 
+ str8 DownloadMode = {0};
  
  // Download mode
  switch(CmdOpts->DownloadMode)
  {
-  case DWN_CODE_DATA_MODE:
-  UpdateTxt("Code and Data",
-            COL_1_X_FLD_ST,
-            DWN_MD_Y,
-            COL_1_FLD_LEN);
-  break;
-  case DWN_CODE_ONLY_MODE:
-  UpdateTxt("Code Only",
-            COL_1_X_FLD_ST,
-            DWN_MD_Y,
-            COL_1_FLD_LEN);
-  break;
-  case DWN_DATA_ONLY_MODE:
-  UpdateTxt("Data Only",
-            COL_1_X_FLD_ST,
-            DWN_MD_Y,
-            COL_1_FLD_LEN);
-  break;
-  default:
-  UpdateTxt("Unknown",
-            COL_1_X_FLD_ST,
-            DWN_MD_Y,
-            COL_1_FLD_LEN);
-  break;
+  case DWN_CODE_DATA_MODE: DownloadMode = S8("Code and Data"); break;
+  case DWN_CODE_ONLY_MODE: DownloadMode = S8("Code Only");     break;
+  case DWN_DATA_ONLY_MODE: DownloadMode = S8("Data Only");     break;
+  default:                 DownloadMode = S8("Unknown");       break;
  }
  
- sprintf(szMessage,"%d Hz",CmdOpts->fcore);
- UpdateTxt(szMessage,COL_1_X_FLD_ST,CRYSTAL_Y,COL_1_FLD_LEN);
+ Log(" Download mode: %S\n", DownloadMode);
+ Log(" Crystal frequency: %dHz\n", CmdOpts->fcore);
  
  // PC is trying to match the ADuC8xx baud. Determine the percentage error
  // and display a warning if > 3% as comms will be unreliable
@@ -610,280 +401,9 @@ void UpdateScreenInfo(TyCmdLineOpts *CmdOpts,TyBaudRates *Bauds)
   ulDiff = Bauds->ADSlowBR - Bauds->PCSlowBR;
  Percentage = (double) (ulDiff* 100)/Bauds->ADSlowBR;
  
- sprintf(szMessage,"%.02f%%",Percentage);
- UpdateTxt(szMessage,COL_1_X_FLD_ST,BAUD_ERR_Y,COL_1_FLD_LEN);
- 
- 
+ Log(" Bauds percentage error: %.02f%%\n", Percentage);
 }
 
-// Function     : DoActions
-// Description  : Perform the download
-int DoActions(TyCmdLineOpts *CmdOpts,TyCfgFileOpt *CfgOpts,TyBaudRates *Bauds)
-{
- char           szMessage[0x80];
- bool           bSuccess = false;
- int            rMajor         = 0;
- int            rMinor         = 0;    // rev number of the target firmware
- char           sanatizedSig[100];
- DWORD          dwStartTime    = 0;
- char           cVHi,cVMid,cVLo;
- DWORD          dwEndTime      = 0;
- DWORD          dwDnwldTime    = 0;
- DWORD          dwVerifyTime   = 0;
- int            iRetVal        = Undefined_error;
- 
- UpdateCurStageTxt("Validating command line");
- if(validateParameters(CmdOpts,&iRetVal))
- {
-  UpdateCurStageTxt("Calculating baudrates to be used");
-  *Bauds = getCorrectBauds(CmdOpts,NULL);
-  
-  UpdateScreenInfo(CmdOpts,Bauds);
-  
-  
-  bSuccess = true;
-  
-  UpdateCurStageTxt("Connecting to ADuC8xx");
-  // Reset the target device (hopefully into loader mode)
-  iRetVal = Communication_error;
-  bSuccess = bSuccess && reset(&rMajor,
-                               &rMinor,
-                               sanatizedSig,
-                               Bauds->PCSlowBR,
-                               CmdOpts,
-                               &cVHi,
-                               &cVMid,
-                               &cVLo,
-                               2,
-                               Bauds);
-  
-  
-  if(bSuccess)
-  {
-   bSuccess=(CommOpen(CmdOpts->iComPort,Bauds->PCSlowBR)==1);
-  }
-  
-  if(bSuccess)
-  {
-   sprintf(szMessage,"%s V%c.%c.%c",sanatizedSig,cVHi,cVMid,cVLo);
-   UpdateTxt(szMessage,COL_1_X_FLD_ST,PART_Y,COL_1_FLD_LEN);
-   UpdateCurStageTxt("Reading configuration information");
-   iRetVal = File_error;
-   bSuccess = bSuccess && UpdateCfgData(sanatizedSig,CfgOpts);
-   
-   // A quick check to see if the user has specified security bits
-   // and the connected processor does not support it
-   if(bSuccess && !CfgOpts->SecurityBitsOption)
-   {
-    if(CmdOpts->SecurityLockMode || CmdOpts->SecuritySecureMode || CmdOpts->SecuritySerialSafeMode)
-    {
-     UpdateCurOpTxt("Checking security feature available");
-     UpdateCurStatTxt("Security specified but unavailable.");
-     iRetVal = Undefined_error;
-     bSuccess = false;
-    }
-   }
-   
-   if(bSuccess)
-   {
-    // Now that we know which part we are targetting it may be
-    // possible to switch to using faster baud rates if the ADuC8xx
-    // can support this
-    *Bauds = getCorrectBauds(CmdOpts,CfgOpts);
-    
-    // Update crystal frequency now that we actually know
-    // what it is
-    sprintf(szMessage,"%d Hz",CmdOpts->fcore);
-    UpdateTxt(szMessage,COL_1_X_FLD_ST,CRYSTAL_Y,COL_1_FLD_LEN);
-    
-    
-    // Use the fastest baud rate that is supported to speed up download
-    if(CfgOpts->FastBROption)
-    {
-     UpdateCurStageTxt("Changing to fast baudrate");
-     iRetVal = Communication_error;
-     bSuccess = ChangeBaudrate(Bauds->FastBR,
-                               CmdOpts,
-                               CfgOpts,Bauds);
-     
-     // We have just changed the baud rate so it is possible that
-     // we now have lost comms with the ADuC8xx. 
-     
-     UpdateCurStageTxt("Erasing Flash");
-     SetStage(ERASE_STAGE);
-     // 
-     // First operation is to erase the code flash. The data flash may
-     // need to be erased as well
-     bSuccess = bSuccess && EraseFlash(CmdOpts);
-     
-     if(!bSuccess)
-     {
-      // Assume now that it was due to the comms
-      UpdateCurStageTxt("Changing to fast baudrate");
-      UpdateCurStatTxt("Lost contact after changing the baudrate");
-     }
-     
-    }
-    else
-    {
-     UpdateCurStageTxt("Erasing Flash");
-     SetStage(ERASE_STAGE);
-     // First operation is to erase the code flash. The data flash may
-     // need to be erased as well
-     bSuccess = bSuccess && EraseFlash(CmdOpts);
-     iRetVal = Erase_error;
-    }
-   }
-   
-   
-   
-   iRetVal = Undefined_error;
-   SetStage(DOWNLOAD_STAGE);
-   
-   // Do we need to download to code flash?
-   if(bSuccess && (CmdOpts->DownloadMode != DWN_DATA_ONLY_MODE))
-   {
-    UpdateCurStageTxt("Downloading bytes to code flash");
-    dwStartTime = GetTickCount();
-    bSuccess = bSuccess && DoDownloadCodeFlash(CfgOpts,
-                                               CmdOpts) ;
-    
-    dwEndTime = GetTickCount();
-    
-    dwDnwldTime    = dwEndTime-dwStartTime;
-    dwVerifyTime   = 0;
-    
-    if(bSuccess)
-    {
-     sprintf(szMessage,
-             "Download completed in %d seconds",
-             (dwEndTime-dwStartTime)/1000);
-     UpdateCurStatTxt(szMessage);
-     
-     sprintf(szMessage,
-             "%s (%d\\%d) [Csum:%d]",
-             FieldCrop(CmdOpts->szCodeHexF,COL_1_FLD_LEN_EX - 25),
-             dwDnwldTime/1000,
-             dwVerifyTime/1000,
-             CmdOpts->ulActualCodeFCSum);
-     UpdateTxt(szMessage,COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
-     
-     // Should we verify now?
-     if(CmdOpts->bVerify && CfgOpts->VerifyAfterDownloadOption)
-     {
-      UpdateCurStageTxt("Verifying Code Flash");
-      SetStage(VERIFY_STAGE);
-      
-      dwStartTime = GetTickCount();
-      bSuccess = bSuccess && verifyfile(CmdOpts);
-      dwEndTime = GetTickCount();
-      
-      if(bSuccess)
-      {
-       dwVerifyTime    = dwEndTime-dwStartTime;
-       
-       sprintf(szMessage,
-               "Verify completed in %d seconds",
-               (dwEndTime-dwStartTime)/1000);
-       UpdateCurStatTxt(szMessage);
-       sprintf(szMessage,
-               "%s (%d\\%d) [Csum:%d]",
-               FieldCrop(CmdOpts->szCodeHexF,COL_1_FLD_LEN_EX - 25),
-               dwDnwldTime/1000,
-               dwVerifyTime/1000,
-               CmdOpts->ulActualCodeFCSum);
-       UpdateTxt(szMessage,COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
-      }
-     }
-    }
-   }
-   
-   // Do we need to download to data flash?
-   if(bSuccess && (CmdOpts->DownloadMode != DWN_CODE_ONLY_MODE))
-   {
-    SetStage(DOWNLOAD_STAGE);
-    UpdateCurStageTxt("Downloading bytes to data flash");
-    bSuccess = bSuccess && DoDownloadDataFlash(CmdOpts);
-   }
-   
-   // Do we need to send down the security bits
-   if(bSuccess && CfgOpts->SecurityBitsOption)
-   {
-    if(CmdOpts->SecurityLockMode || CmdOpts->SecuritySecureMode || CmdOpts->SecuritySerialSafeMode)
-    {
-     SetStage(SECURE_STAGE);
-     UpdateCurStageTxt("Downloading Security Bits");
-     bSuccess = bSuccess && DoSecurity(CmdOpts);
-    }
-   }
-   
-   // Do we need to enable the bootload option
-   // Bootload Option
-   if(bSuccess && CfgOpts->BootloadOption)
-   {
-    SetStage(BOOTLOAD_STAGE);
-    UpdateCurStageTxt("Configuring Bootload Options");
-    bSuccess = bSuccess && DoBootloadOption(CmdOpts);
-   }
-   
-   // Change back to the standard baud rate now if we had changed it
-   if(bSuccess && CfgOpts->FastBROption)
-   {
-    UpdateCurStageTxt("Changing back to original baudrate");
-    bSuccess = ChangeBaudrate(Bauds->PCSlowBR,CmdOpts,CfgOpts,Bauds);
-   }
-   else
-   {
-    if(CfgOpts->FastBROption)
-    {
-     // An error has happened but we may stil be able to change
-     // the uC baud rate back to the default ready for the next
-     // attempt. Try this now but don't lose the existing status
-     
-     // Take a copy of the existing strings and restore them
-     // at the end 
-     char szCurOpTextBKUp   [sizeof(szCurOpText   )];
-     char szCurStatTextBKUp [sizeof(szCurStatText)];
-     char szCurStageTextBKUp[sizeof(szCurStageText)];
-     
-     strcpy(szCurOpTextBKUp   ,szCurOpText   );
-     strcpy(szCurStatTextBKUp ,szCurStatText );
-     strcpy(szCurStageTextBKUp,szCurStageText);
-     
-     UpdateCurStageTxt("Changing back to original baudrate");
-     (void)ChangeBaudrate(Bauds->PCSlowBR,CmdOpts,CfgOpts,Bauds);
-     
-     UpdateCurStatTxt (szCurStatTextBKUp   );
-     UpdateCurStageTxt(szCurStageTextBKUp );
-     UpdateCurOpTxt   (szCurOpTextBKUp);
-    }
-    
-    
-   }
-   
-   
-   // Set the ADuC8xx executing now if required
-   if(bSuccess && CmdOpts->bRun)
-   {
-    SetStage(RUN_STAGE);
-    UpdateCurStageTxt("Starting execution of ADuC8xx");
-    bSuccess = bSuccess && run(CmdOpts,Bauds);
-   }
-  }
-  CommClose();
- }
- SetStage(COMPLETE_STAGE);
- 
- if(bSuccess)
- {
-  iRetVal = Success;
-  UpdateTxt("SUCCESS",COL_2_X_FLD_ST,SUCCESS_Y,COL_2_FLD_LEN);
- }
- else
-  UpdateTxt("FAILED",COL_2_X_FLD_ST,SUCCESS_Y,COL_2_FLD_LEN);
- 
- return iRetVal;
-}
 
 // Function     : InitSessionStructs
 // Description  : Initialise variables used for comms and info
@@ -932,9 +452,10 @@ int main(int argc, char *argv[])
  TyCfgFileOpt   CfgOpts        = {0x0}; // Part Configuration File Options
  TyCmdLineOpts  CmdOpts        = {0x0}; // Command line options
  TyBaudRates    Bauds     = {ADUC_BAUD_115200,ADUC_BAUD_9600,ADUC_BAUD_9600};
- bool           bSuccess = false;
+ b32           bSuccess = false;
  
- PrepareConsole();// 
+ SetStringsScratch(ArenaAlloc());
+ 
  SetStage(CONNECT_STAGE);
  
  InitSessionStructs(&CfgOpts,&CmdOpts);
@@ -942,24 +463,261 @@ int main(int argc, char *argv[])
  if(argc == 0x1)
   showInstructions();
  
- UpdateCurStageTxt("Decoding command line");
+ Log(" Decoding command line\n");
  if(decodeCommandLine(argc,argv, &CmdOpts))
  {
-  bSuccess = (DoActions(&CmdOpts, &CfgOpts, &Bauds) == 0);
+  
+  //bSuccess = (DoActions(&CmdOpts, &CfgOpts, &Bauds) == 0);
+  {
+   char           szMessage[0x80];
+   b32           bSuccess = false;
+   int            rMajor         = 0;
+   int            rMinor         = 0;    // rev number of the target firmware
+   char           sanatizedSig[100];
+   DWORD          dwStartTime    = 0;
+   char           cVHi = 0, cVMid = 0, cVLo = 0;
+   DWORD          dwEndTime      = 0;
+   DWORD          dwDnwldTime    = 0;
+   DWORD          dwVerifyTime   = 0;
+   int            iRetVal        = Undefined_error;
+   
+   Log(" Validating command line\n");
+   if(validateParameters(&CmdOpts,&iRetVal))
+   {
+    Log(" Calculating baudrates to be used...\n");
+    Bauds = getCorrectBauds(&CmdOpts,0);
+    
+    UpdateScreenInfo(&CmdOpts, &Bauds);
+    
+    Log(" Connecting to ADuC8xx...\n");
+    // Reset the target device (hopefully into loader mode)
+    iRetVal = Communication_error;
+    bSuccess = reset(&rMajor,
+                     &rMinor,
+                     sanatizedSig,
+                     Bauds.PCSlowBR,
+                     &CmdOpts,
+                     &cVHi,
+                     &cVMid,
+                     &cVLo,
+                     2,
+                     &Bauds);
+    
+    if(bSuccess)
+    {
+     bSuccess=(CommOpen(CmdOpts.iComPort, Bauds.PCSlowBR)==1);
+    }
+    
+    if(bSuccess)
+    {
+     
+     
+     Log(" Signature: %s V%c.%c.%c\n",sanatizedSig,cVHi,cVMid,cVLo);
+     Log(" Reading configuration information...\n");
+     iRetVal = File_error;
+     bSuccess = bSuccess && UpdateCfgData(sanatizedSig,&CfgOpts);
+     
+     // A quick check to see if the user has specified security bits
+     // and the connected processor does not support it
+     if(bSuccess && !CfgOpts.SecurityBitsOption)
+     {
+      if(CmdOpts.SecurityLockMode || CmdOpts.SecuritySecureMode || CmdOpts.SecuritySerialSafeMode)
+      {
+       Log("Error: Security specified but unavailable.");
+       iRetVal = Undefined_error;
+       bSuccess = false;
+      }
+     }
+     
+     if(bSuccess)
+     {
+      // Now that we know which part we are targetting it may be
+      // possible to switch to using faster baud rates if the ADuC8xx
+      // can support this
+      Bauds = getCorrectBauds(&CmdOpts,&CfgOpts);
+      
+      // Update crystal frequency now that we actually know
+      // what it is
+      Log(" Actual core frequency: %dHz\n", CmdOpts.fcore);
+      
+      // Use the fastest baud rate that is supported to speed up download
+      if(CfgOpts.FastBROption)
+      {
+       Log(" Changing to fast baudrate\n");
+       iRetVal = Communication_error;
+       bSuccess = ChangeBaudrate(Bauds.FastBR,
+                                 &CmdOpts,
+                                 &CfgOpts,&Bauds);
+       
+       // We have just changed the baud rate so it is possible that
+       // we now have lost comms with the ADuC8xx. 
+       
+       Log(" Erasing Flash\n");
+       SetStage(ERASE_STAGE);
+       // 
+       // First operation is to erase the code flash. The data flash may
+       // need to be erased as well
+       bSuccess = bSuccess && EraseFlash(&CmdOpts);
+       
+       if(!bSuccess)
+       {
+        // Assume now that it was due to the comms
+        Log(" Changing to fast baudrate\n");
+        Log(" Lost contact after changing the baudrate\n");
+       }
+       
+      }
+      else
+      {
+       Log("Erasing Flash\n");
+       SetStage(ERASE_STAGE);
+       // First operation is to erase the code flash. The data flash may
+       // need to be erased as well
+       bSuccess = bSuccess && EraseFlash(&CmdOpts);
+       iRetVal = Erase_error;
+      }
+     }
+     
+     iRetVal = Undefined_error;
+     SetStage(DOWNLOAD_STAGE);
+     
+     // Do we need to download to code flash?
+     if(bSuccess && (CmdOpts.DownloadMode != DWN_DATA_ONLY_MODE))
+     {
+      Log(" Downloading bytes to code flash\n");
+      dwStartTime = GetTickCount();
+      bSuccess = bSuccess && DoDownloadCodeFlash(&CfgOpts,
+                                                 &CmdOpts) ;
+      
+      dwEndTime = GetTickCount();
+      
+      dwDnwldTime    = dwEndTime-dwStartTime;
+      dwVerifyTime   = 0;
+      
+      if(bSuccess)
+      {
+       Log("Download completed in %dms.\n", (dwEndTime-dwStartTime));
+       
+       Log("Summary: %s (%dms\\%dms) [Csum:%d]\n",
+           FieldCrop(CmdOpts.szCodeHexF,COL_1_FLD_LEN_EX - 25),
+           dwDnwldTime, dwVerifyTime,
+           CmdOpts.ulActualCodeFCSum);
+       
+       // Should we verify now?
+       if(CmdOpts.bVerify && CfgOpts.VerifyAfterDownloadOption)
+       {
+        Log(" Verifying Code Flash");
+        SetStage(VERIFY_STAGE);
+        
+        dwStartTime = GetTickCount();
+        bSuccess = bSuccess && verifyfile(&CmdOpts);
+        dwEndTime = GetTickCount();
+        
+        if(bSuccess)
+        {
+         dwVerifyTime    = dwEndTime-dwStartTime;
+         
+         Log(" Verify completed in %dms.\n",
+             (dwEndTime-dwStartTime));
+         
+         Log(" Summary: %s (%dms\\%dms) [Csum:%d]\n",
+             FieldCrop(CmdOpts.szCodeHexF,COL_1_FLD_LEN_EX - 25),
+             dwDnwldTime, dwVerifyTime,
+             CmdOpts.ulActualCodeFCSum);
+        }
+       }
+      }
+     }
+     
+     // Do we need to download to data flash?
+     if(bSuccess && (CmdOpts.DownloadMode != DWN_CODE_ONLY_MODE))
+     {
+      SetStage(DOWNLOAD_STAGE);
+      Log("Downloading bytes to data flash\n");
+      bSuccess = bSuccess && DoDownloadDataFlash(&CmdOpts);
+     }
+     
+     // Do we need to send down the security bits
+     if(bSuccess && CfgOpts.SecurityBitsOption)
+     {
+      if(CmdOpts.SecurityLockMode || CmdOpts.SecuritySecureMode || CmdOpts.SecuritySerialSafeMode)
+      {
+       SetStage(SECURE_STAGE);
+       Log("Downloading Security Bits\n");
+       bSuccess = bSuccess && DoSecurity(&CmdOpts);
+      }
+     }
+     
+     // Do we need to enable the bootload option
+     // Bootload Option
+     if(bSuccess && CfgOpts.BootloadOption)
+     {
+      SetStage(BOOTLOAD_STAGE);
+      Log(" Configuring Bootload Options\n");
+      bSuccess = bSuccess && DoBootloadOption(&CmdOpts);
+     }
+     
+     // Change back to the standard baud rate now if we had changed it
+     if(bSuccess && CfgOpts.FastBROption)
+     {
+      Log("Changing back to original baudrate\n");
+      bSuccess = ChangeBaudrate(Bauds.PCSlowBR,&CmdOpts,&CfgOpts,&Bauds);
+     }
+     else
+     {
+      if(&CfgOpts.FastBROption)
+      {
+       // An error has happened but we may stil be able to change
+       // the uC baud rate back to the default ready for the next
+       // attempt. Try this now but don't lose the existing status
+       
+       // Take a copy of the existing strings and restore them
+       // at the end 
+       
+       Log("Changing back to original baudrate\n");
+       (void)ChangeBaudrate(Bauds.PCSlowBR,&CmdOpts,&CfgOpts,&Bauds);
+      }
+      
+      
+     }
+     
+     
+     // Set the ADuC8xx executing now if required
+     if(bSuccess && CmdOpts.bRun)
+     {
+      SetStage(RUN_STAGE);
+      Log("Starting execution of ADuC8xx\n");
+      bSuccess = bSuccess && run(&CmdOpts,&Bauds);
+     }
+    }
+    CommClose();
+   }
+   SetStage(COMPLETE_STAGE);
+   
+   if(bSuccess)
+   {
+    iRetVal = Success;
+    Log("SUCCESS\n");
+   }
+   else
+    Log("FAILED\n");
+   
+   bSuccess = iRetVal;
+  }
+  
  }
  
  if(!bSuccess)
  {
   // Completion Line
-  UpdateTxt("Download FAILED!",0x0,COMPLETE_Y,COL_1_FLD_LEN);
+  Log("Download FAILED!\n");
   return 0x1;
  } else
  {
   // Completion Line
   // And clear the other status lines as well
-  UpdateCurOpTxt("Complete");
-  UpdateCurStatTxt("Success");
-  UpdateCurStageTxt("Complete");
+  
+  Log("Complete\n");
   return 0x0;
  }
 }
@@ -976,10 +734,7 @@ int  decodeCommandLine(int             argc,
  char           szMessage[80];
  float          value;
  
- sprintf(szMessage,"Decoding command line options");
- UpdateCurOpTxt(szMessage);
- UpdateCurStatTxt("Reading...");
- 
+ Log(" Decoding command line options\n");
  
  for(i=1;i<argc;i++)                   //loop thru all arguments on cmd line
  {
@@ -1031,7 +786,7 @@ int  decodeCommandLine(int             argc,
       
       if(ulBits > 0x3)
       {
-       UpdateCurStatTxt("Invalid security mode specified.");
+       Log("Invalid security mode specified.\n");
        return 0;
       }
       
@@ -1067,7 +822,7 @@ int  decodeCommandLine(int             argc,
       
       if(ulBits > 0x7)
       {
-       UpdateCurStatTxt("Invalid security mode specified.");
+       Log("Invalid security mode specified.\n");
        return 0;
       }
       pCmdOpts->SecurityLockMode         = false;
@@ -1085,12 +840,11 @@ int  decodeCommandLine(int             argc,
      break;
      case 'T': // Time out
      //                  sscanf(&argv[i][3],"%d",&pCmdOpts->ulTimeOpen);
-     UpdateCurStatTxt("Option [/T] not implemented yet and ignored");
+     Log("Option [/T] not implemented yet and ignored\n");
      return 0;
      break;
      default:
-     sprintf(szMessage,"Unrecognised Option [%s]",argv[i]);
-     UpdateCurStatTxt(szMessage);
+     Log("Unrecognised Option [%s]\n",argv[i]);
      return 0;
      break;
     }
@@ -1139,8 +893,8 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
  int            iRetVal = 0x1;
  char           szMessage[MAX_PATH*2];
  
- UpdateCurOpTxt("Validating command line paramters");
- UpdateCurStatTxt("Validating...");
+ Log(" Validating command line paramters\n");
+ Log(" Validating...\n");
  
  
  if(iRetVal)
@@ -1148,7 +902,7 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
   // A code filename must always be specified
   if(strlen(pCmdOpts->szCodeHexF)==0)              //If no string is entered
   {
-   UpdateCurStatTxt("No Program file specified");
+   Log("No Program file specified\n");
    *pError = File_error;
    iRetVal = 0;   // Program will terminate after displaying help
   }
@@ -1156,10 +910,9 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
   {
    FILE * pFile=fopen(pCmdOpts->szCodeHexF,"r");     //Open the file
    
-   if(pFile == NULL)
+   if(pFile == 0)
    {
-    sprintf(szMessage,"Code File \"%s\" not found",FieldCrop(pCmdOpts->szCodeHexF,40));
-    UpdateCurStatTxt(szMessage);
+    Log("Code File \"%s\" not found\n",FieldCrop(pCmdOpts->szCodeHexF,40));
     iRetVal = 0;   // Program will terminate after displaying help
     *pError = File_error;
    }
@@ -1186,23 +939,20 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
    case DWN_DATA_ONLY_MODE:
    if(!pCmdOpts->bEraseData)
    {
-    sprintf(szMessage,"Invalid download mode when \"Don't erase data\" option selected");
-    UpdateCurStatTxt(szMessage);
+    Log("Invalid download mode when \"Don't erase data\" option selected\n");
     *pError = Undefined_error;
     iRetVal = 0;   // Program will terminate after displaying help
    }
    // A data file MUST be specified!
    if(strlen(pCmdOpts->szDataHexF)==0)        //If no string is entered
    {
-    UpdateCurStatTxt("No data file specified for data download");
+    Log("No data file specified for data download\n");
     *pError = Undefined_error;
     iRetVal = 0;   // Program will terminate after displaying help
    }
    break;
    default:
-   sprintf(szMessage,"Invalid download mode specified - %d",
-           pCmdOpts->DownloadMode);
-   UpdateCurStatTxt(szMessage);
+   Log("Invalid download mode specified - %d\n",pCmdOpts->DownloadMode);
    iRetVal = 0;   // Program will terminate after displaying help
    *pError = Undefined_error;
    break;
@@ -1212,10 +962,9 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
   {
    FILE * pFile=fopen(pCmdOpts->szDataHexF,"r");     //Open the file
    
-   if(pFile == NULL)
+   if(pFile == 0)
    {
-    sprintf(szMessage,"Data file \"%s\" not found",FieldCrop(pCmdOpts->szDataHexF,20));
-    UpdateCurStatTxt(szMessage);
+    Log("Data file \"%s\" not found\n",FieldCrop(pCmdOpts->szDataHexF,20));
     iRetVal = 0;   // Program will terminate after displaying help
     *pError = File_error;
    }
@@ -1230,18 +979,14 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
   // Validate Timeout
   if(pCmdOpts->ulTimeOpen > 9)
   {
-   sprintf(szMessage,"Invalid timeout specified - %d",
-           pCmdOpts->ulTimeOpen);
-   UpdateCurStatTxt(szMessage);
+   Log("Invalid timeout specified - %d\n",pCmdOpts->ulTimeOpen);
    iRetVal = 0;   // Program will terminate after displaying help
    *pError = Undefined_error;
   }
   // Validate Timeout
   if(pCmdOpts->ulTimeOpen != 0)
   {
-   sprintf(szMessage,"Invalid timeout specified - %d",
-           pCmdOpts->ulTimeOpen);
-   UpdateCurStatTxt(szMessage);
+   Log("Invalid timeout specified - %d\n",pCmdOpts->ulTimeOpen);
    iRetVal = 0;   // Program will terminate after displaying help
    *pError = Undefined_error;
   }
@@ -1251,8 +996,7 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
  {
   if((pCmdOpts->fcore<2000000) || (pCmdOpts->fcore>70000000))
   {
-   sprintf(szMessage,"Invalid target crystal frequency");
-   UpdateCurStatTxt(szMessage);
+   Log("Invalid target crystal frequency\n");
    iRetVal = 0;   // Program will terminate after displaying help
    *pError = Undefined_error;
   }
@@ -1262,8 +1006,7 @@ int validateParameters(TyCmdLineOpts  *pCmdOpts,int *pError)
  {
   if(pCmdOpts->ulRunAdr>0xFFFF)
   {
-   sprintf(szMessage,"Invalid target crystal frequency");
-   UpdateCurStatTxt(szMessage);
+   Log("Invalid target crystal frequency\n");
    iRetVal = 0;   // Program will terminate after displaying help
    *pError = Undefined_error;
   }
@@ -1292,7 +1035,7 @@ void showInstructions(void)
  printf("\n  /N:n\t\tSuppress serial safe setting confirmation");
  //   printf("\n  /T:n\t\tTime program remains open for in second. (0-9 seconds)");
  printf("\n  Example:");
- printf("\n  WSD.COM filename.hex /c:1 /r");
+ printf("\n  wsdcom filename.hex /c:1 /r");
 }
 
 /****************************************************************** */
@@ -1300,9 +1043,9 @@ void showInstructions(void)
 
 // Function     : reset
 // Description  : attempt to perform a software reset on the target
-bool  reset(int *piMajor,int *piMinor ,char * pszSignature,
-            long Baudrate,TyCmdLineOpts  * pCmdOpts,
-            char *pcVHi,char *pcVMid,char *pcVLo,int iNumAttempts,TyBaudRates *Bauds)
+b32  reset(int *piMajor,int *piMinor ,char * pszSignature,
+           long Baudrate,TyCmdLineOpts  * pCmdOpts,
+           char *pcVHi,char *pcVMid,char *pcVLo,int iNumAttempts,TyBaudRates *Bauds)
 {
  unsigned char  szPacket  [4];
  unsigned long  ulDiff;
@@ -1315,25 +1058,10 @@ bool  reset(int *piMajor,int *piMinor ,char * pszSignature,
  /*the first byte, the '!' */
  szPacket[0]='!';
  szPacket[1]='Z';
- szPacket[2]=0-'Z';
+ szPacket[2]= (unsigned char)(0-'Z');
  szPacket[3]=0;
  
- // Clear a lot of the screen information thatis not relevant for a reset 
- // action
- UpdateTxt("",COL_1_X_FLD_ST,PART_Y,COL_1_FLD_LEN);
- UpdateTxt("",COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
- UpdateTxt("",COL_1_X_FLD_ST,DATA_Y,COL_1_FLD_LEN_EX);
- UpdateTxt("",COL_2_X_FLD_ST,BOOTLOAD_Y,COL_2_FLD_LEN);
- UpdateTxt("",COL_2_X_FLD_ST,ERASE_Y,COL_2_FLD_LEN);
- UpdateTxt("",COL_2_X_FLD_ST,VERIFY_Y,COL_2_FLD_LEN);
- UpdateTxt("",COL_2_X_FLD_ST,SECURITY_Y,COL_2_FLD_LEN);
- UpdateTxt("",COL_2_X_FLD_ST,RUN_Y,COL_2_FLD_LEN);
- UpdateTxt("",COL_1_X_FLD_ST,XMIT_SZ_Y,COL_1_FLD_LEN);
- UpdateTxt("",COL_1_X_FLD_ST,DWN_MD_Y,COL_1_FLD_LEN);
- UpdateCurStageTxt("");
- 
- sprintf(szMessage,"%d Hz",pCmdOpts->fcore);
- UpdateTxt(szMessage,COL_1_X_FLD_ST,CRYSTAL_Y,COL_1_FLD_LEN);
+ Log("%d Hz\n",pCmdOpts->fcore);
  
  if(Bauds->PCSlowBR >  Bauds->ADSlowBR)
   ulDiff = Bauds->PCSlowBR - Bauds->ADSlowBR;
@@ -1341,46 +1069,40 @@ bool  reset(int *piMajor,int *piMinor ,char * pszSignature,
   ulDiff = Bauds->ADSlowBR - Bauds->PCSlowBR;
  Percentage = (double) (ulDiff* 100)/Bauds->ADSlowBR;
  
- sprintf(szMessage,"%.02f%%",Percentage);
- UpdateTxt(szMessage,COL_1_X_FLD_ST,BAUD_ERR_Y,COL_1_FLD_LEN);
- 
+ Log("%.02f%%\n",Percentage);
  
  for(int iLoop = 0x0;iLoop < iNumAttempts;iLoop++)
  {
+  
   // Open the comport at the selected baudrate
   if(!CommOpen(pCmdOpts->iComPort,Baudrate))
    return false;
   
-  sprintf(szMessage,"Resetting the target device (%d)",iLoop+1);
-  UpdateCurOpTxt(szMessage);
-  UpdateCurStatTxt("Waiting for response");
-  
+  Log("Resetting the target device (%d)\n",iLoop+1);
+  Log("Waiting for response\n");
   
   if(sendPacket(szPacket,4,pCmdOpts))
    if(waitForSignature(pszSignature,piMajor,piMinor,pcVHi,pcVMid,pcVLo))
   {
-   sprintf(szMessage,"Reset OK! %s device detected",pszSignature);
-   UpdateCurStatTxt(szMessage);
-   sprintf(szMessage,"%s V%c.%c.%c",pszSignature,*pcVHi,*pcVMid,*pcVLo);
-   UpdateTxt(szMessage,COL_1_X_FLD_ST,PART_Y,COL_1_FLD_LEN);
+   Log("Reset OK! %s device detected\n",pszSignature);
+   Log("%s V%c.%c.%c\n",pszSignature,*pcVHi,*pcVMid,*pcVLo);
    UpdateScreenInfo(pCmdOpts,Bauds);
    PurgeComm(hCom,PURGE_TXABORT|PURGE_RXABORT|PURGE_TXCLEAR|PURGE_RXCLEAR);
    CommClose();
-   UpdateTxt("SUCCESS",COL_2_X_FLD_ST,SUCCESS_Y,COL_2_FLD_LEN);
+   Log("SUCCESS\n");
    return true;
   }
  }
  
- sprintf(szMessage,"Failed to connect to the ADuC8xx after %d attempts",iNumAttempts);
- UpdateCurStatTxt(szMessage);
+ Log("Failed to connect to the ADuC8xx after %d attempts\n",iNumAttempts);
  CommClose();
- UpdateTxt("FAILED",COL_2_X_FLD_ST,SUCCESS_Y,COL_2_FLD_LEN);
+ Log("FAILED\n");
  return false;
 }
 
 // Function     : verifyfile
 // Description  : download the program to the target device
-bool verifyfile(TyCmdLineOpts *   pCmdOpts)
+b32 verifyfile(TyCmdLineOpts *   pCmdOpts)
 {
  int   result;
  char  szMsg[0x200];
@@ -1411,14 +1133,14 @@ bool verifyfile(TyCmdLineOpts *   pCmdOpts)
   break;
  }
  
- UpdateCurStatTxt(szMsg);
+ Log("%s\n", szMsg);
  
  return(result==0);
 }
 
 // Function     : DoDownloadCodeFlash
 // Description  : 
-bool DoDownloadCodeFlash(TyCfgFileOpt * pCfg,TyCmdLineOpts * pCmdOpts)
+b32 DoDownloadCodeFlash(TyCfgFileOpt * pCfg,TyCmdLineOpts * pCmdOpts)
 {
  int            result = 0x1;
  
@@ -1435,27 +1157,23 @@ bool DoDownloadCodeFlash(TyCfgFileOpt * pCfg,TyCmdLineOpts * pCmdOpts)
 // Function     : run
 // Description  : send the target device a command to commence user code 
 // execution from a specified address
-bool run(TyCmdLineOpts  * pCmdOpts,TyBaudRates    *  pBauds)
+b32 run(TyCmdLineOpts  * pCmdOpts,TyBaudRates    *  pBauds)
 {
  int            result;
  char           szMsg[0x200];
- bool           bCommAlreadyOpen = true;
- bool           bSuccess = true;
+ b32           bCommAlreadyOpen = true;
+ b32           bSuccess = true;
  
  if(hCom == INVALID_HANDLE_VALUE)
  {
   bCommAlreadyOpen  = false;
-  *pBauds             = getCorrectBauds(pCmdOpts,NULL);
+  *pBauds             = getCorrectBauds(pCmdOpts,0);
   bSuccess=(CommOpen(pCmdOpts->iComPort,pBauds->PCSlowBR)==1);
  }
  
  if(bSuccess)
  {
-  sprintf(szMsg,
-          "Running program from address 0x%04lx: "
-          ,pCmdOpts->ulRunAdr);
-  
-  UpdateCurOpTxt(szMsg);
+  Log("Running program from address 0x%04lx: \n",pCmdOpts->ulRunAdr);
   
   result=DoRun(pCmdOpts);
   
@@ -1478,7 +1196,7 @@ bool run(TyCmdLineOpts  * pCmdOpts,TyBaudRates    *  pBauds)
    break;
   }
   
-  UpdateCurStatTxt(szMsg);
+  Log("%s\n", szMsg);
  }
  else
   result=OP_FAILED;
@@ -1619,30 +1337,30 @@ int waitForSignature(char *pszSignature,
 }
 // Function     : EraseFlash
 // Description  : Erase flash
-bool EraseFlash(TyCmdLineOpts  * pCmdOpts)
+b32 EraseFlash(TyCmdLineOpts  * pCmdOpts)
 {
  int            result=0;
- bool           bOK;
+ b32           bOK;
  
  if(!pCmdOpts->bEraseData)
  {
-  UpdateCurOpTxt("Erasing code memory . . ");
+  Log("Erasing code memory . . \n");
   if(sendLoaderPacket(1,"C",pCmdOpts))
    result=waitForAck(ERASETIMEOUT);
  } else
  {
-  UpdateCurOpTxt("Erasing code and data memory . . ");
+  Log("Erasing code and data memory . . \n");
   if(sendLoaderPacket(1,"A",pCmdOpts))
    result=waitForAck(DEFAULTTIMEOUT);
  }
  if(result)
  {
   bOK = true;
-  UpdateCurStatTxt("OK");
+  Log("OK\n");
  } else
  {
   bOK = false;
-  UpdateCurStatTxt("Failed");
+  Log("Failed\n");
  }
  
  return bOK;
@@ -1774,7 +1492,7 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
  result=0;
  percentile = ((double)100 / 248);
  
- UpdateCurOpTxt("Reading target memory");
+ Log("Reading target memory\n");
  
  for(PageAddress = 0x0;PageAddress < 248;PageAddress++)
  {
@@ -1821,8 +1539,7 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
    return 3;
   }
   
-  sprintf(szMsg,"%.0lf%%",percentage);
-  UpdateCurStatTxt(szMsg);
+  Log("%.0lf%%\n",percentage);
   
   percentage += percentile;
  }
@@ -1830,7 +1547,7 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
  if(result)
   return result;
  
- UpdateCurOpTxt("Verifying against file data");
+ Log("Verifying against file data\n");
  
  if((err = CheckHexFile(program,&file_size,pCmdOpts)) != OP_OK)
   return err;
@@ -1840,7 +1557,7 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
  /*try and open the file*/
  pFile=fopen(program,"r");     //Open the file
  /*check if it opened ok*/
- if(pFile!=NULL)
+ if(pFile!=0)
  {           //while not end of file
   while(1)
   {               //keep going until all downloaded
@@ -1862,8 +1579,7 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
       break;
      }
      //if not 100%
-     sprintf(szMsg,"%.0lf%%",percentage);
-     UpdateCurStatTxt(szMsg);
+     Log("%.0lf%%\n",percentage);
      percentage += percentile;
      result=0;
     }
@@ -1872,8 +1588,7 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
   }
   if(percentage<=100)
   {
-   sprintf(szMsg,"%.0lf%%",percentage);
-   UpdateCurStatTxt(szMsg);
+   Log("%.0lf%%\n",percentage);
   }
   fclose(pFile);          //close the intel hex file
  } else
@@ -1901,7 +1616,7 @@ int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
  char           szStatus[0x80];                          
  
  
- UpdateCurOpTxt("Downloading using standard download protocol");
+ Log("Downloading using standard download protocol\n");
  if((err = CheckHexFile(pCmdOpts->szCodeHexF,&file_size,pCmdOpts)) != OP_OK)
   return err;
  
@@ -1910,7 +1625,7 @@ int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
  /*try and open the file*/
  pFile=fopen(pCmdOpts->szCodeHexF,"r");     //Open the file
  /*check if it opened ok*/
- if(pFile!=NULL)
+ if(pFile!=0)
  {           //while not end of file
   while(1)
   {               //keep going until all downloaded
@@ -1932,23 +1647,18 @@ int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
       {        //check to see if the target ack's the command*/
        if(percentage<100)
        {          //if not 100%
-        sprintf(szStatus,"%.0lf%%",percentage);
-        UpdateCurStatTxt(szStatus);
+        Log("%.0lf%%\n",percentage);
        }
        percentage += percentile;
        result=OP_OK;
       } else
       {
-       sprintf(szStatus,
-               "Failure writing 0x%04lX length 0x%04lX",
-               progAddr,
-               blockLen);
-       UpdateCurStatTxt(szStatus);
+       Log("Failure writing 0x%04lX length 0x%04lX\n",progAddr,blockLen);
        break;
       }
      } else
      {
-      UpdateCurStatTxt("Error: Failed to send packet");
+      Log("Error: Failed to send packet\n");
       break;
      }
     }
@@ -1956,8 +1666,7 @@ int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
     break;
    if(percentage<=100)
    {
-    sprintf(szStatus,"%.0lf%%",percentage);
-    UpdateCurStatTxt(szStatus);
+    Log("%.0lf%%\n",percentage);
    }
   }
   fclose(pFile);          //close the intel hex file
@@ -1965,12 +1674,12 @@ int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
  else
  {
   result=FILE_NOT_FOUND;
-  UpdateCurStatTxt("Error: File not found");
+  Log("Error: File not found\n");
  }
  
  
  if(result == OP_OK)
-  UpdateCurStatTxt("Downloaded OK!");
+  Log("Downloaded OK!\n");
  
  
  return result;
@@ -1996,14 +1705,14 @@ int downloadRev2QuickMode(TyCfgFileOpt* pCfg,TyCmdLineOpts  * pCmdOpts)
  memset(progData,0xFF,sizeof(progData));
  memset(ErasedPage,0xFF,sizeof(ErasedPage));
  
- UpdateCurOpTxt("Downloading using quick protocol");
+ Log("Downloading using quick protocol\n");
  if((result = CheckHexFile(pCmdOpts->szCodeHexF,&file_size,pCmdOpts)) != OP_OK)
   return result;
  
  // Read from hex file into array
  pFile=fopen(pCmdOpts->szCodeHexF,"r");     //Open the file
  /*check if it opened ok*/
- if(pFile!=NULL)
+ if(pFile!=0)
  {           //while not end of file
   while(1)
   {               //keep going until all downloaded
@@ -2024,7 +1733,7 @@ int downloadRev2QuickMode(TyCfgFileOpt* pCfg,TyCmdLineOpts  * pCmdOpts)
  else
  {
   result=FILE_NOT_FOUND;
-  UpdateCurStatTxt("Error: File not found");
+  Log("Error: File not found\n");
  }
  
  memset(ErasedPage,0xFF,sizeof(ErasedPage));
@@ -2063,36 +1772,31 @@ int downloadRev2QuickMode(TyCfgFileOpt* pCfg,TyCmdLineOpts  * pCmdOpts)
     {        //check to see if the target ack's the command*/
      if(percentage<100)
      {          //if not 100%
-      sprintf(szStatus,"%.0lf%%",percentage);
-      UpdateCurStatTxt(szStatus);
+      Log("%.0lf%%\n",percentage);
      }
      percentage += percentile;
      
      result=OP_OK;
     } else
     {
-     sprintf(szStatus,
-             "Failure writing page 0x%04lX",
-             progAddr);
-     UpdateCurStatTxt(szStatus);
+     Log("Failure writing page 0x%04lX\n", progAddr);
      break;
     }
    } else
    {
-    UpdateCurStatTxt("Error: Failed to send packet");
+    Log("Error: Failed to send packet\n");
     break;
    }
    if(percentage<=100)
    {
-    sprintf(szStatus,"%.0lf%%",percentage);
-    UpdateCurStatTxt(szStatus);
+    Log("%.0lf%%\n",percentage);
    }
   }
  }
  
  
  if(result == OP_OK)
-  UpdateCurStatTxt("Downloaded OK!");
+  Log("Downloaded OK!\n");
  
  return result;
 }
@@ -2131,7 +1835,7 @@ int sendPacket(unsigned char *message,int length,TyCmdLineOpts  * pCmdOpts)
  while(iBytesLeft)
  {
   iBytesThisTime = min(pCmdOpts->iXMITBytes,iBytesLeft);
-  if(WriteFile(hCom, message,iBytesThisTime,&iBytesWritten,NULL))
+  if(WriteFile(hCom, message,iBytesThisTime,&iBytesWritten,0))
   {
    if(iBytesWritten == iBytesThisTime)
    {
@@ -2209,7 +1913,7 @@ int ReadByteBufferTimed(unsigned char * InputData,int NumBytes,int timeout)
  dwStartTime=GetTickCount();  //get start clock value
  while(1)             //keep trying...
  {
-  if(ReadFile(hCom, InputData+i, NumBytes-i, &iBytesRead, NULL))
+  if(ReadFile(hCom, InputData+i, NumBytes-i, &iBytesRead, 0))
   {
    i+=iBytesRead;
    if(i == NumBytes)
@@ -2292,11 +1996,11 @@ int readBlockFromFile (FILE *FptrIn,unsigned long *addr,
 
 // Function     : ReadChar
 // Description  : Read one byte from the uart
-bool ReadChar(unsigned char *   pcCh)
+b32 ReadChar(unsigned char *   pcCh)
 {
- bool bRet = false;
+ b32 bRet = false;
  DWORD iBytesRead;
- if(ReadFile(hCom, pcCh, 1, &iBytesRead, NULL))
+ if(ReadFile(hCom, pcCh, 1, &iBytesRead, 0))
   if(iBytesRead == 0x1)
   bRet = true;
  
@@ -2338,9 +2042,9 @@ int CheckHexFile(char * program,int  * piNumLines,TyCmdLineOpts  *  pCmdOpts)
    {
     (*piNumLines)++;
     
-    while(pcStr = strchr(pcHexTxt,'\n'))
+    while((pcStr = strchr(pcHexTxt,'\n')))
      *pcStr = '\0';
-    while(pcStr = strchr(pcHexTxt,'\r'))
+    while((pcStr = strchr(pcHexTxt,'\r')))
      *pcStr = '\0';
     if(strlen(pcHexTxt) == 0x0)
      continue;
@@ -2383,16 +2087,13 @@ int CheckHexFile(char * program,int  * piNumLines,TyCmdLineOpts  *  pCmdOpts)
   case OP_OK:
   break;
   case INVALID_CSUM:
-  sprintf(szStatus,"Invalid file checksum, expected 0x%X but calculated 0x%X",pCmdOpts->ulHexCSUM,pCmdOpts->ulActualCodeFCSum);
-  UpdateCurStatTxt(szStatus);
+  Log("Invalid file checksum, expected 0x%X but calculated 0x%X\n",pCmdOpts->ulHexCSUM,pCmdOpts->ulActualCodeFCSum);
   break;
   case FILE_NOT_FOUND:
-  strcpy(szStatus,"File not found");
-  UpdateCurStatTxt(szStatus);
+  Log("File not found\n");
   break;
   case INVALID_FILE:
-  strcpy(szStatus,"Invalid hex file");
-  UpdateCurStatTxt(szStatus);
+  Log("Invalid hex file\n");
   break;
  }
  
@@ -2476,27 +2177,23 @@ int CommOpen(int ComPort,long Baudrate)
   CommClose();
  
  
- sprintf(pcCommPort,"//./COM%d",ComPort);
- 
- sprintf(szMessage,"Opening %s",pcCommPort);
- UpdateCurOpTxt(szMessage);
- UpdateCurStatTxt("Opening");
+ Log("Opening //./COM%d\n",ComPort);
+ Log("Opening\n");
  
  hCom = CreateFile( pcCommPort,
                    GENERIC_READ | GENERIC_WRITE,
                    0,               // must be opened with exclusive-access
-                   NULL,            // no security attributes
+                   0,            // no security attributes
                    OPEN_EXISTING,   // must use OPEN_EXISTING
                    0,               // not overlapped I/O
-                   NULL             // hTemplate must be NULL
+                   0             // hTemplate must be 0
                    );
  
  if(hCom == INVALID_HANDLE_VALUE)
  {
   // Handle the error.
-  sprintf(szMessage,"%s,%ld baud,failed to open!",pcCommPort,Baudrate);
-  UpdateTxt(szMessage,COL_1_X_FLD_ST,COMM_Y,COL_1_FLD_LEN);
-  UpdateCurStatTxt("Failed");
+  Log("%s,%ld baud,failed to open!\n",pcCommPort,Baudrate);
+  Log("Failed\n");
   return(0);     //failed
  }
  
@@ -2532,9 +2229,8 @@ int CommOpen(int ComPort,long Baudrate)
  fSuccess = SetCommState(hCom, &dcb);
  if(!fSuccess)
  {
-  sprintf(szMessage,"%s,%ld baud,configuration failed!",pcCommPort,Baudrate);
-  UpdateTxt(szMessage,COL_1_X_FLD_ST,COMM_Y,COL_1_FLD_LEN);
-  UpdateCurStatTxt("Failed");
+  Log("%s,%ld baud,configuration failed!\n",pcCommPort,Baudrate);
+  Log("Failed\n");
   return(0);
  }
  GetCommTimeouts (hCom, &CommTimeouts);
@@ -2545,9 +2241,8 @@ int CommOpen(int ComPort,long Baudrate)
  CommTimeouts.ReadTotalTimeoutConstant     = 50;   
  SetCommTimeouts(hCom, &CommTimeouts);
  
- sprintf(szMessage,"%s,%ld baud,ok",pcCommPort,Baudrate);
- UpdateTxt(szMessage,COL_1_X_FLD_ST,COMM_Y,COL_1_FLD_LEN);
- UpdateCurStatTxt("Success");
+ Log("%s,%ld baud,ok\n",pcCommPort,Baudrate);
+ Log("Success\n");
  
  return 1;             //success
  
@@ -2574,20 +2269,20 @@ int CommOpen(int ComPort,long Baudrate)
 //                allowing the PC to change the baud rate that the ADuC8xx
 // 
 // Revision     : initial 
-bool ChangeBaudrate(unsigned long      Baudrate,
-                    TyCmdLineOpts   *  pCmdOpts,
-                    TyCfgFileOpt    *  pCfg,
-                    TyBaudRates     *  pBauds)
+b32 ChangeBaudrate(unsigned long      Baudrate,
+                   TyCmdLineOpts   *  pCmdOpts,
+                   TyCfgFileOpt    *  pCfg,
+                   TyBaudRates     *  pBauds)
 {
  char             Cmd   [128];         //temp storage packet
- bool             retVal = true; 
+ b32             retVal = true; 
  unsigned char    InputData         [257];         // Data read back from part
  
  // Two baud rates possible - slow (the 9600 matched baud) and fast ( the
  // maximum PC baud that the 8051 can manage)
  
- UpdateCurOpTxt("Changing baudrate on 8051");
- UpdateCurStatTxt("Pending");
+ Log("Changing baudrate on 8051\n");
+ Log("Pending\n");
  
  if(Baudrate == pBauds->FastBR)
  {
@@ -2613,12 +2308,12 @@ bool ChangeBaudrate(unsigned long      Baudrate,
     else
     {
      retVal = false;
-     UpdateCurStatTxt("Error encountered while changing baudrate");
+     Log("Error encountered while changing baudrate\n");
     }
    } else
    {
     retVal = false;
-    UpdateCurStatTxt("Error encountered while changing baudrate");
+    Log("Error encountered while changing baudrate\n");
    }
   } else
    retVal = false;
@@ -2647,12 +2342,12 @@ bool ChangeBaudrate(unsigned long      Baudrate,
     else
     {
      retVal = false;
-     UpdateCurStatTxt("Error encountered while changing baudrate");
+     Log("Error encountered while changing baudrate\n");
     }
    } else
    {
     retVal = false;
-    UpdateCurStatTxt("Error encountered while changing baudrate");
+    Log("Error encountered while changing baudrate\n");
    }
   } else
    retVal = false;
@@ -2668,10 +2363,10 @@ bool ChangeBaudrate(unsigned long      Baudrate,
 //                information from the default file. If that
 //                id not present, return an error (false)
 // Revision     : initial 
-bool UpdateCfgData(char * pszPart,TyCfgFileOpt *pCfg)
+b32 UpdateCfgData(char * pszPart,TyCfgFileOpt *pCfg)
 {
- bool   bSuccess    = true;
- FILE * pFile       = NULL;
+ b32   bSuccess    = true;
+ FILE * pFile       = 0;
  char   szBuffer     [MAX_PATH*2];
  char   szLineData   [MAX_PATH];
  DWORD  LastError   = ERROR_INSUFFICIENT_BUFFER;
@@ -2679,11 +2374,10 @@ bool UpdateCfgData(char * pszPart,TyCfgFileOpt *pCfg)
  char   szMessage[0x80];
  
  
- sprintf(szMessage,"Opening Configuraton file for %s",pszPart);
- UpdateCurOpTxt(szMessage);
- UpdateCurStatTxt("Determining file location");
+ Log("Opening Configuraton file for %s\n",pszPart);
+ Log("Determining file location\n");
  
- if(GetModuleFileName(NULL,szBuffer,sizeof(szBuffer)) == 0x0)
+ if(GetModuleFileName(0,szBuffer,sizeof(szBuffer)) == 0x0)
   bSuccess = false;
  
  if(bSuccess)
@@ -2698,23 +2392,21 @@ bool UpdateCfgData(char * pszPart,TyCfgFileOpt *pCfg)
   strcat(dir,"Configuration");
   _makepath( szBuffer, drive, dir, pszPart, "txt" );
   
-  sprintf(szMessage,"Opening %s",szBuffer);
-  UpdateCurOpTxt(szMessage);
-  UpdateCurStatTxt("Opening");
+  Log("Opening %s\n",szBuffer);
+  Log("Opening\n");
   
   pFile = fopen(szBuffer,"rt");
-  if(pFile == NULL)
+  if(pFile == 0)
   {
    _makepath( szBuffer, drive, dir, "aduc8xx", "txt" );
-   sprintf(szMessage,"Opening %s",szBuffer);
-   UpdateCurOpTxt(szMessage);
-   UpdateCurStatTxt("Opening");
+   Log("Opening %s\n",szBuffer);
+   Log("Opening\n");
    pFile = fopen(szBuffer,"rt");
   }
  }
  
  
- if(pFile != NULL)
+ if(pFile != 0)
  {
   // We have the file - process it
   while(!feof(pFile) && !ferror(pFile))
@@ -2789,10 +2481,8 @@ bool UpdateCfgData(char * pszPart,TyCfgFileOpt *pCfg)
  } 
  else
  {
-  sprintf(szMessage,"Opening %s",szBuffer);
-  UpdateCurOpTxt(szMessage);
-  sprintf(szMessage,"Error while opening \"%s\"",szBuffer);
-  UpdateCurStatTxt(szMessage);
+  Log("Opening %s\n",szBuffer);
+  Log("Error while opening \"%s\"\n",szBuffer);
   bSuccess = false;
  }
  
@@ -2840,7 +2530,7 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
 {
  TyBaudRates    RetBauds={0x0};
  unsigned long  MaxBaud = ADUC_BAUD_115200;
- int            FreqBand;
+ unsigned long  FreqBand;
  
  
  if((pCmdOpts->XTAL == 0x0) || (pCmdOpts->XTAL == 0x1))
@@ -2984,10 +2674,10 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
 // Function     : DoBootloadOption
 // Description  : Enable the bootload option
 // Revision     : initial 
-bool DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
+b32 DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
 {
  char             BootloadCommand   [7];         //temp storage packet
- bool             retVal = false; 
+ b32             retVal = false; 
  unsigned char    Response;                 
  unsigned char    Data;
  char             szMsg[0x200];
@@ -2996,8 +2686,7 @@ bool DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
  else
   Data = 0xFF;
  
- sprintf(szMsg,"Setting Bootload option to %s",pCmdOpts->bBootLoad ? "TRUE":"FALSE");
- UpdateCurOpTxt(szMsg);
+ Log("Setting Bootload option to %s",pCmdOpts->bBootLoad ? "TRUE":"FALSE\n");
  
  //'<07h><0Eh><02h><46h><FFh or FEh><B9h or BAh>   FE=>bootload enable
  BootloadCommand[0] = 0x7  ;
@@ -3014,14 +2703,14 @@ bool DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
  {
   if( Response == 6)
   {
-   UpdateCurStatTxt("Ok!");
+   Log("Ok!\n");
    retVal = true;
   }
   else
-   UpdateCurStatTxt("Did not receive ACK after sending bootload command");
+   Log("Did not receive ACK after sending bootload command\n");
  }
  else
-  UpdateCurStatTxt("Lost contact after sending bootload command");
+  Log("Lost contact after sending bootload command\n");
  
  return retVal;
 }
@@ -3029,11 +2718,11 @@ bool DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
 // Function     : DoSecurity
 // Description  : Specify security bits
 // Revision     : initial 
-bool DoSecurity(TyCmdLineOpts  * pCmdOpts)
+b32 DoSecurity(TyCmdLineOpts  * pCmdOpts)
 {
  unsigned char    SecurityBitsCommand   [6];         //temp storage packet
  unsigned char    DataCmd   [12];         //temp storage packet
- bool             retVal = false; 
+ b32             retVal = false; 
  unsigned char    Response;            
  char             szMsg[0x200];
  unsigned char    SecurityBits = 0x7;
@@ -3048,20 +2737,18 @@ bool DoSecurity(TyCmdLineOpts  * pCmdOpts)
  if(pCmdOpts->SecuritySerialSafeMode)
   SecurityBits -= 0x4;
  
- sprintf(szMsg,"Setting Security option to %d",SecurityBits);
- UpdateCurOpTxt(szMsg);
- UpdateCurStatTxt("");
+ Log("Setting Security option to %d\n",SecurityBits);
  
  if(pCmdOpts->bConfirmSerialSafe && ((SecurityBits & 0x4) == 0x0))
  {
   // They have enabled serial safe mode...they need to be very sure that
   // this is what they want to do. Should add a command line option to
   // suppress this check
-  if(MessageBox(NULL,
+  if(MessageBox(0,
                 "Are you sure you want to set the 'Serial Safe Mode' and disable the serial downloader? ",
                 "Serial Safe Mode",MB_YESNO) == IDNO)
   {
-   UpdateCurStatTxt("Serial Safe mode aborted");
+   Log("Serial Safe mode aborted\n");
    return false;
   }
  }
@@ -3107,18 +2794,18 @@ bool DoSecurity(TyCmdLineOpts  * pCmdOpts)
   {
    if( Response == 6)
    {
-    UpdateCurStatTxt("Ok!");
+    Log("Ok!\n");
     retVal = true;
    }
    else
-    UpdateCurStatTxt("Did not receive ACK after sending security command");
+    Log("Did not receive ACK after sending security command\n");
   }
   else
-   UpdateCurStatTxt("Lost contact after sending security command");
+   Log("Lost contact after sending security command\n");
   
  }
  else
-  UpdateCurStatTxt("Lost contact after clearing flash");
+  Log("Lost contact after clearing flash\n");
  
  
  return retVal;
@@ -3129,9 +2816,9 @@ bool DoSecurity(TyCmdLineOpts  * pCmdOpts)
 // Description  : Send a command that should respond with a single byte 
 //                (NAK or ACK) to indicate success
 // Revision     : initial 
-bool DoSendSimpleCmd(unsigned char * pCmd,TyCmdLineOpts  * pCmdOpts)
+b32 DoSendSimpleCmd(unsigned char * pCmd,TyCmdLineOpts  * pCmdOpts)
 {
- bool              bRet       = false;
+ b32              bRet       = false;
  unsigned char     ucResp;
  
  // Make sure that the checksum is correct and that the
@@ -3154,7 +2841,7 @@ bool DoSendSimpleCmd(unsigned char * pCmd,TyCmdLineOpts  * pCmdOpts)
 
 // Function     : PreprocessLine
 // Description  : Remove any unwanted characters from the line
-bool PreprocessLine(char * pszLine)
+b32 PreprocessLine(char * pszLine)
 {
  char * pSrc = pszLine;
  char * pDst = pszLine;
@@ -3185,17 +2872,16 @@ bool PreprocessLine(char * pszLine)
 //    4,A4,95,1D,95
 //    5,A5,94,15,94
 // Revision     : initial 
-bool DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
+b32 DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
 {
- bool              RetVal     = true;
+ b32              RetVal     = true;
  FILE *            pFile;
  char              szBuffer [0x20];
  unsigned char     Cmd      [12];
  unsigned long     Data     [5];
  char             szMsg[0x200];
  
- sprintf(szMsg,"Downloading %s to data flash",FieldCrop(pCmdOpts->szDataHexF,20));
- UpdateCurOpTxt(szMsg);
+ Log("Downloading %s to data flash\n",FieldCrop(pCmdOpts->szDataHexF,20));
  
  pFile=fopen(pCmdOpts->szDataHexF,"r"); 
  if(pFile)
@@ -3229,18 +2915,16 @@ bool DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
      } else
      {
       // Invalid format
-      sprintf(szMsg,
-              "Data flash file \"%s\" contains invalid line (%s)",
-              FieldCrop(pCmdOpts->szDataHexF,20),
-              szBuffer);
-      UpdateCurStatTxt(szMsg);
+      Log("Data flash file \"%s\" contains invalid line (%s)\n",
+          FieldCrop(pCmdOpts->szDataHexF,20),
+          szBuffer);
       
       RetVal = false;
      }
      if(!DoSendSimpleCmd(Cmd,pCmdOpts))
      {
       // Error in sending command
-      UpdateCurStatTxt("Data flash write FAILED");
+      Log("Data flash write FAILED\n");
       RetVal = false;
      }
     }
@@ -3251,14 +2935,14 @@ bool DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
     // then it's an unexpected error
     if(!feof(pFile))
     {
-     UpdateCurStatTxt("Error reading from data flash file");
+     Log("Error reading from data flash file\n");
      RetVal = false;
     }
    }
   }
  } else
  {
-  UpdateCurStatTxt("Unable to open data flash file");
+  Log("Unable to open data flash file\n");
   RetVal = false;
  }
  
@@ -3267,7 +2951,7 @@ bool DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
   fclose(pFile);
  
  if(RetVal)
-  UpdateCurStatTxt("Download ok.");
+  Log("Download ok.\n");
  
  return RetVal;
 }
@@ -3302,7 +2986,7 @@ char * FieldCrop(const char * pszFileName,int iFldLen)
  strncpy(szFieldString,pszFileName,sizeof(szFieldString));
  szFieldString[sizeof(szFieldString)-1] = '\0';
  
- iStrLen  = strlen(szFieldString);
+ iStrLen  = (int)strlen(szFieldString);
  
  if((iStrLen  > iFldLen) && (iFldLen > 0x0))
  {
@@ -3317,12 +3001,12 @@ char * FieldCrop(const char * pszFileName,int iFldLen)
   {
    // We need at least room for "...\" to indicate that part of
    // the filename is being omitted
-   iNumChars -= strlen(INITIAL_FILENAME_STRING);
+   iNumChars -= (int)strlen(INITIAL_FILENAME_STRING);
    
    // Now do we have enough room for the filename itself
    char  szFileName      [MAX_PATH];
-   char * pCharPtr   =     NULL;
-   char * pLastSlash =     NULL;
+   char * pCharPtr   =     0;
+   char * pLastSlash =     0;
    
    strcpy(szFileName, pszFileName);
    
@@ -3344,7 +3028,7 @@ char * FieldCrop(const char * pszFileName,int iFldLen)
    }
    else
    {
-    if (pLastSlash != NULL)
+    if (pLastSlash != 0)
     {
      strcpy(szFieldString,INITIAL_FILENAME_STRING);
      strcat(szFieldString,pLastSlash+1);

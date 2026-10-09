@@ -123,11 +123,11 @@ typedef struct
  unsigned long  T3FD9600;             // baudrate cfg 9600
  unsigned long  fcore;                // default
  unsigned long  ClkAdjust;            // For checking of max. kernel bauds
- bool           QuickDownloadOption; // Allow Quick Download Protocol
- bool           FastBROption;  // Allow change to Fast Baudrate
- bool           SecurityBitsOption;  // Allow Download to Security Bits
- bool           BootloadOption;      // Allow Bootload Mode
- bool           VerifyAfterDownloadOption;  // Allow Verify Code Command
+ b32           QuickDownloadOption; // Allow Quick Download Protocol
+ b32           FastBROption;  // Allow change to Fast Baudrate
+ b32           SecurityBitsOption;  // Allow Download to Security Bits
+ b32           BootloadOption;      // Allow Bootload Mode
+ b32           VerifyAfterDownloadOption;  // Allow Verify Code Command
 } TyCfgFileOpt;  // Configuration File Options
 
 typedef struct
@@ -136,24 +136,24 @@ typedef struct
  char           szCodeHexF[MAX_PATH];   // hex file for code flash
  char           szDataHexF[MAX_PATH];   // hex file for data flash
  unsigned int   iComPort;               // COM Port required
- bool           bEraseData;             // Erase the data flash ?
- bool           bRun;                   // Run the program after downloading
+ b32           bEraseData;             // Erase the data flash ?
+ b32           bRun;                   // Run the program after downloading
  unsigned long  ulRunAdr;               // Run Address
- bool           bVerify;                // Verify after download
+ b32           bVerify;                // Verify after download
  unsigned long  fcore;                  // Crystal frequency in Hz
- bool           bBootLoad;              // Bootload Option, runs from 0xE000
+ b32           bBootLoad;              // Bootload Option, runs from 0xE000
  unsigned long  DownloadMode;           // Download mode
- bool           SecurityLockMode;       // Security Mode
- bool           SecuritySerialSafeMode; // Security Mode
- bool           SecuritySecureMode;     // Security Mode
+ b32           SecurityLockMode;       // Security Mode
+ b32           SecuritySerialSafeMode; // Security Mode
+ b32           SecuritySecureMode;     // Security Mode
  unsigned long  ulTimeOpen;             // Time Program Remains Open for
  int            iXMITBytes;             // Number of bytes to send at a time
- bool           bPromptForFiles;        // Do I need to prompt for the files to download?
- bool           bVerifyCSUM;            // Do I need to verify the hex file checksum
+ b32           bPromptForFiles;        // Do I need to prompt for the files to download?
+ b32           bVerifyCSUM;            // Do I need to verify the hex file checksum
  unsigned long  ulHexCSUM;              // Expected Hex file checksum
  unsigned long  ulActualCodeFCSum;      // Actual hex file checksum
  unsigned long  fcoreLimit;             // Threshold above which kernel will detect fast clock
- bool           bConfirmSerialSafe;     // Do I need to confirm serial safe mode
+ b32           bConfirmSerialSafe;     // Do I need to confirm serial safe mode
 } TyCmdLineOpts;  // Options specified on the invocation line
 
 typedef struct
@@ -176,18 +176,13 @@ TyBaudRates getCorrectBauds
  TyCfgFileOpt  *   pCfgOpts
  );
 
-void PrepareConsole
-(
- void
- );
-
 int DoActions
 (
  TyCmdLineOpts *CmdOpts,
  TyCfgFileOpt  *CfgOpts,
  TyBaudRates   *Bauds
  );
-bool  reset
+b32  reset
 (
  int  *            major, 
  int  *            minor,
@@ -200,7 +195,7 @@ bool  reset
  int               iNumAttempts,
  TyBaudRates       *Bauds
  );
-bool  run
+b32  run
 (
  TyCmdLineOpts  *  pCmdOpts,
  TyBaudRates    *  pBauds

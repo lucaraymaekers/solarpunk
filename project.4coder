@@ -14,7 +14,8 @@ patterns =
  "*.mdesk",
  "*.4coder",
  "*.glsl",
- "*.txt"
+ "*.txt",
+ "*.asm",
 };
 
 blacklist_patterns = 
@@ -36,8 +37,9 @@ paths =
  { .path = "code/cling/",  .recursive = true, .relative = true, },
  //{ .path = "code/muze/",        .recursive = true,  .relative = true, },
  //{ .path = "code/editor/",      .recursive = true,  .relative = true, },
- //{ .path = "code/school/",      .recursive = true,  .relative = true, },
- { .path = "code/compenhance/", .recursive = true,  .relative = true, },
+ { .path = "code/school/",      .recursive = true,  .relative = true, },
+ //{ .path = "code/compenhance/", .recursive = true,  .relative = true, },
+ { .path = "code/wsdcom/",      .recursive = true,  .relative = true, },
 };
 
 load_paths =
@@ -52,8 +54,17 @@ commands =
  .build = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh norebuild -Meta -HaversineProcessor",
-  .win = ".\\code\\build.bat -Meta -HaversineProcessor",
+  .linux = "./code/build.sh norebuild -Meta -WSD -compile",
+  .win = ".\\code\\build.bat -Meta -WSD -compile",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_m51 = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh norebuild -Meta -M51",
+  .win = ".\\code\\build.bat -Meta -M51",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
