@@ -108,7 +108,8 @@ static u64 ReadOSTimer(void)
    because compilers will inline it anyway. But compilers will warn about 
    static functions that aren't used. So "inline" is just the simplest way 
    to tell them to stop complaining about that. */
-inline u64 ReadCPUTimer(void)
+// NOTE(luca): Removed the inline
+u64 ReadCPUTimer(void)
 {
 	// NOTE(casey): If you were on ARM, you would need to replace __rdtsc
 	// with one of their performance counter read instructions, depending

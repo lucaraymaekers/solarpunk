@@ -43,7 +43,7 @@ I == 0; \
 Prof_BlockEnd(Block), I = (prof_block *)1)
 #define Prof_TimeScope_(Label, Counter) \
 Prof_TimeScope__(Glue(Block, Counter), Glue(BlockI, Counter), Label)
-#define Prof_TimeScope(Label) Prof_TimeScope_(Label, __COUNTER)
+#define Prof_TimeScope(Label) Prof_TimeScope_(Label, __COUNTER__)
 #define Prof_TimeScopeFunc() Prof_TimeScope(__FUNCTION__)
 
 //~ Functions

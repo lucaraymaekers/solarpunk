@@ -202,8 +202,8 @@ Cng_CommonBuildCommand(cng_build_options *Options)
  
  str8 Compiler = {0};
  if(0) {}
- else if(Clang) Compiler = S8("clang");
- else if(GCC) Compiler = S8("gcc");
+ else if(Options->Clang) Compiler = S8("clang");
+ else if(Options->GCC) Compiler = S8("gcc");
  
  str8 ModeFlags = (Debug ? 
                    S8("-g -ggdb -g3 -fno-omit-frame-pointer") :
@@ -212,23 +212,13 @@ Cng_CommonBuildCommand(cng_build_options *Options)
  
  str8 Mode = {0};
  
- if(0) {}
- else if(Release)
- {
-  Mode = S8("release");
- }
- else if(Debug)
- {
-  Mode = S8("debug");
- }
- 
- if(Asan)
+ if(Options->Asan)
  {
   Cng_S8ArrayAppend(S8("-fsanitize=undefined,address"));
  }
  
  if(0) {}
- else if(Clang)
+ else if(Options->Clang)
  {
   Compiler = S8("clang");
   Cng_S8ArrayAppend(Compiler);
@@ -236,16 +226,16 @@ Cng_CommonBuildCommand(cng_build_options *Options)
   {
    Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
   }
-  else if(Release)
+  else
   {
    Cng_S8ArrayAppend(S8("-O3"));
   }
   Cng_S8ArrayAppend(CommonCompilerFlags);
   Cng_S8ArrayAppend(S8("-fdiagnostics-absolute-paths -ftime-trace"));
   Cng_S8ArrayAppend(CommonWarningFlags);
-  Cng_S8ArrayAppend(S8("-Wno-null-dereference -Wno-missing-braces -Wno-vla-cxx-extension -Wno-writable-strings -Wno-missing-designated-field-initializers -Wno-address-of-temporary -Wno-int-to-void-pointer-cast"));
+  Cng_S8ArrayAppend(S8("-Wno-null-dereference -Wno-missing-braces -Wno-vla-cxx-extension -Wno-writable-strings -Wno-missing-designated-field-initializers -Wno-address-of-temporary -Wno-int-to-void-pointer-cast -Wno-incompatible-pointer-types-discards-qualifiers"));
  }
- else if(GCC)
+ else if(Options->GCC)
  {
   Compiler = S8("g++");
   Cng_S8ArrayAppend(Compiler);
@@ -256,7 +246,7 @@ Cng_CommonBuildCommand(cng_build_options *Options)
   {
    Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
   }
-  else if(Release)
+  else
   {
    Cng_S8ArrayAppend(S8("-O3"));
   }
@@ -794,7 +784,8 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   Log("[self build]\n");
   
   Cng_SetSelectedArray(Cng_PushS8Array(256));
-  Cng_CommonBuildCommand(false, true, true, false);
+  
+  Cng_CommonBuildCommand(&((cng_build_options){.Clang = true}));
   
   str8 ClingSourcePath = Cng_PathFromExe(CommandName, S8(CLING_SOURCE_PATH));
   str8 ClingCodePath = Cng_PathFromExe(CommandName, S8(CLING_CODE_PATH));
