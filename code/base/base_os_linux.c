@@ -40,7 +40,7 @@ LinuxTimeSpecToNS(struct timespec Counter)
 }
 
 //~ Syscalls
-#define AssertErrno(Expression) do { if(!(Expression)) { TrapMsg(ERRNO_FMT, ERRNO_ARG); }; } while(0)
+#define AssertErrno(Expression) do { if(!(Expression)) { TrapMsg(ERRNO_FMT "\n", ERRNO_ARG); }; } while(0)
 
 internal b32
 OS_FileExists(char *FileName)

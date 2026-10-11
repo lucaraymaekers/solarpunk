@@ -344,6 +344,39 @@ SimpleBuildAndRun(cng_build_options *BuildOptions, str8 BuildName, str8 Source)
  
  Cng_Scratch();
  Cng_CommonBuildCommand(BuildOptions);
+ 
+ if(Cng_IsOs(CngOS_Linux))
+ {
+  // Exename is source file name without the '.'
+  str8 ExeName = {0};
+  {
+   u64 OnePastLastSlash = 0;
+   for EachIndex(Idx, Source.Size)
+   {
+    if(Source.Data[Idx] == '/')
+    {
+     OnePastLastSlash = Idx + 1;
+    }
+   }
+   
+   u64 LastDot = 0;
+   for EachIndex(Idx, Source.Size)
+   {
+    if(Source.Data[Idx] == '.')
+    {
+     LastDot = Idx;
+    }
+   }
+   
+   str8 BaseName = S8From(Source, OnePastLastSlash);
+   Log("%S\n", BaseName); 
+   
+   ExeName = S8FromTo(Source, OnePastLastSlash, LastDot);
+  }
+  
+  Cng_S8ArrayAppendMultiple(S8("-o"), ExeName);
+ }
+ 
  Cng_S8ArrayAppend(Source);
  
  if(Cng_IsOs(CngOS_Windows))
@@ -808,6 +841,13 @@ ENTRY_POINT(EntryPoint)
    Cng_RunCommand(S8("sdas8051 -plosgff main.rel ../code/school/aduc832v4/main.asm"));
    Cng_RunCommand(S8("sdld -n -i main.ihx main.rel"));
    Cng_RunCommand(S8("wsdcom /C:4 /R:0000 main.ihx"));
+  }
+  
+  //~ Linux Serial Downloader
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("LSD"), S8("Target")))
+  {
+   DidWork = true;
+   SimpleBuildAndRun(&BuildOptions, S8("LSD"), S8("../code/lsd/lsd.c"));
   }
   
   //~ School

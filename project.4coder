@@ -54,7 +54,7 @@ commands =
  .build = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh norebuild -Meta -HaversineProcessor",
+  .linux = "./code/build.sh norebuild -Meta -LSD",
   .win = ".\\code\\build.bat -Meta -WSD -compile",
   .save_dirty_files = true,
   .footer_panel = false,
