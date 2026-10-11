@@ -11,12 +11,12 @@ POSSIBILITY OF SUCH DAMAGE.
 // NOTE(luca): I have modified this code to fit my needs.
 // - Ported to c
 // - Added pragma for libraries
+// - Change terminal output in favor of line prints
 
 // TODO(luca):
 // x Build with cling
 // x Find configuration folder as path next to exe
-// - Change terminal output in favor of line prints
-// - Remove standard libraries and replace it with base layer
+// - Remove standard libraries and replace it with base layer ?
 
 #pragma comment(lib, "User32.lib")
 

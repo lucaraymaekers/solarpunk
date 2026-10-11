@@ -39,11 +39,6 @@ struct command
  b32 Written;
 };
 
-//~ Functions
-
-
-
-
 //~ Entry point
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
@@ -118,20 +113,24 @@ ENTRY_POINT(EntryPoint)
      {
       //{Command_Interrogate},
       {Command_EraseAll},
-      {Command_Program, 
+      {
+       .Kind = Command_Program, 
        .BufferCount = 0x09,
-       .Buffer = {0x02, 0x00, 0x03, 0x75, 0xA0, 0x00, 0x02, 0x00, 0x03, }
+#if 1
+       //                                  P2    Val
+       .Buffer = { 0x02, 0x00, 0x03, 0x75, 0xA0, 0xAA, 0x02, 0x00, 0x03, }
+#else
+       //                                  P0    P2
+       .Buffer = { 0x02, 0x00, 0x03, 0x85, 0x80, 0xA0, 0x02, 0x00, 0x03, },
+#endif
       },
       {Command_Run},
      };
      u64 CommandCount = ArrayCount(Commands);
      
-     b32 Reading = false;
-     
      b32 ShouldQuit = false;
      while(!ShouldQuit)
      {
-      
       command *Command = Commands + CommandIdx;
       if(CommandIdx < CommandCount)
       {
@@ -310,7 +309,6 @@ ENTRY_POINT(EntryPoint)
       }
       
       // NOTE(luca): This is a delay because I don't know if it's a good idea to have none.
-      OS_Sleep(Thousand(500));
      }
      
      
