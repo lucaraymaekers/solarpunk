@@ -931,7 +931,7 @@ ENTRY_POINT(EntryPoint)
    b32 StartAtLast = (Last && !All);
    str8_node *First = (!StartAtLast ? CmdLine->FirstFile : CmdLine->LastFile);
    
-   for EachNode(Node, str8_node, First)
+   for(str8_node *Node = First; !IsNilS8Node(Node); Node = Node->Next)
    {
     str8 Path = Str8Fmt(PathFormat, Node->V);
     

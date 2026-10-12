@@ -40,6 +40,14 @@ struct command
  
  b32 Written;
 };
+
+//~ Globals
+
+// Constants
+read_only global_variable command Cmd_EraseAll = {.Kind = Command_EraseAll, .CheckSum = 0xBE};
+read_only global_variable command Cmd_Run = {.Kind = Command_Run, .CheckSum = 0xA7};
+read_only global_variable command Cmd_Interrogate = {.Kind = Command_Interrogate};
+
 //~ Functions
 internal u8
 ParseHexDigit(str8 File, u64 *At, b32 *Success)
@@ -127,16 +135,16 @@ ENTRY_POINT(EntryPoint)
     
     struct termios Options;
     Ret = tcgetattr(TerminalHandle, &Options);
-    AssertErrno(Ret != -1);
+    PrintErrnoIf(Ret != -1);
     
     // TODO(luca): Baud Rate = 9600 Baud × Crystal Freq/11.0592 MHz
     // What if crystal speed changed?
     
     Ret = cfsetispeed(&Options, B9600);
-    AssertErrno(Ret != -1);
+    PrintErrnoIf(Ret != -1);
     
     Ret = cfsetospeed(&Options, B9600);
-    AssertErrno(Ret != -1);
+    PrintErrnoIf(Ret != -1);
     
     // NOTE(luca): Never set directly because of compatibility
     {
@@ -166,7 +174,7 @@ ENTRY_POINT(EntryPoint)
     }
     
     Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-    AssertErrno(Ret != -1);
+    PrintErrnoIf(Ret != -1);
     
     if(Ret != -1)
     {
@@ -177,8 +185,8 @@ ENTRY_POINT(EntryPoint)
 #if 0     
      command Commands[] =
      {
-      //{Command_Interrogate},
-      { .Kind = Command_EraseAll, .CheckSum = 0xBE, },
+      Cmd_Interrogate,
+      Cmd_EraseAll,
       {
        .Kind = Command_Program, 
        .BufferCount = 0x09,
@@ -190,7 +198,7 @@ ENTRY_POINT(EntryPoint)
        .Buffer = { 0x02, 0x00, 0x03, 0x85, 0x80, 0xA0, 0x02, 0x00, 0x03, },
 #endif
       },
-      { .Kind = Command_Run, .CheckSum = 0xA7, },
+      Cmd_Run,
      };
      CommandCount = ArrayCount(Commands);
 #else
@@ -199,17 +207,16 @@ ENTRY_POINT(EntryPoint)
      str8 File = OS_ReadEntireFileIntoMemory(HexFileName);
      if(File.Size)
      {
-      Commands[CommandCount] = (command){.Kind = Command_EraseAll, .CheckSum = 0xBE};
+      Commands[CommandCount] = Cmd_EraseAll;
       CommandCount += 1;
       
       b32 ParseSucceeded = true;
       
-      // Parse hex file
+      // Parse hex file and create program commands accordingly
       {
        b32 FinishedParsing = false;
-       
        u64 At = 0;
-       while(!FinishedParsing && ParseSucceeded && At < File.Size)
+       while(!FinishedParsing)
        {        
         ParseSucceeded = (File.Data[At] == ':');
         At += 1;
@@ -247,7 +254,7 @@ ENTRY_POINT(EntryPoint)
          // TODO(luca): Verify checksum?
          //Command->CheckSum = CheckSum;
          
-         // 1 byte: newline
+         // 1 or 2 byte: newline
          if(File.Data[At] == '\r')
          {
           At += 1;
@@ -262,11 +269,23 @@ ENTRY_POINT(EntryPoint)
           ParseSucceeded = false;
          }
         }
-        else
+        else if(RecordType == 0x01)
         {
          FinishedParsing = true;
         }
+        else
+        {
+         ParseSucceeded = false;
+        }
+        
+        if(!FinishedParsing &&
+           (!ParseSucceeded || At >= File.Size))
+        {
+         FinishedParsing = true;
+         ParseSucceeded = false;
+        }
        }
+       
       }
       
       if(ParseSucceeded)
@@ -388,7 +407,7 @@ ENTRY_POINT(EntryPoint)
         }
         else
         {
-         AssertErrno(0);
+         PrintErrnoIf(0);
         }
        }
       }
@@ -471,17 +490,17 @@ ENTRY_POINT(EntryPoint)
     }
     else
     {
-     AssertErrno(0);
+     PrintErrnoIf(0);
     }
    }
    else
    {
-    AssertErrno(0);
+    PrintErrnoIf(0);
    }
   }
   else
   {
-   AssertErrno(0);
+   PrintErrnoIf(0);
   }
   
  }

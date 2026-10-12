@@ -114,7 +114,7 @@ CmdLineGetEntry(cmd_line *CmdLine, str8 Flag)
 internal b32
 CmdLineHasEntry(cmd_line *CmdLine, str8 Flag)
 {
- b32 Result = IsNilCmdLineEntry(CmdLineGetEntry(CmdLine, Flag));
+ b32 Result = !IsNilCmdLineEntry(CmdLineGetEntry(CmdLine, Flag));
  return Result;
 }
 

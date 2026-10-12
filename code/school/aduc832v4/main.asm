@@ -1,12 +1,9 @@
-; p2 .equ 0xA0
-
-;        .module main
-;        .area CSEG (CODE)
-
-;        ljmp start            ; Reset entry at address 0000h
-
 org 0000h
 
-start:
-        mov  0xA0, #0xAA      	; Turn LEDs on
-        ljmp start             ; Repeat forever
+p0 data 080H
+p2 data 0A0H
+
+loop:
+    ; mov 0xA0, 0x80
+				mov p2, p0
+				ljmp loop
