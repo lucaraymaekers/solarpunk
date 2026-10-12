@@ -213,13 +213,19 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 #define MemoryCopyStruct(Dest, Source) MemoryCopy((Dest), (Source), sizeof(*(Dest)))
 
 //~ List macros
+#define CheckNil(Datum, Nil) (Datum == 0 || Datum == Nil)
+
 #define DLLAppend(Node, First, Last) \
 ((!First ? First = Node : 0), \
 (Last ? Last->Next = Node : 0), \
 Node->Prev = Last, \
 Last = Node)
 
-#define CheckNil(Datum, Nil) (Datum == 0 || Datum == Nil)
+#define DLLAppendNil(Node, First, Last, Nil) \
+((CheckNil(First, Nil) ? First = Node : 0), \
+(!CheckNil(Last, Nil) ? Last->Next = Node : 0), \
+Node->Prev = Last, \
+Last = Node)
 
 //~ Attributes
 #define internal static

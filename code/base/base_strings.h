@@ -6,6 +6,8 @@
 #include "base/base_arenas.h"
 #include <stdarg.h>
 
+//~ Types
+
 typedef struct str8 str8;
 struct str8
 {
@@ -17,10 +19,18 @@ raddbg_type_view(str8, no_addr(array(Data, Size)));
 typedef struct str8_node str8_node;
 struct str8_node
 {
- str8 V;
  str8_node *Next;
  str8_node *Prev;
+ str8 V;
 };
+
+//~ Globals
+read_only str8_node _NilS8Node = {&_NilS8Node, &_NilS8Node};
+read_only str8_node *NilS8Node = &_NilS8Node;
+
+#define IsNilS8Node(Node) CheckNil(Node, NilS8Node)
+
+//~ Functions
 
 internal b32 IsPrintable(u8 Char);
 internal b32 IsRuneDigit(rune Char);
@@ -52,6 +62,9 @@ internal u64  U64HashFromStr8(str8 String);
 #define S8FromTo(String, Start, End) S8Cast{.Data = (u8 *)(String).Data + (Start), .Size = ((End) - (Start))}
 #define S8FromCString(String)        S8Cast{.Data = (u8 *)(String), .Size = StringLength((char *)(String))}
 #define S8FromArray(Array)           S8Cast{.Data = (u8 *)(Array), .Size = sizeof((Array))}
+
+// NOTE(luca): C string from str8
+#define CSS8(String)  (char *)String.Data
 
 #define PushS8_(Arena, Count) S8Cast{.Data = (PushArray((Arena), u8, (Count))), .Size = (Count)} 
 #define PushS8(Arena, Size) PushS8_(Arena, Size)

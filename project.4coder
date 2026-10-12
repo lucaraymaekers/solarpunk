@@ -39,7 +39,8 @@ paths =
  //{ .path = "code/editor/",      .recursive = true,  .relative = true, },
  { .path = "code/school/",      .recursive = true,  .relative = true, },
  //{ .path = "code/compenhance/", .recursive = true,  .relative = true, },
- { .path = "code/wsdcom/",      .recursive = true,  .relative = true, },
+ //{ .path = "code/wsdcom/",      .recursive = true,  .relative = true, },
+ { .path = "code/lsd/",         .recursive = true,  .relative = true, },
 };
 
 load_paths =

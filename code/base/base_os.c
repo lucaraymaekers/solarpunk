@@ -6,10 +6,13 @@ ENTRY_POINT(OS_EntryPoint)
  // NOTE(luca): Disable line buffering, (workaround for cling and 4coder)
  setvbuf(stdout, NULL, _IONBF, 0);
  
- Params->CmdLine.EntryCapacity = 256;
- Params->CmdLine.Entries = PushArray(Arena, cmd_line_entry, Params->CmdLine.EntryCapacity);
+ cmd_line *CmdLine = &Params->CmdLine;
+ CmdLine->EntryCapacity = 256;
+ CmdLine->Entries = PushArray(Arena, cmd_line_entry, CmdLine->EntryCapacity);
  
- Params->CmdLine.ExePath = S8FromCString(Params->Args[0]);
+ CmdLine->ExePath = S8FromCString(Params->Args[0]);
+ CmdLine->FirstFile = NilS8Node;
+ CmdLine->LastFile = NilS8Node;
  
  for(s32 Idx = 1; Idx < Params->ArgCount; Idx += 1)
  {
@@ -34,7 +37,7 @@ ENTRY_POINT(OS_EntryPoint)
   {
    if(NameOffset > 0)
    {
-    cmd_line_entry *Entry = GetP(Params->CmdLine.Entries, Params->CmdLine.EntryCapacity, Params->CmdLine.EntryCount);
+    cmd_line_entry *Entry = GetP(CmdLine->Entries, CmdLine->EntryCapacity, CmdLine->EntryCount);
     
     // Search if name contains equals
     u64 EqualsOffset = Name.Size;
@@ -48,22 +51,24 @@ ENTRY_POINT(OS_EntryPoint)
     }
     
     // If we found an equals truncate 
+    str8 NameAfterEquals = S8From(Name, EqualsOffset + 1);
     Name = S8To(Name, EqualsOffset);
     
     // Append entry
     if(Name.Size)
     {
-     Params->CmdLine.EntryCount += 1;
+     CmdLine->EntryCount += 1;
      Entry->Name = Name;
+     Entry->First = NilS8Node;
+     Entry->Last = NilS8Node;
     }
     
-    str8 NameAfterEquals = S8From(Name, EqualsOffset + 1);
     if(NameAfterEquals.Size)
     {
      // Append files to entry
      // TODO(luca): Handle comma separated list of files
      str8_node *Node = PushArray(Arena, str8_node, 1);
-     DLLAppend(Node, Entry->First, Entry->Last);
+     DLLAppendNil(Node, Entry->First, Entry->Last, NilS8Node);
      Node->V = NameAfterEquals;
     }
     
@@ -71,7 +76,7 @@ ENTRY_POINT(OS_EntryPoint)
    else
    {
     str8_node *Node = PushArray(Arena, str8_node, 1);
-    DLLAppend(Node, Params->CmdLine.FirstFile, Params->CmdLine.LastFile);
+    DLLAppendNil(Node, CmdLine->FirstFile, CmdLine->LastFile, NilS8Node);
     Node->V = Name;
    }
   }
@@ -109,7 +114,7 @@ CmdLineGetEntry(cmd_line *CmdLine, str8 Flag)
 internal b32
 CmdLineHasEntry(cmd_line *CmdLine, str8 Flag)
 {
- b32 Result = (CmdLineGetEntry(CmdLine, Flag) != NilCmdLineEntry);
+ b32 Result = IsNilCmdLineEntry(CmdLineGetEntry(CmdLine, Flag));
  return Result;
 }
 

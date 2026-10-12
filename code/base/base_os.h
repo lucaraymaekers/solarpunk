@@ -7,10 +7,9 @@
 typedef struct cmd_line_entry cmd_line_entry;
 struct cmd_line_entry
 {
- str8 Name;
- 
  str8_node *First;
  str8_node *Last;
+ str8 Name;
 };
 
 typedef struct cmd_line cmd_line;
@@ -95,8 +94,10 @@ global_variable b32 GlobalIsProfiling = true;
 global_variable b32 GlobalIsProfiling = false;
 #endif
 
-read_only cmd_line_entry _NilCmdLineEntry;
+read_only cmd_line_entry _NilCmdLineEntry = {&_NilS8Node, &_NilS8Node};
 read_only cmd_line_entry *NilCmdLineEntry = &_NilCmdLineEntry;
+
+#define IsNilCmdLineEntry(Entry) CheckNil(Entry, NilCmdLineEntry)
 
 //~ Functions
 #define ENTRY_POINT(Name) void *Name(entry_point_params *Params)

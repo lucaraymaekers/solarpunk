@@ -918,7 +918,7 @@ ENTRY_POINT(EntryPoint)
      if(OS_FileExists((char *)Path.Data))
      {
       str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
-      DLLAppend(Node, CmdLine->FirstFile, CmdLine->LastFile);
+      DLLAppendNil(Node, CmdLine->FirstFile, CmdLine->LastFile, NilS8Node);
       Node->V = LastIdxString; 
       
       LastIdx = Idx;
