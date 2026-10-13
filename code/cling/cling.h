@@ -240,7 +240,7 @@ Cng_CommonBuildCommand(cng_build_options *Options)
   Compiler = S8("g++");
   Cng_S8ArrayAppend(Compiler);
   
-  Cng_S8ArrayAppend(S8("-Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
+  Cng_S8ArrayAppend(S8("-Wno-type-limits -Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
   
   if(Debug)
   {

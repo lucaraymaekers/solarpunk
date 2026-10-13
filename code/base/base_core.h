@@ -143,7 +143,7 @@ Swap(t& A, t& B) { t T = A; A = B; B = T; }
 #if LANG_C
 # define ZeroStruct {0}
 #elif LANG_CPP
-# define ZeroStruct {0}
+# define ZeroStruct {}
 #endif
 
 #if OS_LINUX || OS_ANDROID
@@ -350,6 +350,7 @@ __asan_unpoison_memory_region((Address), (Size))
 _Pragma("GCC diagnostic push") \
 _Pragma("GCC diagnostic ignored \"-Wall\"") \
 _Pragma("GCC diagnostic ignored \"-Wextra\"") \
+_Pragma("GCC diagnostic ignored \"-Wshadow\"") \
 _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
 _Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"") \
 _Pragma("GCC diagnostic ignored \"-Wsign-conversion\"") \

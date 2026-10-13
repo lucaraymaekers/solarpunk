@@ -218,7 +218,9 @@ Str8Fmt(const char *Format, ...)
 # endif
 #endif
 
+NO_WARNINGS_BEGIN
 #include "lib/xxHash/xxhash.h"
+NO_WARNINGS_END
 
 internal u64
 U64HashFromSeedStr8(u64 Seed, str8 String)

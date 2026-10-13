@@ -6,6 +6,17 @@
 //   https://www.msweet.org/serial/serial.html
 // - AN-1074: Understanding the Serial Download Protocol
 //   https://www.analog.com/en/resources/app-notes/an-1074.html
+// - Data sheet for ADuC832
+//   https://www.analog.com/media/en/technical-documentation/data-sheets/ADuC832.pdf
+
+// TODO:
+// - Abort command boolean that makes it not write the command, in the case of ChangeBaud
+//   if it is not supported by the PC.
+// x ExpectedReturnBytes value, so we can have 0 for the None command, 25 bytes for interrogate,
+//   etc.
+// - PacketSize inferred from BufferCount, exception for interrogate
+// - B115200 should be checked if defined first.
+// - Validate device id 
 
 
 //~ Libraries
@@ -14,39 +25,62 @@
 #include "base/base.h"
 #include "base/base.c"
 
-//~ Types
-enum command_kind
-{
- Command_None,
- Command_Interrogate,
- Command_EraseAll,
- Command_Program,
- Command_Run,
-};
-typedef enum command_kind command_kind;
+#include "lsd/generated/lsd.meta.c"
 
+//~ Types
 typedef struct command command;
 struct command
 {
  command_kind Kind;
  
- u8 AddressH;
- u8 AddressL;
- 
  u64 BufferCount;
- u8 Buffer[256];
- 
+ u8 Buffer[KB(64)];
  u8 CheckSum;
+ s32 Baud;
  
+ u8 ExpectedBytesReturned;
  b32 Written;
 };
 
 //~ Globals
 
 // Constants
-read_only global_variable command Cmd_EraseAll = {.Kind = Command_EraseAll, .CheckSum = 0xBE};
-read_only global_variable command Cmd_Run = {.Kind = Command_Run, .CheckSum = 0xA7};
-read_only global_variable command Cmd_Interrogate = {.Kind = Command_Interrogate};
+read_only global_variable command Command_EraseAll = 
+{
+ .Kind = CommandKind_EraseAll, 
+ .CheckSum = 0xBE
+};
+
+read_only global_variable command Command_Run = 
+{
+ .Kind = CommandKind_Run,
+ .BufferCount = 3, .Buffer = {0x00, 0x00, 0x00}, 
+ .CheckSum = 0xA7
+};
+
+read_only global_variable command Command_Interrogate = 
+{
+ .Kind = CommandKind_Interrogate, 
+ .BufferCount = 4, .Buffer = { 0x21, 0x5A, 0x00, 0xA6 }, 
+};
+
+// NOTE(luca): See table 44 in datasheet for AduC832
+read_only global_variable command Command_SetFastBaud = 
+{
+ .Kind = CommandKind_ChangeBaud, 
+ //                           T3CON T3FD
+ .BufferCount = 2, .Buffer = {0x82, 0x09},
+ .Baud = 115200,
+};
+read_only global_variable command Command_SetSlowBaud = 
+{
+ .Kind = CommandKind_ChangeBaud, 
+ // NOTE(luca): Assumes normal clock speed
+ //                           T3CON T3FD
+ .BufferCount = 2, .Buffer = {0x85, 0x2D},
+ .Baud = 9600,
+};
+
 
 //~ Functions
 internal u8
@@ -93,7 +127,7 @@ ParseHexDigitPair(str8 File, u64 *At, b32 *Succeeded)
  
  u8 H = ParseHexDigit(File, At, Succeeded);
  u8 L = ParseHexDigit(File, At, Succeeded);
- Result = H*0x10 + L;
+ Result = (u8)(H*0x10) + L;
  
  return Result;
 }
@@ -142,7 +176,6 @@ ENTRY_POINT(EntryPoint)
     
     Ret = cfsetispeed(&Options, B9600);
     PrintErrnoIf(Ret == -1);
-    
     Ret = cfsetospeed(&Options, B9600);
     PrintErrnoIf(Ret == -1);
     
@@ -163,8 +196,8 @@ ENTRY_POINT(EntryPoint)
      // Raw input -> Disable canonical, echoing and signals
      Options.c_lflag &= (tcflag_t)~(ICANON | ECHO | ECHOE | ISIG);
      
-     // Enable parity checks and strip of parity bit afterwads
-     Options.c_iflag |= (INPCK | ISTRIP);
+     // Disable parity checks and strip of it
+     Options.c_iflag &= (tcflag_t)~(INPCK | ISTRIP);
      
      // Disable software flow control
      Options.c_iflag &= (tcflag_t)~(IXON | IXOFF | IXANY);
@@ -182,128 +215,148 @@ ENTRY_POINT(EntryPoint)
      u64 CommandIdx = 0;
      u64 CommandCount = 0;
      
-#if 0     
-     command Commands[] =
-     {
-      Cmd_Interrogate,
-      Cmd_EraseAll,
-      {
-       .Kind = Command_Program, 
-       .BufferCount = 0x09,
-#if 1
-       //                                  P2    Val
-       .Buffer = { 0x02, 0x00, 0x03, 0x75, 0xA0, 0xAA, 0x02, 0x00, 0x03, }
-#else
-       //                                  P0    P2
-       .Buffer = { 0x02, 0x00, 0x03, 0x85, 0x80, 0xA0, 0x02, 0x00, 0x03, },
-#endif
-      },
-      Cmd_Run,
-     };
-     CommandCount = ArrayCount(Commands);
-#else
-     command Commands[KB(4)] = {0};
+     command Commands_[KB(4)] = {0};
+     command *Commands = Commands_;
      
-     str8 File = OS_ReadEntireFileIntoMemory(HexFileName);
-     if(File.Size)
+     Commands[CommandCount] = Command_Interrogate;
+     CommandCount += 1;
+     
+     str8 File = {0};
+     if(HexFileName)
      {
-      Commands[CommandCount] = Cmd_EraseAll;
-      CommandCount += 1;
-      
-      b32 ParseSucceeded = true;
-      
-      // Parse hex file and create program commands accordingly
+      File = OS_ReadEntireFileIntoMemory(HexFileName);
+      if(File.Size)
       {
-       b32 FinishedParsing = false;
-       u64 At = 0;
-       while(!FinishedParsing)
-       {        
-        ParseSucceeded = (File.Data[At] == ':');
-        At += 1;
-        
-        // 2 bytes: record length
-        u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
-        
-        // 4 bytes: load address
-        u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
-        u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
-        
-        // 2 bytes: record type
-        u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
-        if(RecordType == 0x00)
-        {
-         command *Command = Commands + CommandCount;
-         CommandCount += 1;
+       Commands[CommandCount] = Command_EraseAll;
+       CommandCount += 1;
+       
+       Commands[CommandCount] = Command_SetFastBaud;
+       CommandCount += 1;
+       
+       b32 ParseSucceeded = true;
+       
+       // Parse hex file and create program commands accordingly
+       {
+        b32 FinishedParsing = false;
+        u64 At = 0;
+        while(!FinishedParsing)
+        {        
+         ParseSucceeded = (File.Data[At] == ':');
+         At += 1;
          
-         Command->Kind = Command_Program;
+         // 2 bytes: record length
+         u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
          
-         Command->AddressH = AddressH;
-         Command->AddressL = AddressL;
+         // 4 bytes: load address
+         u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
+         u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
          
-         // x data bytes
-         for EachIndex(Idx, RecordLength)
+         // 2 bytes: record type
+         u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
+         if(RecordType == 0x00)
          {
-          u8 Byte = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          Command->Buffer[Command->BufferCount] = Byte;
-          Command->BufferCount += 1;
+          command *Command = Commands + CommandCount;
+          CommandCount += 1;
+          
+          Command->Kind = CommandKind_Program;
+          
+          Command->Buffer[0] = 0; // Not used, ADuC832 uses 16 bit adresses. 
+          Command->Buffer[1] = AddressH;
+          Command->Buffer[2] = AddressL;
+          Command->BufferCount += 3;
+          
+          // x data bytes
+          for EachIndex(Idx, RecordLength)
+          {
+           u8 Byte = ParseHexDigitPair(File, &At, &ParseSucceeded);
+           Command->Buffer[Command->BufferCount] = Byte;
+           Command->BufferCount += 1;
+          }
+          
+          // 2 bytes: checksum
+          Command->CheckSum = ParseHexDigitPair(File, &At, &ParseSucceeded);
+          
+          // 1 or 2 byte: newline
+          if(File.Data[At] == '\r')
+          {
+           At += 1;
+          }
+          
+          if(File.Data[At] == '\n')
+          {
+           At += 1;
+          }
+          else
+          {
+           ParseSucceeded = false;
+          }
          }
-         
-         // 2 bytes: checksum
-         u8 CheckSum = ParseHexDigitPair(File, &At, &ParseSucceeded);
-         
-         // TODO(luca): Verify checksum?
-         //Command->CheckSum = CheckSum;
-         
-         // 1 or 2 byte: newline
-         if(File.Data[At] == '\r')
+         else if(RecordType == 0x01)
          {
-          At += 1;
-         }
-         
-         if(File.Data[At] == '\n')
-         {
-          At += 1;
+          FinishedParsing = true;
          }
          else
          {
           ParseSucceeded = false;
          }
-        }
-        else if(RecordType == 0x01)
-        {
-         FinishedParsing = true;
-        }
-        else
-        {
-         ParseSucceeded = false;
+         
+         if(!FinishedParsing &&
+            (!ParseSucceeded || At >= File.Size))
+         {
+          FinishedParsing = true;
+          ParseSucceeded = false;
+         }
         }
         
-        if(!FinishedParsing &&
-           (!ParseSucceeded || At >= File.Size))
-        {
-         FinishedParsing = true;
-         ParseSucceeded = false;
-        }
        }
        
-      }
-      
-      if(ParseSucceeded)
-      {
-       Commands[CommandCount] = (command){.Kind = Command_Run, .CheckSum = 0xA7 };
+       Commands[CommandCount] = Command_SetSlowBaud;
        CommandCount += 1;
+       
+       if(ParseSucceeded)
+       {
+        Commands[CommandCount] = Command_Run;
+        CommandCount += 1;
+       }
+       else
+       {
+        Log("Error: Invalid hex file '%s'.\n", HexFileName);
+        CommandCount = 0;
+       }
       }
       else
       {
-       Log("Error: Invalid hex file '%s'.\n", HexFileName);
-       CommandCount = 0;
+       Log("Error: Could not read file '%s'\n", HexFileName);
       }
      }
-     else
-     {
-      Log("Error: Could not read file '%s'\n", HexFileName);
-     }
+     
+#if 0
+     Commands[CommandCount] = Command_EraseAll;
+     CommandCount += 1;
+     
+     Commands[CommandCount] = 
+     (command){
+      .Kind = CommandKind_Program, 
+      .BufferCount = 12,
+#if 1
+      //                                                    P2    Val
+      .Buffer = { 0x00, 0x00, 0x00, 0x02, 0x00, 0x03, 0x75, 0xA0, 0xAA, 0x02, 0x00, 0x03, }
+#else
+      //                                                    P0    P2
+      .Buffer = { 0x00, 0x00, 0x00, 0x02, 0x00, 0x03, 0x85, 0x80, 0xA0, 0x02, 0x00, 0x03, },
 #endif
+     };
+     CommandCount += 1;
+#endif
+     
+     u8 ReadBuffer_[KB(64)] = {0};
+     u8 *ReadBuffer = ReadBuffer_;
+     s64 ReadBufferIdx = 0;
+     
+     u8 WriteBuffer_[KB(64)] = {0};
+     u8 *WriteBuffer = WriteBuffer_;
+     
+     str8 Pad = S8("               ");
      
      b32 ShouldQuit = false;
      while(!ShouldQuit && (CommandIdx < CommandCount))
@@ -314,96 +367,96 @@ ENTRY_POINT(EntryPoint)
       {
        if(!Command->Written)
        {          
-        u64 PacketSize = 0;
-        u8 Packet_[KB(64)] = {0};
-        u8 *Packet = Packet_;
+        u8 *Packet = WriteBuffer;
         
-        b32 DoCheckSum = true;
-        u8 HardCodedCheckSum = Command->CheckSum;
+        u64 PacketSize = Command->BufferCount;
+        u8 CommandByte = 0;
         
         switch(Command->Kind)
         {
          default: NotImplemented(); break;
          
-         case Command_Interrogate:
+         case CommandKind_Interrogate:
          {
-          PacketSize = 4;
-          
-          u8 Buf[] = { 0x21, 0x5A, 0x00, 0xA6 };
-          MemoryCopy(Packet, Buf, sizeof(Buf));
-          
-          DoCheckSum = false;
+          Command->ExpectedBytesReturned = 25;
+          MemoryCopy(Packet, Command->Buffer, Command->BufferCount);
          } break;
          
-         case Command_EraseAll:
-         {
-          PacketSize = 5;
-          Packet[3] = 'A';
-          
-         } break;
-         
-         case Command_Program:
-         {
-          // 3: Adress bytes
-          // 1: Command byte
-          u64 MaxDataByteCount = 25 - 3 - 1;
-          
-          // NOTE(luca): We can only copy up to 24 data bytes at a time.
-          if(Command->BufferCount <= MaxDataByteCount)
-          {
-           // 2 id bytes
-           // 1 no of data bytes byte
-           // 1 command byte
-           // 3 adress bytes 
-           // 1 checksum byte
-           PacketSize = Command->BufferCount + 2 + 1 + 1 + 3 + 1;
-           Packet[3] = 'W';
-           
-           // NOTE(luca): ADR is always 0, because we work with 16 bits and not 24 
-           Packet[4] = 0; 
-           Packet[5] = Command->AddressH;
-           Packet[6] = Command->AddressL;
-           
-           MemoryCopy(Packet + 7, Command->Buffer, Command->BufferCount);
-          }
-          
-         } break;
-         
-         case Command_Run:
-         {
-          PacketSize = 8;
-          Packet[3] = 'U';
-         } break;
+         case CommandKind_ChangeBaud:   CommandByte = 'B'; break;
+         case CommandKind_EraseAll:     CommandByte = 'A'; break;
+         case CommandKind_Program:      CommandByte = 'W'; break;
+         case CommandKind_Run:          CommandByte = 'U'; break;
         }
         
-        if(DoCheckSum)
+        if(Command->ExpectedBytesReturned == 0)
         {
+         // Default is expecting NAK/ACK
+         Command->ExpectedBytesReturned = 1;
+        }
+        
+        b32 IsCommand = (CommandByte != 0); 
+        if(IsCommand)
+        {
+         // 2: id bytes
+         // 1: no. data bytes
+         // 1: command byte
+         // 1: checksum 
+         PacketSize += 2 + 1 + 1 + 1;
+         
          Packet[0] = 0x07;
          Packet[1] = 0x0E;
-         // NOTE(luca): 2 ID bytes + 1 No. of data Bytes byte and checksum byte
-         Packet[2] = (u8)(PacketSize - 4);
+         // 1: Command byte
+         Packet[2] = (u8)(Command->BufferCount + 1);
+         Packet[3] = CommandByte;
          
-         u8 *CheckSum = Packet + (PacketSize - 1);
-         u64 Skip = 2;
-         u8 Sum = 0;
-         for(u64 Idx = Skip; Idx < PacketSize - 1; Idx += 1)
-         {
-          Sum += Packet[Idx];
-         }
-         CheckSum[0] = 0 - Sum;
+         MemoryCopy(Packet + 4, Command->Buffer, Command->BufferCount);
          
-         if(HardCodedCheckSum != 0)
+         u8 CheckSum = 0;
          {
-          Assert(HardCodedCheckSum == CheckSum[0]);
+          for(u64 Idx = 2; Idx < PacketSize - 1; Idx += 1)
+          {
+           CheckSum += Packet[Idx];
+          }
+          CheckSum = 0 - CheckSum;
          }
+         
+         Packet[PacketSize - 1] = CheckSum;
+         
+         Assert(Command->CheckSum == 0 ||
+                Command->CheckSum == CheckSum);
         }
         
-        smm BytesWritten = write(TerminalHandle, Packet, PacketSize);
-        if(BytesWritten == (smm)PacketSize)
+        // options 
+        
+        // Considerations:
+        // - Some things you don't want to batch, because you want to receive the ACK 
+        //   before proceeding.
+        //   For now the only thing I can think of is Run To User. 
+        
+        // # I. 
+        // 1. When adding the commands compute packetsize and checksum
+        // 2. When writing if we are a CommandKind_Program
+        //    2.1. We loop until het last contiguous CommandKind_Program
+        //    2.1. We make up our packet like this
+        //
+        // + It seems we will need readidx and writeidx since writing will end up way
+        //   ahead of our reading
+        // - Lots of code changes
+        
+        // # II.
+        // We create a special batch command that we create when parsing the file
+        // we then handle this appropriately here
+        //
+        // + This loop will work the same
+        // - We will have to move the checksum logic up 
+        
+        // # III.
+        
+        s64 BytesWritten = write(TerminalHandle, Packet, PacketSize);
+        if(BytesWritten == (s64)PacketSize)
         {
          Command->Written = true;
-         // TODO(luca): Show command name 
-         Log("%lld bytes written.\n", BytesWritten);
+         Log("Command(%3lldb): %S\n", BytesWritten, CommandDescriptions[Command->Kind]);
         }
         else
         {
@@ -416,49 +469,75 @@ ENTRY_POINT(EntryPoint)
       {
        if(Command->Written)
        {        
-        u8 Buffer[KB(4)] = {0};
-        
-        smm BytesRead = read(TerminalHandle, Buffer, sizeof(Buffer));
-        if(BytesRead > 0)
+        s64 BytesRead = read(TerminalHandle, ReadBuffer + ReadBufferIdx, sizeof(ReadBuffer_));
+        if(BytesRead != -1)
         {
-         Log("%lld bytes read.\n", BytesRead);
-         
-         // NOTE(luca): Assume the command was read so we can bump the idx.
+         ReadBufferIdx += BytesRead;
+        }
+        else 
+        {
+         AssertErrno(errno == EAGAIN);
+        }
+        
+        if(ReadBufferIdx == Command->ExpectedBytesReturned)
+        {
+         // NOTE(luca): The command response was sucessfully read so we can bump the idx.
          CommandIdx += 1;
+         ReadBufferIdx = 0;
          
          switch(Command->Kind)
          {
           default: NotImplemented(); break;
           
-          case Command_Interrogate:
+          case CommandKind_Interrogate:
           {
-           if(BytesRead == 25)
            {
-            Log("Loader connected.\n");
-           }
-           else
-           {
-            Log("Error: Not 25 bytes read.\n");
-            ShouldQuit = true;
+            // TODO(luca): Implement verification that this board is the ADuC832 because 
+            // other boards are not compatible (yet).
+            Log("%SLoader connected.\n", Pad);
            }
            
           } break;
           
-          case Command_EraseAll:
-          case Command_Program:
-          case Command_Run:
+          case CommandKind_ChangeBaud:
+          case CommandKind_EraseAll:
+          case CommandKind_Program:
+          case CommandKind_Run:
           {
            if(BytesRead == 1)
            {
-            if(Buffer[0] == 7)
+            if(ReadBuffer[0] == 7)
             {
-             Log("Error: NAK.\n");
+             Log("%SFailed: NAK.\n", Pad);
              DebugBreak();
              ShouldQuit = true;
             }
-            if(Buffer[0] == 6)
+            if(ReadBuffer[0] == 6)
             {
-             Log("Success: ACK.\n");
+             Log("%SSuccess: ACK.\n", Pad);
+             
+             if(Command->Kind == CommandKind_ChangeBaud)
+             {
+              Log("%SSet baud rate to %d.\n", Pad, Command->Baud);
+              
+              speed_t Speed = {0};
+              if(0) {}
+              else if(Command->Baud == 9600)   Speed = B9600;
+              else if(Command->Baud == 115200) Speed = B115200;
+              else InvalidPath();
+              
+              Ret = cfsetispeed(&Options, Speed);
+              PrintErrnoIf(Ret == -1);
+              Ret = cfsetospeed(&Options, Speed);
+              PrintErrnoIf(Ret == -1);
+              Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
+              PrintErrnoIf(Ret == -1);
+#if 0
+              Ret = tcflush(TerminalHandle, TCIOFLUSH);
+              PrintErrnoIf(Ret == -1);
+#endif
+             }
+             
             }
            }
            else
@@ -469,16 +548,10 @@ ENTRY_POINT(EntryPoint)
            
           } break;
          }
-         
-         
-        }
-        else if(BytesRead == 0)
-        {
-         // NOTE(luca): Nothing to read
         }
         else
         {
-         //Log(ERRNO_FMT "\n", ERRNO_ARG);
+         // NOTE(luca): Wait on more bytes
         }
         
        }

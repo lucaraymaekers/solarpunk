@@ -1,0 +1,26 @@
+@table(Name, Description)
+LSD_Commands:
+{
+ { None         "Nothing"                                          }
+ { Interrogate  "Connect to loader"                                }
+ { EraseAll     "Erase Flash/EE program and data memory"           }
+ { Program      "Progam block of Flash/EE program memory"          }
+ { ChangeBaud   "Change Baud Rate"                                 }
+ { Run          "Jump to User Code"                                }
+ { BatchProgram "Batch - Program block of Flash/EE program memory" }
+}
+
+@data_enum("command_kind")
+{
+ @expand(LSD_Commands)
+  ```CommandKind_$(Name),
+ ```;
+ `CommandKind_Count`;
+}
+
+@data_table("str8")
+CommandDescriptions:
+{
+ @expand(LSD_Commands) @strings
+  `{$(Description)},`;
+};
