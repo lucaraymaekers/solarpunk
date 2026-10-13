@@ -37,10 +37,10 @@ paths =
  { .path = "code/cling/",  .recursive = true, .relative = true, },
  //{ .path = "code/muze/",        .recursive = true,  .relative = true, },
  //{ .path = "code/editor/",      .recursive = true,  .relative = true, },
- { .path = "code/school/",      .recursive = true,  .relative = true, },
- //{ .path = "code/compenhance/", .recursive = true,  .relative = true, },
+ //{ .path = "code/school/",      .recursive = true,  .relative = true, },
+ { .path = "code/compenhance/", .recursive = true,  .relative = true, },
  //{ .path = "code/wsdcom/",      .recursive = true,  .relative = true, },
- { .path = "code/lsd/",         .recursive = true,  .relative = true, },
+ //{ .path = "code/lsd/",         .recursive = true,  .relative = true, },
 };
 
 load_paths =
@@ -55,8 +55,8 @@ commands =
  .build = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh norebuild -Meta -LSD",
-  .win = ".\\code\\build.bat -Meta -WSD -compile",
+  .linux = "./code/build.sh norebuild -Meta -HaversineProcessor",
+  .win = ".\\code\\build.bat -Meta -HaversineProcessor",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,

@@ -10,6 +10,10 @@
 //   https://www.analog.com/media/en/technical-documentation/data-sheets/ADuC832.pdf
 
 // TODO:
+// - Reach optimal transfer speed
+//   1. Raw throughput test: Write all the time for x amount of time
+//   2. Profile code
+//   3. Solve?
 // - Abort command boolean that makes it not write the command, in the case of ChangeBaud
 //   if it is not supported by the PC.
 // x ExpectedReturnBytes value, so we can have 0 for the None command, 25 bytes for interrogate,
@@ -27,6 +31,8 @@
 
 #include "lsd/generated/lsd.meta.c"
 
+//#include "compenhance/haversine_processor/profiler.c"
+
 //~ Types
 typedef struct command command;
 struct command
@@ -34,7 +40,7 @@ struct command
  command_kind Kind;
  
  u64 BufferCount;
- u8 Buffer[KB(64)];
+ u8 Buffer[512];
  u8 CheckSum;
  s32 Baud;
  
@@ -358,6 +364,7 @@ ENTRY_POINT(EntryPoint)
      
      str8 Pad = S8("               ");
      
+     s64 TotalBytesSent = 0;
      b32 ShouldQuit = false;
      while(!ShouldQuit && (CommandIdx < CommandCount))
      {
@@ -422,8 +429,7 @@ ENTRY_POINT(EntryPoint)
          
          Packet[PacketSize - 1] = CheckSum;
          
-         Assert(Command->CheckSum == 0 ||
-                Command->CheckSum == CheckSum);
+         //Assert(Command->CheckSum == 0 || Command->CheckSum == CheckSum);
         }
         
         // options 
@@ -457,6 +463,7 @@ ENTRY_POINT(EntryPoint)
         {
          Command->Written = true;
          Log("Command(%3lldb): %S\n", BytesWritten, CommandDescriptions[Command->Kind]);
+         TotalBytesSent += BytesWritten;
         }
         else
         {
@@ -559,6 +566,7 @@ ENTRY_POINT(EntryPoint)
       
      }
      
+     Log("Total bytes sent: %lld.\n", TotalBytesSent);
      
     }
     else
