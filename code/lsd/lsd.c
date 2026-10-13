@@ -135,16 +135,16 @@ ENTRY_POINT(EntryPoint)
     
     struct termios Options;
     Ret = tcgetattr(TerminalHandle, &Options);
-    PrintErrnoIf(Ret != -1);
+    PrintErrnoIf(Ret == -1);
     
     // TODO(luca): Baud Rate = 9600 Baud × Crystal Freq/11.0592 MHz
     // What if crystal speed changed?
     
     Ret = cfsetispeed(&Options, B9600);
-    PrintErrnoIf(Ret != -1);
+    PrintErrnoIf(Ret == -1);
     
     Ret = cfsetospeed(&Options, B9600);
-    PrintErrnoIf(Ret != -1);
+    PrintErrnoIf(Ret == -1);
     
     // NOTE(luca): Never set directly because of compatibility
     {
@@ -174,7 +174,7 @@ ENTRY_POINT(EntryPoint)
     }
     
     Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-    PrintErrnoIf(Ret != -1);
+    PrintErrnoIf(Ret == -1);
     
     if(Ret != -1)
     {
@@ -407,7 +407,7 @@ ENTRY_POINT(EntryPoint)
         }
         else
         {
-         PrintErrnoIf(0);
+         PrintErrnoIf(true);
         }
        }
       }
@@ -490,17 +490,17 @@ ENTRY_POINT(EntryPoint)
     }
     else
     {
-     PrintErrnoIf(0);
+     PrintErrnoIf(true);
     }
    }
    else
    {
-    PrintErrnoIf(0);
+    PrintErrnoIf(true);
    }
   }
   else
   {
-   PrintErrnoIf(0);
+   PrintErrnoIf(true);
   }
   
  }

@@ -42,7 +42,7 @@ LinuxTimeSpecToNS(struct timespec Counter)
 //~ Syscalls
 #define AssertErrno(Expression) do { if(!(Expression)) { TrapMsg(ERRNO_FMT "\n", ERRNO_ARG); }; } while(0)
 
-#define PrintErrnoIf(Expression) do { if(!(Expression)) { Log(ERRNO_FMT "\n", ERRNO_ARG); } } while(0)
+#define PrintErrnoIf(Expression) do { if((Expression)) { Log(ERRNO_FMT "\n", ERRNO_ARG); } } while(0)
 
 internal b32
 OS_FileExists(char *FileName)
@@ -446,12 +446,15 @@ AndroidMainEntryPoint(int ArgCount, char **Args)
 }
 
 #if !BASE_NO_ENTRYPOINT
-int main(int ArgCount, char **Args, char **Env)
+
+extern char **environ;
+
+int main(int ArgCount, char **Args)
 {
 #if OS_ANDROID
  AndroidMainEntryPoint(ArgCount, Args);
 #else
- LinuxMainEntryPoint(ArgCount, Args, Env);
+ LinuxMainEntryPoint(ArgCount, Args, environ);
 #endif
  return 0;
 }

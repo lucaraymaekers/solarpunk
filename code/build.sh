@@ -8,5 +8,10 @@ cd "$ScriptDirectory"
 
 mkdir -p ../build
 
-[ -x "../build/cling" ] || cc -g -Wno-write-strings -D_GNU_SOURCE=1 -I. -o ../build/cling ./cling/cling.c
-../build/cling "$@"
+if [ ! -x "../build/cling" ]
+then
+	printf '%s\n' cling.c
+	cc -g -Wno-write-strings -D_GNU_SOURCE=1 -I. -o ../build/cling ./cling/cling.c
+fi
+
+CLING_NOREBUILD=1 ../build/cling "$@"

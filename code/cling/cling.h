@@ -677,9 +677,9 @@ LinuxRunCommand(char *Args[])
  {
   if(ChildPID == 0)
   {
-   if(execve(Args[0], Args, __environ) == -1)
+   if(execve(Args[0], Args, environ) == -1)
    {
-    perror("exec");
+    PrintErrnoIf(true);
    }
   }
   else
@@ -689,7 +689,7 @@ LinuxRunCommand(char *Args[])
  }
  else
  {
-  perror("fork");
+  PrintErrnoIf(true);
  }
  
 }
@@ -753,35 +753,29 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
 {
  // Globals
  {
-#if OS_WINDOWS
-  GlobalCurrentOS = CngOS_Windows;
-#elif OS_LINUX
   GlobalCurrentOS = CngOS_Linux;
-#endif
   GlobalEnv = Env;
-  SetStringsScratch(ArenaAlloc());
-  Cng_SetArena(ArenaAlloc());
+  SetStringsScratch(GetScratch());
+  Cng_SetArena(GetScratch());
  }
+ 
+ DebugBreak();
  
  arena *Arena = GlobalClingArena;
  str8 OutputBuffer = PushS8(Arena, KB(2));
  str8 TempBuffer = PushS8(Arena, KB(2));
  
  str8 CommandName = S8FromCString(Args[0]);
- b32 Rebuild = true;
- for(int ArgsIndex = 1;
-     ArgsIndex < ArgCount;
-     ArgsIndex++)
- {
-  if(!strcmp(Args[ArgsIndex], "norebuild"))
-  {
-   Rebuild = false;
-  }
- }
+ 
+ char *Value = getenv(CLING_ARG_NOREBUILD);
+ b32 Rebuild = (Value == 0);
  
  if(Rebuild)
  {
   Log("[self build]\n");
+  
+  int Ret = setenv(CLING_ARG_NOREBUILD, "1", 0);
+  PrintErrnoIf(Ret == -1); 
   
   Cng_SetSelectedArray(Cng_PushS8Array(256));
   
@@ -801,24 +795,12 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   
   Cng_RunCommand(BuildCommand);
   
-  // Run without rebuilding
-  char *Arguments[64] = {0};
-  s32 At;
-  for(At = 1;
-      At < ArgCount;
-      At++)
-  {
-   if(strcmp(Args[At], "rebuild"))
-   {
-    Arguments[At] = Args[At];
-   }
-  }
-  
-  Arguments[0] = (char *)CommandName.Data;
-  Arguments[At++] = "norebuild";
-  Assert(At < (s32)ArrayCount(Arguments));
-  
-  LinuxRunCommand(Arguments);
+  // NOTE(luca): LinuxRunCommand expects Args to have {Args[0], Args[0], Arg1, Arg2} format
+  char **Arguments = PushArray(Arena, char *, (u64)(ArgCount + 2));
+  Arguments[0] = Args[0];
+  Arguments[1] = Args[0];
+  Arguments[2] = 0;
+  LinuxRunCommand(Arguments);;
   
   _exit(0);
  }
