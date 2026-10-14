@@ -11,19 +11,6 @@
 #include "profiler.c"
 #include "json.c"
 
-internal void B(void)
-{
- Prof_TimeScopeFunc();
-}
-
-internal void A(void)
-{
- Prof_TimeScopeFunc()
- {
-  B();
- }
-}
-
 //- Main
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
@@ -38,11 +25,7 @@ ENTRY_POINT(EntryPoint)
   s32 ArgCount = Params->ArgCount;
   
   // Profiler start code
-  Prof.OSStart = ReadOSTimer();
-  Prof.StartTSC = ReadCPUTimer();
-  Prof.MarkerCount = 1;
-  
-  A();
+  Prof_StartProfile();
   
   // Parse command line
   {    
@@ -182,8 +165,7 @@ ENTRY_POINT(EntryPoint)
    Log("Usage: %s <data.json> [data.f64]\n", Args[0]); 
   }
   
-  NoOp();
-  
+  Prof_EndProfileAndPrint();
  }
  
  return 0;
