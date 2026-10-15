@@ -235,3 +235,78 @@ U64HashFromStr8(str8 String)
  u64 Result = U64HashFromSeedStr8(5381, String);
  return Result;
 }
+
+//~ String arrays
+internal str8_array *
+PushS8Array(arena *Arena, u64 Capacity)
+{
+ str8_array *Result = PushArray(Arena, str8_array, 1);
+ Result->Capacity = Capacity;
+ Result->Strings = PushArray(Arena, str8, Result->Capacity);
+ return Result;
+}
+
+internal void 
+S8ArrayAppendTo(str8_array *Array, str8 String)
+{
+ if(String.Size > 0)
+ {
+  Assert(Array->Count < Array->Capacity);
+  Array->Strings[Array->Count] = String;
+  Array->Count += 1;
+ }
+}
+
+internal str8 
+S8ArrayJoinFrom(arena *Arena, str8_array *Array, u8 Char)
+{
+ str8 Result = {0};
+ 
+ if(Array)
+ {    
+  u64 TotalSize = 0;
+  for EachIndex(Idx, Array->Count)
+  {
+   TotalSize += Array->Strings[Idx].Size;
+  }
+  
+  if(Char)
+  {
+   TotalSize += (Array->Count - 1);
+  }
+  
+  str8 Buffer = PushS8(Arena, TotalSize);
+  
+  u64 BufferIndex = 0;
+  for EachIndex(At, Array->Count)
+  {
+   str8 *StringAt = Array->Strings + At;
+   
+   MemoryCopy(Buffer.Data + BufferIndex, StringAt->Data, StringAt->Size);
+   BufferIndex += StringAt->Size;
+   if(Char)
+   {
+    if(At + 1 != Array->Count)
+    {
+     Buffer.Data[BufferIndex] = Char;
+     BufferIndex += 1;
+    }
+   }
+  }
+  
+  Result.Data = Buffer.Data;
+  Result.Size = BufferIndex;
+ }
+ 
+ 
+ return Result;
+}
+
+internal void 
+S8ArrayAppendMultiple_(str8_array *Array, u64 Count, str8 *Strings)
+{
+ for EachIndex(At, Count)
+ {
+  S8ArrayAppendTo(Array, Strings[At]);
+ }
+}

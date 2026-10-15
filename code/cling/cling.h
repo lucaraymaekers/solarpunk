@@ -19,13 +19,6 @@
 #define CLING_DEFAULT_S8ARRAY_CAPACITY 256
 
 //~ Types
-struct str8_array
-{
- str8 *Strings;
- u64 Count;
- u64 Capacity;
-};
-typedef struct str8_array str8_array;
 
 enum cng_os_kind
 {
@@ -65,120 +58,19 @@ Cng_IsOs(cng_os_kind Kind)
 }
 
 //- Strings
-internal void
-Cng_SetArena(arena *Arena)
-{
- GlobalClingArena = Arena;
-}
+internal void Cng_SetArena(arena *Arena) { GlobalClingArena = Arena; }
+internal void Cng_SetSelectedArray(str8_array *Array) { GlobalSelectedArray = Array; }
 
-internal void
-Cng_SetSelectedArray(str8_array *Array)
-{
- GlobalSelectedArray = Array;
-}
-
-internal str8_array *
-Cng_PushS8Array(u64 Capacity)
-{
- str8_array *Result = PushArray(GlobalClingArena, str8_array, 1);
- Result->Capacity = Capacity;
- Result->Strings = PushArray(GlobalClingArena, str8, Result->Capacity);
- return Result;
-}
-
+#define Cng_PushS8Array(Capacity) PushS8Array(GlobalClingArena, Capacity)
+#define Cng_S8ArrayAppend(String) S8ArrayAppendTo(GlobalSelectedArray, String)
+#define Cng_S8ArrayJoin(Char) S8ArrayJoinFrom(GlobalClingArena, GlobalSelectedArray, Char)
+#define Cng_S8ArrayJoinFrom(Array, Char) S8ArrayJoinFrom(GlobalClingArena, Array, Char)
 #define Cng_Scratch() \
 Cng_SetSelectedArray(Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY))
+#define Cng_S8ArrayAppendMultiple(...) \
+S8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__) 
 
-#define Cng_S8ArrayTemp(Array) for(u64 _Count_ = Array->Count, _i_ = 0; \
-_i_ == 0; \
-_i_ = _i_ + 1, Array->Count = _Count_)
-
-internal void 
-Cng_S8ArrayAppendTo(str8_array *Array, str8 String)
-{
- if(String.Size > 0)
- {
-  Assert(Array->Count < Array->Capacity);
-  Array->Strings[Array->Count] = String;
-  Array->Count += 1;
- }
-}
-
-internal void
-Cng_S8ArrayAppend(str8 String)
-{
- Cng_S8ArrayAppendTo(GlobalSelectedArray, String);
-}
-
-#define Cng_S8ArrayAppendMultipleTo(Array, ...) \
-do \
-{ \
-str8 Strings[] = {__VA_ARGS__}; \
-_Cng_S8ArrayAppendMultiple(Array, ArrayCount(Strings), Strings); \
-} while(0);
-void _Cng_S8ArrayAppendMultiple(str8_array *Array, u64 Count, str8 *Strings)
-{
- for EachIndex(At, Count)
- {
-  Cng_S8ArrayAppendTo(Array, Strings[At]);
- }
-}
-
-#define Cng_S8ArrayAppendMultiple(...) Cng_S8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__) 
-
-internal str8 
-Cng_S8ArrayJoinFrom(str8_array *Array, u8 Char)
-{
- str8 Result = {0};
- 
- if(Array)
- {    
-  u64 TotalSize = 0;
-  for EachIndex(Idx, Array->Count)
-  {
-   TotalSize += Array->Strings[Idx].Size;
-  }
-  
-  if(Char)
-  {
-   TotalSize += (Array->Count - 1);
-  }
-  
-  str8 Buffer = PushS8(GlobalClingArena, TotalSize);
-  
-  u64 BufferIndex = 0;
-  for EachIndex(At, Array->Count)
-  {
-   str8 *StringAt = Array->Strings + At;
-   
-   MemoryCopy(Buffer.Data + BufferIndex, StringAt->Data, StringAt->Size);
-   BufferIndex += StringAt->Size;
-   if(Char)
-   {
-    if(At + 1 != Array->Count)
-    {
-     Buffer.Data[BufferIndex] = Char;
-     BufferIndex += 1;
-    }
-   }
-  }
-  
-  Result.Data = Buffer.Data;
-  Result.Size = BufferIndex;
- }
- 
- 
- return Result;
-}
-
-internal str8 
-Cng_S8ArrayJoin(u8 Char)
-{
- str8 Result = Cng_S8ArrayJoinFrom(GlobalSelectedArray, Char);
- return Result;
-}
-
-//~ Helpers
+//- Helpers
 internal void 
 Cng_CommonBuildCommand(cng_build_options *Options)
 {
@@ -759,8 +651,6 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   Cng_SetArena(GetScratch());
  }
  
- DebugBreak();
- 
  arena *Arena = GlobalClingArena;
  str8 OutputBuffer = PushS8(Arena, KB(2));
  str8 TempBuffer = PushS8(Arena, KB(2));
@@ -797,9 +687,15 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   
   // NOTE(luca): LinuxRunCommand expects Args to have {Args[0], Args[0], Arg1, Arg2} format
   char **Arguments = PushArray(Arena, char *, (u64)(ArgCount + 2));
-  Arguments[0] = Args[0];
-  Arguments[1] = Args[0];
-  Arguments[2] = 0;
+  {
+   Arguments[0] = Args[0];
+   Arguments[1] = Args[0];
+   for EachIndex(Idx, ArgCount)
+   {
+    Arguments[Idx + 2] = Args[Idx];
+   }
+   Arguments[ArgCount + 2] = 0;
+  }
   LinuxRunCommand(Arguments);;
   
   _exit(0);

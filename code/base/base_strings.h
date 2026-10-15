@@ -24,6 +24,14 @@ struct str8_node
  str8 V;
 };
 
+struct str8_array
+{
+ u64 Count;
+ u64 Capacity;
+ str8 *Strings;
+};
+typedef struct str8_array str8_array;
+
 //~ Globals
 read_only str8_node _NilS8Node = {&_NilS8Node, &_NilS8Node};
 read_only str8_node *NilS8Node = &_NilS8Node;
@@ -49,6 +57,21 @@ internal str8 Str8VFmt(const char *Format, va_list Args);
 internal str8 Str8Fmt(const char *Format, ...);
 internal u64  U64HashFromSeedStr8(u64 Seed, str8 String);
 internal u64  U64HashFromStr8(str8 String);
+
+internal str8_array *PushS8Array(arena *Arena, u64 Capacity);
+internal void S8ArrayAppendTo(str8_array *Array, str8 String);
+internal str8 S8ArrayJoinFrom(arena *Arena, str8_array *Array, u8 Char);
+
+#define S8ArrayTemp(Array) for(u64 _Count_ = Array->Count, _i_ = 0; \
+_i_ == 0; \
+_i_ = _i_ + 1, Array->Count = _Count_)
+#define S8ArrayAppendMultipleTo(Array, ...) \
+do \
+{ \
+str8 Strings[] = {__VA_ARGS__}; \
+S8ArrayAppendMultiple_(Array, ArrayCount(Strings), Strings); \
+} while(0);
+
 
 #if LANG_CPP
 # define S8Cast str8

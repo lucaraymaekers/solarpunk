@@ -142,16 +142,16 @@ BuildAndRun(str8 Source,
   if(0) {}
   else if(IsObject)
   {
-   Cng_S8ArrayAppendTo(ExtraFlags, S8("-fPIC -x c++ -c"));
+   S8ArrayAppendTo(ExtraFlags, S8("-fPIC -x c++ -c"));
    OutputName = Str8Fmt("%S.o", OutputName);
   }
   else if(IsDLL)
   {
-   Cng_S8ArrayAppendTo(ExtraFlags, S8("-fPIC --shared"));
+   S8ArrayAppendTo(ExtraFlags, S8("-fPIC --shared"));
    OutputName = Str8Fmt("%S.so", OutputName);
   }
   
-  Cng_S8ArrayAppendTo(ExtraFlags, ExtraLinkerFlags);
+  S8ArrayAppendTo(ExtraFlags, ExtraLinkerFlags);
   LinuxBuildCommand(Source, OutputName, BuildOptions, ExtraFlags, false);
   Cng_S8ArrayAppend(ExtraSource);
   RunCommand();
@@ -161,24 +161,24 @@ BuildAndRun(str8 Source,
   if(0) {}
   else if(IsObject)
   {
-   Cng_S8ArrayAppendTo(ExtraFlags, S8("-c /TP"));
-   Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fo" "%S.obj", OutputName));
+   S8ArrayAppendTo(ExtraFlags, S8("-c /TP"));
+   S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fo" "%S.obj", OutputName));
   }
   else if(IsDLL)
   {
-   Cng_S8ArrayAppendTo(ExtraFlags, S8("/LD"));
+   S8ArrayAppendTo(ExtraFlags, S8("/LD"));
    ExtraLinkerFlags = Str8Fmt("%S /DLL /OUT:%S.dll",
                               ExtraLinkerFlags, OutputName);
   }
   else
   {
-   Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fe%S.exe", OutputName));
+   S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fe%S.exe", OutputName));
   }
   
   ExtraLinkerFlags = Str8Fmt("/link -opt:ref -incremental:no %S ", ExtraLinkerFlags);
   
-  Cng_S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fm" "%S.map", OutputName));
-  Cng_S8ArrayAppendTo(ExtraFlags, ExtraSource);
+  S8ArrayAppendTo(ExtraFlags, Str8Fmt("-Fm" "%S.map", OutputName));
+  S8ArrayAppendTo(ExtraFlags, ExtraSource);
   WindowsBuild(Source, ExtraFlags, ExtraLinkerFlags, !BuildOptions->Release, BuildOptions->Asan);
  }
 }
@@ -252,11 +252,11 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
  // Compile
  {            
   str8_array *CommonFlags = Cng_PushS8Array(256);
-  Cng_S8ArrayAppendTo(CommonFlags, 
-                      Str8Fmt("-I" CLING_CODE_PATH " "
-                              "-DRL_PLATFORM_APP_NAME=%S "
-                              "-DRL_PLATFORM_WINDOW_NAME=%S",
-                              AppName, WindowName));
+  S8ArrayAppendTo(CommonFlags, 
+                  Str8Fmt("-I" CLING_CODE_PATH " "
+                          "-DRL_PLATFORM_APP_NAME=%S "
+                          "-DRL_PLATFORM_WINDOW_NAME=%S",
+                          AppName, WindowName));
   
   char *LibsFileName = (Cng_IsOs(CngOS_Windows) ? 
                         CLING_BUILD_PATH "rl_libs.obj" :
@@ -266,9 +266,9 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
   
   if(!BuildOptions->Slow && !OS_FileExists(LibsFileName))
   {
-   Cng_S8ArrayTemp(CommonFlags)
+   S8ArrayTemp(CommonFlags)
    {
-    Cng_S8ArrayAppendTo(CommonFlags, S8("-DRL_LIBS_IMPLEMENTATION=1"));
+    S8ArrayAppendTo(CommonFlags, S8("-DRL_LIBS_IMPLEMENTATION=1"));
     
     BuildAndRun(S8("../code/rl/rl_libs.h"), S8("rl_libs"), 
                 BuildOptions,
@@ -279,25 +279,25 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
   
   str8 LibsName = BuildOptions->Slow ?  S8("") : S8FromCString(LibsFileName);
   
-  Cng_S8ArrayTemp(CommonFlags)
+  S8ArrayTemp(CommonFlags)
   {
    str8 ExtraLinkerFlags = {0};
    
-   Cng_S8ArrayAppendTo(CommonFlags, (BuildOptions->Slow ? 
-                                     S8("-DRL_LIBS_IMPLEMENTATION=1") :
-                                     S8("-DRL_LIBS_IMPLEMENTATION=0")));
+   S8ArrayAppendTo(CommonFlags, (BuildOptions->Slow ? 
+                                 S8("-DRL_LIBS_IMPLEMENTATION=1") :
+                                 S8("-DRL_LIBS_IMPLEMENTATION=0")));
    
    BuildAndRun(AppSource, AppName, BuildOptions,
                CommonFlags, ExtraLinkerFlags, LibsName,
                true, false);
   }
   
-  Cng_S8ArrayTemp(CommonFlags)
+  S8ArrayTemp(CommonFlags)
   {
    str8 ExtraLinkerFlags = {0};
-   Cng_S8ArrayAppendTo(CommonFlags, (BuildOptions->Slow ? 
-                                     S8("-DRL_LIBS_IMPLEMENTATION=1") :
-                                     S8("-DRL_LIBS_IMPLEMENTATION=0")));
+   S8ArrayAppendTo(CommonFlags, (BuildOptions->Slow ? 
+                                 S8("-DRL_LIBS_IMPLEMENTATION=1") :
+                                 S8("-DRL_LIBS_IMPLEMENTATION=0")));
    
    if(0) {}
    else if(Cng_IsOs(CngOS_Linux))
@@ -320,20 +320,6 @@ ConfigMatch(MD_String8 Name, MD_String8 Match, MD_String8 Value)
 {
  b32 Result = (MD_S8Match(Name, Match, 0) && 
                MD_S8Match(Value, S8("1"), 0));
- return Result;
-}
-
-internal b32
-CmdLineHasEntryAndAddHelp(cmd_line *CmdLine, str8_array *Array, str8 Flag, str8 Help)
-{
- b32 Result = false;
- 
- str8 Pad = S8("                        ");
- if(Flag.Size < Pad.Size) Pad.Size -= Flag.Size;
- 
- Cng_S8ArrayAppendTo(Array, Str8Fmt("-%S %S: %S", Flag, Pad, Help));
- Result = CmdLineHasEntry(CmdLine, Flag);
- 
  return Result;
 }
 
@@ -407,14 +393,14 @@ ENTRY_POINT(EntryPoint)
   
   //~ Help
   str8_array *Help = Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY);
-  Cng_S8ArrayAppendTo(Help, S8("Build parameters:"));
+  S8ArrayAppendTo(Help, S8("Build parameters:"));
   
   //~ Config 
   cng_build_options BuildOptions = {0};
   {
    Cng_ConfigBools(&Params->CmdLine, Help);
    
-   Cng_S8ArrayAppendTo(Help, S8("\nTargets:"));
+   S8ArrayAppendTo(Help, S8("\nTargets:"));
    
    MD_String8 FileName = S8("../code/cling/cling.mdesk");
    MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
@@ -813,7 +799,7 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ WSDCOM
-  Cng_S8ArrayAppendTo(Help, S8(" "));
+  S8ArrayAppendTo(Help, S8(" "));
   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("WSD"), S8("(See subcommands with -WSD)")))
   {
    if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile wsdcom")))
@@ -830,7 +816,7 @@ ENTRY_POINT(EntryPoint)
    }
    
   }
-  Cng_S8ArrayAppendTo(Help, S8(" "));
+  S8ArrayAppendTo(Help, S8(" "));
   
   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("M51"), S8("Target")))
   {
@@ -851,7 +837,7 @@ ENTRY_POINT(EntryPoint)
   }
   
   //~ School
-  Cng_S8ArrayAppendTo(Help, S8(" "));
+  S8ArrayAppendTo(Help, S8(" "));
   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(See subcommands with -School)")))
   {
    Cng_Scratch();
@@ -974,7 +960,7 @@ ENTRY_POINT(EntryPoint)
     
     if(Compile)
     {
-     Cng_S8ArrayTemp(GlobalSelectedArray)
+     S8ArrayTemp(GlobalSelectedArray)
      {
       Cng_CommonBuildCommand(&BuildOptions);
       Cng_S8ArrayAppend(Path);
@@ -984,7 +970,7 @@ ENTRY_POINT(EntryPoint)
     
     if(Run)
     {
-     Cng_S8ArrayTemp(GlobalSelectedArray)
+     S8ArrayTemp(GlobalSelectedArray)
      {
       str8 BuildPath = Str8Fmt("../build/%S_%S_%S.exe", NamePrefix, Hoofdstuk, Node->V);
       
@@ -997,11 +983,38 @@ ENTRY_POINT(EntryPoint)
    }
    
   }
-  Cng_S8ArrayAppendTo(Help, S8(" "));
+  S8ArrayAppendTo(Help, S8(" "));
+  
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Zsh"), S8("Print out zsh completions")))
+  {
+   DidWork = true;
+   str8 Text = S8("_cling() \n"
+                  "{\n"
+                  "local cmd=\"${words[1]}\"\n"
+                  "local help_output line token desc\n"
+                  "local -a candidates\n"
+                  "\n"
+                  "help_output=\"$(CLING_NOREBUILD=1 \"$cmd\" -h 2>&1)\"\n"
+                  "\n"
+                  "# Extract entries formatted like:\n"
+                  "# -Asan : Enable address sanitizer\n"
+                  "while IFS= read -r line; do\n"
+                  "if [[ \"$line\" =~ '^[[:space:]]*([^[:space:]]+)[[:space:]]*:[[:space:]]*(.*)$' ]]; then\n"
+                  "token=\"${match[1]}\"\n"
+                  "desc=\"${match[2]}\"\n"
+                  "candidates+=(\"$token:$desc\")\n"
+                  "fi\n"
+                  "done <<< \"$help_output\"\n"
+                  "_describe 'cling arguments' candidates\n"
+                  "}\n"
+                  "compdef _cling cling\n");
+   Log("%S\n", Text);
+  }
   
   if(DidWork)
   {
-   Log("Done.\n");
+   // TODO(luca): Check on windows if we can remove this already.
+   fprintf(stderr, "Done.\n");
   }
   else
   {

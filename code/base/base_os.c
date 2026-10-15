@@ -19,12 +19,7 @@ ENTRY_POINT(OS_EntryPoint)
   str8 Arg = S8FromCString(Params->Args[Idx]);
   
   u64 NameOffset = 0;
-  if(0) {}
-  else if(S8Match(Arg, S8("--"), true))
-  {
-   NameOffset = 2;
-  }
-  else if(S8Match(Arg, S8("-"), true))
+  if(S8Match(Arg, S8("-"), true))
   {
    NameOffset = 1;
   }
@@ -100,8 +95,7 @@ CmdLineGetEntry(cmd_line *CmdLine, str8 Flag)
  {
   cmd_line_entry *Entry = CmdLine->Entries + Idx;
   
-  if(S8Match(Entry->Name, Flag
-             , false))
+  if(S8Match(Entry->Name, Flag, false))
   {
    Result = Entry;
    break;
@@ -115,6 +109,31 @@ internal b32
 CmdLineHasEntry(cmd_line *CmdLine, str8 Flag)
 {
  b32 Result = !IsNilCmdLineEntry(CmdLineGetEntry(CmdLine, Flag));
+ return Result;
+}
+
+internal cmd_line_entry *
+CmdLineGetEntryAndAddHelp(cmd_line *CmdLine, str8_array *Help, str8 Flag, str8 Description)
+{
+ cmd_line_entry *Result = false;
+ 
+ str8 Pad = S8("                        ");
+ if(Flag.Size < Pad.Size) Pad.Size -= Flag.Size;
+ 
+ S8ArrayAppendTo(Help, Str8Fmt("-%S %S: %S", Flag, Pad, Description));
+ Result = CmdLineGetEntry(CmdLine, Flag);
+ 
+ return Result;
+}
+
+internal b32
+CmdLineHasEntryAndAddHelp(cmd_line *CmdLine, str8_array *Help, str8 Flag, str8 Description)
+{
+ b32 Result = false;
+ 
+ cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, Help, Flag, Description);
+ Result = !IsNilCmdLineEntry(Entry);
+ 
  return Result;
 }
 
