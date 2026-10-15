@@ -26,6 +26,7 @@
 
 
 //~ Libraries
+#include <sys/ioctl.h>
 #include <termios.h>
 
 #include "base/base.h"
@@ -33,7 +34,7 @@
 
 #include "lsd/generated/lsd.meta.c"
 
-#include "compenhance/haversine_processor/listing.c"
+#define ReadCPUTimer() __rdtsc()
 #include "compenhance/haversine_processor/profiler.c"
 
 //~ Types
@@ -152,104 +153,128 @@ ENTRY_POINT(EntryPoint)
   char *DeviceFileName = "/dev/ttyUSB0";
   char *HexFileName = 0;
   b32 DefaultDevice = true;
+  b32 DidWork = false;
+  b32 Verbose = false;
   
   cmd_line *CmdLine = &Params->CmdLine;
+  
+  arena *Arena = GetScratch();
+  
+  str8_array *Help = PushS8Array(Arena, 256);
   
   {  
    Prof_StartProfile();
    
+   Verbose = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("verbose"), S8("Increase verbosity"));
+   
    {  
-    cmd_line_entry *Entry = CmdLineGetEntry(CmdLine, S8("DeviceFile"));
+    cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1"));
     if(!IsNilCmdLineEntry(Entry))
     {
      DeviceFileName = CSS8(Entry->First->V);
      DefaultDevice = false;
     }
+    
     HexFileName = CSS8(CmdLine->FirstFile->V);
    }
    
-   TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
-   
-   // NOTE(luca): Sometimes it will open up on /dev/ttyUSB1 if /dev/ttyUSB0 was in use
-   // while plugging in the board.  In those cases, we search for ttyUSB devices in /dev.
-   // NOTE(luca): Since there is a hard limit on max serial devices we could also enumerate them (https://docs.kernel.org/usb/usb-serial.html)
-   if(TerminalHandle == -1 && DefaultDevice)
+   if(HexFileName)
    {
-    os_dir *Dir = OS_WalkDirPush(S8("/dev"), 0);
-    os_dir_entry *Entry;
-    while((Entry = OS_WalkDirGetNext(Dir)))
+    DidWork = true;
+    TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
+    
+    // NOTE(luca): Sometimes it will open up on /dev/ttyUSB1 if /dev/ttyUSB0 was in use
+    // while plugging in the board.  In those cases, we search for ttyUSB devices in /dev.
+    // NOTE(luca): Since there is a hard limit on max serial devices we could also enumerate them (https://docs.kernel.org/usb/usb-serial.html)
+    if(TerminalHandle == -1 && DefaultDevice)
     {
-     if(S8Match(Entry->Name, S8("ttyUSB"), true))
+     os_dir *Dir = OS_WalkDirPush(S8("/dev"), 0);
+     os_dir_entry *Entry;
+     while((Entry = OS_WalkDirGetNext(Dir)))
      {
-      DeviceFileName = CSS8(Str8Fmt("/dev/%S", Entry->Name));
-      
-      break;
+      if(S8Match(Entry->Name, S8("ttyUSB"), true))
+      {
+       DeviceFileName = CSS8(Str8Fmt("/dev/%S", Entry->Name));
+       
+       break;
+      }
      }
+     
+     TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
     }
     
-    TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
-   }
-   
-   // TODO(luca): We have to check that this file is not owned/opened/being read from by
-   // another process.  So we can notify the user.
-   
-   if(TerminalHandle != -1)
-   {
-    int Ret = fcntl(TerminalHandle, F_SETFL, 0);
-    if(Ret != -1)
+    if(TerminalHandle != -1)
     {
-     Ret = fcntl(TerminalHandle, F_SETFL, FNDELAY);
-     
-     // From the docs loader should be in 9600 baud, 8 data bits, and no parity.
-     
+     int Ret;
      struct termios Options;
-     Ret = tcgetattr(TerminalHandle, &Options);
-     PrintErrnoIf(Ret == -1);
-     
-     // TODO(luca): Baud Rate = 9600 Baud × Crystal Freq/11.0592 MHz
-     // What if crystal speed changed?
-     
-     Ret = cfsetispeed(&Options, B9600);
-     PrintErrnoIf(Ret == -1);
-     Ret = cfsetospeed(&Options, B9600);
-     PrintErrnoIf(Ret == -1);
-     
-     // NOTE(luca): Never set directly because of compatibility
      {
-      // NOCTTY equivalent
-      Options.c_cflag |= (CLOCAL | CREAD);
+      // NOTE(luca): goto here acts as a scope exit/early return
+      Ret = fcntl(TerminalHandle, F_SETFL, 0);
+      if(Ret == -1) goto TerminalOpenFail;
       
-      // Set 8 data bits, No parity
-      Options.c_cflag &= (tcflag_t)~PARENB;  // Disable Parity
-      Options.c_cflag &= (tcflag_t)~CSTOPB;  // 1 stop bit (Not 2 bits)
-      Options.c_cflag &= (tcflag_t)~CSIZE;   // Clear data bits size
-      Options.c_cflag |= CS8;                // 8 data bits
+      Ret = fcntl(TerminalHandle, F_SETFL, FNDELAY);
+      if(Ret == -1) goto TerminalOpenFail;
       
-      // NOTE(luca): This was very important and fixed the bug where 25 bits wouldn't be read
-      // when activating the loader.  Since the identity packet would send a newline it would
-      // Cut right after.
-      // Raw input -> Disable canonical, echoing and signals
-      Options.c_lflag &= (tcflag_t)~(ICANON | ECHO | ECHOE | ISIG);
+      Ret = tcgetattr(TerminalHandle, &Options);
+      if(Ret == -1) goto TerminalOpenFail;
       
-      // Disable parity checks and strip of it
-      Options.c_iflag &= (tcflag_t)~(INPCK | ISTRIP);
+      // NOTE(luca): Never set directly because of compatibility
+      // From the docs loader should be in 9600 baud, 8 data bits, and no parity.
+      {
+       // NOCTTY equivalent
+       Options.c_cflag |= (CLOCAL | CREAD);
+       
+       // Set 8 data bits, No parity
+       Options.c_cflag &= (tcflag_t)~PARENB;  // Disable Parity
+       Options.c_cflag &= (tcflag_t)~CSTOPB;  // 1 stop bit (Not 2 bits)
+       Options.c_cflag &= (tcflag_t)~CSIZE;   // Clear data bits size
+       Options.c_cflag |= CS8;                // 8 data bits
+       
+       // NOTE(luca): This was very important and fixed the bug where 25 bits wouldn't be read
+       // when activating the loader.  Since the identity packet would send a newline it would
+       // Cut right after.
+       // Raw input -> Disable canonical, echoing and signals
+       Options.c_lflag &= (tcflag_t)~(ICANON | ECHO | ECHOE | ISIG);
+       
+       // Disable parity checks and strip of it
+       Options.c_iflag &= (tcflag_t)~(INPCK | ISTRIP);
+       
+       // Disable software flow control
+       Options.c_iflag &= (tcflag_t)~(IXON | IXOFF | IXANY);
+       
+       // Enable raw output <- Disable processed output
+       Options.c_oflag &= (tcflag_t)~OPOST;
+       
+       Options.c_cc[VMIN]  = 1;
+       Options.c_cc[VTIME] = 0;
+      }
       
-      // Disable software flow control
-      Options.c_iflag &= (tcflag_t)~(IXON | IXOFF | IXANY);
+      Ret = cfsetispeed(&Options, B9600);
+      if(Ret == -1) goto TerminalOpenFail;
       
-      // Enable raw output <- Disable processed output
-      Options.c_oflag &= (tcflag_t)~OPOST;
+      Ret = cfsetospeed(&Options, B9600);
+      if(Ret == -1) goto TerminalOpenFail;
       
-      Options.c_cc[VMIN]  = 1;
-      Options.c_cc[VTIME] = 0;
-     }
-     
-     Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-     PrintErrnoIf(Ret == -1);
+      Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
+      if(Ret == -1) goto TerminalOpenFail;
+      
+      // NOTE(luca): All options have been (sucessfully ?) set, now try to see if it is opened
+      // already
+      
+      Ret = ioctl(TerminalHandle, TIOCEXCL);
+      if(Ret == -1)
+      {
+       Log("Could not acquire lock.\n");
+       goto TerminalOpenFail;
+      }
+      
+     } TerminalOpenFail:
      
      if(Ret != -1)
      {
-      // TODO(luca): Try ReadIdx & WriteIdx and batching commands and batching reads.
+      // TODO(luca): We have to check that this file is not owned/opened/being read from by
+      // another process.  So we can notify the user.
+      
       u64 CommandIdx = 0;
       u64 CommandCount = 0;
       
@@ -465,39 +490,6 @@ ENTRY_POINT(EntryPoint)
        }
       }
       
-      
-#if 0    
-      Commands[CommandCount] = Command_EraseAll;
-      CommandCount += 1;
-      
-      Commands[CommandCount] = 
-      (command){
-       .Kind = CommandKind_PageDownload,
-       .BufferCount = 257,
-       .Buffer = { 0x00, 0x02, 0x00, 0x03, 0x75, 0xA0, 0xAA, 0x02, 0x00, 0x03, },
-      };
-      CommandCount += 1;
-#endif
-      
-#if 0
-      Commands[CommandCount] = Command_EraseAll;
-      CommandCount += 1;
-      
-      Commands[CommandCount] = 
-      (command){
-       .Kind = CommandKind_Program, 
-       .BufferCount = 12,
-#if 1
-       //          U     H      L                            P2    Val
-       .Buffer = { 0x00, 0x00, 0x00, 0x02, 0x00, 0x03, 0x75, 0xA0, 0xAA, 0x02, 0x00, 0x03, }
-#else
-       //                                                    P0    P2
-       .Buffer = { 0x00, 0x00, 0x00, 0x02, 0x00, 0x03, 0x85, 0x80, 0xA0, 0x02, 0x00, 0x03, },
-#endif
-      };
-      CommandCount += 1;
-#endif
-      
       u8 ReadBuffer_[KB(64)] = {0};
       u8 *ReadBuffer = ReadBuffer_;
       s64 ReadBufferIdx = 0;
@@ -601,7 +593,7 @@ ENTRY_POINT(EntryPoint)
           }
           else
           {
-           PrintErrnoIf(true);
+           if(Verbose) PrintErrnoIf(true);
           }
          }
         }
@@ -655,7 +647,6 @@ ENTRY_POINT(EntryPoint)
               if(ReadBuffer[0] == 7)
               {
                Log("%SFailed: NAK.\n", Pad);
-               DebugBreak();
                ShouldQuit = true;
               }
               if(ReadBuffer[0] == 6)
@@ -674,11 +665,11 @@ ENTRY_POINT(EntryPoint)
                 else InvalidPath();
                 
                 Ret = cfsetispeed(&Options, Speed);
-                PrintErrnoIf(Ret == -1);
+                if(Verbose) PrintErrnoIf(Ret == -1);
                 Ret = cfsetospeed(&Options, Speed);
-                PrintErrnoIf(Ret == -1);
+                if(Verbose) PrintErrnoIf(Ret == -1);
                 Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-                PrintErrnoIf(Ret == -1);
+                if(Verbose) PrintErrnoIf(Ret == -1);
                }
                
                
@@ -705,22 +696,42 @@ ENTRY_POINT(EntryPoint)
       }
       
       Log("Total bytes sent: %lld.\n", TotalBytesSent);
-      
      }
      else
      {
+      Log("Could not set options for port.\n");
       PrintErrnoIf(true);
      }
     }
     else
     {
-     PrintErrnoIf(true);
+     if(Verbose) PrintErrnoIf(true);
+     str8 HelpText = S8("make sure device is present");
+     if(0) {}
+     if(errno == EACCES) HelpText = S8("make sure you have access permission");
+     if(errno == EBUSY)  HelpText = S8("device is already opened by another program.");
+     
+     Log("Could not open '%s', %S.\n", DeviceFileName, HelpText);
     }
    }
-   else
+   
+   b32 ShowHelp = !DidWork;
+   
+   ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("h"), S8("Print out help")) ||
+               ShowHelp);
+   ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("-help"), S8("Print out help")) ||
+               ShowHelp);
+   
+   if(ShowHelp)
    {
-    PrintErrnoIf(true);
+    Log("Usage: lsd [options] file.hex\n"
+        "\n"
+        "Options:\n", Params->Args[0]);
+    
+    str8 HelpText = S8ArrayJoinFrom(Arena, Help, '\n');
+    Log("%S\n", HelpText);
    }
+   
    
    Prof_EndProfileAndPrint();
   }

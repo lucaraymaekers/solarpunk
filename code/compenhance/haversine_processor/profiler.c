@@ -14,7 +14,6 @@ struct prof_profiler
 {
  u64 StartTSC;
  u64 EndTSC;
- u64 OSStart;
  
  prof_marker Markers[4096];
  
@@ -96,7 +95,6 @@ Prof_GuessCPUFreq(u64 OSElapsed, u64 CPUElapsed, u64 OSFreq)
 internal void
 Prof_StartProfile(void)
 {
- Prof.OSStart = ReadOSTimer();
  Prof.StartTSC = ReadCPUTimer();
 }
 
