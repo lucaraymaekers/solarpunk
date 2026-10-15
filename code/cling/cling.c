@@ -858,8 +858,8 @@ ENTRY_POINT(EntryPoint)
    if(All) Last = true;
    
    str8 TemplateText = S8(
-                          "#include <stdio.h>\n"
                           "#define _CRT_SECURE_NO_WARNINGS\n"
+                          "#include <stdio.h>\n"
                           "\n"
                           "int main(int ArgCount, char **Args)\n"
                           "{\n"

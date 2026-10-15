@@ -2,6 +2,8 @@
 #ifndef BASE_BUILD_H
 #define BASE_BUILD_H
 
+// TODO(luca): Metaprogram
+
 // NOTE(luca): These are the default values, if you want to override them create
 // a ".base_build.h" file in which you can define the values.
 // When none of these values are overridden that means that we are in release mode.
@@ -75,5 +77,9 @@
 # define MUZE_STARTUP_PROFILE 0
 #endif
 
+//- LSD 
+#if !defined(LSD_INTERNAL)
+# define LSD_INTERNAL 0
+#endif
 
 #endif // BASE_BUILD_H

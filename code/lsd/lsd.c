@@ -12,18 +12,18 @@
 //   https://docs.kernel.org/usb/usb-serial.html
 
 // TODO:
-// - Reach optimal transfer speed
-//   1. Raw throughput test: Write all the time for x amount of time
-//   2. Profile code
-//   3. Solve?
-// - Abort command boolean that makes it not write the command, in the case of ChangeBaud
+// - Checksum wrong, find out why
+// - Cleanup logic
+//
+// x Reach optimal transfer speed
+// x Abort command boolean that makes it not write the command, in the case of ChangeBaud
 //   if it is not supported by the PC.
 // x ExpectedReturnBytes value, so we can have 0 for the None command, 25 bytes for interrogate,
 //   etc.
-// - PacketSize inferred from BufferCount, exception for interrogate
-// - B115200 should be checked if defined first.
-// - Validate device id 
-
+// x PacketSize inferred from BufferCount, exception for interrogate
+// x B115200 should be checked if defined first.
+// x Validate device id ADI xxx
+// x Baud fallback? (We can infer from datasheet, and just do it on os level)
 
 //~ Libraries
 #include <sys/ioctl.h>
@@ -32,10 +32,8 @@
 #include "base/base.h"
 #include "base/base.c"
 
+#include "rl/rl_profile.h"
 #include "lsd/generated/lsd.meta.c"
-
-#define ReadCPUTimer() __rdtsc()
-#include "compenhance/haversine_processor/profiler.c"
 
 //~ Types
 typedef struct command command;
@@ -47,6 +45,7 @@ struct command
  u8 Buffer[512];
  u8 CheckSum;
  s32 Baud;
+ speed_t BaudSpeed;
  
  u8 ExpectedBytesReturned;
  b32 Written;
@@ -76,13 +75,35 @@ read_only global_variable command Command_Interrogate =
 };
 
 // NOTE(luca): See table 44 in datasheet for AduC832
-read_only global_variable command Command_SetFastBaud = 
+
+read_only global_variable command Command_SetFastBaud =
+#if defined(B230400)
+{
+ .Kind = CommandKind_ChangeBaud, 
+ //                           T3CON T3FD
+ .BufferCount = 2, .Buffer = {0x81, 0x09},
+ .Baud = 230400,
+ .BaudSpeed = B230400,
+};
+#elif defined(B115200)
 {
  .Kind = CommandKind_ChangeBaud, 
  //                           T3CON T3FD
  .BufferCount = 2, .Buffer = {0x82, 0x09},
  .Baud = 115200,
+ .BaudSpeed = B115200,
 };
+#else
+{
+ .Kind = CommandKind_ChangeBaud, 
+ // NOTE(luca): Assumes normal clock speed
+ //                           T3CON T3FD
+ .BufferCount = 2, .Buffer = {0x85, 0x2D},
+ .Baud = 9600,
+ .BaudSpeed = B9600,
+};
+#endif
+
 read_only global_variable command Command_SetSlowBaud = 
 {
  .Kind = CommandKind_ChangeBaud, 
@@ -90,6 +111,7 @@ read_only global_variable command Command_SetSlowBaud =
  //                           T3CON T3FD
  .BufferCount = 2, .Buffer = {0x85, 0x2D},
  .Baud = 9600,
+ .BaudSpeed = B9600,
 };
 
 
@@ -618,6 +640,8 @@ ENTRY_POINT(EntryPoint)
           
           if(ReadBufferIdx == Command->ExpectedBytesReturned)
           {
+           str8 Response = { .Data = ReadBuffer, .Size = Command->ExpectedBytesReturned };
+           
            // NOTE(luca): The command response was sucessfully read so we can bump the idx.
            CommandIdx += 1;
            ReadBufferIdx = 0;
@@ -629,9 +653,49 @@ ENTRY_POINT(EntryPoint)
             case CommandKind_Interrogate:
             {
              {
-              // TODO(luca): Implement verification that this board is the ADuC832 because 
-              // other boards are not compatible (yet).
-              Log("%SLoader connected.\n", Pad);
+              
+              str8 Identifier = S8To(Response, 10);
+              str8 Version = S8FromTo(Response, 10, 14);
+              
+              Log("%SID:        %S\n"
+                  "%SVersion:   %S\n"
+                  "%SHardware:  0x%x%x\n", 
+                  Pad, Identifier,
+                  Pad, Version,
+                  Pad, Response.Data[16], Response.Data[17]);
+              
+              u8 ResponseCheckSum = Response.Data[24];
+              
+              // TODO(luca): My checksum is alwyas off by 3??
+              ResponseCheckSum -= 3;
+              
+              u8 CheckSum = 0;
+              {
+               for EachIndex(Idx, 24)
+               {
+                CheckSum += Response.Data[Idx];
+               }
+               CheckSum = 0 - CheckSum;
+              }
+              
+              if(S8Match(Identifier, S8("ADI 832"), true))
+              {
+               
+               if(CheckSum != ResponseCheckSum)
+               {
+                Log("%SChecksum failed, has:  %x wanted: %x", Pad, CheckSum, ResponseCheckSum);
+               }
+               
+               {
+                Log("%SLoader connected.\n", Pad);
+                
+               }
+              }
+              else
+              {
+               Log("%SError: Board not supported.\n", Pad);
+               ShouldQuit = true;
+              }
              }
              
             } break;
@@ -658,11 +722,7 @@ ENTRY_POINT(EntryPoint)
                {
                 Log("%SSet baud rate to %d.\n", Pad, Command->Baud);
                 
-                speed_t Speed = {0};
-                if(0) {}
-                else if(Command->Baud == 9600)   Speed = B9600;
-                else if(Command->Baud == 115200) Speed = B115200;
-                else InvalidPath();
+                speed_t Speed = Command->BaudSpeed;
                 
                 Ret = cfsetispeed(&Options, Speed);
                 if(Verbose) PrintErrnoIf(Ret == -1);
