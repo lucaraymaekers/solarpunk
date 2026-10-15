@@ -6,9 +6,9 @@ Config:
  { Asan    0 "Enable adress sanitizer" }
  { Release 0 "Enable optimizations and remove debug tooling" }
  // TODO(luca):
- //{ Clean   0 "Clear out the build directoryr to get a clean build" }
+ //{ Clean   0 "Clear out the build directory to get a clean build" }
  { Slow    0 "When building applications, rebuild all libraries every time"}
- { Clang   1 "Use Clang (Linux only)" }
+ { Clang   0 "Use Clang (Linux only)" }
  { GCC     0 "Use GCC (Linux only)" }
  { Wine    0 "Build with wine (Linux only)" }
 }

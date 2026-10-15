@@ -165,7 +165,76 @@ S8Cat(str8 Prefix, str8 Suffix)
 }
 
 internal str8
-Str8DupCString(arena *Arena, char *String)
+S8CutToChar(str8 String, u8 Char, b32 FromStart)
+{
+ str8 Result = {0};
+ 
+ u64 Found = 0;
+ 
+ u64 Idx = (FromStart ? 0 : String.Size - 1);
+ for EachCount(String.Size)
+ {
+  if(String.Data[Idx] == Char)
+  {
+   Found = Idx + 1;
+   break;
+  }
+  
+  Idx += (FromStart ? 1 : (u64)-1);
+ }
+ 
+ Result = S8From(String, Found);
+ 
+ return Result;
+}
+
+internal str8
+S8CutFromChar(str8 String, u8 Char, b32 FromStart)
+{
+ str8 Result = {0};
+ 
+ u64 Found = 0;
+ 
+ u64 Idx = (FromStart ? 0 : String.Size - 1);
+ for EachCount(String.Size)
+ {
+  if(String.Data[Idx] == Char)
+  {
+   Found = Idx + 1;
+   break;
+  }
+  
+  Idx += (FromStart ? 1 : (u64)-1);
+ }
+ 
+ Result = S8From(String, Found);
+ 
+ return Result;
+}
+
+internal u64
+S8FindChar(str8 String, u8 Char, b32 FromStart, b32 Next)
+{
+ u64 Result = 0;
+ 
+ u64 Idx = (FromStart ? 0 : String.Size - 1);
+ 
+ for EachCount(String.Size)
+ {
+  if(String.Data[Idx] == Char)
+  {
+   Result = Idx + !!Next;
+   break;
+  }
+  
+  Idx += (FromStart ? 1 : (u64)-1);
+ }
+ 
+ return Result;
+}
+
+internal str8
+S8DupCString(arena *Arena, char *String)
 {
  str8 Result = {0};
  

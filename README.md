@@ -14,7 +14,7 @@ Editor, text editing playground.
 ### Building 
 This will ultimately run "cling", a self-hosted C build script that is also acts as the metaprogram when required.
 
-On **Linux**, you will need [clang](https://clang.llvm.org/get_started.html).
+On **Linux**, you will need [clang](https://clang.llvm.org/get_started.html) or [gcc](https://gcc.gnu.org/).
 
 ```sh
 ./code/build.sh

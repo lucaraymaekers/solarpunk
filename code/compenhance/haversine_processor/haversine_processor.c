@@ -6,12 +6,19 @@
 
 //- External  
 #include "listing.c"
+
 //- Project 
-#include "haversine_processor.h"
-#include "profiler.c"
+#include "rl/rl_profile.h"
 #include "json.c"
 
-//- Main
+//~ Types
+typedef struct haversine_pair haversine_pair;
+struct haversine_pair
+{
+ f64 X0, Y0, X1, Y1;
+};
+
+//- Functions
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
 {
@@ -149,7 +156,8 @@ ENTRY_POINT(EntryPoint)
      u64 OSFreq = GetOSTimerFreq();
      u64 CPUFreq = Prof_GuessCPUFreq(OSElapsed, TotalCPUElapsed, OSFreq);
      
-     Log("\nTotal time: %0.4fms (CPU freq %llu)\n", 1000.0*((f64)TotalCPUElapsed/(f64)CPUFreq), CPUFreq);
+     Log("\nTotal time: %0.4fms (CPU freq %llu)\n", 
+         1000.0*((f64)TotalCPUElapsed/(f64)CPUFreq), CPUFreq);
      
      
     }

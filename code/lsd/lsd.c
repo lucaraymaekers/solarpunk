@@ -12,6 +12,8 @@
 //   https://docs.kernel.org/usb/usb-serial.html
 
 // TODO:
+// - Udev rule for latency timer to 1
+// - Build with cc
 
 //~ Libraries
 #include <sys/ioctl.h>
@@ -20,6 +22,7 @@
 #include "base/base.h"
 #include "base/base.c"
 
+#include "compenhance/haversine_processor/listing.c"
 #include "rl/rl_profile.h"
 #include "lsd/generated/lsd.meta.c"
 
@@ -34,6 +37,8 @@ struct command
  u8 CheckSum;
  s32 Baud;
  speed_t BaudSpeed;
+ 
+ u64 StartTSC;
  
  u8 ExpectedBytesReturned;
  b32 Written;
@@ -65,7 +70,8 @@ read_only global_variable command Command_Interrogate =
 // NOTE(luca): See table 44 in datasheet for AduC832
 
 read_only global_variable command Command_SetFastBaud =
-#if defined(B230400)
+#if 0
+#elif defined(B230400)
 {
  .Kind = CommandKind_ChangeBaud, 
  //                           T3CON T3FD
@@ -80,6 +86,12 @@ read_only global_variable command Command_SetFastBaud =
  .BufferCount = 2, .Buffer = {0x82, 0x09},
  .Baud = 115200,
  .BaudSpeed = B115200,
+};
+#elif defined(B57600)
+{
+ .Kind = CommandKind_ChangeBaud,
+ .BufferCount = 2, .Buffer = {0x83, 0x09},
+ .BaudSpeed = B57600,
 };
 #else
 {
@@ -180,6 +192,7 @@ ENTRY_POINT(EntryPoint)
   b32 DidWork = false;
   b32 Verbose = false;
   b32 Run = false;
+  b32 ShowHelp = false;
   
   b32 ShouldQuit = false;
   
@@ -195,6 +208,12 @@ ENTRY_POINT(EntryPoint)
   {
    Verbose = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("verbose"), S8("Increase verbosity"));
    Run = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run program after download"));
+   
+   ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("h"), S8("Print out help")) ||
+               ShowHelp);
+   ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("-help"), S8("Print out help")) ||
+               ShowHelp);
+   if(ShowHelp) ShouldQuit = true;
    
    {  
     cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1"));
@@ -325,10 +344,10 @@ ENTRY_POINT(EntryPoint)
         str8 File = OS_ReadEntireFileIntoMemory(HexFileName);
         if(File.Size)
         {
-         Commands[CommandCount] = Command_EraseAll;
+         Commands[CommandCount] = Command_SetFastBaud;
          CommandCount += 1;
          
-         Commands[CommandCount] = Command_SetFastBaud;
+         Commands[CommandCount] = Command_EraseAll;
          CommandCount += 1;
          
          b32 ParseSucceeded = true;
@@ -459,10 +478,11 @@ ENTRY_POINT(EntryPoint)
       u8 *WriteBuffer = WriteBuffer_;
       
       str8 Pad = S8("          ");
+      if(!Verbose) Pad.Size = 1;
       
       s64 TotalBytesSent = 0;
       
-      Prof_TimeScope("Sending commands")
+      Prof_TimeScope("Commands")
       {
        while(!ShouldQuit && (CommandIdx < CommandCount))
        {
@@ -470,188 +490,217 @@ ENTRY_POINT(EntryPoint)
         
         //- Writing  
         {
-         if(!Command->Written)
-         {          
-          u8 *Packet = WriteBuffer;
-          
-          u64 PacketSize = Command->BufferCount;
-          u8 CommandByte = CommandBytes[Command->Kind];
-          
-          if(Command->ExpectedBytesReturned == 0)
-          {
-           // Default is expecting NAK/ACK
-           Command->ExpectedBytesReturned = 1;
-          }
-          
-          if(0) {}
-          else if(Command->Kind == CommandKind_Interrogate)
-          {
-           MemoryCopy(Packet, Command->Buffer, Command->BufferCount);
-          }
-          else if(Command->Kind == CommandKind_PageDownload)
-          {
-           Packet[0] = 0x07;
-           Packet[1] = CommandByte;
-           MemoryCopy(Packet + 2, Command->Buffer, Command->BufferCount);
+         Prof_TimeScope("Write")
+         {
+          if(!Command->Written)
+          {          
+           u8 *Packet = WriteBuffer;
            
-           // 1: id byte
-           // 2: command byte
-           // 3: checksum
-           PacketSize += 1 + 1 + 1;
+           u64 PacketSize = Command->BufferCount;
+           u8 CommandByte = CommandBytes[Command->Kind];
            
-           u8 CheckSum = GetCheckSum(Command->BufferCount, Packet + 2);
-           Packet[PacketSize - 1] = CheckSum;
-          }
-          else if(Command->Kind != CommandKind_None)
-          {
-           // 2: id bytes
-           // 1: no. data bytes
-           // 1: command byte
-           // 1: checksum 
-           PacketSize += 2 + 1 + 1 + 1;
+           if(Command->ExpectedBytesReturned == 0)
+           {
+            // Default is expecting NAK/ACK
+            Command->ExpectedBytesReturned = 1;
+           }
            
-           Packet[0] = 0x07;
-           Packet[1] = 0x0E;
-           // 1: Command byte
-           Packet[2] = (u8)(Command->BufferCount + 1);
-           Packet[3] = CommandByte;
+           if(0) {}
+           else if(Command->Kind == CommandKind_Interrogate)
+           {
+            MemoryCopy(Packet, Command->Buffer, Command->BufferCount);
+           }
+           else if(Command->Kind == CommandKind_PageDownload)
+           {
+            Packet[0] = 0x07;
+            Packet[1] = CommandByte;
+            MemoryCopy(Packet + 2, Command->Buffer, Command->BufferCount);
+            
+            // 1: id byte
+            // 2: command byte
+            // 3: checksum
+            PacketSize += 1 + 1 + 1;
+            
+            u8 CheckSum = GetCheckSum(Command->BufferCount, Packet + 2);
+            Packet[PacketSize - 1] = CheckSum;
+           }
+           else if(Command->Kind != CommandKind_None)
+           {
+            // 2: id bytes
+            // 1: no. data bytes
+            // 1: command byte
+            // 1: checksum 
+            PacketSize += 2 + 1 + 1 + 1;
+            
+            Packet[0] = 0x07;
+            Packet[1] = 0x0E;
+            // 1: Command byte
+            Packet[2] = (u8)(Command->BufferCount + 1);
+            Packet[3] = CommandByte;
+            
+            MemoryCopy(Packet + 4, Command->Buffer, Command->BufferCount);
+            
+            u8 CheckSum = GetCheckSum(Command->BufferCount + 2, Packet + 2);
+            Packet[PacketSize - 1] = CheckSum;
+            
+            Assert(Command->CheckSum == 0 || Command->CheckSum == CheckSum);
+           }
            
-           MemoryCopy(Packet + 4, Command->Buffer, Command->BufferCount);
-           
-           u8 CheckSum = GetCheckSum(Command->BufferCount + 2, Packet + 2);
-           Packet[PacketSize - 1] = CheckSum;
-           
-           Assert(Command->CheckSum == 0 || Command->CheckSum == CheckSum);
-          }
-          
-          s64 BytesWritten;
-          Prof_TimeScope("Write")
-          {
-           BytesWritten = write(TerminalHandle, Packet, PacketSize);
-          }
-          if(BytesWritten == (s64)PacketSize)
-          {
-           Command->Written = true;
-           Log("Command: %S (%lld bytes)\n", CommandDescriptions[Command->Kind], BytesWritten);
-           TotalBytesSent += BytesWritten;
-           
-          }
-          else
-          {
-           if(Verbose) PrintErrnoIf(true);
+           s64 BytesWritten;
+           Prof_TimeScope("Writing")
+           {
+            BytesWritten = write(TerminalHandle, Packet, PacketSize);
+           }
+           if(BytesWritten == (s64)PacketSize)
+           {
+            //tcdrain(TerminalHandle);
+            
+            Command->Written = true;
+            if(Verbose) 
+            {
+             Log("Command: %S (%lld bytes)\n", CommandDescriptions[Command->Kind], BytesWritten);
+            }
+            else if(Command->Kind == CommandKind_Interrogate)
+            {
+             Log("Connect to loader.\n");
+            }
+            TotalBytesSent += BytesWritten;
+            
+            Command->StartTSC = ReadCPUTimer();
+           }
+           else
+           {
+            Log("%SError: Could not write command.\n", Pad);
+            if(Verbose) PrintErrnoIf(true);
+            ShouldQuit = true;
+           }
           }
          }
         }
         
         //- Reading 
         {
-         if(Command->Written)
+         Prof_TimeScope("Read")
          {
-          s64 BytesRead;
-          Prof_TimeScope("Read")
+          if(Command->Written)
           {
-           BytesRead = read(TerminalHandle, ReadBuffer + ReadBufferIdx, sizeof(ReadBuffer_));
-          }
-          if(BytesRead != -1)
-          {
-           ReadBufferIdx += BytesRead;
-          }
-          else 
-          {
-           AssertErrno(errno == EAGAIN);
-          }
-          
-          if(ReadBufferIdx == Command->ExpectedBytesReturned)
-          {
-           str8 Response = { .Data = ReadBuffer, .Size = Command->ExpectedBytesReturned };
-           
-           // NOTE(luca): The command response was sucessfully read so we can bump the idx.
-           CommandIdx += 1;
-           ReadBufferIdx = 0;
-           
-           switch(Command->Kind)
+           s64 BytesRead;
+           Prof_TimeScope("Reading")
            {
-            default: NotImplemented(); break;
+            BytesRead = read(TerminalHandle, ReadBuffer + ReadBufferIdx, sizeof(ReadBuffer_));
+           }
+           if(BytesRead != -1)
+           {
+            ReadBufferIdx += BytesRead;
+           }
+           else 
+           {
+            AssertErrno(errno == EAGAIN);
+           }
+           
+           if(ReadBufferIdx == Command->ExpectedBytesReturned)
+           {
+            str8 Response = { .Data = ReadBuffer, .Size = Command->ExpectedBytesReturned };
             
-            case CommandKind_Interrogate:
-            {
-             str8 Identifier = S8To(Response, 10);
-             str8 Version = S8FromTo(Response, 10, 14);
-             
-             Log("%SID:        %S\n"
-                 "%SVersion:   %S\n"
-                 "%SHardware:  0x%x%x\n", 
-                 Pad, Identifier,
-                 Pad, Version,
-                 Pad, Response.Data[16], Response.Data[17]);
-             
-             u8 ResponseCheckSum = Response.Data[24];
-             u8 CheckSum = GetCheckSum(24, Response.Data);
-             
-             if(!S8Match(Identifier, S8("ADI 832"), true))
-             {
-              Log("%SError: Board not supported.\n", Pad);
-              ShouldQuit = true;
-             } 
-             else if(CheckSum != ResponseCheckSum)
-             {
-              Log("%SError: Checksum failed, has: %x wanted: %x\n", Pad, CheckSum, ResponseCheckSum);
-              ShouldQuit = true;
-             }
-             else
-             {
-              Log("%SLoader connected.\n", Pad);
-             }
-             
-            } break;
+            // NOTE(luca): The command response was sucessfully read so we can bump the idx.
+            CommandIdx += 1;
+            ReadBufferIdx = 0;
             
-            case CommandKind_PageDownload:
-            case CommandKind_ChangeBaud:
-            case CommandKind_EraseAll:
-            case CommandKind_Program:
-            case CommandKind_Run:
+            switch(Command->Kind)
             {
-             if(BytesRead == 1)
+             case CommandKind_None: 
+             case CommandKind_Count:
+             break;
+             
+             case CommandKind_Interrogate:
              {
-              if(ReadBuffer[0] == 7)
+              str8 Identifier = S8To(Response, 10);
+              str8 Version = S8FromTo(Response, 10, 14);
+              
+              if(Verbose)
+               Log("%SID:        %S\n"
+                   "%SVersion:   %S\n"
+                   "%SHardware:  0x%x%x\n", 
+                   Pad, Identifier,
+                   Pad, Version,
+                   Pad, Response.Data[16], Response.Data[17]);
+              
+              u8 ResponseCheckSum = Response.Data[24];
+              u8 CheckSum = GetCheckSum(24, Response.Data);
+              
+              if(!S8Match(Identifier, S8("ADI 832"), true))
               {
-               Log("%SFailed: NAK.\n", Pad);
+               Log("%SError: Board not supported.\n", Pad);
+               ShouldQuit = true;
+              } 
+              else if(CheckSum != ResponseCheckSum)
+              {
+               Log("%SError: Checksum failed, has: %x wanted: %x\n", Pad, CheckSum, ResponseCheckSum);
                ShouldQuit = true;
               }
-              if(ReadBuffer[0] == 6)
+              else
               {
-               if(0) {}
-               else if(Command->Kind == CommandKind_ChangeBaud)
-               {
-                Log("%SSet baud rate to %d.\n", Pad, Command->Baud);
-                
-                speed_t Speed = Command->BaudSpeed;
-                
-                Ret = cfsetispeed(&Options, Speed);
-                if(Verbose) PrintErrnoIf(Ret == -1);
-                Ret = cfsetospeed(&Options, Speed);
-                if(Verbose) PrintErrnoIf(Ret == -1);
-                Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-                if(Verbose) PrintErrnoIf(Ret == -1);
-               }
-               
-               
+               Log("%SLoader connected.\n", Pad);
               }
-             }
-             else
-             {
-              Log("Error: Too many bytes, expected 1.\n");
-              ShouldQuit = true;
-             }
+              
+             } break;
              
-            } break;
+             case CommandKind_PageDownload:
+             case CommandKind_ChangeBaud:
+             case CommandKind_EraseAll:
+             case CommandKind_Program:
+             case CommandKind_Run:
+             {
+              if(BytesRead == 1)
+              {
+               if(ReadBuffer[0] == 0x07)
+               {
+                Log("%SFailed: NAK.\n", Pad);
+                ShouldQuit = true;
+               }
+               if(ReadBuffer[0] == 0x06)
+               {
+                // NOTE(luca): "ACK"
+                
+#if LSD_INTERNAL
+                u64 Elapsed = ReadCPUTimer() - Command->StartTSC;
+                u64 CPUFreq = 2306294089;
+                Log("%Stook %fms\n", Pad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
+#endif
+                
+                if(0) {}
+                else if(Command->Kind == CommandKind_ChangeBaud)
+                {
+                 if(Verbose) Log("%SSet baud rate to %d.\n", Pad, Command->Baud);
+                 
+                 speed_t Speed = Command->BaudSpeed;
+                 
+                 Ret = cfsetispeed(&Options, Speed);
+                 if(Verbose) PrintErrnoIf(Ret == -1);
+                 Ret = cfsetospeed(&Options, Speed);
+                 if(Verbose) PrintErrnoIf(Ret == -1);
+                 Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
+                 if(Verbose) PrintErrnoIf(Ret == -1);
+                }
+                
+                
+               }
+              }
+              else
+              {
+               Log("Error: Too many bytes, expected 1.\n");
+               ShouldQuit = true;
+              }
+              
+             } break;
+            }
            }
+           else
+           {
+            // NOTE(luca): Wait on more bytes
+           }
+           
           }
-          else
-          {
-           // NOTE(luca): Wait on more bytes
-          }
-          
          }
         }
         
@@ -682,13 +731,7 @@ ENTRY_POINT(EntryPoint)
     }
    }
    
-   b32 ShowHelp = !DidWork;
-   
-   ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("h"), S8("Print out help")) ||
-               ShowHelp);
-   ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("-help"), S8("Print out help")) ||
-               ShowHelp);
-   
+   ShowHelp = (ShowHelp || !DidWork);
    if(ShowHelp)
    {
     Log("Usage: lsd [options] file.hex\n"

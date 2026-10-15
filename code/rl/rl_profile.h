@@ -15,6 +15,8 @@ struct prof_profiler
  u64 StartTSC;
  u64 EndTSC;
  
+ u64 OSStart;
+ 
  prof_marker Markers[4096];
  
  u64 ParentIdx;
@@ -98,12 +100,21 @@ internal void
 Prof_StartProfile(void)
 {
  Prof.StartTSC = ReadCPUTimer();
+ Prof.OSStart = ReadOSTimer();
 }
 
 internal void
 Prof_EndProfileAndPrint(void)
 {
  u64 TotalTSCElapsed = ReadCPUTimer() - Prof.StartTSC;
+ u64 OSElapsed = ReadOSTimer() - Prof.OSStart;
+ 
+ u64 OSFreq = GetOSTimerFreq();
+ u64 CPUFreq = Prof_GuessCPUFreq(OSElapsed, TotalTSCElapsed, OSFreq);
+ 
+ Log("\nTotal time: %0.4fms (CPU freq %llu)\n", 
+     1000.0*((f64)TotalTSCElapsed/(f64)CPUFreq), CPUFreq);
+ 
  for EachIndex(Idx, ArrayCount(Prof.Markers))
  {
   prof_marker *Marker = Prof.Markers + Idx;

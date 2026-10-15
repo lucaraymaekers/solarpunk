@@ -71,6 +71,11 @@ Cng_SetSelectedArray(Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY))
 S8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__) 
 
 //- Helpers
+
+#if OS_LINUX
+internal str8 LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, u8 *Command, char *Env[]);
+#endif
+
 internal void 
 Cng_CommonBuildCommand(cng_build_options *Options)
 {
@@ -79,28 +84,55 @@ Cng_CommonBuildCommand(cng_build_options *Options)
  b32 Debug = !Options->Release;
  
 #if OS_LINUX
- str8 CommonCompilerFlags = S8("-I" CLING_CODE_PATH 
-                               " -fno-threadsafe-statics -nostdinc++ -D_GNU_SOURCE=1 -fno-exceptions -fno-rtti");
+ str8 CommonCompilerFlags = S8("-I" CLING_CODE_PATH " "
+                               "-D_GNU_SOURCE=1 "
+                               // NOTE(luca): CPP flags
+                               //"-fno-threadsafe-statics -nostdinc++ -fno-exceptions -fno-rtti"
+                               );
  str8 CommonWarningFlags = S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow " 
-                              "-Wno-double-promotion -Wno-unused-but-set-variable -Wno-write-strings -Wno-string-conversion -Wno-pointer-arith "
+                              "-Wno-double-promotion "
+                              "-Wno-unused-but-set-variable "
+                              "-Wno-write-strings "
+                              "-Wno-pointer-arith "
                               "-Wno-missing-field-initializers "
-                              "-Wno-initializer-overrides "
                               "-Wno-unused-parameter "
                               "-Wno-unused-variable "
-                              "-Wno-unused-function "
-                              "-Wno-unused-command-line-argument ");
+                              "-Wno-unused-function ");
  
  str8 LinuxLinkerFlags = S8("-lm");
  
  str8 Compiler = {0};
  if(0) {}
  else if(Options->Clang) Compiler = S8("clang");
- else if(Options->GCC) Compiler = S8("gcc");
- 
- str8 ModeFlags = (Debug ? 
-                   S8("-g -ggdb -g3 -fno-omit-frame-pointer") :
-                   S8("-O3"));
- 
+ else if(Options->GCC)   Compiler = S8("gcc");
+ else
+ {
+  Compiler = S8("cc");
+  // Find compiler cc is linking to
+  {
+   u8 Buffer[PATH_MAX] = {0};
+   LinuxFindCommandInPATH(sizeof(Buffer), Buffer, Compiler.Data, GlobalEnv);
+   
+   u8 *Path = PushArray(GlobalClingArena, u8, PATH_MAX);
+   s64 Size = readlink((char *)Buffer, (char *)Path, PATH_MAX);
+   Path[Size] = 0;
+   
+   Compiler = (str8){.Data = Path, .Size = (u64)Size};
+   
+   u64 OPLSlashIdx = S8FindChar(Compiler, '/', false, true);
+   Compiler = S8From(Compiler, OPLSlashIdx);
+  }
+  
+  if(0) {}
+  else if(S8Match(Compiler, S8("gcc"), false))
+  {
+   Options->GCC = true;
+  }
+  else if(S8Match(Compiler, S8("clang"), false))
+  {
+   Options->Clang = true;
+  }
+ }
  
  str8 Mode = {0};
  
@@ -112,7 +144,6 @@ Cng_CommonBuildCommand(cng_build_options *Options)
  if(0) {}
  else if(Options->Clang)
  {
-  Compiler = S8("clang");
   Cng_S8ArrayAppend(Compiler);
   if(Debug)
   {
@@ -129,7 +160,6 @@ Cng_CommonBuildCommand(cng_build_options *Options)
  }
  else if(Options->GCC)
  {
-  Compiler = S8("g++");
   Cng_S8ArrayAppend(Compiler);
   
   Cng_S8ArrayAppend(S8("-Wno-type-limits -Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
@@ -571,6 +601,7 @@ LinuxRunCommand(char *Args[])
   {
    if(execve(Args[0], Args, environ) == -1)
    {
+    Log("Could not execute %s.\n", Args[0]);
     PrintErrnoIf(true);
    }
   }
@@ -669,7 +700,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   
   Cng_SetSelectedArray(Cng_PushS8Array(256));
   
-  Cng_CommonBuildCommand(&((cng_build_options){.Clang = true}));
+  Cng_CommonBuildCommand(&((cng_build_options){0}));
   
   str8 ClingSourcePath = Cng_PathFromExe(CommandName, S8(CLING_SOURCE_PATH));
   str8 ClingCodePath = Cng_PathFromExe(CommandName, S8(CLING_CODE_PATH));

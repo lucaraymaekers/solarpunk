@@ -19,7 +19,20 @@ InterlockedAdd64((__int64 *)(Pointer), (Value))
 # define CountLeadingZeroes64(Value) __lzcnt64(Value)
 #endif
 
-#define ReadCPUTimer() __rdtsc()
+internal u64 rdtsc(void)
+{
+ u64 Result = 0;
+ 
+ u32 H, L;
+ 
+ __asm__ __volatile__ ("rdtsc" : "=a"(L), "=d"(H));
+ 
+ Result = ((u64)H << 32 | (u64)L);
+ 
+ return Result;
+}
+
+#define ReadCPUTimer() rdtsc()
 
 internal inline f64
 SinF64(f64 X)
