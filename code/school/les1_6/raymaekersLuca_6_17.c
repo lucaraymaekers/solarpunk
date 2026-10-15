@@ -1,5 +1,5 @@
-#include <stdio.h>
 #define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
 
 void square(int Filled);
 void empty_square(void);

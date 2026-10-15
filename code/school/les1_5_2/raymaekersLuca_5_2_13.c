@@ -1,5 +1,5 @@
-#include <stdio.h>
 #define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
 
 
 #define OperatorCase(Result, Op1, Op2, Operator) case (#Operator)[0]: Result = Op1 Operator Op2; break; 

@@ -1,6 +1,5 @@
-#include <stdio.h>
 #define _CRT_SECURE_NO_WARNINGS
-// TODO(luca): Flowchart
+#include <stdio.h>
 
 void draw_bar();
 

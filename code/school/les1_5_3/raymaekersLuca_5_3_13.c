@@ -1,6 +1,6 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <limits.h>
-#define _CRT_SECURE_NO_WARNINGS
 
 int main(int ArgCount, char **Args)
 {
