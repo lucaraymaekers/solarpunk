@@ -665,7 +665,7 @@ ENTRY_POINT(EntryPoint)
 #if LSD_INTERNAL
                 u64 Elapsed = ReadCPUTimer() - Command->StartTSC;
                 u64 CPUFreq = 2306294089;
-                Log("%Stook %fms\n", Pad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
+                if(Verbose) Log("%Stook %fms\n", Pad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
 #endif
                 
                 if(0) {}
@@ -710,7 +710,7 @@ ENTRY_POINT(EntryPoint)
       if(TotalBytesSent)
       {
        if(Verbose) Log("\nCommand count: %llu.\n", CommandCount);
-       Log("Total bytes sent: %lld.\n\n", TotalBytesSent);
+       Log("Total bytes sent: %lld.\n", TotalBytesSent);
       }
      }
      else

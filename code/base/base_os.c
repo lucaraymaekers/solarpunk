@@ -46,7 +46,7 @@ ENTRY_POINT(OS_EntryPoint)
     }
     
     // If we found an equals truncate 
-    str8 NameAfterEquals = S8From(Name, EqualsOffset + 1);
+    str8 NameAfterEquals = S8From(Name, EqualsOffset + 1 - !!(EqualsOffset == Name.Size));
     Name = S8To(Name, EqualsOffset);
     
     // Append entry

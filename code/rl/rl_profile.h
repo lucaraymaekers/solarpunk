@@ -7,6 +7,7 @@ struct prof_marker
  u64 TSCElapsedExclusive;
  u64 TSCElapsedInclusive;
  u64 HitCount;
+ u64 Indent;
 };
 
 typedef struct prof_profiler prof_profiler;
@@ -18,6 +19,7 @@ struct prof_profiler
  u64 OSStart;
  
  prof_marker Markers[4096];
+ u64 Indent;
  
  u64 ParentIdx;
 };
@@ -62,6 +64,7 @@ Prof_BlockBegin(char *Label, u64 MarkerIdx)
  Result.ParentIdx = Prof.ParentIdx;
  Result.StartTSC = ReadCPUTimer();
  Prof.ParentIdx = MarkerIdx;
+ Prof.Indent += 1;
  
  // NOTE(luca): Could be computed at compile time, but not in C.
  Marker->Label = Label;
@@ -82,6 +85,9 @@ Prof_BlockEnd(prof_block Block)
  Marker->TSCElapsedExclusive += Elapsed;
  Marker->TSCElapsedInclusive = Block.OldTSCElapsedInclusive + Elapsed;
  Marker->HitCount += 1;
+ Marker->Indent = Prof.Indent;
+ 
+ Prof.Indent -= 1;
 }
 
 internal u64 
@@ -112,16 +118,22 @@ Prof_EndProfileAndPrint(void)
  u64 OSFreq = GetOSTimerFreq();
  u64 CPUFreq = Prof_GuessCPUFreq(OSElapsed, TotalTSCElapsed, OSFreq);
  
+ str8 Pad = S8("                                                         ");
+ 
  Log("\nTotal time: %0.4fms (CPU freq %llu)\n", 
      1000.0*((f64)TotalTSCElapsed/(f64)CPUFreq), CPUFreq);
  
  for EachIndex(Idx, ArrayCount(Prof.Markers))
  {
+  Pad.Size = 64;
+  
   prof_marker *Marker = Prof.Markers + Idx;
   if(Marker->TSCElapsedInclusive)
   {   
+   Pad.Size = Marker->Indent + 2;
    f64 Percent = 100.0 * ((f64)Marker->TSCElapsedExclusive / (f64)TotalTSCElapsed);
-   Log("  %s[%llu]: %llu (%.2f%%", Marker->Label, Marker->HitCount, Marker->TSCElapsedExclusive, Percent);
+   Log("%S%s[%llu]: %llu (%.2f%%", 
+       Pad, Marker->Label, Marker->HitCount, Marker->TSCElapsedExclusive, Percent);
    if(Marker->TSCElapsedInclusive != Marker->TSCElapsedExclusive)
    {
     f64 PercentWithChildren = 100.0 * ((f64)Marker->TSCElapsedInclusive / (f64)TotalTSCElapsed);
