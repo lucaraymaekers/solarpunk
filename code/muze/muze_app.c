@@ -1635,7 +1635,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     if(*dtForFrame > 0.f)
     {
      Piece->PrevPlayPos.X += (MarkerPos.X - Piece->PrevPlayPos.X)*UI_State->AnimSpeed;
-     Log("Update.\n");
     }
     
    }

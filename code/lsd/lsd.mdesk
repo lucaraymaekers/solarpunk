@@ -1,13 +1,13 @@
-@table(Name, Description)
+@table(Name, Byte, Description)
 LSD_Commands:
 {
- { None         "Nothing"                                          }
- { Interrogate  "Connect to loader"                                }
- { EraseAll     "Erase Flash/EE program and data memory"           }
- { Program      "Progam block of Flash/EE program memory"          }
- { ChangeBaud   "Change Baud Rate"                                 }
- { Run          "Jump to User Code"                                }
- { BatchProgram "Batch - Program block of Flash/EE program memory" }
+ { None         "\0" "Nothing"                                          }
+ { Interrogate  "\0"  "Connect to loader"                                }
+ { EraseAll     "A"  "Erase Flash/EE program and data memory"           }
+ { Program      "W"  "Progam block of Flash/EE program memory"          }
+ { ChangeBaud   "B"  "Change Baud Rate"                                 }
+ { Run          "U"  "Jump to User Code"                                }
+ { PageDownload "Q"  "Page Download" }
 }
 
 @data_enum("command_kind")
@@ -24,3 +24,10 @@ CommandDescriptions:
  @expand(LSD_Commands) @strings
   `{$(Description)},`;
 };
+
+@data_table("u8")
+CommandBytes:
+{
+ @expand(LSD_Commands)
+  `'$(Byte)',`;
+}
