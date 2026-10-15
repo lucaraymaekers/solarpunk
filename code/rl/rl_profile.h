@@ -44,6 +44,8 @@ Prof_TimeScope__(Glue(Block, Counter), Glue(BlockI, Counter), Label)
 #define Prof_TimeScope(Label) Prof_TimeScope_(Label, __COUNTER__)
 #define Prof_TimeScopeFunc() Prof_TimeScope(__FUNCTION__)
 
+#define Prof_Profile() DeferLoop(Prof_StartProfile(), Prof_EndProfileAndPrint())
+
 //~ Functions
 internal prof_block
 Prof_BlockBegin(char *Label, u64 MarkerIdx)

@@ -12,18 +12,6 @@
 //   https://docs.kernel.org/usb/usb-serial.html
 
 // TODO:
-// - Checksum wrong, find out why
-// - Cleanup logic
-//
-// x Reach optimal transfer speed
-// x Abort command boolean that makes it not write the command, in the case of ChangeBaud
-//   if it is not supported by the PC.
-// x ExpectedReturnBytes value, so we can have 0 for the None command, 25 bytes for interrogate,
-//   etc.
-// x PacketSize inferred from BufferCount, exception for interrogate
-// x B115200 should be checked if defined first.
-// x Validate device id ADI xxx
-// x Baud fallback? (We can infer from datasheet, and just do it on os level)
 
 //~ Libraries
 #include <sys/ioctl.h>
@@ -165,6 +153,20 @@ ParseHexDigitPair(str8 File, u64 *At, b32 *Succeeded)
  return Result;
 }
 
+internal u8
+GetCheckSum(u64 Size, u8 *Data)
+{
+ u8 CheckSum = 0;
+ 
+ for EachIndex(Idx, Size)
+ {
+  CheckSum += Data[Idx];
+ }
+ CheckSum = 0 - CheckSum;
+ 
+ return CheckSum;
+}
+
 //~ Entry point
 raddbg_entry_point(EntryPoint);
 ENTRY_POINT(EntryPoint)
@@ -177,6 +179,9 @@ ENTRY_POINT(EntryPoint)
   b32 DefaultDevice = true;
   b32 DidWork = false;
   b32 Verbose = false;
+  b32 Run = false;
+  
+  b32 ShouldQuit = false;
   
   cmd_line *CmdLine = &Params->CmdLine;
   
@@ -184,10 +189,12 @@ ENTRY_POINT(EntryPoint)
   
   str8_array *Help = PushS8Array(Arena, 256);
   
-  {  
-   Prof_StartProfile();
-   
+#if LSD_INTERNAL
+  Prof_Profile()
+#endif
+  {
    Verbose = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("verbose"), S8("Increase verbosity"));
+   Run = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run program after download"));
    
    {  
     cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1"));
@@ -203,100 +210,105 @@ ENTRY_POINT(EntryPoint)
    if(HexFileName)
    {
     DidWork = true;
-    TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
     
-    // NOTE(luca): Sometimes it will open up on /dev/ttyUSB1 if /dev/ttyUSB0 was in use
-    // while plugging in the board.  In those cases, we search for ttyUSB devices in /dev.
-    // NOTE(luca): Since there is a hard limit on max serial devices we could also enumerate them (https://docs.kernel.org/usb/usb-serial.html)
-    if(TerminalHandle == -1 && DefaultDevice)
-    {
-     os_dir *Dir = OS_WalkDirPush(S8("/dev"), 0);
-     os_dir_entry *Entry;
-     while((Entry = OS_WalkDirGetNext(Dir)))
-     {
-      if(S8Match(Entry->Name, S8("ttyUSB"), true))
-      {
-       DeviceFileName = CSS8(Str8Fmt("/dev/%S", Entry->Name));
-       
-       break;
-      }
-     }
-     
+    Prof_TimeScope("Open terminal")
+    {    
      TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
+     
+     // NOTE(luca): Sometimes it will open up on /dev/ttyUSB1 if /dev/ttyUSB0 was in use
+     // while plugging in the board.  In those cases, we search for ttyUSB devices in /dev.
+     // NOTE(luca): Since there is a hard limit on max serial devices we could also enumerate them (https://docs.kernel.org/usb/usb-serial.html)
+     if(TerminalHandle == -1 && DefaultDevice)
+     {
+      os_dir *Dir = OS_WalkDirPush(S8("/dev"), 0);
+      os_dir_entry *Entry;
+      while((Entry = OS_WalkDirGetNext(Dir)))
+      {
+       if(S8Match(Entry->Name, S8("ttyUSB"), true))
+       {
+        DeviceFileName = CSS8(Str8Fmt("/dev/%S", Entry->Name));
+        
+        break;
+       }
+      }
+      
+      TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
+     }
     }
     
     if(TerminalHandle != -1)
     {
      int Ret;
      struct termios Options;
+     
+     Prof_TimeScope("Terminal options")
      {
-      // NOTE(luca): goto here acts as a scope exit/early return
-      Ret = fcntl(TerminalHandle, F_SETFL, 0);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = fcntl(TerminalHandle, F_SETFL, FNDELAY);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = tcgetattr(TerminalHandle, &Options);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      // NOTE(luca): Never set directly because of compatibility
-      // From the docs loader should be in 9600 baud, 8 data bits, and no parity.
       {
-       // NOCTTY equivalent
-       Options.c_cflag |= (CLOCAL | CREAD);
+       // NOTE(luca): goto here acts as a scope exit/early return
+       Ret = fcntl(TerminalHandle, F_SETFL, 0);
+       if(Ret == -1) goto TerminalOpenFail;
        
-       // Set 8 data bits, No parity
-       Options.c_cflag &= (tcflag_t)~PARENB;  // Disable Parity
-       Options.c_cflag &= (tcflag_t)~CSTOPB;  // 1 stop bit (Not 2 bits)
-       Options.c_cflag &= (tcflag_t)~CSIZE;   // Clear data bits size
-       Options.c_cflag |= CS8;                // 8 data bits
+       Ret = fcntl(TerminalHandle, F_SETFL, FNDELAY);
+       if(Ret == -1) goto TerminalOpenFail;
        
-       // NOTE(luca): This was very important and fixed the bug where 25 bits wouldn't be read
-       // when activating the loader.  Since the identity packet would send a newline it would
-       // Cut right after.
-       // Raw input -> Disable canonical, echoing and signals
-       Options.c_lflag &= (tcflag_t)~(ICANON | ECHO | ECHOE | ISIG);
+       Ret = tcgetattr(TerminalHandle, &Options);
+       if(Ret == -1) goto TerminalOpenFail;
        
-       // Disable parity checks and strip of it
-       Options.c_iflag &= (tcflag_t)~(INPCK | ISTRIP);
+       // NOTE(luca): Never set directly because of compatibility
+       // From the docs loader should be in 9600 baud, 8 data bits, and no parity.
+       {
+        // NOCTTY equivalent
+        Options.c_cflag |= (CLOCAL | CREAD);
+        
+        // Set 8 data bits, No parity
+        Options.c_cflag &= (tcflag_t)~PARENB;  // Disable Parity
+        Options.c_cflag &= (tcflag_t)~CSTOPB;  // 1 stop bit (Not 2 bits)
+        Options.c_cflag &= (tcflag_t)~CSIZE;   // Clear data bits size
+        Options.c_cflag |= CS8;                // 8 data bits
+        
+        // NOTE(luca): This was very important and fixed the bug where 25 bits wouldn't be read
+        // when activating the loader.  Since the identity packet would send a newline it would
+        // Cut right after.
+        // Raw input -> Disable canonical, echoing and signals
+        Options.c_lflag &= (tcflag_t)~(ICANON | ECHO | ECHOE | ISIG);
+        
+        // Disable parity checks and strip of it
+        Options.c_iflag &= (tcflag_t)~(INPCK | ISTRIP);
+        
+        // Disable software flow control
+        Options.c_iflag &= (tcflag_t)~(IXON | IXOFF | IXANY);
+        
+        // NOTE(luca): When interrogating the ADuC board it will send /r/n in its response,
+        // its important for the checksum that this does not get translated.
+        Options.c_iflag &= (tcflag_t)~(ICRNL | INLCR | IGNCR);
+        
+        // Enable raw output <- Disable processed output
+        Options.c_oflag &= (tcflag_t)~OPOST;
+        
+        Options.c_cc[VMIN]  = 1;
+        Options.c_cc[VTIME] = 0;
+       }
        
-       // Disable software flow control
-       Options.c_iflag &= (tcflag_t)~(IXON | IXOFF | IXANY);
+       Ret = cfsetispeed(&Options, B9600);
+       if(Ret == -1) goto TerminalOpenFail;
        
-       // Enable raw output <- Disable processed output
-       Options.c_oflag &= (tcflag_t)~OPOST;
+       Ret = cfsetospeed(&Options, B9600);
+       if(Ret == -1) goto TerminalOpenFail;
        
-       Options.c_cc[VMIN]  = 1;
-       Options.c_cc[VTIME] = 0;
-      }
-      
-      Ret = cfsetispeed(&Options, B9600);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = cfsetospeed(&Options, B9600);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      // NOTE(luca): All options have been (sucessfully ?) set, now try to see if it is opened
-      // already
-      
-      Ret = ioctl(TerminalHandle, TIOCEXCL);
-      if(Ret == -1)
-      {
-       Log("Could not acquire lock.\n");
-       goto TerminalOpenFail;
-      }
-      
-     } TerminalOpenFail:
+       Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
+       if(Ret == -1) goto TerminalOpenFail;
+       
+       // NOTE(luca): All options have been (sucessfully ?) set, now try to see if it is opened
+       // already
+       
+       Ret = ioctl(TerminalHandle, TIOCEXCL);
+       if(Ret == -1) goto TerminalOpenFail;
+       
+      } TerminalOpenFail:;
+     }
      
      if(Ret != -1)
      {
-      // TODO(luca): We have to check that this file is not owned/opened/being read from by
-      // another process.  So we can notify the user.
-      
       u64 CommandIdx = 0;
       u64 CommandCount = 0;
       
@@ -306,209 +318,136 @@ ENTRY_POINT(EntryPoint)
       Commands[CommandCount] = Command_Interrogate;
       CommandCount += 1;
       
-      str8 File = {0};
-      if(HexFileName)
-      {
-       File = OS_ReadEntireFileIntoMemory(HexFileName);
-       if(File.Size)
+      Prof_TimeScope("Hex file parse")
+      {      
+       if(HexFileName)
        {
-        Commands[CommandCount] = Command_EraseAll;
-        CommandCount += 1;
-        
-        Commands[CommandCount] = Command_SetFastBaud;
-        CommandCount += 1;
-        
-        b32 ParseSucceeded = true;
-        
-#if 0        
-        // Parse hex file and create program commands accordingly
+        str8 File = OS_ReadEntireFileIntoMemory(HexFileName);
+        if(File.Size)
         {
-         b32 FinishedParsing = false;
-         u64 At = 0;
-         while(!FinishedParsing)
-         {        
-          ParseSucceeded = (File.Data[At] == ':');
-          At += 1;
-          
-          // 2 bytes: record length
-          u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          
-          // 4 bytes: load address
-          u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          
-          // 2 bytes: record type
-          u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          if(RecordType == 0x00)
-          {
-           command *Command = Commands + CommandCount;
-           CommandCount += 1;
-           
-           Command->Kind = CommandKind_Program;
-           
-           Command->Buffer[0] = 0; // Not used, ADuC832 uses 16 bit adresses. 
-           Command->Buffer[1] = AddressH;
-           Command->Buffer[2] = AddressL;
-           Command->BufferCount += 3;
-           
-           // x data bytes
-           for EachIndex(Idx, RecordLength)
-           {
-            u8 Byte = ParseHexDigitPair(File, &At, &ParseSucceeded);
-            Command->Buffer[Command->BufferCount] = Byte;
-            Command->BufferCount += 1;
-           }
-           
-           // 2 bytes: checksum
-           //Command->CheckSum = 
-           ParseHexDigitPair(File, &At, &ParseSucceeded);
-           
-           // 1 or 2 byte: newline
-           if(File.Data[At] == '\r')
-           {
-            At += 1;
-           }
-           
-           if(File.Data[At] == '\n')
-           {
-            At += 1;
-           }
-           else
-           {
-            ParseSucceeded = false;
-           }
-          }
-          else if(RecordType == 0x01)
-          {
-           FinishedParsing = true;
-          }
-          else
-          {
-           ParseSucceeded = false;
-          }
-          
-          if(!FinishedParsing &&
-             (!ParseSucceeded || At >= File.Size))
-          {
-           FinishedParsing = true;
-           ParseSucceeded = false;
-          }
-         }
-         
-        }
-#else
-        
-        // Parse hex file and create program commands accordingly
-        {
-         b32 FinishedParsing = false;
-         u64 At = 0;
-         
-         u8 PageIdx = 0;
-         u64 BufferIdx = 0;
-         
-         while(!FinishedParsing)
-         {        
-          ParseSucceeded = (File.Data[At] == ':');
-          At += 1;
-          
-          // 2 bytes: record length
-          u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          
-          // 4 bytes: load address
-          u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          
-          // 2 bytes: record type
-          u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          if(RecordType == 0x00)
-          {
-           command *Command = Commands + CommandCount;
-           
-           Command->Kind = CommandKind_PageDownload;
-           Command->Buffer[0] = PageIdx;
-           
-           // 1: PageIdx
-           Command->BufferCount = 1 + 256;
-           u8 *B = Command->Buffer + BufferIdx + 1;
-           
-           // x data bytes
-           for EachIndex(Idx, RecordLength)
-           {
-            B[Idx] = ParseHexDigitPair(File, &At, &ParseSucceeded);
-           }
-           BufferIdx += RecordLength;
-           
-           if(BufferIdx >= 256)
-           {
-            Assert(BufferIdx == 256);
-            PageIdx += 1;
-            CommandCount += 1;
-            BufferIdx = 0;
-           }
-           
-           // 2 bytes: checksum
-           
-           // TODO(luca): Figure out why this checksum is different.
-           //Command->CheckSum = 
-           ParseHexDigitPair(File, &At, &ParseSucceeded);
-           
-           // 1 or 2 byte: newline
-           if(File.Data[At] == '\r')
-           {
-            At += 1;
-           }
-           
-           if(File.Data[At] == '\n')
-           {
-            At += 1;
-           }
-           else
-           {
-            ParseSucceeded = false;
-           }
-          }
-          else if(RecordType == 0x01)
-          {
-           FinishedParsing = true;
-          }
-          else
-          {
-           ParseSucceeded = false;
-          }
-          
-          if(!FinishedParsing &&
-             (!ParseSucceeded || At >= File.Size))
-          {
-           FinishedParsing = true;
-           ParseSucceeded = false;
-          }
-         }
-         
-         if(PageIdx == 0 && BufferIdx > 0)
-         {
-          CommandCount += 1;
-         }
-         
-        }
-#endif
-        
-        Commands[CommandCount] = Command_SetSlowBaud;
-        CommandCount += 1;
-        
-        if(ParseSucceeded)
-        {
-         Commands[CommandCount] = Command_Run;
+         Commands[CommandCount] = Command_EraseAll;
          CommandCount += 1;
+         
+         Commands[CommandCount] = Command_SetFastBaud;
+         CommandCount += 1;
+         
+         b32 ParseSucceeded = true;
+         
+         // Parse hex file and create program commands accordingly
+         {
+          b32 FinishedParsing = false;
+          u64 At = 0;
+          
+          u8 PageIdx = 0;
+          u64 BufferIdx = 0;
+          
+          while(!FinishedParsing)
+          {        
+           ParseSucceeded = (File.Data[At] == ':');
+           At += 1;
+           
+           // 2 bytes: record length
+           u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
+           
+           // 4 bytes: load address
+           u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
+           u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
+           
+           // 2 bytes: record type
+           u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
+           if(RecordType == 0x00)
+           {
+            command *Command = Commands + CommandCount;
+            
+            Command->Kind = CommandKind_PageDownload;
+            Command->Buffer[0] = PageIdx;
+            
+            // 1: PageIdx
+            Command->BufferCount = 1 + 256;
+            u8 *B = Command->Buffer + BufferIdx + 1;
+            
+            // x data bytes
+            for EachIndex(Idx, RecordLength)
+            {
+             B[Idx] = ParseHexDigitPair(File, &At, &ParseSucceeded);
+            }
+            BufferIdx += RecordLength;
+            
+            if(BufferIdx >= 256)
+            {
+             Assert(BufferIdx == 256);
+             PageIdx += 1;
+             CommandCount += 1;
+             BufferIdx = 0;
+            }
+            
+            // 2 bytes: checksum
+            
+            // TODO(luca): Figure out why this checksum is different.
+            //Command->CheckSum = 
+            ParseHexDigitPair(File, &At, &ParseSucceeded);
+            
+            // 1 or 2 byte: newline
+            if(File.Data[At] == '\r')
+            {
+             At += 1;
+            }
+            
+            if(File.Data[At] == '\n')
+            {
+             At += 1;
+            }
+            else
+            {
+             ParseSucceeded = false;
+            }
+           }
+           else if(RecordType == 0x01)
+           {
+            FinishedParsing = true;
+           }
+           else
+           {
+            ParseSucceeded = false;
+           }
+           
+           if(!FinishedParsing &&
+              (!ParseSucceeded || At >= File.Size))
+           {
+            FinishedParsing = true;
+            ParseSucceeded = false;
+           }
+          }
+          
+          if(PageIdx == 0 && BufferIdx > 0)
+          {
+           CommandCount += 1;
+          }
+          
+         }
+         
+         Commands[CommandCount] = Command_SetSlowBaud;
+         CommandCount += 1;
+         
+         if(ParseSucceeded)
+         {
+          if(Run)
+          {
+           Commands[CommandCount] = Command_Run;
+           CommandCount += 1;
+          }
+         }
+         else
+         {
+          Log("Error: Invalid hex file '%s'.\n", HexFileName);
+          ShouldQuit = true;
+         }
         }
         else
         {
-         Log("Error: Invalid hex file '%s'.\n", HexFileName);
-         CommandCount = 0;
+         Log("Error: Could not read file '%s'.\n", HexFileName);
+         ShouldQuit = true;
         }
-       }
-       else
-       {
-        Log("Error: Could not read file '%s'\n", HexFileName);
        }
       }
       
@@ -519,10 +458,10 @@ ENTRY_POINT(EntryPoint)
       u8 WriteBuffer_[KB(64)] = {0};
       u8 *WriteBuffer = WriteBuffer_;
       
-      str8 Pad = S8("               ");
+      str8 Pad = S8("          ");
       
       s64 TotalBytesSent = 0;
-      b32 ShouldQuit = false;
+      
       Prof_TimeScope("Sending commands")
       {
        while(!ShouldQuit && (CommandIdx < CommandCount))
@@ -560,15 +499,7 @@ ENTRY_POINT(EntryPoint)
            // 3: checksum
            PacketSize += 1 + 1 + 1;
            
-           u8 CheckSum = 0;
-           {
-            for(u64 Idx = 2; Idx < PacketSize - 1; Idx += 1)
-            {
-             CheckSum += Packet[Idx];
-            }
-            CheckSum = 0 - CheckSum;
-           }
-           
+           u8 CheckSum = GetCheckSum(Command->BufferCount, Packet + 2);
            Packet[PacketSize - 1] = CheckSum;
           }
           else if(Command->Kind != CommandKind_None)
@@ -587,15 +518,7 @@ ENTRY_POINT(EntryPoint)
            
            MemoryCopy(Packet + 4, Command->Buffer, Command->BufferCount);
            
-           u8 CheckSum = 0;
-           {
-            for(u64 Idx = 2; Idx < PacketSize - 1; Idx += 1)
-            {
-             CheckSum += Packet[Idx];
-            }
-            CheckSum = 0 - CheckSum;
-           }
-           
+           u8 CheckSum = GetCheckSum(Command->BufferCount + 2, Packet + 2);
            Packet[PacketSize - 1] = CheckSum;
            
            Assert(Command->CheckSum == 0 || Command->CheckSum == CheckSum);
@@ -609,7 +532,7 @@ ENTRY_POINT(EntryPoint)
           if(BytesWritten == (s64)PacketSize)
           {
            Command->Written = true;
-           Log("Command(%3lldb): %S\n", BytesWritten, CommandDescriptions[Command->Kind]);
+           Log("Command: %S (%lld bytes)\n", CommandDescriptions[Command->Kind], BytesWritten);
            TotalBytesSent += BytesWritten;
            
           }
@@ -652,50 +575,32 @@ ENTRY_POINT(EntryPoint)
             
             case CommandKind_Interrogate:
             {
+             str8 Identifier = S8To(Response, 10);
+             str8 Version = S8FromTo(Response, 10, 14);
+             
+             Log("%SID:        %S\n"
+                 "%SVersion:   %S\n"
+                 "%SHardware:  0x%x%x\n", 
+                 Pad, Identifier,
+                 Pad, Version,
+                 Pad, Response.Data[16], Response.Data[17]);
+             
+             u8 ResponseCheckSum = Response.Data[24];
+             u8 CheckSum = GetCheckSum(24, Response.Data);
+             
+             if(!S8Match(Identifier, S8("ADI 832"), true))
              {
-              
-              str8 Identifier = S8To(Response, 10);
-              str8 Version = S8FromTo(Response, 10, 14);
-              
-              Log("%SID:        %S\n"
-                  "%SVersion:   %S\n"
-                  "%SHardware:  0x%x%x\n", 
-                  Pad, Identifier,
-                  Pad, Version,
-                  Pad, Response.Data[16], Response.Data[17]);
-              
-              u8 ResponseCheckSum = Response.Data[24];
-              
-              // TODO(luca): My checksum is alwyas off by 3??
-              ResponseCheckSum -= 3;
-              
-              u8 CheckSum = 0;
-              {
-               for EachIndex(Idx, 24)
-               {
-                CheckSum += Response.Data[Idx];
-               }
-               CheckSum = 0 - CheckSum;
-              }
-              
-              if(S8Match(Identifier, S8("ADI 832"), true))
-              {
-               
-               if(CheckSum != ResponseCheckSum)
-               {
-                Log("%SChecksum failed, has:  %x wanted: %x", Pad, CheckSum, ResponseCheckSum);
-               }
-               
-               {
-                Log("%SLoader connected.\n", Pad);
-                
-               }
-              }
-              else
-              {
-               Log("%SError: Board not supported.\n", Pad);
-               ShouldQuit = true;
-              }
+              Log("%SError: Board not supported.\n", Pad);
+              ShouldQuit = true;
+             } 
+             else if(CheckSum != ResponseCheckSum)
+             {
+              Log("%SError: Checksum failed, has: %x wanted: %x\n", Pad, CheckSum, ResponseCheckSum);
+              ShouldQuit = true;
+             }
+             else
+             {
+              Log("%SLoader connected.\n", Pad);
              }
              
             } break;
@@ -715,8 +620,6 @@ ENTRY_POINT(EntryPoint)
               }
               if(ReadBuffer[0] == 6)
               {
-               Log("%SSuccess: ACK.\n", Pad);
-               
                if(0) {}
                else if(Command->Kind == CommandKind_ChangeBaud)
                {
@@ -755,7 +658,11 @@ ENTRY_POINT(EntryPoint)
        }
       }
       
-      Log("Total bytes sent: %lld.\n", TotalBytesSent);
+      if(TotalBytesSent)
+      {
+       if(Verbose) Log("\nCommand count: %llu.\n", CommandCount);
+       Log("Total bytes sent: %lld.\n\n", TotalBytesSent);
+      }
      }
      else
      {
@@ -792,8 +699,6 @@ ENTRY_POINT(EntryPoint)
     Log("%S\n", HelpText);
    }
    
-   
-   Prof_EndProfileAndPrint();
   }
   
  }

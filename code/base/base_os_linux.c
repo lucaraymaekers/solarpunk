@@ -80,7 +80,9 @@ OS_ReadEntireFileIntoMemory(char *FileName)
   }
   else
   {
+#if 0
    ErrorLog("Could not read file '%s', " ERRNO_FMT "\n", FileName, ERRNO_ARG);
+#endif
   }
   
  }

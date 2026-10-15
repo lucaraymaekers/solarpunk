@@ -1,6 +1,7 @@
 # Misc
 - bounds check on arrays
 
+- Use new profiler
 - Better profiler. (with UI)
   - graph(s)
   - computerenhance
