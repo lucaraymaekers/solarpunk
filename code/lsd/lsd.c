@@ -1,6 +1,6 @@
-// NOTE(luca): This program is a Serial Downloader for Linux 
-// I use this for my ADUC832v4 board
-
+//-
+//  Linux Serial Downloader for the ADUC832v4 board
+//- 
 // Resources used:
 // - Serial Programming Guide for POSIX Operating systems
 //   https://www.msweet.org/serial/serial.html
@@ -12,6 +12,7 @@
 //   https://www.analog.com/media/en/technical-documentation/application-notes/uC007___ULOAD_Example_for_ADuC834__ADuC832.pdf?doc=aduc832.pdf
 // - Linux USB serial
 //   https://docs.kernel.org/usb/usb-serial.html
+//-
 
 //~ Libraries
 #include <sys/ioctl.h>

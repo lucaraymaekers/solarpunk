@@ -9,5 +9,8 @@ cd ../../../build
 
 set -eux
 
+# Assemble
 asm51 -a -n -o main.hex "$Source"
-./lsd main.hex
+
+# Download
+./lsd -verbose -run main.hex

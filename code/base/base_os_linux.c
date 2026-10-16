@@ -25,7 +25,7 @@
 #include "base_arenas.h"
 #include "base_os_linux_errno_to_str8.c"
 
-#define ERRNO_FMT "Errno(%d): %S"
+#define ERRNO_FMT "Errno[%d]: %S"
 #define ERRNO_ARG errno, ErrnoToStr8(errno)
 
 //~ Types
