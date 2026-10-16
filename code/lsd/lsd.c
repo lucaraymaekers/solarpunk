@@ -8,12 +8,10 @@
 //   https://www.analog.com/en/resources/app-notes/an-1074.html
 // - Data sheet for ADuC832
 //   https://www.analog.com/media/en/technical-documentation/data-sheets/ADuC832.pdf
+// - UC-007: User Donwload (ULOAD) Mode
+//   https://www.analog.com/media/en/technical-documentation/application-notes/uC007___ULOAD_Example_for_ADuC834__ADuC832.pdf?doc=aduc832.pdf
 // - Linux USB serial
 //   https://docs.kernel.org/usb/usb-serial.html
-
-// TODO:
-// - Udev rule for latency timer to 1
-// - Build with cc
 
 //~ Libraries
 #include <sys/ioctl.h>
@@ -193,6 +191,7 @@ ENTRY_POINT(EntryPoint)
   b32 Verbose = false;
   b32 Run = false;
   b32 ShowHelp = false;
+  b32 Udev = false;
   
   b32 ShouldQuit = false;
   
@@ -208,6 +207,8 @@ ENTRY_POINT(EntryPoint)
   {
    Verbose = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("verbose"), S8("Increase verbosity"));
    Run = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run program after download"));
+   Udev = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("udev"), S8("Print udev rule for setting usb latency timer automatically"));
+   
    
    ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("h"), S8("Print out help")) ||
                ShowHelp);
@@ -729,6 +730,14 @@ ENTRY_POINT(EntryPoint)
      
      Log("Could not open '%s', %S.\n", DeviceFileName, HelpText);
     }
+   }
+   
+   if(Udev)
+   {
+    DidWork = true;
+    if(Verbose)
+     Log("E.g., copy to /etc/udev/rules.d/99-usb-serial-latency.rules\n\n");
+    Log("ACTION==\"add\", SUBSYSTEM==\"usb-serial\", ATTR{latency_timer}=\"1\"\n");
    }
    
    ShowHelp = (ShowHelp || !DidWork);
