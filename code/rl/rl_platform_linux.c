@@ -395,8 +395,8 @@ P_INIT()
        Dev->CanWrite = CanWrite;
        
        // TODO(luca): Trim whitespace
-       Dev->Name = Str8DupCString(Arena, (char *)snd_seq_client_info_get_name(MIDIClientInfo));
-       Dev->PortName = Str8DupCString(Arena, (char *)snd_seq_port_info_get_name(MIDIPortInfo));
+       Dev->Name = S8DupCString(Arena, (char *)snd_seq_client_info_get_name(MIDIClientInfo));
+       Dev->PortName = S8DupCString(Arena, (char *)snd_seq_port_info_get_name(MIDIPortInfo));
       }
      }
     }

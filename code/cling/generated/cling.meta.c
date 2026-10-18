@@ -5,7 +5,8 @@ if(0) {} \
   else if(ConfigMatch(Name, S8("Slow"), Value)) Slow = true; \
   else if(ConfigMatch(Name, S8("Clang"), Value)) Clang = true; \
   else if(ConfigMatch(Name, S8("GCC"), Value)) GCC = true; \
-  else if(ConfigMatch(Name, S8("Wine"), Value)) Wine = true;
+  else if(ConfigMatch(Name, S8("Wine"), Value)) Wine = true; \
+  else if(ConfigMatch(Name, S8("CPP"), Value)) CPP = true;
 #define Cng_ConfigBools(CmdLine, Help) \
  \
   b32 Asan = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Asan"), S8("Enable adress sanitizer")); \
@@ -13,7 +14,8 @@ if(0) {} \
   b32 Slow = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Slow"), S8("When building applications, rebuild all libraries every time")); \
   b32 Clang = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Clang"), S8("Use Clang (Linux only)")); \
   b32 GCC = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("GCC"), S8("Use GCC (Linux only)")); \
-  b32 Wine = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Wine"), S8("Build with wine (Linux only)"));
+  b32 Wine = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Wine"), S8("Build with wine (Linux only)")); \
+  b32 CPP = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("CPP"), S8("Source code is CPP"));
 
   internal field_hash_node *
   GetFieldHashNode(str8 String, u64 Seed, u64 ArraySize, field_hash_node *Array)

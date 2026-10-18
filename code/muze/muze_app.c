@@ -2360,7 +2360,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    
    for EachIndex(Idx, InstrumentCount)
    {
-    App->InstrumentNames[Idx] = Str8DupCString(App->TSFArena, (char *)tsf_get_presetname(GlobalTSF, Idx));
+    App->InstrumentNames[Idx] = S8DupCString(App->TSFArena, (char *)tsf_get_presetname(GlobalTSF, Idx));
    }
    
    App->TrackerForTSF = GlobalTSF;

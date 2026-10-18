@@ -38,7 +38,6 @@ struct prof_block
 global_variable prof_profiler Prof; 
 
 //~ Macros
-
 #define Prof_TimeScope__(Block, I, Label) \
 for(prof_block Block = Prof_BlockBegin(Label, __COUNTER__ + 1), *I = 0;\
 I == 0; \
@@ -106,16 +105,16 @@ internal void
 Prof_StartProfile(void)
 {
  Prof.StartTSC = ReadCPUTimer();
- Prof.OSStart = ReadOSTimer();
+ Prof.OSStart = OS_ReadTimer();
 }
 
 internal void
 Prof_EndProfileAndPrint(void)
 {
  u64 TotalTSCElapsed = ReadCPUTimer() - Prof.StartTSC;
- u64 OSElapsed = ReadOSTimer() - Prof.OSStart;
+ u64 OSElapsed = OS_ReadTimer() - Prof.OSStart;
  
- u64 OSFreq = GetOSTimerFreq();
+ u64 OSFreq = OS_GetTimerFreq();
  u64 CPUFreq = Prof_GuessCPUFreq(OSElapsed, TotalTSCElapsed, OSFreq);
  
  str8 Pad = S8("                                                         ");

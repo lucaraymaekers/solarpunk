@@ -1,19 +1,7 @@
-# Editor
+# Unknown
+Unknown is my personal codebase written from scratch in C using a minimal amount of libraries.
 
-Editor is my personal codebase written from scratch in C using very few libraries.
-It runs on Linux and Windows (OpenGL) with nice debug features such as code profiling, hot reloading, loop editing, saving/loading replays and state to/from disk. 
-
-### Demo's
-
-Muze, my music composition software.
-<video autoplay loop src="https://git.keyfried.com/editor/plain/data/muze/demo/showcase_muze_260423.gif?h=main">
-
-Editor, text editing playground.
-<video autoplay loop src="https://git.keyfried.com/editor/data/editor/showcase_260404.gif?h=main">
-
-### Building 
-This will ultimately run "cling", a self-hosted C build script that is also acts as the metaprogram when required.
-
+## Building 
 On **Linux**, you will need [clang](https://clang.llvm.org/get_started.html) or [gcc](https://gcc.gnu.org/).
 
 ```sh
@@ -26,3 +14,28 @@ On **Windows**, you will need [msvc](https://visualstudio.microsoft.com/download
 .\code\build.bat
 ```
 
+**Example**: To build `Muze` on Linux you would do `./code/build.sh -Muze`. This will create an executable `./build/muze` which you can then run.
+
+# Applications
+All applications can be built by passing a flag to the build script.  Run the script with no flags to see available targets.
+
+## Muze (-Muze)
+A GUI for music composition and practice.
+
+It runs on Linux and Windows (OpenGL) with nice platform debug features such as code profiling, hot reloading, loop editing, saving/loading replays and state to/from disk. 
+
+## Editor (-Editor) 
+A POC GUI text editor.
+
+## LSD (-LSD)
+Linux only!
+
+A Linux Serial Downloader for my ADuC832 school board.
+
+## WSDCOM (-WSD)
+Windows only!
+
+My C port of the wsdcom utility.
+
+## Cling
+The self-hosting C build script and metaprogram for all projects. 

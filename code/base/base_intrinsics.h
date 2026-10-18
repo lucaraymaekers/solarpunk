@@ -3,7 +3,7 @@
 #ifndef BASE_INTRINSICS_H
 #define BASE_INTRINSICS_H
 
-#include "math.h"
+#include <math.h>
 
 #if COMPILER_GNU || COMPILER_CLANG
 # define AtomicAddEvalU64(Pointer, Value) \
@@ -19,6 +19,7 @@ InterlockedAdd64((__int64 *)(Pointer), (Value))
 # define CountLeadingZeroes64(Value) __lzcnt64(Value)
 #endif
 
+#if COMPILER_GNU || COMPILER_CLANG
 internal u64 rdtsc(void)
 {
  u64 Result = 0;
@@ -31,6 +32,9 @@ internal u64 rdtsc(void)
  
  return Result;
 }
+#elif COMPILER_MSVC
+#define rdtsc() __rdtsc()
+#endif
 
 #define ReadCPUTimer() rdtsc()
 

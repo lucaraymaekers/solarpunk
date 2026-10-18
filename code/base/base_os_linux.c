@@ -7,12 +7,12 @@
 
 // Linux
 #include <errno.h>
-#include <linux/prctl.h> 
 #include <linux/limits.h>
 #include <sys/prctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
+#include <sys/time.h>
 // UNIX & POSIX
 #include <pthread.h>
 #include <unistd.h>
@@ -166,6 +166,7 @@ OS_MarkReadonly(void *Memory, u64 Size)
  AssertErrno(Ret == 0);
 }
 
+//~ Time 
 internal f64 
 OS_GetWallClock(void)
 {
@@ -182,6 +183,24 @@ internal void
 OS_Sleep(u32 MicroSeconds)
 {
  usleep(MicroSeconds);
+}
+
+internal 
+u64 OS_GetTimerFreq(void)
+{
+	return 1000000;
+}
+
+internal 
+u64 OS_ReadTimer(void)
+{
+	// NOTE(casey): The "struct" keyword is not necessary here when compiling in C++,
+	// but just in case anyone is using this file from C, I include it.
+	struct timeval Value;
+	gettimeofday(&Value, 0);
+	
+	u64 Result = OS_GetTimerFreq()*(u64)Value.tv_sec + (u64)Value.tv_usec;
+	return Result;
 }
 
 //~ Filesystem operations 
@@ -224,6 +243,15 @@ OS_WalkDirPush(str8 Path, os_dir *Current)
  return Result;
 }
 
+internal os_dir *
+OS_WalkDirPop(os_dir *Dir)
+{
+ closedir(Dir->Opaque->Dir);
+ Dir = Dir->Parent;
+ 
+ return Dir;
+}
+
 internal os_dir_entry *
 OS_WalkDirGetNext(os_dir *Dir)
 {
@@ -257,15 +285,6 @@ OS_WalkDirGetNext(os_dir *Dir)
  }
  
  return Result;
-}
-
-internal os_dir *
-OS_WalkDirPop(os_dir *Dir)
-{
- closedir(Dir->Opaque->Dir);
- Dir = Dir->Parent;
- 
- return Dir;
 }
 
 //~ Entrypoint
@@ -318,7 +337,7 @@ LinuxSigHandler(int Signal, siginfo_t *SigInfo, void *Arg)
 #endif
 }
 
-void
+internal void
 LinuxSetDebuggerAttached()
 {
  s32 TracerPid = 0;

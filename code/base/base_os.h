@@ -83,43 +83,40 @@ struct os_dir
  os_dir_opaque *Opaque;
 };
 
-//~ Globals
-global_variable u8 LogBuffer[KB(64)];
-global_variable os_profiler GlobalProfiler = {0}; 
-global_variable char *GlobalProfilerPrefix; 
-
-#if BASE_PROFILE
-global_variable b32 GlobalIsProfiling = true;
-#else
-global_variable b32 GlobalIsProfiling = false;
-#endif
-
-read_only cmd_line_entry _NilCmdLineEntry = {&_NilS8Node, &_NilS8Node};
-read_only cmd_line_entry *NilCmdLineEntry = &_NilCmdLineEntry;
-
-#define IsNilCmdLineEntry(Entry) CheckNil(Entry, NilCmdLineEntry)
-
 //~ Functions
 #define ENTRY_POINT(Name) void *Name(entry_point_params *Params)
 typedef ENTRY_POINT(entry_point_func);
 
-C_LINKAGE ENTRY_POINT(EntryPoint);
+#define BASE_ENTRY_POINT() C_LINKAGE ENTRY_POINT(EntryPoint)
+C_LINKAGE BASE_ENTRY_POINT();
+raddbg_entry_point(EntryPoint);
 
-internal str8  OS_ReadEntireFileIntoMemory(char *FileName);
-internal b32   OS_FileExists(char *FileName);
-internal void  OS_FreeFileMemory(str8 File);
-internal b32   OS_WriteEntireFile(char *FileName, str8 File);
 internal void  OS_PrintFormat(char *Format, ...);
-internal void  OS_BarrierWait(barrier Barrier);
-internal void  OS_SetThreadName(str8 ThreadName);
+//- Memory 
 internal void *OS_AllocateAtOffset(u64 Size, u64 Offset);
 internal void *OS_Allocate(u64 Size);
 internal void  OS_MarkReadonly(void *Memory, u64 Size);
+//- Thraeds 
+internal void  OS_SetThreadName(str8 ThreadName);
 internal void  OS_BarrierWait(barrier Barrier);
+//- Time
 internal f64   OS_GetWallClock(void);
 // TODO(luca): Implement our own sleep function?
 internal void  OS_Sleep(u32 MicroSeconds);
-internal void  OS_ChangeDirectory(char *Path);
+internal u64   OS_GetTimerFreq(void);
+internal u64   OS_ReadTimer(void);
+//- Filesystem 
+internal str8    OS_ReadEntireFileIntoMemory(char *FileName);
+internal void    OS_FreeFileMemory(str8 File);
+internal b32     OS_WriteEntireFile(char *FileName, str8 File);
+internal b32     OS_FileExists(char *FileName);
+internal void    OS_ChangeDirectory(char *Path);
+internal void    OS_MakeDirectory(char *Path);
+internal os_dir *OS_WalkDirPush(str8 Path, os_dir *Current);
+internal os_dir *OS_WalkDirPop(os_dir *Dir);
+internal os_dir_entry *OS_WalkDirGetNext(os_dir *Dir);
+
+
 //- OS agnostic, implemented in `base_os.c`.
 internal f64  OS_SecondsElapsed(f64 Start, f64 End);
 internal f64  OS_MSElapsed(f64 Start, f64 End);

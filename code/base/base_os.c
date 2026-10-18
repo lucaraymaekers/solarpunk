@@ -1,3 +1,20 @@
+//~ Globals
+read_only cmd_line_entry _NilCmdLineEntry = {&_NilS8Node, &_NilS8Node};
+read_only cmd_line_entry *NilCmdLineEntry = &_NilCmdLineEntry;
+
+global_variable u8 LogBuffer[KB(64)];
+global_variable os_profiler GlobalProfiler = {0}; 
+global_variable char *GlobalProfilerPrefix; 
+
+#if BASE_PROFILE
+global_variable b32 GlobalIsProfiling = true;
+#else
+global_variable b32 GlobalIsProfiling = false;
+#endif
+
+#define IsNilCmdLineEntry(Entry) CheckNil(Entry, NilCmdLineEntry)
+
+//~ Functions
 #if !BASE_NO_ENTRYPOINT
 ENTRY_POINT(OS_EntryPoint)
 {

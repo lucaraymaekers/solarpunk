@@ -1,5 +1,4 @@
-//~ Strings
-
+//~ Libaries
 #include <stdio.h>
 
 #if !BASE_EXTERNAL_LIBS || RL_LIBS_IMPLEMENTATION
@@ -11,9 +10,15 @@ NO_WARNINGS_BEGIN
 #include "lib/stb_sprintf.h"
 NO_WARNINGS_END
 
+//~ Globals
 global_variable arena *StringsScratch = 0;
 
 #define SetStringsScratch(Arena) SetStringsScratch_(Arena, #Arena, __FILE__, __LINE__) 
+
+read_only str8_node _NilS8Node = {&_NilS8Node, &_NilS8Node};
+read_only str8_node *NilS8Node = &_NilS8Node;
+
+//~ Functions
 
 internal void
 SetStringsScratch_(arena *Arena, const char *Name, const char *FileName, s32 Line)

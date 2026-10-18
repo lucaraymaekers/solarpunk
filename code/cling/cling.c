@@ -5,7 +5,6 @@
 //~ Libaries
 #define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
-
 #include "base/base.h"
 #include "base/base.c"
 
@@ -47,10 +46,9 @@ internal void
 RunCommand(void)
 {
  str8 BuildCommand = Cng_S8ArrayJoin(' ');
- if(0)
- {
-  Log("%S\n", BuildCommand);
- }
+#if 0
+ Log("%S\n", BuildCommand);
+#endif
  Cng_RunCommand(BuildCommand);
 }
 
@@ -113,18 +111,7 @@ LinuxBuildCommand(str8 Source,
                   str8_array *ExtraFlags,
                   b32 Run)
 {
- Log("%S\n", Cng_GetBaseFileName(Source));
  
- Cng_Scratch();
- Cng_CommonBuildCommand(BuildOptions);
- Cng_S8ArrayAppendMultiple(Cng_S8ArrayJoinFrom(ExtraFlags, ' '),
-                           S8("-o"), OutputName,
-                           Source);
- 
- if(Run)
- {
-  RunCommand();
- }
 }
 
 internal void
@@ -152,7 +139,14 @@ BuildAndRun(str8 Source,
   }
   
   S8ArrayAppendTo(ExtraFlags, ExtraLinkerFlags);
-  LinuxBuildCommand(Source, OutputName, BuildOptions, ExtraFlags, false);
+  Log("%S\n", Cng_GetBaseFileName(Source));
+  
+  Cng_Scratch();
+  Cng_CommonBuildCommand(BuildOptions);
+  Cng_S8ArrayAppendMultiple(Cng_S8ArrayJoinFrom(ExtraFlags, ' '),
+                            S8("-o"), OutputName,
+                            Source);
+  
   Cng_S8ArrayAppend(ExtraSource);
   RunCommand();
  }
@@ -237,17 +231,19 @@ S8ListPushFmt(char *Format, ...)
 
 //- Custom build params
 internal void 
-LogBuildMode(str8 Name, b32 Debug)
+LogBuildMode(str8 Name, cng_build_options *Options)
 {
- str8 ModeString = (Debug ? S8("debug") : S8("release"));
- Log("[%S (%S)]\n", Name, ModeString);
+ str8 ModeString = (!Options->Release ? S8("debug") : S8("release"));
+ str8 Compiler = (Options->Clang ? S8("clang") :
+                  Options->GCC ? S8("gcc") : S8(""));
+ Log("[%S %S(%S)]\n", Name, Compiler, ModeString);
 }
 
 internal void
 ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
                  cng_build_options *BuildOptions)
 {
- LogBuildMode(ExeName, !BuildOptions->Release);
+ LogBuildMode(ExeName, BuildOptions);
  
  // Compile
  {            
@@ -270,10 +266,12 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
    {
     S8ArrayAppendTo(CommonFlags, S8("-DRL_LIBS_IMPLEMENTATION=1"));
     
+    BuildOptions->CPP = true;
     BuildAndRun(S8("../code/rl/rl_libs.h"), S8("rl_libs"), 
                 BuildOptions,
                 CommonFlags, S8(""), S8(""),
                 false, true);
+    BuildOptions->CPP = false;
    }
   }
   
@@ -302,7 +300,7 @@ ApplicationBuild(str8 ExeName, str8 AppName, str8 AppSource, str8 WindowName,
    if(0) {}
    else if(Cng_IsOs(CngOS_Linux))
    {
-    ExtraLinkerFlags = S8("-lasound -lX11 -lGL -lGLX");
+    ExtraLinkerFlags = S8("-lm -lasound -lX11 -lGL -lGLX");
    }
    
    BuildAndRun(S8("../code/rl/rl_platform.c"), ExeName, 
@@ -326,34 +324,21 @@ ConfigMatch(MD_String8 Name, MD_String8 Match, MD_String8 Value)
 internal void
 SimpleBuildAndRun(cng_build_options *BuildOptions, str8 BuildName, str8 Source)
 {
- LogBuildMode(BuildName, !BuildOptions->Release);
- 
  Cng_Scratch();
+ 
  Cng_CommonBuildCommand(BuildOptions);
+ LogBuildMode(BuildName, BuildOptions);
+ 
+ Cng_S8ArrayAppend(Source);
  
  if(Cng_IsOs(CngOS_Linux))
  {
   // Exename is source file name without the '.'
+  
   str8 ExeName = {0};
   {
-   u64 OnePastLastSlash = 0;
-   for EachIndex(Idx, Source.Size)
-   {
-    if(Source.Data[Idx] == '/')
-    {
-     OnePastLastSlash = Idx + 1;
-    }
-   }
-   
-   u64 LastDot = 0;
-   for EachIndex(Idx, Source.Size)
-   {
-    if(Source.Data[Idx] == '.')
-    {
-     LastDot = Idx;
-    }
-   }
-   
+   u64 OnePastLastSlash = S8FindChar(Source, OS_SlashChar, false, true);
+   u64 LastDot = S8FindChar(Source, '.', false, false);
    str8 BaseName = S8From(Source, OnePastLastSlash);
    Log("%S\n", BaseName); 
    
@@ -361,9 +346,8 @@ SimpleBuildAndRun(cng_build_options *BuildOptions, str8 BuildName, str8 Source)
   }
   
   Cng_S8ArrayAppendMultiple(S8("-o"), ExeName);
+  Cng_S8ArrayAppend(S8("-lm"));
  }
- 
- Cng_S8ArrayAppend(Source);
  
  if(Cng_IsOs(CngOS_Windows))
  {
@@ -373,654 +357,646 @@ SimpleBuildAndRun(cng_build_options *BuildOptions, str8 BuildName, str8 Source)
  RunCommand();
 }
 
-raddbg_entry_point(EntryPoint);
-ENTRY_POINT(EntryPoint)
+BASE_ENTRY_POINT()
 {
- if(LaneIndex() == 0)
+ Cng_InitAndRebuildSelf(Params->ArgCount, Params->Args, Params->Env);
+ 
+ // Change to build directory
+ {        
+  str8 Path = Cng_PathFromExe(S8FromCString(Params->Args[0]), S8(CLING_BUILD_PATH));
+  OS_ChangeDirectory((char *)Path.Data);
+ }
+ 
+ // Globals
+ {        
+  GlobalMDArena = MD_ArenaAlloc();
+ }
+ 
+ //~ Help
+ str8_array *Help = Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY);
+ S8ArrayAppendTo(Help, S8("Build parameters:"));
+ 
+ //~ Config 
+ cng_build_options BuildOptions = {0};
  {
-  Cng_InitAndRebuildSelf(Params->ArgCount, Params->Args, Params->Env);
+  Cng_ConfigBools(&Params->CmdLine, Help);
   
-  // Change to build directory
-  {        
-   str8 Path = Cng_PathFromExe(S8FromCString(Params->Args[0]), S8(CLING_BUILD_PATH));
-   OS_ChangeDirectory((char *)Path.Data);
-  }
+  S8ArrayAppendTo(Help, S8("\nTargets:"));
   
-  // Globals
-  {        
-   GlobalMDArena = MD_ArenaAlloc();
-  }
+  MD_String8 FileName = S8("../code/cling/cling.mdesk");
+  MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
   
-  //~ Help
-  str8_array *Help = Cng_PushS8Array(CLING_DEFAULT_S8ARRAY_CAPACITY);
-  S8ArrayAppendTo(Help, S8("Build parameters:"));
-  
-  //~ Config 
-  cng_build_options BuildOptions = {0};
+  for(MD_Message *Message = Parse.errors.first; Message; Message = Message->next)
   {
-   Cng_ConfigBools(&Params->CmdLine, Help);
-   
-   S8ArrayAppendTo(Help, S8("\nTargets:"));
-   
-   MD_String8 FileName = S8("../code/cling/cling.mdesk");
-   MD_ParseResult Parse = MD_ParseWholeFile(GlobalMDArena, FileName);
-   
-   for(MD_Message *Message = Parse.errors.first; Message; Message = Message->next)
+   MD_CodeLoc Loc = MD_CodeLocFromNode(Message->node);
+   MD_PrintMessage(stderr, Loc, Message->kind, Message->string);
+  }
+  
+  if(Parse.errors.max_message_kind < MD_MessageKind_Error)
+  {
+   MD_Node *Root = Parse.node->first_child;
+   for(MD_EachNode(Table, Root))
    {
-    MD_CodeLoc Loc = MD_CodeLocFromNode(Message->node);
-    MD_PrintMessage(stderr, Loc, Message->kind, Message->string);
-   }
-   
-   if(Parse.errors.max_message_kind < MD_MessageKind_Error)
-   {
-    MD_Node *Root = Parse.node->first_child;
-    for(MD_EachNode(Table, Root))
+    if(S8Match(Table->string, S8("Config"), false))
     {
-     if(S8Match(Table->string, S8("Config"), false))
-     {
-      for(MD_EachNode(Node, Table->first_child))
-      {      
-       MD_String8 Name = MD_NodeAtIndex(Node->first_child, 0)->string;
-       MD_String8 Value = MD_NodeAtIndex(Node->first_child, 1)->string;
-       Cng_ConfigMatchers(Name, Value);
-      }
-      break;
+     for(MD_EachNode(Node, Table->first_child))
+     {      
+      MD_String8 Name = MD_NodeAtIndex(Node->first_child, 0)->string;
+      MD_String8 Value = MD_NodeAtIndex(Node->first_child, 1)->string;
+      Cng_ConfigMatchers(Name, Value);
      }
-     
+     break;
     }
+    
    }
-   
-   Slow |= Asan;
-   if(GCC) Clang = false;
-   
-   BuildOptions.Asan = Asan;
-   BuildOptions.Release = Release;
-   BuildOptions.Slow = Slow;
-   BuildOptions.Clang = Clang;
-   BuildOptions.GCC = GCC;
-   BuildOptions.Wine = Wine;
   }
   
-  b32 DidWork = false;
-  cmd_line *CmdLine = &Params->CmdLine;
+  Slow |= Asan;
+  if(GCC) Clang = false;
   
-  //~ Metaprogram
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Meta"), S8("Search all .mdesk files and generate code accordingly")))
+  BuildOptions.Asan = Asan;
+  BuildOptions.Release = Release;
+  BuildOptions.Slow = Slow;
+  BuildOptions.Clang = Clang;
+  BuildOptions.GCC = GCC;
+  BuildOptions.Wine = Wine;
+ }
+ 
+ b32 DidWork = false;
+ cmd_line *CmdLine = &Params->CmdLine;
+ 
+ //~ Metaprogram
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Meta"), S8("Search all .mdesk files and generate code accordingly")))
+ {
+  DidWork = true;
+  
+  Log("Generating code...\n");
+  
+  arena *Arena = GlobalClingArena;
+  
+  u64 HashArraySize = KB(4);
+  table_hash_node *TableHashArray = PushArrayZero(Arena, table_hash_node, HashArraySize);
+  field_hash_node *FieldHashArray = PushArrayZero(Arena, field_hash_node, HashArraySize);
+  
+  for(os_dir *Dir = OS_WalkDirPush(S8("../code"), 0);
+      Dir != 0;
+      )
   {
-   DidWork = true;
+   os_dir_entry *Entry = OS_WalkDirGetNext(Dir);
    
-   Log("Generating code...\n");
-   
-   arena *Arena = GlobalClingArena;
-   
-   u64 HashArraySize = KB(4);
-   table_hash_node *TableHashArray = PushArrayZero(Arena, table_hash_node, HashArraySize);
-   field_hash_node *FieldHashArray = PushArrayZero(Arena, field_hash_node, HashArraySize);
-   
-   for(os_dir *Dir = OS_WalkDirPush(S8("../code"), 0);
-       Dir != 0;
-       )
+   if(Entry != 0)
    {
-    os_dir_entry *Entry = OS_WalkDirGetNext(Dir);
+    str8 Name = Entry->Name;
     
-    if(Entry != 0)
+    b32 InvalidDir = (S8Match(Entry->Name, S8("."), false) || 
+                      S8Match(Entry->Name, S8(".."), false));
+    if(!InvalidDir)
     {
-     str8 Name = Entry->Name;
-     
-     b32 InvalidDir = (S8Match(Entry->Name, S8("."), false) || 
-                       S8Match(Entry->Name, S8(".."), false));
-     if(!InvalidDir)
+     if(0) {}
+     else if(Entry->Kind == OS_DirEntryKind_Directory)
      {
-      if(0) {}
-      else if(Entry->Kind == OS_DirEntryKind_Directory)
+      Dir = OS_WalkDirPush(Entry->Name, Dir);
+     }
+     else if(Entry->Kind == OS_DirEntryKind_File)
+     {
+      str8 Ext = S8(".mdesk");
+      str8 Scan = S8From(Name, Name.Size - Ext.Size);
+      
+      b32 Match = (Name.Size > Ext.Size &&
+                   S8Match(Scan, Ext, false));
+      
+      if(Match)
       {
-       Dir = OS_WalkDirPush(Entry->Name, Dir);
-      }
-      else if(Entry->Kind == OS_DirEntryKind_File)
-      {
-       str8 Ext = S8(".mdesk");
-       str8 Scan = S8From(Name, Name.Size - Ext.Size);
+       str8 NewDirPath = Str8Fmt("%S/generated", Dir->Path);
+       OS_MakeDirectory((char *)NewDirPath.Data);
        
-       b32 Match = (Name.Size > Ext.Size &&
-                    S8Match(Scan, Ext, false));
+       str8 BaseName = S8To(Name, Name.Size - Ext.Size);
+       str8 OutFile = Str8Fmt("%S.meta.c", BaseName); 
        
-       if(Match)
+       MD_String8 FilePath = Str8Fmt("%S/%S", Dir->Path, Name);
+       MD_ParseResult FileParse = MD_ParseWholeFile(GlobalMDArena, FilePath);
+       
+       // Print metadesk errors
+       for(MD_Message *Message = FileParse.errors.first;
+           Message != 0;
+           Message = Message->next)
        {
-        str8 NewDirPath = Str8Fmt("%S/generated", Dir->Path);
-        OS_MakeDirectory((char *)NewDirPath.Data);
+        MD_CodeLoc code_loc = MD_CodeLocFromNode(Message->node);
+        MD_PrintMessage(stderr, code_loc, Message->kind, Message->string);
+       }
+       if(FileParse.errors.max_message_kind < MD_MessageKind_Error)
+       {
+        MD_Node *Root = FileParse.node->first_child;
         
-        str8 BaseName = S8To(Name, Name.Size - Ext.Size);
-        str8 OutFile = Str8Fmt("%S.meta.c", BaseName); 
+        PushStream(OutFile);
         
-        MD_String8 FilePath = Str8Fmt("%S/%S", Dir->Path, Name);
-        MD_ParseResult FileParse = MD_ParseWholeFile(GlobalMDArena, FilePath);
-        
-        // Print metadesk errors
-        for(MD_Message *Message = FileParse.errors.first;
-            Message != 0;
-            Message = Message->next)
+        for(MD_EachNode(Node, Root))
         {
-         MD_CodeLoc code_loc = MD_CodeLocFromNode(Message->node);
-         MD_PrintMessage(stderr, code_loc, Message->kind, Message->string);
-        }
-        if(FileParse.errors.max_message_kind < MD_MessageKind_Error)
-        {
-         MD_Node *Root = FileParse.node->first_child;
-         
-         PushStream(OutFile);
-         
-         for(MD_EachNode(Node, Root))
+         //- NOTE(luca): Header "file" tag  
+         b32 FilePushed = false;
+         str8 FilePushedName = {0};
          {
-          //- NOTE(luca): Header "file" tag  
-          b32 FilePushed = false;
-          str8 FilePushedName = {0};
+          MD_Node *FileTag = MD_TagFromString(Node, S8("file"), 0);
+          if(!MD_NodeIsNil(FileTag))
           {
-           MD_Node *FileTag = MD_TagFromString(Node, S8("file"), 0);
-           if(!MD_NodeIsNil(FileTag))
+           FilePushedName = FileTag->first_child->string;
+           PushStream(FilePushedName);
+           FilePushed = true;
+          }
+         }
+         
+         //- NOTE(luca): Add tables
+         {
+          MD_Node *TableTag = MD_TagFromString(Node, S8("table"), 0);
+          if(!MD_NodeIsNil(TableTag))
+          {
+           str8 TableName = Node->string;
+           table_hash_node *TableHash = AddTableHashNode(Arena, TableName, 0, 
+                                                         HashArraySize, TableHashArray);
+           TableHash->Table = Node;
+           
+           u64 FieldIdx = 0;
+           for(MD_EachNode(Field, TableTag->first_child))
            {
-            FilePushedName = FileTag->first_child->string;
-            PushStream(FilePushedName);
-            FilePushed = true;
+            AddFieldHashNode(Arena, Field->string, TableHash->Key, 
+                             HashArraySize, FieldHashArray)->Idx = FieldIdx;
+            
+            FieldIdx += 1;
            }
           }
+         }
+         
+         //- NOTE(luca): Gen data
+         {
+          b32 ToLower = MD_NodeHasTag(Node, S8("to_lower"), 0);
+          b32 GenData = MD_NodeHasTag(Node, S8("data"), 0);
+          b32 NoPadding = MD_NodeHasTag(Node, S8("no_padding"), 0);
+          MD_Node *GenDataTable = MD_TagFromString(Node, S8("data_table"), 0);
+          MD_Node *GenDataEnum = MD_TagFromString(Node, S8("data_enum"), 0);
+          MD_Node *GenDataStruct = MD_TagFromString(Node, S8("data_struct"), 0);
+          str8 TypeName = {0};
           
-          //- NOTE(luca): Add tables
+          GenData |= (!MD_NodeIsNil(GenDataTable));
+          GenData |= (!MD_NodeIsNil(GenDataEnum));
+          GenData |= (!MD_NodeIsNil(GenDataStruct));
+          
+          if(GenData)
           {
-           MD_Node *TableTag = MD_TagFromString(Node, S8("table"), 0);
-           if(!MD_NodeIsNil(TableTag))
-           {
-            str8 TableName = Node->string;
-            table_hash_node *TableHash = AddTableHashNode(Arena, TableName, 0, 
-                                                          HashArraySize, TableHashArray);
-            TableHash->Table = Node;
-            
-            u64 FieldIdx = 0;
-            for(MD_EachNode(Field, TableTag->first_child))
+           // Add headers
+           {                                                
+            if(NoPadding)
             {
-             AddFieldHashNode(Arena, Field->string, TableHash->Key, 
-                              HashArraySize, FieldHashArray)->Idx = FieldIdx;
+             S8ListPush(S8("NO_STRUCT_PADDING_BEGIN\n"));
+            }
+            
+            if(!MD_NodeIsNil(GenDataTable))
+            {
+             TypeName = GenDataTable->first_child->string;
+             S8ListPush(Str8Fmt("%S %S[] = {\n", TypeName, Node->string)); 
+            }
+            
+            if(!MD_NodeIsNil(GenDataStruct))
+            {
+             TypeName = GenDataStruct->first_child->string;
+             S8ListPush(Str8Fmt("typedef struct %S %S;\n"
+                                "struct %S\n"
+                                "{\n", TypeName, TypeName, TypeName)); 
+            }
+            
+            if(!MD_NodeIsNil(GenDataEnum))
+            {
+             TypeName = GenDataEnum->first_child->string;
+             S8ListPush(Str8Fmt("enum %S\n"
+                                "{\n", TypeName, TypeName, TypeName)); 
              
-             FieldIdx += 1;
             }
            }
-          }
-          
-          //- NOTE(luca): Gen data
-          {
-           b32 ToLower = MD_NodeHasTag(Node, S8("to_lower"), 0);
-           b32 GenData = MD_NodeHasTag(Node, S8("data"), 0);
-           b32 NoPadding = MD_NodeHasTag(Node, S8("no_padding"), 0);
-           MD_Node *GenDataTable = MD_TagFromString(Node, S8("data_table"), 0);
-           MD_Node *GenDataEnum = MD_TagFromString(Node, S8("data_enum"), 0);
-           MD_Node *GenDataStruct = MD_TagFromString(Node, S8("data_struct"), 0);
-           str8 TypeName = {0};
            
-           GenData |= (!MD_NodeIsNil(GenDataTable));
-           GenData |= (!MD_NodeIsNil(GenDataEnum));
-           GenData |= (!MD_NodeIsNil(GenDataStruct));
-           
-           if(GenData)
+           for(MD_EachNode(Row, Node->first_child))
            {
-            // Add headers
-            {                                                
-             if(NoPadding)
-             {
-              S8ListPush(S8("NO_STRUCT_PADDING_BEGIN\n"));
-             }
-             
-             if(!MD_NodeIsNil(GenDataTable))
-             {
-              TypeName = GenDataTable->first_child->string;
-              S8ListPush(Str8Fmt("%S %S[] = {\n", TypeName, Node->string)); 
-             }
-             
-             if(!MD_NodeIsNil(GenDataStruct))
-             {
-              TypeName = GenDataStruct->first_child->string;
-              S8ListPush(Str8Fmt("typedef struct %S %S;\n"
-                                 "struct %S\n"
-                                 "{\n", TypeName, TypeName, TypeName)); 
-             }
-             
-             if(!MD_NodeIsNil(GenDataEnum))
-             {
-              TypeName = GenDataEnum->first_child->string;
-              S8ListPush(Str8Fmt("enum %S\n"
-                                 "{\n", TypeName, TypeName, TypeName)); 
-              
-             }
-            }
-            
-            for(MD_EachNode(Row, Node->first_child))
+            MD_Node *ExpandTag = MD_TagFromString(Row, S8("expand"), 0);
+            b32 GenStrings = MD_NodeHasTag(Row, S8("strings"), 0);
+            if(!MD_NodeIsNil(ExpandTag))
             {
-             MD_Node *ExpandTag = MD_TagFromString(Row, S8("expand"), 0);
-             b32 GenStrings = MD_NodeHasTag(Row, S8("strings"), 0);
-             if(!MD_NodeIsNil(ExpandTag))
+             str8 TableName = ExpandTag->first_child->string;
+             
+             table_hash_node *TableHash = GetTableHashNode(TableName, 0, HashArraySize, TableHashArray);
+             Assert(TableHash);
+             
+             u64 RowCount = 0;
+             for(MD_EachNode(TableRow, TableHash->Table->first_child))
              {
-              str8 TableName = ExpandTag->first_child->string;
               
-              table_hash_node *TableHash = GetTableHashNode(TableName, 0, HashArraySize, TableHashArray);
-              Assert(TableHash);
+              str8 String;
               
-              u64 RowCount = 0;
-              for(MD_EachNode(TableRow, TableHash->Table->first_child))
+              S8OverPush(Arena, String, KB(4), String.Size)
               {
+               u64 StringIdx = 0;
                
-               str8 String;
+               str8 RowString = Row->string;
                
-               S8OverPush(Arena, String, KB(4), String.Size)
+               for EachIndex(Idx, Row->string.Size)
                {
-                u64 StringIdx = 0;
-                
-                str8 RowString = Row->string;
-                
-                for EachIndex(Idx, Row->string.Size)
+                if(RowString.Data[Idx] == '$')
                 {
-                 if(RowString.Data[Idx] == '$')
+                 Idx += 1;
+                 
+                 if(RowString.Data[Idx] == '(')
                  {
                   Idx += 1;
                   
-                  if(RowString.Data[Idx] == '(')
+                  u64 Start = Idx;
+                  
+                  while(RowString.Data[Idx] != ')') Idx += 1;
+                  
+                  str8 FieldName = S8FromTo(RowString, Start, Idx); 
+                  str8 OutString = {0};
+                  
+                  if(S8Match(FieldName, S8("_Idx"), false))
                   {
-                   Idx += 1;
+                   OutString = Str8Fmt("%llu", RowCount);
+                  }
+                  else
+                  {
+                   field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
+                   MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
                    
-                   u64 Start = Idx;
-                   
-                   while(RowString.Data[Idx] != ')') Idx += 1;
-                   
-                   str8 FieldName = S8FromTo(RowString, Start, Idx); 
-                   str8 OutString = {0};
-                   
-                   if(S8Match(FieldName, S8("_Idx"), false))
+                   if(GenStrings)
                    {
-                    OutString = Str8Fmt("%llu", RowCount);
+                    OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
+                                        Field->string, Field->string.Size);
                    }
                    else
                    {
-                    field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
-                    MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
-                    
-                    if(GenStrings)
-                    {
-                     OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
-                                         Field->string, Field->string.Size);
-                    }
-                    else
-                    {
-                     OutString = Field->string;
-                    }
-                    
-                   }
-                   
-                   // Output that string
-                   {                 
-                    for EachIndex(CharIdx, OutString.Size)
-                    {
-                     u8 Char = OutString.Data[CharIdx];
-                     if(ToLower)
-                     {
-                      Char = ToLowercase(Char);
-                     }
-                     String.Data[StringIdx] = Char;
-                     StringIdx += 1;
-                    }
-                   }
-                   
-                   if(OutString.Size == 0)
-                   {
-                    Log("ERROR: field \"%S\" not found\n", FieldName);
+                    OutString = Field->string;
                    }
                    
                   }
-                 }
-                 else
-                 {
-                  String.Data[StringIdx] = RowString.Data[Idx];
-                  StringIdx += 1;
+                  
+                  // Output that string
+                  {                 
+                   for EachIndex(CharIdx, OutString.Size)
+                   {
+                    u8 Char = OutString.Data[CharIdx];
+                    if(ToLower)
+                    {
+                     Char = ToLowercase(Char);
+                    }
+                    String.Data[StringIdx] = Char;
+                    StringIdx += 1;
+                   }
+                  }
+                  
+                  if(OutString.Size == 0)
+                  {
+                   Log("ERROR: field \"%S\" not found\n", FieldName);
+                  }
+                  
                  }
                 }
-                
-                String.Size = StringIdx;
+                else
+                {
+                 String.Data[StringIdx] = RowString.Data[Idx];
+                 StringIdx += 1;
+                }
                }
                
-               S8ListPush(String);
-               
-               RowCount += 1;
+               String.Size = StringIdx;
               }
               
-             }
-             else
-             {
-              S8ListPush(Row->string);
-             }
-            }
-            
-            // Add footers 
-            {           
-             if(!MD_NodeIsNil(GenDataTable) ||
-                !MD_NodeIsNil(GenDataStruct))
-             {
-              S8ListPush(S8("\n};\n")); 
-             }
-             
-             if(!MD_NodeIsNil(GenDataEnum))
-             {
-              S8ListPush(Str8Fmt("\n};\n"
-                                 "typedef enum %S %S;\n", TypeName, TypeName));
-             }
-             
-             if(NoPadding)
-             {
-              S8ListPush(S8("NO_STRUCT_PADDING_END\n"));
+              S8ListPush(String);
+              
+              RowCount += 1;
              }
              
             }
-            
-            // Pretty
-            S8ListPush(S8("\n"));
+            else
+            {
+             S8ListPush(Row->string);
+            }
            }
+           
+           // Add footers 
+           {           
+            if(!MD_NodeIsNil(GenDataTable) ||
+               !MD_NodeIsNil(GenDataStruct))
+            {
+             S8ListPush(S8("\n};\n")); 
+            }
+            
+            if(!MD_NodeIsNil(GenDataEnum))
+            {
+             S8ListPush(Str8Fmt("\n};\n"
+                                "typedef enum %S %S;\n", TypeName, TypeName));
+            }
+            
+            if(NoPadding)
+            {
+             S8ListPush(S8("NO_STRUCT_PADDING_END\n"));
+            }
+            
+           }
+           
+           // Pretty
+           S8ListPush(S8("\n"));
           }
-          
-          //- NOTE(luca): Footer "file" tag  
-          if(FilePushed)
-          {
-           PopStream(NewDirPath);
-          }
-          //- 
          }
          
-         PopStream(NewDirPath);
+         //- NOTE(luca): Footer "file" tag  
+         if(FilePushed)
+         {
+          PopStream(NewDirPath);
+         }
+         //- 
         }
+        
+        PopStream(NewDirPath);
        }
       }
      }
     }
-    else
+   }
+   else
+   {
+    Dir = OS_WalkDirPop(Dir);
+   }
+  }
+ }
+ 
+ //~ Haversine Generator
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("HaversineGenerator"), S8("Target")))
+ {
+  DidWork = true;
+  
+  SimpleBuildAndRun(&BuildOptions, S8("Haversine Generator"), S8("../code/compenhance/haversine_generator/haversine_generator.c"));
+ }
+ 
+ //~ Haversine Processor
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("HaversineProcessor"), S8("Target")))
+ {
+  DidWork = true;
+  
+  SimpleBuildAndRun(&BuildOptions, S8("Haversine Processor"), S8("../code/compenhance/haversine_processor/haversine_processor.c"));
+ }
+ 
+ //~ Sim86
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Sim86"), S8("Target")))
+ {
+  DidWork = true;
+  
+  
+  Cng_Scratch();
+  Cng_CommonBuildCommand(&BuildOptions);
+  LogBuildMode(S8("sim86"), &BuildOptions);
+  
+  if(Cng_IsOs(CngOS_Windows))
+  {
+   Cng_S8ArrayAppend(S8("/std:c++20"));
+  }
+  
+  Cng_S8ArrayAppend(S8("../code/compenhance/sim86/sim86.cpp"));
+  
+  RunCommand();
+  
+ }
+ 
+ //~ Editor
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Editor"), S8("Target")))
+ {
+  DidWork = true;
+  
+  ApplicationBuild(S8("editor"), S8("editor_app"), 
+                   S8("../code/editor/editor_app.c"), S8("Editor"),
+                   &BuildOptions);
+ }
+ 
+ //~ Muze
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Muze"), S8("Target")))
+ {
+  DidWork = true;
+  
+  ApplicationBuild(S8("muze"), S8("muze_app"), 
+                   S8("../code/muze/muze_app.c"), S8("Muze"),
+                   &BuildOptions);
+ }
+ 
+ //~ WSDCOM
+ S8ArrayAppendTo(Help, S8(" "));
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("WSD"), S8("(See subcommands with -WSD)")))
+ {
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile wsdcom")))
+  {   
+   DidWork = true;
+   SimpleBuildAndRun(&BuildOptions, S8("wsdcom"), S8("../code/wsdcom/wsdcom.c"));
+  }
+  
+  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("copy"), S8("Copy configuration files.")))
+  {
+   DidWork = true;
+   OS_MakeDirectory("Configuration");
+   Cng_RunCommand(S8("cmd.exe /c copy ..\\code\\wsdcom\\Configuration Configuration"));
+  }
+  
+ }
+ S8ArrayAppendTo(Help, S8(" "));
+ 
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("M51"), S8("Target")))
+ {
+  DidWork = true;
+  
+  LogBuildMode(S8("main.asm"), &BuildOptions);
+  
+  Cng_RunCommand(S8("sdas8051 -plosgff main.rel ../code/school/aduc832v4/main.asm"));
+  Cng_RunCommand(S8("sdld -n -i main.ihx main.rel"));
+  Cng_RunCommand(S8("wsdcom /C:4 /R:0000 main.ihx"));
+ }
+ 
+ //~ Linux Serial Downloader
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("LSD"), S8("Target")))
+ {
+  DidWork = true;
+  SimpleBuildAndRun(&BuildOptions, S8("LSD"), S8("../code/lsd/lsd.c"));
+ }
+ 
+ //~ School
+ S8ArrayAppendTo(Help, S8(" "));
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(See subcommands with -School)")))
+ {
+  Cng_Scratch();
+  
+  b32 Compile  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile the source file"));
+  b32 Run      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run the built program"));
+  b32 Last     = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("last"), S8("Use the last found source file as input"));
+  b32 All      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("all"), S8("Use all source files as input"));
+  b32 Template = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("template"), S8("Create a template source file"));
+  b32 Print    = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("print"), S8("Print the source file path"));
+  b32 Convert  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("convert"), S8("Convert spaces to tabs in the source file"));
+  
+  if(Compile)
+  {
+   LogBuildMode(S8("Les1"), &BuildOptions);
+  }
+  
+  if(All) Last = true;
+  
+  str8 TemplateText = S8(
+                         "#define _CRT_SECURE_NO_WARNINGS\n"
+                         "#include <stdio.h>\n"
+                         "\n"
+                         "int main(int ArgCount, char **Args)\n"
+                         "{\n"
+                         "\tprintf(\"Hello, world!\\n\");\n"
+                         "\treturn 0;\n"
+                         "}\n"
+                         );
+  
+  // Sanitization
+  {
+   b32 Error = false;
+   if(Template)
+   {
+    if(Compile) { Log("ERROR: -compile is incompatible with -template.\n"); Error = true; } 
+    if(Run)     { Log("ERROR: -run is incompatible with -template.\n"); Error = true; }
+   }
+   
+   if(Error)
+   {
+    Compile = false;
+    Run = false;
+    Template = false;
+    Last = false;
+   }
+  }
+  
+  str8 NamePrefix = S8("raymaekersLuca");
+  str8 Hoofdstuk = S8("6");
+  
+  char *PathFormat = (char *)Str8Fmt("../code/school/les1_%S/%S_%S_%%S.c", 
+                                     Hoofdstuk, NamePrefix, Hoofdstuk).Data;
+  
+  if(Last)
+  {
+   u64 MaxLastIdx = 64;
+   u64 LastIdx = 1;
+   for(u64 Idx = LastIdx; Idx < MaxLastIdx; Idx += 1)
+   {
+    str8 LastIdxString = Str8Fmt("%llu", Idx);
+    
+    str8 Path = Str8Fmt(PathFormat, LastIdxString);
+    if(OS_FileExists((char *)Path.Data))
     {
-     Dir = OS_WalkDirPop(Dir);
+     str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
+     DLLAppendNil(Node, CmdLine->FirstFile, CmdLine->LastFile, NilS8Node);
+     Node->V = LastIdxString; 
+     
+     LastIdx = Idx;
     }
+    
+    Assert(LastIdx < MaxLastIdx);
    }
   }
   
-  //~ Haversine Generator
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("HaversineGenerator"), S8("Target")))
-  {
-   DidWork = true;
-   
-   SimpleBuildAndRun(&BuildOptions, S8("Haversine Generator"), S8("../code/compenhance/haversine_generator/haversine_generator.c"));
-  }
+  b32 StartAtLast = (Last && !All);
+  str8_node *First = (!StartAtLast ? CmdLine->FirstFile : CmdLine->LastFile);
   
-  //~ Haversine Processor
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("HaversineProcessor"), S8("Target")))
+  for(str8_node *Node = First; !IsNilS8Node(Node); Node = Node->Next)
   {
-   DidWork = true;
+   str8 Path = Str8Fmt(PathFormat, Node->V);
    
-   SimpleBuildAndRun(&BuildOptions, S8("Haversine Processor"), S8("../code/compenhance/haversine_processor/haversine_processor.c"));
-  }
-  
-  //~ Sim86
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Sim86"), S8("Target")))
-  {
-   DidWork = true;
-   
-   LogBuildMode(S8("sim86"), !BuildOptions.Release);
-   
-   Cng_Scratch();
-   Cng_CommonBuildCommand(&BuildOptions);
-   if(Cng_IsOs(CngOS_Windows))
+   if(Print)
    {
-    Cng_S8ArrayAppend(S8("/std:c++20"));
+    Log("%S\n", Path);
    }
    
-   Cng_S8ArrayAppend(S8("../code/compenhance/sim86/sim86.cpp"));
-   
-   RunCommand();
-   
-  }
-  
-  //~ Editor
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Editor"), S8("Target")))
-  {
-   DidWork = true;
-   
-   ApplicationBuild(S8("editor"), S8("editor_app"), 
-                    S8("../code/editor/editor_app.c"), S8("Editor"),
-                    &BuildOptions);
-  }
-  
-  //~ Muze
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Muze"), S8("Target")))
-  {
-   DidWork = true;
-   
-   ApplicationBuild(S8("muze"), S8("muze_app"), 
-                    S8("../code/muze/muze_app.c"), S8("Muze"),
-                    &BuildOptions);
-  }
-  
-  //~ WSDCOM
-  S8ArrayAppendTo(Help, S8(" "));
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("WSD"), S8("(See subcommands with -WSD)")))
-  {
-   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile wsdcom")))
-   {   
-    DidWork = true;
-    SimpleBuildAndRun(&BuildOptions, S8("wsdcom"), S8("../code/wsdcom/wsdcom.c"));
-   }
-   
-   if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("copy"), S8("Copy configuration files.")))
+   if(Template)
    {
-    DidWork = true;
-    OS_MakeDirectory("Configuration");
-    Cng_RunCommand(S8("cmd.exe /c copy ..\\code\\wsdcom\\Configuration Configuration"));
+    OS_WriteEntireFile((char *)Path.Data, TemplateText);
    }
    
-  }
-  S8ArrayAppendTo(Help, S8(" "));
-  
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("M51"), S8("Target")))
-  {
-   DidWork = true;
-   
-   LogBuildMode(S8("main.asm"), !BuildOptions.Release);
-   
-   Cng_RunCommand(S8("sdas8051 -plosgff main.rel ../code/school/aduc832v4/main.asm"));
-   Cng_RunCommand(S8("sdld -n -i main.ihx main.rel"));
-   Cng_RunCommand(S8("wsdcom /C:4 /R:0000 main.ihx"));
-  }
-  
-  //~ Linux Serial Downloader
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("LSD"), S8("Target")))
-  {
-   DidWork = true;
-   SimpleBuildAndRun(&BuildOptions, S8("LSD"), S8("../code/lsd/lsd.c"));
-  }
-  
-  //~ School
-  S8ArrayAppendTo(Help, S8(" "));
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("School"), S8("(See subcommands with -School)")))
-  {
-   Cng_Scratch();
-   
-   b32 Compile  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("compile"), S8("Compile the source file"));
-   b32 Run      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run the built program"));
-   b32 Last     = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("last"), S8("Use the last found source file as input"));
-   b32 All      = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("all"), S8("Use all source files as input"));
-   b32 Template = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("template"), S8("Create a template source file"));
-   b32 Print    = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("print"), S8("Print the source file path"));
-   b32 Convert  = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("convert"), S8("Convert spaces to tabs in the source file"));
+   if(Convert)
+   {
+    str8 File = OS_ReadEntireFileIntoMemory((char *)Path.Data);
+    
+    str8 Out = PushS8(GlobalClingArena, File.Size);
+    
+    // Convert tab to spaces.
+    b32 OnStartOfLine = true;
+    for EachIndex(Idx, File.Size)
+    {
+     u8 Char = File.Data[Idx];
+     
+     if(0) {}
+     else if(Char == '\n') OnStartOfLine = true;
+     else if(Char != ' ') OnStartOfLine = false;
+     else
+     {
+      if(OnStartOfLine) Char = '\t';
+     }
+     
+     Out.Data[Idx] = Char;
+    }
+    
+    OS_WriteEntireFile((char *)Path.Data, Out);
+    OS_FreeFileMemory(File);
+   }
    
    if(Compile)
    {
-    LogBuildMode(S8("Les1"), !BuildOptions.Release);
+    S8ArrayTemp(GlobalSelectedArray)
+    {
+     Cng_CommonBuildCommand(&BuildOptions);
+     Cng_S8ArrayAppend(Path);
+     RunCommand();
+    }
    }
    
-   if(All) Last = true;
-   
-   str8 TemplateText = S8(
-                          "#define _CRT_SECURE_NO_WARNINGS\n"
-                          "#include <stdio.h>\n"
-                          "\n"
-                          "int main(int ArgCount, char **Args)\n"
-                          "{\n"
-                          "\tprintf(\"Hello, world!\\n\");\n"
-                          "\treturn 0;\n"
-                          "}\n"
-                          );
-   
-   // Sanitization
+   if(Run)
    {
-    b32 Error = false;
-    if(Template)
+    S8ArrayTemp(GlobalSelectedArray)
     {
-     if(Compile) { Log("ERROR: -compile is incompatible with -template.\n"); Error = true; } 
-     if(Run)     { Log("ERROR: -run is incompatible with -template.\n"); Error = true; }
-    }
-    
-    if(Error)
-    {
-     Compile = false;
-     Run = false;
-     Template = false;
-     Last = false;
+     str8 BuildPath = Str8Fmt("../build/%S_%S_%S.exe", NamePrefix, Hoofdstuk, Node->V);
+     
+     Cng_S8ArrayAppend(BuildPath);
+     RunCommand();
     }
    }
    
-   str8 NamePrefix = S8("raymaekersLuca");
-   str8 Hoofdstuk = S8("6");
-   
-   char *PathFormat = (char *)Str8Fmt("../code/school/les1_%S/%S_%S_%%S.c", 
-                                      Hoofdstuk, NamePrefix, Hoofdstuk).Data;
-   
-   if(Last)
-   {
-    u64 MaxLastIdx = 64;
-    u64 LastIdx = 1;
-    for(u64 Idx = LastIdx; Idx < MaxLastIdx; Idx += 1)
-    {
-     str8 LastIdxString = Str8Fmt("%llu", Idx);
-     
-     str8 Path = Str8Fmt(PathFormat, LastIdxString);
-     if(OS_FileExists((char *)Path.Data))
-     {
-      str8_node *Node = PushArray(GlobalClingArena, str8_node, 1);
-      DLLAppendNil(Node, CmdLine->FirstFile, CmdLine->LastFile, NilS8Node);
-      Node->V = LastIdxString; 
-      
-      LastIdx = Idx;
-     }
-     
-     Assert(LastIdx < MaxLastIdx);
-    }
-   }
-   
-   b32 StartAtLast = (Last && !All);
-   str8_node *First = (!StartAtLast ? CmdLine->FirstFile : CmdLine->LastFile);
-   
-   for(str8_node *Node = First; !IsNilS8Node(Node); Node = Node->Next)
-   {
-    str8 Path = Str8Fmt(PathFormat, Node->V);
-    
-    if(Print)
-    {
-     Log("%S\n", Path);
-    }
-    
-    if(Template)
-    {
-     OS_WriteEntireFile((char *)Path.Data, TemplateText);
-    }
-    
-    if(Convert)
-    {
-     str8 File = OS_ReadEntireFileIntoMemory((char *)Path.Data);
-     
-     str8 Out = PushS8(GlobalClingArena, File.Size);
-     
-     // Convert tab to spaces.
-     b32 OnStartOfLine = true;
-     for EachIndex(Idx, File.Size)
-     {
-      u8 Char = File.Data[Idx];
-      
-      if(0) {}
-      else if(Char == '\n') OnStartOfLine = true;
-      else if(Char != ' ') OnStartOfLine = false;
-      else
-      {
-       if(OnStartOfLine) Char = '\t';
-      }
-      
-      Out.Data[Idx] = Char;
-     }
-     
-     OS_WriteEntireFile((char *)Path.Data, Out);
-     OS_FreeFileMemory(File);
-    }
-    
-    if(Compile)
-    {
-     S8ArrayTemp(GlobalSelectedArray)
-     {
-      Cng_CommonBuildCommand(&BuildOptions);
-      Cng_S8ArrayAppend(Path);
-      RunCommand();
-     }
-    }
-    
-    if(Run)
-    {
-     S8ArrayTemp(GlobalSelectedArray)
-     {
-      str8 BuildPath = Str8Fmt("../build/%S_%S_%S.exe", NamePrefix, Hoofdstuk, Node->V);
-      
-      Cng_S8ArrayAppend(BuildPath);
-      RunCommand();
-     }
-    }
-    
-    DidWork = true;
-   }
-   
-  }
-  S8ArrayAppendTo(Help, S8(" "));
-  
-  if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Zsh"), S8("Print out zsh completions")))
-  {
    DidWork = true;
-   str8 Text = S8("_cling() \n"
-                  "{\n"
-                  "local cmd=\"${words[1]}\"\n"
-                  "local help_output line token desc\n"
-                  "local -a candidates\n"
-                  "\n"
-                  "help_output=\"$(CLING_NOREBUILD=1 \"$cmd\" -h 2>&1)\"\n"
-                  "\n"
-                  "# Extract entries formatted like:\n"
-                  "# -Asan : Enable address sanitizer\n"
-                  "while IFS= read -r line; do\n"
-                  "if [[ \"$line\" =~ '^[[:space:]]*([^[:space:]]+)[[:space:]]*:[[:space:]]*(.*)$' ]]; then\n"
-                  "token=\"${match[1]}\"\n"
-                  "desc=\"${match[2]}\"\n"
-                  "candidates+=(\"$token:$desc\")\n"
-                  "fi\n"
-                  "done <<< \"$help_output\"\n"
-                  "_describe 'cling arguments' candidates\n"
-                  "}\n"
-                  "compdef _cling cling\n");
-   Log("%S\n", Text);
   }
   
-  if(DidWork)
-  {
-   // TODO(luca): Check on windows if we can remove this already.
-   fprintf(stderr, "Done.\n");
-  }
-  else
-  {
-   str8 HelpText = Cng_S8ArrayJoinFrom(Help, '\n');
-   Log("\nNo target provided.\n\n%S\n", HelpText);
-  }
+ }
+ S8ArrayAppendTo(Help, S8(" "));
+ 
+ if(CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Zsh"), S8("Print out zsh completions")))
+ {
+  DidWork = true;
+  str8 Text = S8("_cling() \n"
+                 "{\n"
+                 "local cmd=\"${words[1]}\"\n"
+                 "local help_output line token desc\n"
+                 "local -a candidates\n"
+                 "\n"
+                 "help_output=\"$(CLING_NOREBUILD=1 \"$cmd\" -h 2>&1)\"\n"
+                 "\n"
+                 "# Extract entries formatted like:\n"
+                 "# -Asan : Enable address sanitizer\n"
+                 "while IFS= read -r line; do\n"
+                 "if [[ \"$line\" =~ '^[[:space:]]*([^[:space:]]+)[[:space:]]*:[[:space:]]*(.*)$' ]]; then\n"
+                 "token=\"${match[1]}\"\n"
+                 "desc=\"${match[2]}\"\n"
+                 "candidates+=(\"$token:$desc\")\n"
+                 "fi\n"
+                 "done <<< \"$help_output\"\n"
+                 "_describe 'cling arguments' candidates\n"
+                 "}\n"
+                 "compdef _cling cling\n");
+  Log("%S\n", Text);
+ }
+ 
+ if(!DidWork)
+ {
+  str8 HelpText = Cng_S8ArrayJoinFrom(Help, '\n');
+  Log("\nNo target provided.\n\n%S\n", HelpText);
  }
  
  return 0;

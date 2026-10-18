@@ -233,8 +233,7 @@ DisabledButton(str8 Text, b32 Disabled)
 UI_ButtonWithToggle(S8(ButtonText), Toggled, GlobalPadding, ButtonColor, .ClipSize = true, ##__VA_ARGS__).OneClicked
 
 //~ Entrypoint
-raddbg_entry_point(EntryPoint);
-C_LINKAGE ENTRY_POINT(EntryPoint)
+BASE_ENTRY_POINT()
 {
  if(LaneIndex() == 0)
  {
@@ -283,19 +282,9 @@ C_LINKAGE ENTRY_POINT(EntryPoint)
   
   // Get ExeDirPath
   {
-   u64 OnePastLastSlash = 0;
-   char *FileName = Params->Args[0];
-   u64 SizeOfFileName = StringLength(FileName);
-   for EachIndex(Idx, SizeOfFileName)
-   {
-    if(FileName[Idx] == OS_SlashChar)
-    {
-     OnePastLastSlash = Idx + 1;
-    }
-   }
-   
-   ExeDirPath.Data = (u8 *)FileName;
-   ExeDirPath.Size = OnePastLastSlash;
+   str8 FileName = S8FromCString(Params->Args[0]);
+   u64 OnePastLastSlash = S8FindChar(FileName, OS_SlashChar, false, true);
+   ExeDirPath = S8To(FileName, OnePastLastSlash);
   }
   
   app_memory AppMemory = {0};

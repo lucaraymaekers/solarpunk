@@ -215,6 +215,22 @@ OS_Sleep(u32 MicroSeconds)
  CloseHandle(Timer);
 }
 
+internal u64 
+OS_GetTimerFreq(void)
+{
+	LARGE_INTEGER Freq;
+	QueryPerformanceFrequency(&Freq);
+	return Freq.QuadPart;
+}
+
+internal u64 
+OS_ReadTimer(void)
+{
+	LARGE_INTEGER Value;
+	QueryPerformanceCounter(&Value);
+	return Value.QuadPart;
+}
+
 //~ Filesystem operations
 internal void
 OS_ChangeDirectory(char *Path)
@@ -280,7 +296,7 @@ OS_WalkDirGetNext(os_dir *Dir)
   arena *Arena = GetScratch();
   Result = PushArrayZero(Arena, os_dir_entry, 1);
   
-  Result->Name = Str8DupCString(Arena, FindData.cFileName);
+  Result->Name = S8DupCString(Arena, FindData.cFileName);
   
   Result->Kind = OS_DirEntryKind_File;
   if(FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) Result->Kind = OS_DirEntryKind_Directory;

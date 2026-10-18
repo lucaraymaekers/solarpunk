@@ -33,8 +33,6 @@ struct str8_array
 typedef struct str8_array str8_array;
 
 //~ Globals
-read_only str8_node _NilS8Node = {&_NilS8Node, &_NilS8Node};
-read_only str8_node *NilS8Node = &_NilS8Node;
 
 #define IsNilS8Node(Node) CheckNil(Node, NilS8Node)
 
@@ -52,7 +50,8 @@ internal str8 S8SkipLastSlash(str8 String);
 internal b32  S8Match(str8 A, str8 B, b32 BIsPrefix);
 internal u64  StringLength(char *String);
 internal str8 S8Cat(str8 Prefix, str8 Suffix);
-internal str8 Str8DupCString(arena *Arena, char *String);
+internal u64  S8FindChar(str8 String, u8 Char, b32 FromStart, b32 Next);
+internal str8 S8DupCString(arena *Arena, char *String);
 internal str8 Str8VFmt(const char *Format, va_list Args);
 internal str8 Str8Fmt(const char *Format, ...);
 internal u64  U64HashFromSeedStr8(u64 Seed, str8 String);

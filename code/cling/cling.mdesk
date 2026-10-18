@@ -3,14 +3,15 @@
 Config:
 {
  // Build Params
- { Asan    0 "Enable adress sanitizer" }
- { Release 0 "Enable optimizations and remove debug tooling" }
+ { Asan    0 "Enable adress sanitizer"                                      }
+ { Release 0 "Enable optimizations and remove debug tooling"                }
  // TODO(luca):
- //{ Clean   0 "Clear out the build directory to get a clean build" }
- { Slow    0 "When building applications, rebuild all libraries every time"}
- { Clang   0 "Use Clang (Linux only)" }
- { GCC     0 "Use GCC (Linux only)" }
- { Wine    0 "Build with wine (Linux only)" }
+ //{ Clean   0 "Clear out the build directory to get a clean build"           }
+ { Slow    0 "When building applications, rebuild all libraries every time" }
+ { Clang   0 "Use Clang (Linux only)"                                       }
+ { GCC     0 "Use GCC (Linux only)"                                         }
+ { Wine    0 "Build with wine (Linux only)"                                 }
+ { CPP     0 "Source code is CPP"                                           }
 }
 
 //~ Config

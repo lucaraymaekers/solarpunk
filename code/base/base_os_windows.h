@@ -3,10 +3,9 @@
 #ifndef BASE_OS_WINDOWS_H
 #define BASE_OS_WINDOWS_H
 
-typedef struct os_dir_opaque os_dir_opaque;
 struct os_dir_opaque
 {
-    HANDLE Handle;
+ HANDLE Handle;
 };
 
 #endif //BASE_OS_WINDOWS_H

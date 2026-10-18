@@ -5,11 +5,10 @@
 
 #include <dirent.h>
 
-typedef struct os_dir_opaque os_dir_opaque;
 struct os_dir_opaque
 {
-    DIR *Dir;
-    struct dirent *Entry;
+ DIR *Dir;
+ struct dirent *Entry;
 };
 
 internal s64 LinuxTimeSpecTo(struct timespec Counter);

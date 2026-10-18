@@ -1,8 +1,4 @@
 //~ Libraries
-// Standard library (TODO(luca): get rid of it) 
-#include <stdio.h>
-#include <string.h>
-
 #if !defined(CLING_SOURCE_PATH)
 # error "You must define CLING_SOURCE_PATH"
 #endif
@@ -10,7 +6,7 @@
 # error "You must define CLING_CODE_PATH"
 #endif
 #if !defined(CLING_BUILD_PATH)
-# error "You must define CLING_CODE_PATH"
+# error "You must define CLING_BUILD_PATH"
 #endif
 
 #define CLING_ARG_NOREBUILD "CLING_NOREBUILD"
@@ -36,6 +32,7 @@ struct cng_build_options
  b32 Release;
  b32 Slow;
  b32 Wine;
+ b32 CPP;
 };
 
 //~ Globals
@@ -73,7 +70,7 @@ S8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__)
 //- Helpers
 
 #if OS_LINUX
-internal str8 LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, u8 *Command, char *Env[]);
+internal str8 LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command, char *Env[]);
 #endif
 
 internal void 
@@ -99,28 +96,67 @@ Cng_CommonBuildCommand(cng_build_options *Options)
                               "-Wno-unused-variable "
                               "-Wno-unused-function ");
  
- str8 LinuxLinkerFlags = S8("-lm");
- 
  str8 Compiler = {0};
  if(0) {}
  else if(Options->Clang) Compiler = S8("clang");
  else if(Options->GCC)   Compiler = S8("gcc");
  else
  {
-  Compiler = S8("cc");
-  // Find compiler cc is linking to
+  // Find compiler `cc` is Linked to
   {
-   u8 Buffer[PATH_MAX] = {0};
-   LinuxFindCommandInPATH(sizeof(Buffer), Buffer, Compiler.Data, GlobalEnv);
+   u8 Buffer_[PATH_MAX] = {0};
+   // NOTE(luca): For Swap() to work
+   u8 *Buffer = Buffer_;
    
-   u8 *Path = PushArray(GlobalClingArena, u8, PATH_MAX);
-   s64 Size = readlink((char *)Buffer, (char *)Path, PATH_MAX);
-   Path[Size] = 0;
-   
-   Compiler = (str8){.Data = Path, .Size = (u64)Size};
-   
-   u64 OPLSlashIdx = S8FindChar(Compiler, '/', false, true);
-   Compiler = S8From(Compiler, OPLSlashIdx);
+   str8 Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "cc", GlobalEnv);
+   if(Command.Size)
+   {
+    Compiler = S8("cc");
+    
+    u8 Path_[PATH_MAX] = {0};
+    u8 *Path = Path_;
+    
+    s64 Size = 0;
+    while(Size != -1)
+    {
+     Path[Size] = 0;
+     
+     Size = readlink((char *)Buffer, (char *)Path, PATH_MAX);
+     
+     b32 Break = false;
+     for(s64 Idx = 0; Idx < Size && !Break; Idx += 1)
+     {
+      Break = true;
+      str8 Search = {.Data = Path + Idx, .Size = (u64)(Size - Idx)};
+      if(0) {}
+      else if(S8Match(Search, S8("clang"), true)) Compiler = S8("clang");
+      else if(S8Match(Search, S8("gcc"), true)) Compiler = S8("gcc");
+      else Break = false;
+     }
+     if(Break) break;
+     
+     Swap(Buffer, Path);
+    }
+   }
+   else
+   {
+    // NOTE(luca): No CC, try "gcc" or "clang" if present.
+    Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "gcc", GlobalEnv);
+    if(Command.Size) 
+    {
+     Compiler = S8("gcc");
+     goto CompilerFound;
+    }
+    
+    Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "clang", GlobalEnv);
+    if(Command.Size) 
+    {
+     Compiler = S8("clang");
+     goto CompilerFound;
+    }
+    
+    CompilerFound:;
+   }
   }
   
   if(0) {}
@@ -132,36 +168,52 @@ Cng_CommonBuildCommand(cng_build_options *Options)
   {
    Options->Clang = true;
   }
+  else
+  {
+   Log("Error: No compiler found.\n");
+  }
  }
  
- str8 Mode = {0};
+ Cng_S8ArrayAppend(Compiler);
  
  if(Options->Asan)
  {
   Cng_S8ArrayAppend(S8("-fsanitize=undefined,address"));
  }
  
+ if(!Options->CPP)
+ {
+  Cng_S8ArrayAppend(S8("-std=c99"));
+ }
+ 
  if(0) {}
  else if(Options->Clang)
  {
-  Cng_S8ArrayAppend(Compiler);
   if(Debug)
   {
    Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
   }
   else
   {
-   Cng_S8ArrayAppend(S8("-O3"));
+   Cng_S8ArrayAppend(S8("-O2"));
   }
   Cng_S8ArrayAppend(CommonCompilerFlags);
   Cng_S8ArrayAppend(S8("-fdiagnostics-absolute-paths -ftime-trace"));
   Cng_S8ArrayAppend(CommonWarningFlags);
-  Cng_S8ArrayAppend(S8("-Wno-null-dereference -Wno-missing-braces -Wno-vla-cxx-extension -Wno-writable-strings -Wno-missing-designated-field-initializers -Wno-address-of-temporary -Wno-int-to-void-pointer-cast -Wno-incompatible-pointer-types-discards-qualifiers"));
+  Cng_S8ArrayAppend(S8("-Wno-null-dereference "
+                       "-Wno-missing-braces "
+                       "-Wno-undefined-internal "
+                       "-Wno-initializer-overrides "
+                       "-Wno-string-conversion "
+                       "-Wno-vla-cxx-extension "
+                       "-Wno-writable-strings "
+                       "-Wno-missing-designated-field-initializers "
+                       "-Wno-address-of-temporary "
+                       "-Wno-int-to-void-pointer-cast "
+                       "-Wno-incompatible-pointer-types-discards-qualifiers"));
  }
  else if(Options->GCC)
  {
-  Cng_S8ArrayAppend(Compiler);
-  
   Cng_S8ArrayAppend(S8("-Wno-type-limits -Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
   
   if(Debug)
@@ -170,14 +222,13 @@ Cng_CommonBuildCommand(cng_build_options *Options)
   }
   else
   {
-   Cng_S8ArrayAppend(S8("-O3"));
+   Cng_S8ArrayAppend(S8("-O2"));
   }
   Cng_S8ArrayAppend(CommonCompilerFlags);
   Cng_S8ArrayAppend(CommonWarningFlags);
   Cng_S8ArrayAppend(S8("-Wno-cast-function-type -Wno-missing-field-initializers -Wno-int-to-pointer-cast"));
  }
  
- Cng_S8ArrayAppend(LinuxLinkerFlags);
 #elif OS_WINDOWS    
  
 #if defined(CLING_MSVC_SETUP)
@@ -201,15 +252,7 @@ Cng_PathFromExe(str8 ExePath, str8 Path)
  
  MemoryCopy(FileName.Data, ExePath.Data, ExePath.Size);
  
- u64 OnePastLastSlash = 0;
- for EachIndex(Idx, ExePath.Size)
- {
-  if(ExePath.Data[Idx] == OS_SlashChar)
-  {
-   OnePastLastSlash = Idx + 1;
-  }
- }
- 
+ u64 OnePastLastSlash = S8FindChar(ExePath, OS_SlashChar, false, true);
  FileName.Size = OnePastLastSlash + Path.Size;
  
  u64 At = OnePastLastSlash;
@@ -218,7 +261,6 @@ Cng_PathFromExe(str8 ExePath, str8 Path)
   FileName.Data[At] = Path.Data[Idx];
   At += 1;
  }
- 
  FileName.Data[FileName.Size] = 0;
  
  return FileName;
@@ -229,15 +271,7 @@ Cng_GetBaseFileName(str8 FileName)
 {
  str8 Result = {0};
  
- u64 OnePastLastSlash = 0;
- for EachIndex(Idx, FileName.Size)
- {
-  if(FileName.Data[Idx] == OS_SlashChar)
-  {
-   OnePastLastSlash = Idx + 1;
-  }
- }
- 
+ u64 OnePastLastSlash = S8FindChar(FileName, OS_SlashChar, false, true);
  Result = S8From(FileName, OnePastLastSlash);
  
  return Result;
@@ -317,8 +351,8 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
  {
   GlobalCurrentOS = CngOS_Windows;
   GlobalEnv = Env;
-  SetStringsScratch(ArenaAlloc());
-  Cng_SetArena(ArenaAlloc());
+  SetStringsScratch(GetScratch());
+  Cng_SetArena(GetScratch());
  }
  
  str8 NoRebuildString = Win32GetEnvironmentVar(CLING_ARG_NOREBUILD);
@@ -513,8 +547,9 @@ LinuxErrorWrapperRead(int File, void *Buffer, umm BytesToRead)
  return BytesRead;
 }
 
+// TODO(luca): Simplify
 internal str8 
-LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, u8 *Command, char *Env[])
+LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command, char *Env[])
 {
  u8 **VarAt = (u8 **)Env;
  char Search[] = "PATH=";
@@ -560,14 +595,16 @@ LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, u8 *Command, char *Env[])
    {
     Result.Data[At] = Scan[At];
    }
-   Result.Data[At++] = '/';
+   Result.Data[At] = '/';
+   At += 1;
    
    // Add the executable name
-   for(u8 *CharAt = Command;
+   for(char *CharAt = Command;
        *CharAt;
-       CharAt++)
+       CharAt += 1)
    {
-    Result.Data[At++] = *CharAt;
+    Result.Data[At] = (u8)CharAt[0];
+    At += 1;
    }
    Result.Data[At] = 0;
    
@@ -661,7 +698,7 @@ Cng_RunCommand(str8 Command)
  if(Args[0] && Args[0][0] != '/')
  {
   u8 Buffer[PATH_MAX] = {0};
-  str8 ExePath = LinuxFindCommandInPATH(sizeof(Buffer), Buffer, (u8 *)Args[0], GlobalEnv);
+  str8 ExePath = LinuxFindCommandInPATH(sizeof(Buffer), Buffer, Args[0], GlobalEnv);
   if(ExePath.Size)
   {
    Args[0] = (char *)ExePath.Data;
@@ -700,7 +737,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   
   Cng_SetSelectedArray(Cng_PushS8Array(256));
   
-  Cng_CommonBuildCommand(&((cng_build_options){0}));
+  Cng_CommonBuildCommand(Nil(cng_build_options));
   
   str8 ClingSourcePath = Cng_PathFromExe(CommandName, S8(CLING_SOURCE_PATH));
   str8 ClingCodePath = Cng_PathFromExe(CommandName, S8(CLING_CODE_PATH));
