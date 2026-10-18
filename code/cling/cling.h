@@ -643,8 +643,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
    // Copy to temp
    Win32LogIf(!CopyFile((char *)NewPath.Data, 
                         (char *)TempPath.Data,
-                        
-                        .false));
+                        false));
    RunPath = TempPath;
   }
   else

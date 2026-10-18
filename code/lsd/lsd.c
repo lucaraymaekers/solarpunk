@@ -15,15 +15,21 @@
 //-
 
 //~ Libraries
-#include <sys/ioctl.h>
-#include <termios.h>
 
+#define BASE_CONSOLE_APPLICATION 1
 #define BASE_FORCE_THREADS_COUNT 1
 #include "base/base.h"
 #include "base/base.c"
 
 #include "rl/rl_profile.h"
+
 #include "lsd/generated/lsd.meta.c"
+#include "lsd/lsd.h"
+#if OS_LINUX
+# include "lsd/lsd_linux.c"
+#elif OS_WINDOWS
+# include "lsd/lsd_windows.c"
+#endif
 
 //~ Types
 typedef struct command command;
@@ -32,10 +38,9 @@ struct command
  command_kind Kind;
  
  u64 BufferCount;
- u8 Buffer[512];
+ u8 Buffer[256];
  u8 CheckSum;
  s32 Baud;
- speed_t BaudSpeed;
  
  u64 StartTSC;
  
@@ -69,28 +74,27 @@ read_only global_variable command Command_Interrogate =
 // NOTE(luca): See table 44 in datasheet for AduC832
 
 read_only global_variable command Command_SetFastBaud =
-#if 0
-#elif defined(B230400)
 {
  .Kind = CommandKind_ChangeBaud, 
  //                           T3CON T3FD
  .BufferCount = 2, .Buffer = {0x81, 0x09},
  .Baud = 230400,
- .BaudSpeed = B230400,
 };
+
+#if 0
+#if 0
 #elif defined(B115200)
 {
  .Kind = CommandKind_ChangeBaud, 
  //                           T3CON T3FD
  .BufferCount = 2, .Buffer = {0x82, 0x09},
  .Baud = 115200,
- .BaudSpeed = B115200,
 };
 #elif defined(B57600)
 {
  .Kind = CommandKind_ChangeBaud,
  .BufferCount = 2, .Buffer = {0x83, 0x09},
- .BaudSpeed = B57600,
+ .Baud = 57600,
 };
 #else
 {
@@ -99,8 +103,8 @@ read_only global_variable command Command_SetFastBaud =
  //                           T3CON T3FD
  .BufferCount = 2, .Buffer = {0x85, 0x2D},
  .Baud = 9600,
- .BaudSpeed = B9600,
 };
+#endif
 #endif
 
 read_only global_variable command Command_SetSlowBaud = 
@@ -110,7 +114,6 @@ read_only global_variable command Command_SetSlowBaud =
  //                           T3CON T3FD
  .BufferCount = 2, .Buffer = {0x85, 0x2D},
  .Baud = 9600,
- .BaudSpeed = B9600,
 };
 
 
@@ -181,10 +184,9 @@ GetCheckSum(u64 Size, u8 *Data)
 //~ Entry point
 BASE_ENTRY_POINT()
 {
- int TerminalHandle = 0;
- char *DeviceFileName = "/dev/ttyUSB0";
+ lsd_port_handle TerminalHandle = {0};
+ str8 DeviceFileName = S8("");
  char *HexFileName = 0;
- b32 DefaultDevice = true;
  b32 DidWork = false;
  b32 Verbose = false;
  b32 Run = false;
@@ -215,11 +217,10 @@ BASE_ENTRY_POINT()
   if(ShowHelp) ShouldQuit = true;
   
   {  
-   cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1"));
+   cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1 (linux) or -device=COM1 (windows)"));
    if(!IsNilCmdLineEntry(Entry))
    {
-    DeviceFileName = CSS8(Entry->First->V);
-    DefaultDevice = false;
+    DeviceFileName = Entry->First->V;
    }
    
    HexFileName = CSS8(CmdLine->FirstFile->V);
@@ -230,242 +231,145 @@ BASE_ENTRY_POINT()
    DidWork = true;
    
    Prof_TimeScope("Open terminal")
-   {    
-    TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
-    
-    // NOTE(luca): Sometimes it will open up on /dev/ttyUSB1 if /dev/ttyUSB0 was in use
-    // while plugging in the board.  In those cases, we search for ttyUSB devices in /dev.
-    // NOTE(luca): Since there is a hard limit on max serial devices we could also enumerate them (https://docs.kernel.org/usb/usb-serial.html)
-    if(TerminalHandle == -1 && DefaultDevice)
-    {
-     os_dir *Dir = OS_WalkDirPush(S8("/dev"), 0);
-     os_dir_entry *Entry;
-     while((Entry = OS_WalkDirGetNext(Dir)))
-     {
-      if(S8Match(Entry->Name, S8("ttyUSB"), true))
-      {
-       DeviceFileName = CSS8(Str8Fmt("/dev/%S", Entry->Name));
-       
-       break;
-      }
-     }
-     
-     TerminalHandle = open(DeviceFileName, O_RDWR | O_NOCTTY | O_NDELAY);
-    }
-   }
-   
-   if(TerminalHandle != -1)
    {
-    int Ret;
-    struct termios Options;
-    
-    Prof_TimeScope("Terminal options")
-    {
-     {
-      // NOTE(luca): goto here acts as a scope exit/early return
-      Ret = fcntl(TerminalHandle, F_SETFL, 0);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = fcntl(TerminalHandle, F_SETFL, FNDELAY);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = tcgetattr(TerminalHandle, &Options);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      // NOTE(luca): Never set directly because of compatibility
-      // From the docs loader should be in 9600 baud, 8 data bits, and no parity.
-      {
-       // NOCTTY equivalent
-       Options.c_cflag |= (CLOCAL | CREAD);
-       
-       // Set 8 data bits, No parity
-       Options.c_cflag &= (tcflag_t)~PARENB;  // Disable Parity
-       Options.c_cflag &= (tcflag_t)~CSTOPB;  // 1 stop bit (Not 2 bits)
-       Options.c_cflag &= (tcflag_t)~CSIZE;   // Clear data bits size
-       Options.c_cflag |= CS8;                // 8 data bits
-       
-       // NOTE(luca): This was very important and fixed the bug where 25 bits wouldn't be read
-       // when activating the loader.  Since the identity packet would send a newline it would
-       // Cut right after.
-       // Raw input -> Disable canonical, echoing and signals
-       Options.c_lflag &= (tcflag_t)~(ICANON | ECHO | ECHOE | ISIG);
-       
-       // Disable parity checks and strip of it
-       Options.c_iflag &= (tcflag_t)~(INPCK | ISTRIP);
-       
-       // Disable software flow control
-       Options.c_iflag &= (tcflag_t)~(IXON | IXOFF | IXANY);
-       
-       // NOTE(luca): When interrogating the ADuC board it will send /r/n in its response,
-       // its important for the checksum that this does not get translated.
-       Options.c_iflag &= (tcflag_t)~(ICRNL | INLCR | IGNCR);
-       
-       // Enable raw output <- Disable processed output
-       Options.c_oflag &= (tcflag_t)~OPOST;
-       
-       Options.c_cc[VMIN]  = 1;
-       Options.c_cc[VTIME] = 0;
-      }
-      
-      Ret = cfsetispeed(&Options, B9600);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = cfsetospeed(&Options, B9600);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-      // NOTE(luca): All options have been (sucessfully ?) set, now try to see if it is opened
-      // already
-      
-      Ret = ioctl(TerminalHandle, TIOCEXCL);
-      if(Ret == -1) goto TerminalOpenFail;
-      
-     } TerminalOpenFail:;
-    }
-    
-    if(Ret != -1)
+    TerminalHandle = LSD_OpenPort(DeviceFileName);
+    if(TerminalHandle.Valid)
     {
      u64 CommandIdx = 0;
      u64 CommandCount = 0;
      
-     command Commands_[KB(4)] = {0};
-     command *Commands = Commands_;
+     command *Commands = PushArray(Arena, command, KB(1));
      
      Commands[CommandCount] = Command_Interrogate;
      CommandCount += 1;
      
      Prof_TimeScope("Hex file parse")
      {      
-      if(HexFileName)
+      str8 File = OS_ReadEntireFileIntoMemory(HexFileName);
+      if(File.Size)
       {
-       str8 File = OS_ReadEntireFileIntoMemory(HexFileName);
-       if(File.Size)
+       Commands[CommandCount] = Command_SetFastBaud;
+       CommandCount += 1;
+       
+       Commands[CommandCount] = Command_EraseAll;
+       CommandCount += 1;
+       
+       b32 ParseSucceeded = true;
+       
+       // Parse hex file and create program commands accordingly
        {
-        Commands[CommandCount] = Command_SetFastBaud;
-        CommandCount += 1;
+        b32 FinishedParsing = false;
+        u64 At = 0;
         
-        Commands[CommandCount] = Command_EraseAll;
-        CommandCount += 1;
+        u8 PageIdx = 0;
+        u64 BufferIdx = 0;
         
-        b32 ParseSucceeded = true;
-        
-        // Parse hex file and create program commands accordingly
-        {
-         b32 FinishedParsing = false;
-         u64 At = 0;
+        while(!FinishedParsing)
+        {        
+         ParseSucceeded = (File.Data[At] == ':');
+         At += 1;
          
-         u8 PageIdx = 0;
-         u64 BufferIdx = 0;
+         // 2 bytes: record length
+         u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
          
-         while(!FinishedParsing)
-         {        
-          ParseSucceeded = (File.Data[At] == ':');
-          At += 1;
+         // 4 bytes: load address
+         u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
+         u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
+         
+         // 2 bytes: record type
+         u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
+         if(RecordType == 0x00)
+         {
+          command *Command = Commands + CommandCount;
           
-          // 2 bytes: record length
-          u8 RecordLength = ParseHexDigitPair(File, &At, &ParseSucceeded);
+          Command->Kind = CommandKind_PageDownload;
+          Command->Buffer[0] = PageIdx;
           
-          // 4 bytes: load address
-          u8 AddressH = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          u8 AddressL = ParseHexDigitPair(File, &At, &ParseSucceeded);
+          // 1: PageIdx
+          Command->BufferCount = 1 + 256;
+          u8 *B = Command->Buffer + BufferIdx + 1;
           
-          // 2 bytes: record type
-          u8 RecordType = ParseHexDigitPair(File, &At, &ParseSucceeded);
-          if(RecordType == 0x00)
+          // x data bytes
+          for EachIndex(Idx, RecordLength)
           {
-           command *Command = Commands + CommandCount;
-           
-           Command->Kind = CommandKind_PageDownload;
-           Command->Buffer[0] = PageIdx;
-           
-           // 1: PageIdx
-           Command->BufferCount = 1 + 256;
-           u8 *B = Command->Buffer + BufferIdx + 1;
-           
-           // x data bytes
-           for EachIndex(Idx, RecordLength)
-           {
-            B[Idx] = ParseHexDigitPair(File, &At, &ParseSucceeded);
-           }
-           BufferIdx += RecordLength;
-           
-           if(BufferIdx >= 256)
-           {
-            Assert(BufferIdx == 256);
-            PageIdx += 1;
-            CommandCount += 1;
-            BufferIdx = 0;
-           }
-           
-           // 2 bytes: checksum
-           
-           // TODO(luca): Figure out why this checksum is different.
-           //Command->CheckSum = 
-           ParseHexDigitPair(File, &At, &ParseSucceeded);
-           
-           // 1 or 2 byte: newline
-           if(File.Data[At] == '\r')
-           {
-            At += 1;
-           }
-           
-           if(File.Data[At] == '\n')
-           {
-            At += 1;
-           }
-           else
-           {
-            ParseSucceeded = false;
-           }
+           B[Idx] = ParseHexDigitPair(File, &At, &ParseSucceeded);
           }
-          else if(RecordType == 0x01)
+          BufferIdx += RecordLength;
+          
+          if(BufferIdx >= 256)
           {
-           FinishedParsing = true;
+           Assert(BufferIdx == 256);
+           PageIdx += 1;
+           CommandCount += 1;
+           BufferIdx = 0;
+          }
+          
+          // 2 bytes: checksum
+          
+          // TODO(luca): Figure out why this checksum is different.
+          //Command->CheckSum = 
+          ParseHexDigitPair(File, &At, &ParseSucceeded);
+          
+          // 1 or 2 byte: newline
+          if(File.Data[At] == '\r')
+          {
+           At += 1;
+          }
+          
+          if(File.Data[At] == '\n')
+          {
+           At += 1;
           }
           else
           {
            ParseSucceeded = false;
           }
-          
-          if(!FinishedParsing &&
-             (!ParseSucceeded || At >= File.Size))
-          {
-           FinishedParsing = true;
-           ParseSucceeded = false;
-          }
+         }
+         else if(RecordType == 0x01)
+         {
+          FinishedParsing = true;
+         }
+         else
+         {
+          ParseSucceeded = false;
          }
          
-         if(PageIdx == 0 && BufferIdx > 0)
+         if(!FinishedParsing &&
+            (!ParseSucceeded || At >= File.Size))
          {
-          CommandCount += 1;
-         }
-         
-        }
-        
-        Commands[CommandCount] = Command_SetSlowBaud;
-        CommandCount += 1;
-        
-        if(ParseSucceeded)
-        {
-         if(Run)
-         {
-          Commands[CommandCount] = Command_Run;
-          CommandCount += 1;
+          FinishedParsing = true;
+          ParseSucceeded = false;
          }
         }
-        else
+        
+        if(PageIdx == 0 && BufferIdx > 0)
         {
-         Log("Error: Invalid hex file '%s'.\n", HexFileName);
-         ShouldQuit = true;
+         CommandCount += 1;
+        }
+        
+       }
+       
+       Commands[CommandCount] = Command_SetSlowBaud;
+       CommandCount += 1;
+       
+       if(ParseSucceeded)
+       {
+        if(Run)
+        {
+         Commands[CommandCount] = Command_Run;
+         CommandCount += 1;
         }
        }
        else
        {
-        Log("Error: Could not read file '%s'.\n", HexFileName);
+        Log("Error: Invalid hex file '%s'.\n", HexFileName);
         ShouldQuit = true;
        }
+      }
+      else
+      {
+       Log("Error: Could not read file '%s'.\n", HexFileName);
+       ShouldQuit = true;
       }
      }
      
@@ -476,7 +380,6 @@ BASE_ENTRY_POINT()
      u8 WriteBuffer_[KB(64)] = {0};
      u8 *WriteBuffer = WriteBuffer_;
      
-     str8 Pad = S8("          ");
      if(!Verbose) Pad.Size = 1;
      
      s64 TotalBytesSent = 0;
@@ -545,32 +448,34 @@ BASE_ENTRY_POINT()
            Assert(Command->CheckSum == 0 || Command->CheckSum == CheckSum);
           }
           
-          s64 BytesWritten;
+          lsd_rw_result Write = {0};
           Prof_TimeScope("Writing")
           {
-           BytesWritten = write(TerminalHandle, Packet, PacketSize);
+           Write = LSD_Write(TerminalHandle, Packet, PacketSize);
           }
-          if(BytesWritten == (s64)PacketSize)
+          if(Write.Count == PacketSize)
           {
            //tcdrain(TerminalHandle);
            
            Command->Written = true;
            if(Verbose) 
            {
-            Log("Command: %S (%lld bytes)\n", CommandDescriptions[Command->Kind], BytesWritten);
+            Log("Command: %S (%lld bytes)\n", CommandDescriptions[Command->Kind], Write.Count);
            }
            else if(Command->Kind == CommandKind_Interrogate)
            {
             Log("Connect to loader.\n");
            }
-           TotalBytesSent += BytesWritten;
+           TotalBytesSent += Write.Count;
            
            Command->StartTSC = ReadCPUTimer();
           }
           else
           {
            Log("%SError: Could not write command.\n", Pad);
+#if OS_LINUX
            if(Verbose) PrintErrnoIf(true);
+#endif
            ShouldQuit = true;
           }
          }
@@ -583,19 +488,12 @@ BASE_ENTRY_POINT()
         {
          if(Command->Written)
          {
-          s64 BytesRead;
+          lsd_rw_result Read = {0};
           Prof_TimeScope("Reading")
           {
-           BytesRead = read(TerminalHandle, ReadBuffer + ReadBufferIdx, sizeof(ReadBuffer_));
+           Read = LSD_Read(TerminalHandle, ReadBuffer + ReadBufferIdx, sizeof(ReadBuffer_));
           }
-          if(BytesRead != -1)
-          {
-           ReadBufferIdx += BytesRead;
-          }
-          else 
-          {
-           AssertErrno(errno == EAGAIN);
-          }
+          ReadBufferIdx += Read.Count;
           
           if(ReadBufferIdx == Command->ExpectedBytesReturned)
           {
@@ -650,7 +548,7 @@ BASE_ENTRY_POINT()
             case CommandKind_Program:
             case CommandKind_Run:
             {
-             if(BytesRead == 1)
+             if(Read.Count == 1)
              {
               if(ReadBuffer[0] == 0x07)
               {
@@ -663,7 +561,8 @@ BASE_ENTRY_POINT()
                
 #if LSD_INTERNAL
                u64 Elapsed = ReadCPUTimer() - Command->StartTSC;
-               u64 CPUFreq = 2306294089;
+               // NOTE(luca): Set Manually
+               u64 CPUFreq = Prof_GuessCPUFreq(OS_ReadTimer() - Prof.OSStart, Elapsed, OS_GetTimerFreq());
                if(Verbose) Log("%Stook %fms\n", Pad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
 #endif
                
@@ -671,18 +570,8 @@ BASE_ENTRY_POINT()
                else if(Command->Kind == CommandKind_ChangeBaud)
                {
                 if(Verbose) Log("%SSet baud rate to %d.\n", Pad, Command->Baud);
-                
-                speed_t Speed = Command->BaudSpeed;
-                
-                Ret = cfsetispeed(&Options, Speed);
-                if(Verbose) PrintErrnoIf(Ret == -1);
-                Ret = cfsetospeed(&Options, Speed);
-                if(Verbose) PrintErrnoIf(Ret == -1);
-                Ret = tcsetattr(TerminalHandle, TCSANOW, &Options);
-                if(Verbose) PrintErrnoIf(Ret == -1);
+                LSD_SetBaudRate(TerminalHandle, Command->Baud);
                }
-               
-               
               }
              }
              else
@@ -690,7 +579,6 @@ BASE_ENTRY_POINT()
               Log("Error: Too many bytes, expected 1.\n");
               ShouldQuit = true;
              }
-             
             } break;
            }
           }
@@ -698,11 +586,9 @@ BASE_ENTRY_POINT()
           {
            // NOTE(luca): Wait on more bytes
           }
-          
          }
         }
        }
-       
       }
      }
      
@@ -712,21 +598,6 @@ BASE_ENTRY_POINT()
       Log("Total bytes sent: %lld.\n", TotalBytesSent);
      }
     }
-    else
-    {
-     Log("Could not set options for port.\n");
-     PrintErrnoIf(true);
-    }
-   }
-   else
-   {
-    if(Verbose) PrintErrnoIf(true);
-    str8 HelpText = S8("make sure device is present");
-    if(0) {}
-    if(errno == EACCES) HelpText = S8("make sure you have access permission");
-    if(errno == EBUSY)  HelpText = S8("device is already opened by another program.");
-    
-    Log("Could not open '%s', %S.\n", DeviceFileName, HelpText);
    }
   }
   

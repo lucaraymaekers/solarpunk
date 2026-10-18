@@ -2,7 +2,7 @@
 LSD_Commands:
 {
  { None         "\0" "Nothing"                                          }
- { Interrogate  "\0"  "Connect to loader"                                }
+ { Interrogate  "\0" "Connect to loader"                                }
  { EraseAll     "A"  "Erase Flash/EE program and data memory"           }
  { Program      "W"  "Progam block of Flash/EE program memory"          }
  { ChangeBaud   "B"  "Change Baud Rate"                                 }

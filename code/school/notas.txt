@@ -119,3 +119,12 @@ Inhoudsopgave opnieuw
 
 # PAL 01/05/2026
 <
+
+
+
+# Embedded fundamentals (14/10/2026)
+
+rlc for printing binary number 
+examenvraag 3 punten
+with rr rl 
+Al de rest is in de labo
