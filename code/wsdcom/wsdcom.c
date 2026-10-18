@@ -114,7 +114,7 @@ void CommClose
  );
 b32 ChangeBaudrate
 (
- unsigned long     Baudrate,
+ ulong     Baudrate,
  TyCmdLineOpts  *  pCmdOpts,
  TyCfgFileOpt   *  pCfg,
  TyBaudRates    *  pBauds
@@ -134,7 +134,7 @@ b32 UpdateCfgData
  );
 b32 DoSendSimpleCmd
 (
- unsigned char *  pCmd,
+ uchar *  pCmd,
  TyCmdLineOpts  * pCmdOpts
  );
 void showInstructions
@@ -148,24 +148,24 @@ int  validateParameters
  );
 void UpdateCS
 (
- unsigned char *pucCmd
+ uchar *pucCmd
  );
 
 b32 ReadChar
 (
- unsigned char *   ch
+ uchar *   ch
  );
 int  readRecordFromFile
 (
  FILE *            FptrIn, 
- unsigned char *   Record
+ uchar *   Record
  );
 int  readBlockFromFile
 (
  FILE *            FptrIn, 
- unsigned long *   addr,
+ ulong *   addr,
  int *             len, 
- unsigned char *   data
+ uchar *   data
  );
 int  CheckHexFile
 (
@@ -176,13 +176,13 @@ int  CheckHexFile
 void ReadHexBlock
 (
  char *            pcHexLn,
- unsigned long *   addr,
+ ulong *   addr,
  unsigned int *    len,
- unsigned char *   data
+ uchar *   data
  );
 int  sendPacket
 (
- unsigned char *   message, 
+ uchar *   message, 
  int               length,
  TyCmdLineOpts  *  pCmdOpts
  
@@ -238,7 +238,7 @@ int  DoRun
  );
 int  ReadByteBufferTimed
 (
- unsigned char *   InputData,
+ uchar *   InputData,
  int               NumBytes,
  int               timeout
  );
@@ -270,8 +270,8 @@ char * FieldCrop
 global_variable HANDLE hCom = INVALID_HANDLE_VALUE;        // Handle to the serial port
 
 // Hex file contents
-global_variable unsigned char ucHexFileData[MAX_HEX_DATA];
-global_variable unsigned long ulNumHexBytes = 0x0;
+global_variable uchar ucHexFileData[MAX_HEX_DATA];
+global_variable ulong ulNumHexBytes = 0x0;
 
 global_variable char                szCurOpText        [0x80];
 global_variable char                szCurStatText      [0x80];
@@ -357,7 +357,7 @@ void UpdateCurStageTxt(char * pszText)
 void UpdateScreenInfo(TyCmdLineOpts *CmdOpts,TyBaudRates *Bauds)
 {
  char           szMessage[0x80];
- unsigned long  ulDiff;
+ ulong  ulDiff;
  double         Percentage ;
  
  UpdateTxt(FieldCrop(CmdOpts->szCodeHexF,COL_1_FLD_LEN_EX),COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
@@ -533,7 +533,6 @@ int main(int argc, char *argv[])
   //bSuccess = (DoActions(&CmdOpts, &CfgOpts, &Bauds) == 0);
   {
    char           szMessage[0x80];
-   b32           bSuccess = false;
    int            rMajor         = 0;
    int            rMinor         = 0;    // rev number of the target firmware
    char           sanatizedSig[100];
@@ -833,7 +832,7 @@ int  decodeCommandLine(int             argc,
      ||(argv[i][0]=='\\')
      ||(argv[i][0]=='/'))
   {
-   option=toupper(argv[i][1]);
+   option=(char)toupper(argv[i][1]);
    if(argv[i][2]==':')             // 3rd char in param string must be ';'
    {
     switch(option)               // check the second char to see what
@@ -853,7 +852,7 @@ int  decodeCommandLine(int             argc,
      break;
      case 'X'://crystal frequency
      sscanf(&argv[i][3],"%f",&value);   
-     pCmdOpts->fcore = (unsigned long)(value * 1000000);
+     pCmdOpts->fcore = (ulong)(value * 1000000);
      if(pCmdOpts->fcore == 11059200)
       pCmdOpts->XTAL = 0x0;
      else
@@ -861,7 +860,7 @@ int  decodeCommandLine(int             argc,
      break;
      case 'L'://Kernel frequency threshold for alternate behaviour
      sscanf(&argv[i][3],"%f",&value);   
-     pCmdOpts->fcoreLimit = (unsigned long)(value * 1000000);
+     pCmdOpts->fcoreLimit = (ulong)(value * 1000000);
      break;
      case 'H'://Hex file checksum
      pCmdOpts->bVerifyCSUM = true;
@@ -872,7 +871,7 @@ int  decodeCommandLine(int             argc,
      break;
      case 'S':// Security Mode
      {
-      unsigned long ulBits;
+      ulong ulBits;
       sscanf(&argv[i][3],"%d",&ulBits);
       
       if(ulBits > 0x3)
@@ -908,7 +907,7 @@ int  decodeCommandLine(int             argc,
      break;
      case 'Y':// Extended Security Mode
      {
-      unsigned long ulBits;
+      ulong ulBits;
       sscanf(&argv[i][3],"%d",&ulBits);
       
       if(ulBits > 0x7)
@@ -1150,8 +1149,8 @@ b32  reset(int *piMajor,int *piMinor ,char * pszSignature,
            long Baudrate,TyCmdLineOpts  * pCmdOpts,
            char *pcVHi,char *pcVMid,char *pcVLo,int iNumAttempts,TyBaudRates *Bauds)
 {
- unsigned char  szPacket  [4];
- unsigned long  ulDiff;
+ uchar  szPacket  [4];
+ ulong  ulDiff;
  double         Percentage ;
  char szMessage[0x100] ;
  *piMajor=0;
@@ -1161,7 +1160,7 @@ b32  reset(int *piMajor,int *piMinor ,char * pszSignature,
  /*the first byte, the '!' */
  szPacket[0]='!';
  szPacket[1]='Z';
- szPacket[2]= (unsigned char)(0-'Z');
+ szPacket[2]= (uchar)(0-'Z');
  szPacket[3]=0;
  
  sprintf(szMessage,"%d Hz",pCmdOpts->fcore);
@@ -1330,10 +1329,10 @@ int waitForSignature(char *pszSignature,
 {
  int            i        = 0;
  int            state    = 0;
- unsigned char  checksum = 0;
+ uchar  checksum = 0;
  DWORD          dwStartTime;    //clock variable for determining timeouts
- unsigned char  ch;
- unsigned char  data[30];
+ uchar  ch;
+ uchar  data[30];
  
  strcpy(pszSignature,"none");      
  dwStartTime=GetTickCount();          //get start clock value
@@ -1481,14 +1480,14 @@ b32 EraseFlash(TyCmdLineOpts  * pCmdOpts)
 // Function     : IHEX_WriteFile
 // Description  : Write an intel hex file
 int IHEX_WriteFile(FILE          *hOutputFile, 
-                   unsigned char *pszDataBuffer, 
-                   unsigned long  ulDataAddr,
-                   unsigned long  ulDataCount)
+                   uchar *pszDataBuffer, 
+                   ulong  ulDataAddr,
+                   ulong  ulDataCount)
 {
- unsigned char ucChecksum;
- unsigned long i;
- unsigned long ulNewBaseAddress,m_ulBaseAddress=0x0;
- unsigned long ulDataCountThisTime = ulDataCount;
+ uchar ucChecksum;
+ ulong i;
+ ulong ulNewBaseAddress,m_ulBaseAddress=0x0;
+ ulong ulDataCountThisTime = ulDataCount;
  
  while(ulDataCount)
  {
@@ -1507,40 +1506,40 @@ int IHEX_WriteFile(FILE          *hOutputFile,
     ucChecksum += 0x00;
     ucChecksum += 0x00;
     ucChecksum += 0x02;
-    ucChecksum += (unsigned char)(m_ulBaseAddress >> 4);
-    ucChecksum += (unsigned char)(m_ulBaseAddress >> 12);
+    ucChecksum += (uchar)(m_ulBaseAddress >> 4);
+    ucChecksum += (uchar)(m_ulBaseAddress >> 12);
     fprintf(hOutputFile, ":02000002");
     fprintf(hOutputFile, 
             "%4.4X", 
             (unsigned short)(m_ulBaseAddress >> 4));
-    fprintf(hOutputFile, "%2.2X\n", (unsigned char)(0 - ucChecksum));
+    fprintf(hOutputFile, "%2.2X\n", (uchar)(0 - ucChecksum));
    } else
    {
     ucChecksum =  0x02;
     ucChecksum += 0x00;
     ucChecksum += 0x00;
     ucChecksum += 0x04;
-    ucChecksum += (unsigned char)(m_ulBaseAddress >> 16);
-    ucChecksum += (unsigned char)(m_ulBaseAddress >> 24);
+    ucChecksum += (uchar)(m_ulBaseAddress >> 16);
+    ucChecksum += (uchar)(m_ulBaseAddress >> 24);
     fprintf(hOutputFile, ":02000004");
     fprintf(hOutputFile, 
             "%4.4X", 
             (unsigned short)(m_ulBaseAddress >> 16));
-    fprintf(hOutputFile, "%2.2X\n", (unsigned char)(0 - ucChecksum));
+    fprintf(hOutputFile, "%2.2X\n", (uchar)(0 - ucChecksum));
    }
   }
   
-  ucChecksum =  (unsigned char)ulDataCountThisTime;
-  ucChecksum += (unsigned char)(ulDataAddr - m_ulBaseAddress);
-  ucChecksum += (unsigned char)((ulDataAddr - m_ulBaseAddress) >> 8);
-  fprintf(hOutputFile, ":%2.2X%4.4X00",(unsigned char)ulDataCountThisTime,
+  ucChecksum =  (uchar)ulDataCountThisTime;
+  ucChecksum += (uchar)(ulDataAddr - m_ulBaseAddress);
+  ucChecksum += (uchar)((ulDataAddr - m_ulBaseAddress) >> 8);
+  fprintf(hOutputFile, ":%2.2X%4.4X00",(uchar)ulDataCountThisTime,
           (unsigned short)(ulDataAddr - m_ulBaseAddress));
   for(i=0; i < ulDataCountThisTime; i++)
   {
    ucChecksum += pszDataBuffer[i];
    fprintf(hOutputFile, "%2.2X", pszDataBuffer[i]);
   }
-  fprintf(hOutputFile, "%2.2X\n", (unsigned char)(0 - ucChecksum));
+  fprintf(hOutputFile, "%2.2X\n", (uchar)(0 - ucChecksum));
   
   ulDataAddr    += ulDataCountThisTime;
   pszDataBuffer += ulDataCountThisTime;
@@ -1559,7 +1558,7 @@ int IHEX_WriteFile(FILE          *hOutputFile,
 int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
 {
  FILE *         pFile;                           //Old C pointer to file
- unsigned long  progAddr;                        //address to download to
+ ulong  progAddr;                        //address to download to
  int            blockLen;                        //number of bytes 
  int            PageAddress;
  int            file_size;                       // No. of lines in a file
@@ -1567,16 +1566,16 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
  double         percentile        = 0;
  double         percentage        = 0;
  int            result            = 0;           // succes
- unsigned char  verifyData        [0xF800];      // Data read back from part
- unsigned char  InputData         [257];         // Data read back from part
- unsigned char  verifyfilename    [_MAX_PATH];
- unsigned char  verifyfilenamebin [_MAX_PATH];
+ uchar  verifyData        [0xF800];      // Data read back from part
+ uchar  InputData         [257];         // Data read back from part
+ uchar  verifyfilename    [_MAX_PATH];
+ uchar  verifyfilenamebin [_MAX_PATH];
  char           drive             [_MAX_DRIVE];
  char           dir               [_MAX_DIR];
  char           fname             [_MAX_FNAME];
  char           ext               [_MAX_EXT];
  char           packet            [128];         //temp storage packet
- unsigned char  progData          [128];         //block of data to download
+ uchar  progData          [128];         //block of data to download
  char           szMsg             [_MAX_PATH*2];                          
  
  
@@ -1618,21 +1617,21 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
    packet[2]=0x2;
    packet[3]='V';   // <-- Non-documented verify command. Can only be sent
    // after an erase/program sequence.
-   packet[4]= PageAddress;
+   packet[4]= (char)PageAddress;
    packet[5] = (512 - 2 - 86 - PageAddress) % 256;
    
-   if(sendPacket((unsigned char *)packet,6,pCmdOpts))
+   if(sendPacket((uchar *)packet,6,pCmdOpts))
    {
     //wait for 500ms or till 257 bytes received
     if(ReadByteBufferTimed(InputData, 257, 500))
     {
      int i;
-     unsigned char checksum=0;
+     uchar checksum=0;
      
      for(i=0;i<256;i++)
       checksum+= InputData[i];
      
-     if((unsigned char)(0x100 - checksum) == InputData[i])
+     if((uchar)(0x100 - checksum) == InputData[i])
      {
       memcpy(verifyData+(PageAddress*256),InputData,256);
       break;
@@ -1719,8 +1718,8 @@ int VerifyAfterDownload(char *program,TyCmdLineOpts *   pCmdOpts)
 int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
 {
  FILE *         pFile;               // Old C pointer to file
- unsigned char  progData[128];       // block of data to download
- unsigned long  progAddr;            // address to download to
+ uchar  progData[128];       // block of data to download
+ ulong  progAddr;            // address to download to
  int            blockLen;            // number of bytes in the block
  int            result=0;            // succes
  char           packet[128];         // temp storage packet
@@ -1812,14 +1811,14 @@ int downloadRev2(TyCfgFileOpt *   pCfg,TyCmdLineOpts  * pCmdOpts)
 int downloadRev2QuickMode(TyCfgFileOpt* pCfg,TyCmdLineOpts  * pCmdOpts)
 {
  FILE *         pFile;               // Old C pointer to file
- unsigned char  progData[0xF800];    // block of data to download
- unsigned long  progAddr;            // address to download to
+ uchar  progData[0xF800];    // block of data to download
+ ulong  progAddr;            // address to download to
  int            blockLen,NumBlocks;  // number of bytes in the block
  int            result=0;            // succes
  char           packet[260];         // temp storage packet
  double         percentile = 0;
  double         percentage = 0;
- unsigned char  ErasedPage[0x100];   // temp storage packet
+ uchar  ErasedPage[0x100];   // temp storage packet
  char           szStatus[0x80];                          
  int            file_size;                       // No. of lines in a file
  
@@ -1878,7 +1877,7 @@ int downloadRev2QuickMode(TyCfgFileOpt* pCfg,TyCmdLineOpts  * pCmdOpts)
    result=FAILED_TO_DO;      //assume the worst...
    packet[0]=7; //build up the program packet
    packet[1]='Q'; //build up the program packet
-   packet[2]=(progAddr>>8); //set up the 24bit address
+   packet[2]=(char)(progAddr>>8); //set up the 24bit address
    memcpy(packet+3,progData+progAddr,0x100);
    
    int xsum=0;
@@ -1886,9 +1885,9 @@ int downloadRev2QuickMode(TyCfgFileOpt* pCfg,TyCmdLineOpts  * pCmdOpts)
     xsum+=progData[progAddr+i];
    
    xsum += (progAddr>>8);
-   packet[259]=0-xsum;
+   packet[259]=(char)(0-xsum);
    
-   if(sendPacket((unsigned char *)packet,sizeof(packet),pCmdOpts))
+   if(sendPacket((uchar *)packet,sizeof(packet),pCmdOpts))
    {  //send the command as a 'loader' packet*/
     if(waitForAck(DEFAULTTIMEOUT))
     {        //check to see if the target ack's the command*/
@@ -1951,7 +1950,7 @@ int DoRun(TyCmdLineOpts  * pCmdOpts)
 
 // Function     : sendPacket
 // Description  : Send data to the ADuC8xx
-int sendPacket(unsigned char *message,int length,TyCmdLineOpts  * pCmdOpts)
+int sendPacket(uchar *message,int length,TyCmdLineOpts  * pCmdOpts)
 {
  DWORD iBytesWritten  = 0x0;
  int   iBytesThisTime = 0x1;
@@ -1964,7 +1963,7 @@ int sendPacket(unsigned char *message,int length,TyCmdLineOpts  * pCmdOpts)
   iBytesThisTime = min(pCmdOpts->iXMITBytes,iBytesLeft);
   if(WriteFile(hCom, message,iBytesThisTime,&iBytesWritten,0))
   {
-   if(iBytesWritten == iBytesThisTime)
+   if((int)iBytesWritten == iBytesThisTime)
    {
     iBytesLeft -= iBytesThisTime;
     message    += iBytesThisTime;
@@ -1980,15 +1979,15 @@ int sendPacket(unsigned char *message,int length,TyCmdLineOpts  * pCmdOpts)
 // Description  : sends a correctly formated loader command packet to the target
 int sendLoaderPacket(int len, char *data,TyCmdLineOpts  * pCmdOpts)
 {
- unsigned char packet[263];  //the loader packet
- unsigned char xsum;        //temp var to calculate the checksum
+ uchar packet[263];  //the loader packet
+ uchar xsum;        //temp var to calculate the checksum
  int            i;
  
  /*set up the 070E header*/
  packet[0]=0x07;
  packet[1]=0x0E;
  /*set up the number of data bytes in the loader packet*/
- packet[2]=len;
+ packet[2]=(char)len;
  /*copy the data into the packet*/
  for(i=0;i<len;i++)
   packet[3+i]=data[i];
@@ -1996,7 +1995,7 @@ int sendLoaderPacket(int len, char *data,TyCmdLineOpts  * pCmdOpts)
  /*now calculate the checksum of the packet*/
  /*ignore the header, but include the length byte*/
  
- xsum=len;
+ xsum=(char)len;
  for(i=0;i<len;i++)
   xsum+=packet[i+3];
  packet[len+3]=0-xsum;
@@ -2009,7 +2008,7 @@ int sendLoaderPacket(int len, char *data,TyCmdLineOpts  * pCmdOpts)
 int waitForAck(int iTimeoutMS)
 {
  int            i=0;
- unsigned char  ch;
+ uchar  ch;
  DWORD          dwStartTime;  //clock variable for determining the timeouts
  
  dwStartTime=GetTickCount();  //get start clock value
@@ -2031,7 +2030,7 @@ int waitForAck(int iTimeoutMS)
 
 // Function     : ReadByteBufferTimed
 // Description  : Read data from target with a timeout
-int ReadByteBufferTimed(unsigned char * InputData,int NumBytes,int timeout)
+int ReadByteBufferTimed(uchar * InputData,int NumBytes,int timeout)
 {
  int            i=0;
  DWORD          dwStartTime;  //clock variable for determining the timeouts
@@ -2053,15 +2052,15 @@ int ReadByteBufferTimed(unsigned char * InputData,int NumBytes,int timeout)
 
 // Function     : readRecordFromFile
 // Description  : 
-int readRecordFromFile(FILE *FptrIn,unsigned char *Record)
+int readRecordFromFile(FILE *FptrIn,uchar *Record)
 {
  int Index=0;
- unsigned char InChar;
- InChar=fgetc(FptrIn);
+ uchar InChar;
+ InChar=(char)fgetc(FptrIn);
  while((InChar!='\n') && ((char)InChar!=EOF))
  {
   Record[Index++]=InChar;
-  InChar=fgetc(FptrIn);
+  InChar=(char)fgetc(FptrIn);
  }
  Record[Index] = '\0';
  if(Index==0) return 0;        /*nothing read*/
@@ -2072,40 +2071,40 @@ int readRecordFromFile(FILE *FptrIn,unsigned char *Record)
 
 // Function     : readBlockFromFile
 // Description  : 
-int readBlockFromFile (FILE *FptrIn,unsigned long *addr,
-                       int *len, unsigned char *data)
+int readBlockFromFile (FILE *FptrIn,ulong *addr,
+                       int *len, uchar *data)
 {
  char           Record[128];
  int            bytecount;
- unsigned char  xsum=0;
+ uchar  xsum=0;
  int            rectype;
  int            packetxsum;
  int            i;
- unsigned long  DataByte=0;
+ ulong  DataByte=0;
  
  
- if(readRecordFromFile(FptrIn,(unsigned char*)Record))
+ if(readRecordFromFile(FptrIn,(uchar*)Record))
  {
   /*get the number of data bytes in the record*/
   if(sscanf(Record+1,"%2X",&bytecount)!=1) return 0;
-  xsum+=bytecount;
+  xsum+=(char)bytecount;
   /*get the block start address*/
   if(sscanf(Record+3,"%4lX",addr)!=1) return 0;
-  xsum+=(*addr)/256;
+  xsum+=(uchar)((*addr)/256);
   xsum+=(*addr)%256;
   /*get the record type*/
   if(sscanf(Record+7,"%2X",&rectype)!=1) return 0;
-  xsum+=rectype;
+  xsum+=(char)rectype;
   /*get the data from the record*/
   for(i=0;i<bytecount;i++)
   {
    if(sscanf(Record+9+i*2,"%2X",&DataByte)!=1) return 0;
-   data[i] = (unsigned char)DataByte;
+   data[i] = (uchar)DataByte;
    xsum+=data[i];
   }
   /*get the checksum from the record*/
   if(sscanf(Record+9+bytecount*2,"%2X",&packetxsum)!=1) return 0;
-  xsum+=packetxsum;
+  xsum+=(char)packetxsum;
   /*validate the checksum*/
   if(xsum!=0)
    return 0;
@@ -2123,7 +2122,7 @@ int readBlockFromFile (FILE *FptrIn,unsigned long *addr,
 
 // Function     : ReadChar
 // Description  : Read one byte from the uart
-b32 ReadChar(unsigned char *   pcCh)
+b32 ReadChar(uchar *   pcCh)
 {
  b32 bRet = false;
  DWORD iBytesRead;
@@ -2151,7 +2150,7 @@ int CheckHexFile(char * program,int  * piNumLines,TyCmdLineOpts  *  pCmdOpts)
  char           szStatus[0x80];                          
  int            iLoop;
  char           csHexVal[3];
- unsigned long  HexVal;
+ ulong  HexVal;
  char *         pcStr;
  
  pCmdOpts->ulActualCodeFCSum        = 0x0;
@@ -2235,38 +2234,38 @@ int CheckHexFile(char * program,int  * piNumLines,TyCmdLineOpts  *  pCmdOpts)
 // Function     : ReadHexBlock
 // Description  : 
 void ReadHexBlock(char *         pcHexLn,
-                  unsigned long *addr,
+                  ulong *addr,
                   unsigned int * len,
-                  unsigned char *data)
+                  uchar *data)
 {
  int            iBytecount;
- unsigned char  cCSum=0;        //Checksum.
+ uchar  cCSum=0;        //Checksum.
  int            iRectype;
  int            packetxsum;
  int            i1;
- unsigned long  ulTmp;
+ ulong  ulTmp;
  
  *len = 0;
  if(sscanf(pcHexLn+1,"%2x",&iBytecount)==1)
  {
-  cCSum += iBytecount;
+  cCSum += (char)iBytecount;
   if(sscanf(pcHexLn+3,"%4lx",addr)==1)
   {
-   cCSum += (*addr)/256;
+   cCSum += (uchar)((*addr)/256);
    cCSum += (*addr)%256;
    if(sscanf(pcHexLn+7,"%2x",&iRectype)==1)
    {
-    cCSum += iRectype;
+    cCSum += (char)iRectype;
     for(i1=0; i1<iBytecount; i1++)
     {
      sscanf(pcHexLn+9+i1*2,"%2x",&ulTmp);
-     data[i1] = (unsigned char)ulTmp;
+     data[i1] = (uchar)ulTmp;
      cCSum += data[i1];
     }
     if(sscanf(pcHexLn+9+iBytecount*2,"%2x",&ulTmp)==1)
     {
      packetxsum = (int)ulTmp;
-     cCSum += packetxsum;
+     cCSum += (char)packetxsum;
      if((cCSum==0) && (iRectype==0))
       *len = iBytecount;   //Ignore other rectypes.
      
@@ -2405,14 +2404,14 @@ int CommOpen(int ComPort,long Baudrate)
 //                allowing the PC to change the baud rate that the ADuC8xx
 // 
 // Revision     : initial 
-b32 ChangeBaudrate(unsigned long      Baudrate,
+b32 ChangeBaudrate(ulong      Baudrate,
                    TyCmdLineOpts   *  pCmdOpts,
                    TyCfgFileOpt    *  pCfg,
                    TyBaudRates     *  pBauds)
 {
  char             Cmd   [128];         //temp storage packet
  b32             retVal = true; 
- unsigned char    InputData         [257];         // Data read back from part
+ uchar    InputData         [257];         // Data read back from part
  
  // Two baud rates possible - slow (the 9600 matched baud) and fast ( the
  // maximum PC baud that the 8051 can manage)
@@ -2430,11 +2429,11 @@ b32 ChangeBaudrate(unsigned long      Baudrate,
    Cmd[1] = 14 ;
    Cmd[2] = 3  ;
    Cmd[3] = 66 ;
-   Cmd[4] = pCfg->T3CON;
-   Cmd[5] = pCfg->T3FD ;
+   Cmd[4] = (char)pCfg->T3CON;
+   Cmd[5] = (char)pCfg->T3FD ;
    Cmd[6] = (512 - 3 - 66 - pCfg->T3CON - pCfg->T3FD) % 256;
    
-   sendPacket((unsigned char *)Cmd,7,pCmdOpts);
+   sendPacket((uchar *)Cmd,7,pCmdOpts);
    
    //wait for 500ms or till 257 bytes received
    if(ReadByteBufferTimed(InputData, 1, 500))
@@ -2464,11 +2463,11 @@ b32 ChangeBaudrate(unsigned long      Baudrate,
    Cmd[1] = 14;
    Cmd[2] = 3 ;
    Cmd[3] = 66;
-   Cmd[4] = pCfg->T3CON9600;
-   Cmd[5] = pCfg->T3FD9600 ;
+   Cmd[4] = (char)pCfg->T3CON9600;
+   Cmd[5] = (char)pCfg->T3FD9600 ;
    Cmd[6] = (512-3-66-pCfg->T3CON9600-pCfg->T3FD9600)%256;
    
-   sendPacket((unsigned char *)Cmd,7,pCmdOpts);
+   sendPacket((uchar *)Cmd,7,pCmdOpts);
    
    //wait for 500ms or till 257 bytes received
    if(ReadByteBufferTimed(InputData, 1, 500))
@@ -2670,8 +2669,8 @@ b32 UpdateCfgData(char * pszPart,TyCfgFileOpt *pCfg)
 TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
 {
  TyBaudRates    RetBauds={0x0};
- unsigned long  MaxBaud = ADUC_BAUD_115200;
- unsigned long  FreqBand;
+ ulong  MaxBaud = ADUC_BAUD_115200;
+ ulong  FreqBand;
  
  
  if((pCmdOpts->XTAL == 0x0) || (pCmdOpts->XTAL == 0x1))
@@ -2687,7 +2686,7 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
  {
   double dTmp = ((ADUC_BAUD_115200 * 1152) / (double)pCmdOpts->fcore);
   // Calculate the baud that the ADuC8xx is using after a reset
-  RetBauds.ADSlowBR = ADUC_BAUD_115200 / dTmp;
+  RetBauds.ADSlowBR = (ulong)(ADUC_BAUD_115200 / dTmp);
   
   if(RetBauds.ADSlowBR > ADUC_BAUD_115200)
   {
@@ -2703,8 +2702,8 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
     if(RetBauds.ADSlowBR > (ADUC_BAUD_115200 / FreqBand))
     {
      // Set the baud rate
-     unsigned long ulDiffLwrBaud = RetBauds.ADSlowBR - (ADUC_BAUD_115200 / FreqBand);
-     unsigned long ulDiffUprBaud = (ADUC_BAUD_115200 / (FreqBand-1)) - RetBauds.ADSlowBR;
+     ulong ulDiffLwrBaud = RetBauds.ADSlowBR - (ADUC_BAUD_115200 / FreqBand);
+     ulong ulDiffUprBaud = (ADUC_BAUD_115200 / (FreqBand-1)) - RetBauds.ADSlowBR;
      if(ulDiffLwrBaud > ulDiffUprBaud)
       RetBauds.PCSlowBR = ADUC_BAUD_115200 / (FreqBand - 1);
      else
@@ -2726,7 +2725,7 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
   // frequency
   double dTmp =  (double)20000000 / (double)pCmdOpts->fcore;
   
-  RetBauds.ADSlowBR     = ADUC_BAUD_9600 / dTmp;
+  RetBauds.ADSlowBR     = (ulong)(ADUC_BAUD_9600 / dTmp);
   
   // Now we have to calculate the best PC match
   // Calculate the best match the PC has for this baud rate
@@ -2735,8 +2734,8 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
    if(RetBauds.ADSlowBR > (ADUC_BAUD_115200 / FreqBand))
    {
     // Set the baud rate
-    unsigned long ulDiffLwrBaud = RetBauds.ADSlowBR - (ADUC_BAUD_115200 / FreqBand);
-    unsigned long ulDiffUprBaud = (ADUC_BAUD_115200 / (FreqBand-1)) - RetBauds.ADSlowBR;
+    ulong ulDiffLwrBaud = RetBauds.ADSlowBR - (ADUC_BAUD_115200 / FreqBand);
+    ulong ulDiffUprBaud = (ADUC_BAUD_115200 / (FreqBand-1)) - RetBauds.ADSlowBR;
     if(ulDiffLwrBaud > ulDiffUprBaud)
      RetBauds.PCSlowBR = ADUC_BAUD_115200 / (FreqBand - 1);
     else
@@ -2800,11 +2799,11 @@ TyBaudRates getCorrectBauds(TyCmdLineOpts *pCmdOpts,TyCfgFileOpt *pCfgOpts)
    //         else
    //            {
    // Calculate them instead
-   unsigned long DIV;
-   DIV = (log(pCmdOpts->fcore / (RetBauds.FastBR * 32))) / log(2);
+   ulong DIV;
+   DIV = (ulong)((log(pCmdOpts->fcore / (RetBauds.FastBR * 32))) / log(2));
    // add enable bit
    pCfgOpts->T3CON = 128 + DIV;
-   pCfgOpts->T3FD = (2 * pCmdOpts->fcore) / ((pow(2, DIV)) * RetBauds.FastBR) - 64;
+   pCfgOpts->T3FD = (ulong)((2 * pCmdOpts->fcore) / ((pow(2, DIV)) * RetBauds.FastBR) - 64);
    //            }
   }
  }
@@ -2819,8 +2818,8 @@ b32 DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
 {
  char             BootloadCommand   [7];         //temp storage packet
  b32             retVal = false; 
- unsigned char    Response;                 
- unsigned char    Data;
+ uchar    Response;                 
+ uchar    Data;
  char             szMsg[0x200];
  if(pCmdOpts->bBootLoad)
   Data = 0xFE;
@@ -2838,7 +2837,7 @@ b32 DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
  BootloadCommand[4] = Data;
  BootloadCommand[5] = (512 - 2 - 0x46 - Data) % 256;
  
- sendPacket((unsigned char *)BootloadCommand,6,pCmdOpts);
+ sendPacket((uchar *)BootloadCommand,6,pCmdOpts);
  
  //wait for 500ms or till 1 bytes received
  if(ReadByteBufferTimed(&Response, 1, 500))
@@ -2862,12 +2861,12 @@ b32 DoBootloadOption(TyCmdLineOpts  * pCmdOpts)
 // Revision     : initial 
 b32 DoSecurity(TyCmdLineOpts  * pCmdOpts)
 {
- unsigned char    SecurityBitsCommand   [6];         //temp storage packet
- unsigned char    DataCmd   [12];         //temp storage packet
+ uchar    SecurityBitsCommand   [6];         //temp storage packet
+ uchar    DataCmd   [12];         //temp storage packet
  b32             retVal = false; 
- unsigned char    Response;            
+ uchar    Response;            
  char             szMsg[0x200];
- unsigned char    SecurityBits = 0x7;
+ uchar    SecurityBits = 0x7;
  
  
  if(pCmdOpts->SecurityLockMode)
@@ -2913,7 +2912,7 @@ b32 DoSecurity(TyCmdLineOpts  * pCmdOpts)
  DataCmd[10] = 0xFF;       //EDATA4
  DataCmd[11] = 183;        //CS
  
- sendPacket((unsigned char *)DataCmd,12,pCmdOpts);
+ sendPacket((uchar *)DataCmd,12,pCmdOpts);
  
  //wait for 500ms or till 1 bytes received
  if(ReadByteBufferTimed(&Response, 1, 500))
@@ -2932,7 +2931,7 @@ b32 DoSecurity(TyCmdLineOpts  * pCmdOpts)
   SecurityBitsCommand[4] = SecurityBits;
   SecurityBitsCommand[5] = 256 - 83 - 2 - SecurityBits;
   
-  sendPacket((unsigned char *)SecurityBitsCommand,6,pCmdOpts);
+  sendPacket((uchar *)SecurityBitsCommand,6,pCmdOpts);
   //wait for 500ms or till 1 bytes received
   if(ReadByteBufferTimed(&Response, 1, 500))
   {
@@ -2960,10 +2959,10 @@ b32 DoSecurity(TyCmdLineOpts  * pCmdOpts)
 // Description  : Send a command that should respond with a single byte 
 //                (NAK or ACK) to indicate success
 // Revision     : initial 
-b32 DoSendSimpleCmd(unsigned char * pCmd,TyCmdLineOpts  * pCmdOpts)
+b32 DoSendSimpleCmd(uchar * pCmd,TyCmdLineOpts  * pCmdOpts)
 {
  b32              bRet       = false;
- unsigned char     ucResp;
+ uchar     ucResp;
  
  // Make sure that the checksum is correct and that the
  // fixed protocol characters are correct
@@ -3021,8 +3020,8 @@ b32 DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
  b32              RetVal     = true;
  FILE *            pFile;
  char              szBuffer [0x20];
- unsigned char     Cmd      [12];
- unsigned long     Data     [5];
+ uchar     Cmd      [12];
+ ulong     Data     [5];
  char             szMsg[0x200];
  
  sprintf(szMsg,"Downloading %s to data flash",FieldCrop(pCmdOpts->szDataHexF,20));
@@ -3051,12 +3050,12 @@ b32 DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
                Data+3,
                Data+4)==0x5)
      {
-      Cmd[5]  = (unsigned char)(Data[0]>>8); // ADDRH
-      Cmd[6]  = (unsigned char)(Data[0]);    // ADDRL
-      Cmd[7]  = (unsigned char)(Data[1]);    // DATA1
-      Cmd[8]  = (unsigned char)(Data[2]);    // DATA2
-      Cmd[9]  = (unsigned char)(Data[3]);    // DATA3
-      Cmd[10] = (unsigned char)(Data[4]);    // DATA4
+      Cmd[5]  = (uchar)(Data[0]>>8); // ADDRH
+      Cmd[6]  = (uchar)(Data[0]);    // ADDRL
+      Cmd[7]  = (uchar)(Data[1]);    // DATA1
+      Cmd[8]  = (uchar)(Data[2]);    // DATA2
+      Cmd[9]  = (uchar)(Data[3]);    // DATA3
+      Cmd[10] = (uchar)(Data[4]);    // DATA4
      } else
      {
       // Invalid format
@@ -3107,16 +3106,16 @@ b32 DoDownloadDataFlash(TyCmdLineOpts  * pCmdOpts)
 // Description  : Update the checksum in a command packet
 //                pucCmd should point to the length byte
 //                in the command
-void UpdateCS(unsigned char *pucCmd)
+void UpdateCS(uchar *pucCmd)
 {
  int               iCS   = 0x0;
- unsigned char     ucLen = pucCmd[0x0];
- unsigned char     i;
+ uchar     ucLen = pucCmd[0x0];
+ uchar     i;
  
  iCS = 0x0;
  for(i=0;i<=ucLen;i++)
   iCS += pucCmd[i];
- pucCmd[i] = 0x100 - (iCS % 0x100);  // CS
+ pucCmd[i] = (uchar)(0x100 - (iCS % 0x100));  // CS
 }
 
 // Function     : FieldCrop
@@ -3192,4 +3191,3 @@ char * FieldCrop(const char * pszFileName,int iFldLen)
  
  return szFieldString;
 }
-

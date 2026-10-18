@@ -229,8 +229,8 @@ Top = Push;
 //- Generated stack functions 
 UI_StackFunctions
 
-internal v4 UI_BorderColorTop() { return UI_State->BorderColorTop->Value; }
-internal f32 UI_BorderThicknessTop() { return UI_State->BorderThicknessTop->Value; }
+internal v4 UI_BorderColorTop(void) { return UI_State->BorderColorTop->Value; }
+internal f32 UI_BorderThicknessTop(void) { return UI_State->BorderThicknessTop->Value; }
 
 internal void
 UI_PushSemanticSizeOnAxis(axis2 Axis, ui_size Size)

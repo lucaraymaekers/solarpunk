@@ -169,9 +169,9 @@ PanelAlloc(void)
 }
 
 internal void PanelPushAxis(axis2 Axis) { StackPush(PanelArena, axis2_stack_node, Axis, PanelAxisTop); }
-internal void PanelPopAxis() { PanelAxisTop = PanelAxisTop->Prev; }
+internal void PanelPopAxis(void) { PanelAxisTop = PanelAxisTop->Prev; }
 
-internal void PanelPushChildren() 
+internal void PanelPushChildren(void) 
 {
  PanelAppendToParent = true;
  
@@ -2750,7 +2750,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   //- Lister UI 
   if(App->ListerOpened)
   {
-   s32 ShowItemCount = 10.f;
+   s32 ShowItemCount = 10;
    f32 ListerBorderSize = 2.f;
    
    // Input

@@ -28,6 +28,7 @@ enum cng_compiler
  CngCompiler_CC,
  CngCompiler_GCC,
  CngCompiler_Clang,
+ CngCompiler_MSVC,
 };
 typedef enum cng_compiler cng_compiler;
 
@@ -67,7 +68,7 @@ internal cng_command_result Cng_RunCommand(str8 Command);
 
 //~ Functions
 internal b32
-Cng_IsOs(cng_os_kind Kind)
+Cng_IsOS(cng_os_kind Kind)
 {
  b32 Result = (GlobalCurrentOS == Kind);
  return Result;
@@ -210,10 +211,9 @@ Cng_Build__(str8 BuildName,
    }
   }
  }
- 
- b32 Clang = (Options->Compiler == CngCompiler_Clang);
- b32 GCC = (Options->Compiler == CngCompiler_GCC);
- b32 Debug = (!Options->Release);
+#elif OS_WINDOWS
+ Options->Compiler = CngCompiler_MSVC;
+#endif
  
  if(!GlobalSelectedArray) Cng_Scratch();
  GlobalSelectedArray->Count = 0;
@@ -221,134 +221,220 @@ Cng_Build__(str8 BuildName,
  // Create compile command 
  S8ArrayTemp(GlobalSelectedArray)
  { 
+  b32 Clang = (Options->Compiler == CngCompiler_Clang);
+  b32 GCC = (Options->Compiler == CngCompiler_GCC);
+  b32 MSVC = (Options->Compiler == CngCompiler_MSVC);
+  b32 Debug = (!Options->Release);
+  
   str8 Compiler = {0};
   if(0) {}
   else if(Clang) Compiler = S8("clang");
   else if(GCC)   Compiler = S8("gcc");
+  else if(MSVC)  Compiler = S8("cl");
   else           Compiler = S8("cc");
-  Cng_S8ArrayAppend(Compiler);
   
-  if(!Options->CPP)
+  if(Cng_IsOS(CngOS_Linux))
   {
-   Cng_S8ArrayAppend(S8("-std=c99"));
-  }
-  else
-  {
-   Cng_S8ArrayAppend(S8("-fno-threadsafe-statics -nostdinc++ -fno-exceptions -fno-rtti"));
-  }
-  
-  if(Options->Asan)
-  {
-   Cng_S8ArrayAppend(S8("-fsanitize=undefined,address"));
-  }
-  
-  // Common compiler flags
-  Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH " "
-                       "-D_GNU_SOURCE=1"));
-  // Common warning flags
-  Cng_S8ArrayAppend(S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow " 
-                       "-Wno-double-promotion "
-                       "-Wno-unused-but-set-variable "
-                       "-Wno-write-strings "
-                       "-Wno-pointer-arith "
-                       "-Wno-missing-field-initializers "
-                       "-Wno-unused-parameter "
-                       "-Wno-unused-variable "
-                       "-Wno-unused-function "));
-  
-  
-  if(Clang) 
-  {
-   Cng_S8ArrayAppend(S8("-fdiagnostics-absolute-paths -ftime-trace"));
-   Cng_S8ArrayAppend(S8("-Wno-null-dereference "
-                        "-Wno-missing-braces "
-                        "-Wno-undefined-internal "
-                        "-Wno-initializer-overrides "
-                        "-Wno-string-conversion "
-                        "-Wno-vla-cxx-extension "
-                        "-Wno-writable-strings "
-                        "-Wno-missing-designated-field-initializers "
-                        "-Wno-address-of-temporary "
-                        "-Wno-int-to-void-pointer-cast "
-                        "-Wno-incompatible-pointer-types-discards-qualifiers"));
-  }
-  
-  if(GCC)
-  {
-   Cng_S8ArrayAppend(S8("-Wno-type-limits "
-                        "-Wno-cast-function-type "
-                        "-Wno-missing-field-initializers "
-                        "-Wno-int-to-pointer-cast "
-                        "-Wno-cast-function-type "
-                        "-Wno-missing-field-initializers "
-                        "-Wno-int-to-pointer-cast "));
+   Cng_S8ArrayAppend(Compiler);
    
-  }
-  
-  if(Debug) Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
-  else      Cng_S8ArrayAppend(S8("-O2"));
-  
-  // Extra flags depending on build type
-  {  
-   if(Type != CngBuildType_EXE) Cng_S8ArrayAppend(S8("-fPIC"));
-   
-   if(Type == CngBuildType_OBJ) 
+   if(!Options->CPP)
    {
-    Cng_S8ArrayAppend(S8("-c"));
-    if(Options->CPP) Cng_S8ArrayAppend(S8("-x c++"));
-    else             Cng_S8ArrayAppend(S8("-x c"));
+    Cng_S8ArrayAppend(S8("-std=c99"));
+   }
+   else
+   {
+    Cng_S8ArrayAppend(S8("-fno-threadsafe-statics -nostdinc++ -fno-exceptions -fno-rtti"));
    }
    
-   if(Type == CngBuildType_DLL) Cng_S8ArrayAppend(S8("--shared"));
-  }
-  Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraCompilerFlags, ' '));
-  
-  Cng_S8ArrayAppend(S8("-o"));
-  
-  if(!OutputName.Size)
-  {   
-   // Get output name from source file name without extension
+   if(Options->Asan)
+   {
+    Cng_S8ArrayAppend(S8("-fsanitize=undefined,address"));
+   }
+   
+   // Common compiler flags
+   Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH " "
+                        "-D_GNU_SOURCE=1"));
+   // Common warning flags
+   Cng_S8ArrayAppend(S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow " 
+                        "-Wno-double-promotion "
+                        "-Wno-unused-but-set-variable "
+                        "-Wno-write-strings "
+                        "-Wno-pointer-arith "
+                        "-Wno-missing-field-initializers "
+                        "-Wno-unused-parameter "
+                        "-Wno-unused-variable "
+                        "-Wno-unused-function "));
+   
+   
+   if(Clang) 
+   {
+    Cng_S8ArrayAppend(S8("-fdiagnostics-absolute-paths -ftime-trace"));
+    Cng_S8ArrayAppend(S8("-Wno-null-dereference "
+                         "-Wno-missing-braces "
+                         "-Wno-undefined-internal "
+                         "-Wno-initializer-overrides "
+                         "-Wno-string-conversion "
+                         "-Wno-vla-cxx-extension "
+                         "-Wno-writable-strings "
+                         "-Wno-missing-designated-field-initializers "
+                         "-Wno-address-of-temporary "
+                         "-Wno-int-to-void-pointer-cast "
+                         "-Wno-incompatible-pointer-types-discards-qualifiers"));
+   }
+   
+   if(GCC)
+   {
+    Cng_S8ArrayAppend(S8("-Wno-type-limits "
+                         "-Wno-cast-function-type "
+                         "-Wno-missing-field-initializers "
+                         "-Wno-int-to-pointer-cast "
+                         "-Wno-cast-function-type "
+                         "-Wno-missing-field-initializers "
+                         "-Wno-int-to-pointer-cast "));
+    
+   }
+   
+   if(Debug) Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
+   else      Cng_S8ArrayAppend(S8("-O2"));
+   
+   // Extra flags depending on build type
+   {  
+    if(Type != CngBuildType_EXE) Cng_S8ArrayAppend(S8("-fPIC"));
+    
+    if(Type == CngBuildType_OBJ) 
+    {
+     Cng_S8ArrayAppend(S8("-c"));
+     if(Options->CPP) Cng_S8ArrayAppend(S8("-x c++"));
+     else             Cng_S8ArrayAppend(S8("-x c"));
+    }
+    
+    if(Type == CngBuildType_DLL) Cng_S8ArrayAppend(S8("--shared"));
+   }
+   Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraCompilerFlags, ' '));
+   
+   Cng_S8ArrayAppend(S8("-o"));
+   
+   if(!OutputName.Size)
    {   
-    str8 Source = Sources->Strings[0];
-    u64 OPLSlash = S8FindChar(Source, '/', false, true);
-    u64 LastDot  = S8FindChar(Source, '.', false, false);
-    OutputName = S8FromTo(Source, OPLSlash, LastDot);
+    // Get output name from source file name without extension
+    {   
+     str8 Source = Sources->Strings[0];
+     u64 OPLSlash = S8FindChar(Source, '/', false, true);
+     u64 LastDot  = S8FindChar(Source, '.', false, false);
+     OutputName = S8FromTo(Source, OPLSlash, LastDot);
+    }
+    
+    str8 Suffix = {0};
+    if(Type == CngBuildType_OBJ) Suffix = S8(".obj");
+    if(Type == CngBuildType_DLL) Suffix = S8(".so");
+    if(Type == CngBuildType_EXE) Suffix = S8("");
+    
+    OutputName = S8Cat(OutputName, Suffix);
    }
    
-   str8 Suffix = {0};
-   if(Type == CngBuildType_OBJ) Suffix = S8(".obj");
-   if(Type == CngBuildType_DLL) Suffix = S8(".so");
-   if(Type == CngBuildType_EXE) Suffix = S8("");
+   Cng_S8ArrayAppend(OutputName);
    
-   OutputName = S8Cat(OutputName, Suffix);
+   Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(Sources, ' '));
+   
+   // Common linker flags
+   Cng_S8ArrayAppend(S8("-lm"));
+   Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraLinkerFlags, ' '));
+   
+   // LogBuildMode()
   }
-  
-  Cng_S8ArrayAppend(OutputName);
-  
-  Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(Sources, ' '));
-  
-  // Common linker flags
-  Cng_S8ArrayAppend(S8("-lm"));
-  Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraLinkerFlags, ' '));
-  
-  // LogBuildMode()
+  else if(Cng_IsOS(CngOS_Windows))
+  {
+#if defined(CLING_MSVC_SETUP)
+   Cng_S8ArrayAppend(S8("cmd /c \"" CLING_MSVC_SETUP));
+   Cng_S8ArrayAppend(S8("&&"));
+#endif
+   
+   Cng_S8ArrayAppend(Compiler);
+   
+   Cng_S8ArrayAppend(S8("-nologo "
+                        "-MTd "  // Static cruntime
+                        "-Gm- "  // Disable incremental build 
+                        "-GR- "  // Disable RTTI (cpp)
+                        "-EHa- " // Disable exceptions(cpp)
+                        "-Oi "   // Enable intrinsics
+                        "-FC"    // Full path names
+                        ));
+   
+   Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
+   
+   Cng_S8ArrayAppend(S8("-WX "     // Warnings as errors
+                        "-W4 "     // Enable most warnings
+                        "-wd4459 " // Non-standard extension 
+                        // "-wd4456 " // Local variable shadowing 
+                        "-wd4201 " // Nameless struct/union 
+                        "-wd4100 " // Unreferenced formal parameter 
+                        "-wd4101 " // Unreferenced local variable 
+                        "-wd4505 " // Unreferenced local function 
+                        "-wd4189 " // Initialized but unreferenced variable 
+                        "-wd4996 " // Deprecated function 
+                        "-wd4820 " // Padding added 
+                        "-wd4296 " // Epression always true 
+                        "-wd4127 " // Epression constant 
+                        "-wd5045 " //  
+                        "-wd4061 " // Case not handled in switch  
+                        // "-wd4389 " // Signed/unsigned comparison 
+                        // "-wd4244 " // Possible data loss conversion 
+                        "-wd5287 " // Enum comparison 
+                        ));
+   
+   if(0) {}
+   else if(Type == CngBuildType_OBJ) Cng_S8ArrayAppend(S8("-c /TP"));
+   else if(Type == CngBuildType_DLL) Cng_S8ArrayAppend(S8("/LD"));
+   
+   if(OutputName.Size) 
+   {
+    Cng_S8ArrayAppend(Str8Fmt("-Fe%S", OutputName));
+    Cng_S8ArrayAppend(Str8Fmt("-Fm" "%S.map", OutputName));
+    if(0) {}
+    else if(Type == CngBuildType_EXE) OutputName = S8Cat(OutputName, S8(".exe"));
+    else if(Type == CngBuildType_OBJ) OutputName = S8Cat(OutputName, S8(".obj"));
+    else if(Type == CngBuildType_DLL) OutputName = S8Cat(OutputName, S8(".dll"));
+   }
+   
+   if(Options->Asan) Cng_S8ArrayAppend(S8("/fsanitize=address"));
+   
+   if(Debug) Cng_S8ArrayAppend(S8("-Z7")); // Debug info
+   else      Cng_S8ArrayAppend(S8("-O2")); // Optimizations
+   
+   if(Options->CPP) Cng_S8ArrayAppend(S8("/std:c++20"));
+   
+   Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraCompilerFlags, ' '));
+   
+   Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(Sources, ' '));
+   
+   // Common linker flags
+   Cng_S8ArrayAppend(S8("/link -opt:ref -incremental:no"));
+   Cng_S8ArrayAppend(Cng_S8ArrayJoinFrom(ExtraLinkerFlags, ' '));
+   
+   if(OutputName.Size)
+   {
+    Cng_S8ArrayAppend(S8Cat(S8("/out:"), OutputName));
+   }
+  }
   
   Log("[%S %S-%S]\n", 
       BuildName,
       Compiler, 
       (Debug ? S8("debug") : S8("release")));
   
-  Log("%S\n", Cng_GetBaseFileName(Sources->Strings[0]));
+  if(Cng_IsOS(CngOS_Linux))
+  {
+   Log("%S\n", Cng_GetBaseFileName(Sources->Strings[0]));
+  }
   
   str8 Command = Cng_S8ArrayJoin(' ');
   if(0)
   {
    Log("%S\n", Command);
   }
+  
   Result = Cng_RunCommand(Command);
  }
- 
-#endif
  
  return Result;
 };
@@ -398,7 +484,6 @@ Cng_Build_((cng_build_params) { \
 #define CLING_TEMP_EXE "cling_temp.exe"
 
 //~ Implementation
-
 internal cng_command_result 
 Cng_RunCommandAsync(str8 Command, b32 Async)
 {
@@ -408,6 +493,9 @@ Cng_RunCommandAsync(str8 Command, b32 Async)
  StartupInfo.cb = sizeof(StartupInfo);
  
  PROCESS_INFORMATION ProcessInfo = {0};
+ 
+ 
+ arena *Arena = GetScratch();
  
  u8 *CommandCString = PushArray(Arena, u8, Command.Size + 1);
  MemoryCopy(CommandCString, Command.Data, Command.Size);
@@ -443,7 +531,7 @@ Cng_RunCommandAsync(str8 Command, b32 Async)
 internal cng_command_result
 Cng_RunCommand(str8 Command)
 {
- Result = Cng_RunCommandAsync(Command, false);
+ cng_command_result Result = Cng_RunCommandAsync(Command, false);
  return Result;
 }
 
@@ -452,10 +540,11 @@ Win32GetEnvironmentVar(char *Name)
 {
  str8 Result;
  
+ arena *Arena = GetScratch();
+ 
  S8OverPush(Arena, Result, KB(64), Result.Size)
  { 
-  DWORD Size = GetEnvironmentVariableA(Name, (char *)Result.Data, Result.Size);
-  Result.Size = Size;
+  Result.Size = GetEnvironmentVariableA(Name, (char *)Result.Data, (DWORD)Result.Size);
  }
  
  return Result;
@@ -479,7 +568,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
  str8 ExePath = {0};
  {
   ExePath = PushS8(Arena, MAX_PATH);
-  ExePath.Size = GetModuleFileNameA(0, (char *)ExePath.Data, ExePath.Size);
+  ExePath.Size = GetModuleFileNameA(0, (char *)ExePath.Data, (DWORD)ExePath.Size);
   ExePath.Data[ExePath.Size] = 0;
  }
  
@@ -539,25 +628,12 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
     str8 ClingSourcePath = Cng_PathFromExe(ExePath, S8(CLING_SOURCE_PATH));
     str8 ClingCodePath = Cng_PathFromExe(ExePath, S8(CLING_CODE_PATH));
     
-    Log("[self build]\n");
-    
     // NOTE(luca): So that build artifacts end up in the right directory.
     OS_ChangeDirectory((char *)BuildDirPath.Data);
     
-    cng_build_options BuildOptions = {0};
-    BuildOptions.Clang = true;
+    Cng_Build(S8("Cling"), NilP(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)),
+              .OutputName = NewPath);
     
-    Cng_SetSelectedArray(Cng_PushS8Array(256));
-    Cng_CommonBuildCommand(&BuildOptions);
-    
-    Cng_S8ArrayAppendMultiple(S8("-I"), ClingCodePath);
-    
-    Cng_S8ArrayAppend(ClingSourcePath);
-    
-    Cng_S8ArrayAppend(S8Cat(S8("/link -opt:ref -incremental:no /out:"), NewPath));
-    
-    str8 BuildCommand = Cng_S8ArrayJoin(' ');
-    Cng_RunCommand(BuildCommand);
    }
    
    RunPath = NewPath;
@@ -568,7 +644,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
    Win32LogIf(!CopyFile((char *)NewPath.Data, 
                         (char *)TempPath.Data,
                         
-                        false));
+                        .false));
    RunPath = TempPath;
   }
   else

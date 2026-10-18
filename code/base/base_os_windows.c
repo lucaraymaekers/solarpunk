@@ -369,7 +369,7 @@ WinMain(HINSTANCE Instance,
  
  LARGE_INTEGER PerfCountFrequencyResult;
  QueryPerformanceFrequency(&PerfCountFrequencyResult);
- GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
+ GlobalPerfCountFrequency = (f64)PerfCountFrequencyResult.QuadPart;
  
 #if BASE_FORCE_THREADS_COUNT
  u64 ThreadsCount = BASE_FORCE_THREADS_COUNT;
@@ -396,7 +396,7 @@ WinMain(HINSTANCE Instance,
  char *Args[2] = {0};
  
  str8 ExePath = PushS8(Arena, MAX_PATH);
- ExePath.Size = GetModuleFileNameA(0, (char *)ExePath.Data, ExePath.Size);
+ ExePath.Size = GetModuleFileNameA(0, (char *)ExePath.Data, (u32)ExePath.Size);
  ExePath.Data[ExePath.Size] = 0;
  
  Args[0] = (char *)ExePath.Data;

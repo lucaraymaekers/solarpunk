@@ -124,6 +124,43 @@ ConfigMatch(MD_String8 Name, MD_String8 Match, MD_String8 Value)
 
 //~ Build helpers
 
+internal void
+AppBuild(cng_build_options *BuildOptions, 
+         str8 Name, str8 AppSource, str8 AppName, str8 ExeName)
+{
+ str8 LibFileName = S8("../build/rl_libs.obj");
+ 
+ if(!OS_FileExists(CSS8(LibFileName)))
+ {
+  Cng_Build(Name, BuildOptions, 
+            S8ArrayLit(S8("../code/rl/rl_libs.h")),
+            .Type = CngBuildType_OBJ,
+            .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=1")),
+            .OutputName = LibFileName);
+ }
+ 
+ Cng_Build(Name, BuildOptions, 
+           S8ArrayLit(AppSource, LibFileName),
+           .Type = CngBuildType_DLL,
+           .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0")));
+ 
+ str8 Defines = Str8Fmt("-DRL_PLATFORM_APP_NAME=%S "
+                        "-DRL_PLATFORM_WINDOW_NAME=%S",
+                        AppName, ExeName);
+ 
+ str8 LinkerFlags = {0};
+ if(Cng_IsOS(CngOS_Linux)) LinkerFlags = S8("-lasound -lX11 -lGL -lGLX");
+ 
+ Cng_Build(Name, BuildOptions, 
+           S8ArrayLit(S8("../code/rl/rl_platform.c"),
+                      LibFileName),
+           .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
+                                            Defines),
+           .ExtraLinkerFlags   = S8ArrayLit(LinkerFlags),
+           .OutputName = ExeName);
+ 
+};
+
 //~ Entrypoint
 BASE_ENTRY_POINT()
 {
@@ -494,74 +531,17 @@ BASE_ENTRY_POINT()
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Editor"), S8("Target")))
  {
   DidWork = true;
-  
-  str8 LibFileName = S8("../build/rl_libs.obj");
-  
-  if(!OS_FileExists(CSS8(LibFileName)))
-  {
-   Cng_Build(S8("Editor"), &BuildOptions, 
-             S8ArrayLit(S8("../code/rl/rl_libs.h")),
-             .Type = CngBuildType_OBJ,
-             .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=1")),
-             .OutputName = LibFileName);
-  }
-  
-  Cng_Build(S8("Editor"), &BuildOptions, 
-            S8ArrayLit(S8("../code/editor/editor_app.c"),
-                       LibFileName),
-            .Type = CngBuildType_DLL,
-            .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0")));
-  
-  str8 Defines = Str8Fmt("-DRL_PLATFORM_APP_NAME=%S "
-                         "-DRL_PLATFORM_WINDOW_NAME=%S",
-                         S8("editor_app"), S8("editor"));
-  
-  Cng_Build(S8("Editor"), &BuildOptions, 
-            S8ArrayLit(S8("../code/rl/rl_platform.c"),
-                       LibFileName),
-            .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
-                                             Defines),
-            .ExtraLinkerFlags   = S8ArrayLit(S8("-lasound -lX11 -lGL -lGLX")),
-            .OutputName = S8("editor"));
-  
+  AppBuild(&BuildOptions, S8("Editor"), S8("../code/editor/editor_app.c"), S8("editor_app"), S8("editor"));
  }
  
  //~ Muze
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Muze"), S8("Target")))
  {
   DidWork = true;
-  
-  str8 LibFileName = S8("../build/rl_libs.obj");
-  
-  if(!OS_FileExists(CSS8(LibFileName)))
-  {
-   Cng_Build(S8("Muze"), &BuildOptions, 
-             S8ArrayLit(S8("../code/rl/rl_libs.h")),
-             .Type = CngBuildType_OBJ,
-             .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=1")),
-             .OutputName = LibFileName);
-  }
-  
-  Cng_Build(S8("Muze"), &BuildOptions, 
-            S8ArrayLit(S8("../code/muze/muze_app.c"),
-                       LibFileName),
-            .Type = CngBuildType_DLL,
-            .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0")));
-  
-  str8 Defines = Str8Fmt("-DRL_PLATFORM_APP_NAME=%S "
-                         "-DRL_PLATFORM_WINDOW_NAME=%S",
-                         S8("muze_app"), S8("muze"));
-  
-  Cng_Build(S8("Muze"), &BuildOptions, 
-            S8ArrayLit(S8("../code/rl/rl_platform.c"),
-                       LibFileName),
-            .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
-                                             Defines),
-            .ExtraLinkerFlags   = S8ArrayLit(S8("-lasound -lX11 -lGL -lGLX")),
-            .OutputName = S8("muze"));
-  
+  AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"));
  }
  
+ //~ Sim86
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Sim86"), S8("Target")))
  {
   DidWork = true;
@@ -595,6 +575,52 @@ BASE_ENTRY_POINT()
  {
   DidWork = true;
   Cng_Build(S8("LSD"), &BuildOptions, S8ArrayLit(S8("../code/lsd/lsd.c")));
+ }
+ 
+ //~ WSDCOM
+ S8ArrayAppendTo(&Help, S8(" "));
+ if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("WSD"), S8("(See subcommands with -WSD)")))
+ {
+  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("compile"), S8("Compile wsdcom")))
+  {   
+   DidWork = true;
+   Cng_Build(S8("WSDCOM"), &BuildOptions, S8ArrayLit(S8("../code/wsdcom/wsdcom.c")));
+  }
+  
+  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("copy"), S8("Copy configuration files.")))
+  {
+   DidWork = true;
+   OS_MakeDirectory("Configuration");
+   Cng_RunCommand(S8("cmd.exe /c copy ..\\code\\wsdcom\\Configuration Configuration"));
+  }
+ }
+ S8ArrayAppendTo(&Help, S8(" "));
+ 
+ //~ ZSH
+ if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Zsh"), S8("Print out zsh completions")))
+ {
+  DidWork = true;
+  str8 Text = S8("_cling() \n"
+                 "{\n"
+                 "local cmd=\"${words[1]}\"\n"
+                 "local help_output line token desc\n"
+                 "local -a candidates\n"
+                 "\n"
+                 "help_output=\"$(CLING_NOREBUILD=1 \"$cmd\" -h 2>&1)\"\n"
+                 "\n"
+                 "# Extract entries formatted like:\n"
+                 "# -Asan : Enable address sanitizer\n"
+                 "while IFS= read -r line; do\n"
+                 "if [[ \"$line\" =~ '^[[:space:]]*([^[:space:]]+)[[:space:]]*:[[:space:]]*(.*)$' ]]; then\n"
+                 "token=\"${match[1]}\"\n"
+                 "desc=\"${match[2]}\"\n"
+                 "candidates+=(\"$token:$desc\")\n"
+                 "fi\n"
+                 "done <<< \"$help_output\"\n"
+                 "_describe 'cling arguments' candidates\n"
+                 "}\n"
+                 "compdef _cling cling\n");
+  Log("%S\n", Text);
  }
  
  if(!DidWork)

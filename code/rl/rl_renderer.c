@@ -139,8 +139,8 @@ DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 C
   stbtt_packedchar *PackedChar = &Atlas->PackedChars[PackedCharIdx];
   stbtt_aligned_quad *Quad = &Atlas->AlignedQuads[PackedCharIdx];
   // TODO(luca): Investigate why floorf needed.
-  f32 Width = FloorF32(PackedChar->x1 - PackedChar->x0);
-  f32 Height = FloorF32(PackedChar->y1 - PackedChar->y0);
+  f32 Width = FloorF32((f32)(PackedChar->x1 - PackedChar->x0));
+  f32 Height = FloorF32((f32)(PackedChar->y1 - PackedChar->y0));
   {    
    f32 Baseline = GetBaseline(Font);
    f32 Descent = Font->Scale*(f32)Font->Descent;
@@ -302,7 +302,7 @@ RenderPushClip(v4 Value)
  GlobalClipStackTop = Node;
 }
 
-internal void RenderPopClip()
+internal void RenderPopClip(void)
 {
  GlobalClipStackTop = GlobalClipStackTop->Prev;
 }

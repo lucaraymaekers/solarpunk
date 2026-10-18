@@ -1,21 +1,26 @@
 #if !defined(BASE_CORE_H)
 #define BASE_CORE_H
 
+#if __has_include(".base_build.h")
+# include ".base_build.h"
+#endif
+#include "base_build.h"
+
 // detect OS
-#if ANDROID
+#if defined(ANDROID)
 # define OS_ANDROID 1
-#elif __linux__
+#elif defined(__linux__)
 # define OS_LINUX 1
-#elif _WIN32
+#elif defined(_WIN32)
 # define OS_WINDOWS 1
 #endif
 
 // Detect compiler
-#if __clang__
+#if defined(__clang__)
 # define COMPILER_CLANG 1
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 # define COMPILER_MSVC 1
-#elif __GNUC__
+#elif defined(__GNUC__)
 # define  COMPILER_GNU 1
 #endif
 
@@ -24,6 +29,24 @@
 # define LANG_CPP 1
 #else
 # define LANG_C 1
+#endif
+
+#if COMPILER_MSVC
+# if defined(__SANITIZE_ADDRESS__)
+#  define ASAN_ENABLED 1
+#  define NO_ASAN __declspec(no_sanitize_address)
+# else
+#  define NO_ASAN
+# endif
+#elif COMPILER_CLANG
+# if defined(__has_feature)
+#  if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+#   define ASAN_ENABLED 1
+#  endif
+# endif
+# define NO_ASAN __attribute__((no_sanitize("address")))
+#else
+# define NO_ASAN
 #endif
 
 // Zero undefined
@@ -45,11 +68,23 @@
 #if !defined(COMPILER_GNU)
 # define COMPILER_GNU 0
 #endif
+#if !defined(COMPILER_CLANG)
+# define COMPILER_CLANG 0
+#endif
 #if !defined(LANG_C)
 # define LANG_C 0
 #endif
 #if !defined(LANG_CPP)
 # define LANG_CPP 0
+#endif
+#if !defined(BUILD_DEBUG)
+# define BUILD_DEBUG 0
+#endif
+#if !defined(BUILD_DEBUG)
+# define BUILD_DEBUG 0
+#endif
+#if !defined(ASAN_ENABLED)
+# define ASAN_ENABLED 0
 #endif
 
 //~ OS
@@ -63,6 +98,35 @@
 # include <windows.h>
 # include <stdio.h>
 # define ssize_t SSIZE_T
+#endif
+
+// Push/Pop warnings
+#if COMPILER_GNU
+# define NO_WARNINGS_BEGIN \
+_Pragma("GCC diagnostic push") \
+_Pragma("GCC diagnostic ignored \"-Wall\"") \
+_Pragma("GCC diagnostic ignored \"-Wextra\"") \
+_Pragma("GCC diagnostic ignored \"-Wshadow\"") \
+_Pragma("GCC diagnostic ignored \"-Wconversion\"") \
+_Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"") \
+_Pragma("GCC diagnostic ignored \"-Wsign-conversion\"") \
+_Pragma("GCC diagnostic ignored \"-Wsign-compare\"") \
+_Pragma("GCC diagnostic ignored \"-Wdouble-promotion\"") \
+_Pragma("GCC diagnostic ignored \"-Wimplicit-fallthrough\"")
+# define NO_WARNINGS_END _Pragma("GCC diagnostic pop")
+#elif COMPILER_CLANG
+# define NO_WARNINGS_BEGIN \
+_Pragma("clang diagnostic push") \
+_Pragma("clang diagnostic ignored \"-Weverything\"")
+# define NO_WARNINGS_END _Pragma("clang diagnostic pop")
+#elif COMPILER_MSVC
+# define NO_WARNINGS_BEGIN \
+__pragma(warning(push)) \
+__pragma(warning(disable: 4267 4996 4146 4668 4389 4388 4191 4061 4365 5219 4063 4244)) 
+# define NO_WARNINGS_END \
+__pragma(warning(pop))
+#else
+# error "No compatible compiler found"
 #endif
 
 #if OS_WINDOWS
@@ -79,7 +143,9 @@
 # define RADDBG_MARKUP_STUBS
 # include <sys/types.h>
 #endif
+NO_WARNINGS_BEGIN
 #include "lib/raddbg_markup.h"
+NO_WARNINGS_END
 
 #if defined(COMPILER_MSVC)
 #  if LANG_CPP
@@ -305,24 +371,6 @@ Last = Node)
 # define NO_OPTIMIZE_END
 #endif
 
-#if COMPILER_MSVC
-# if defined(__SANITIZE_ADDRESS__)
-#  define ASAN_ENABLED 1
-#  define NO_ASAN __declspec(no_sanitize_address)
-# else
-#  define NO_ASAN
-# endif
-#elif COMPILER_CLANG
-# if defined(__has_feature)
-#  if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
-#   define ASAN_ENABLED 1
-#  endif
-# endif
-# define NO_ASAN __attribute__((no_sanitize("address")))
-#else
-# define NO_ASAN
-#endif
-
 #if ASAN_ENABLED
 C_LINKAGE void __asan_poison_memory_region(void const volatile *Address, size_t Size);
 C_LINKAGE void __asan_unpoison_memory_region(void const volatile *Address, size_t Size);
@@ -346,34 +394,6 @@ __asan_unpoison_memory_region((Address), (Size))
 # error AlignOf not defined for this compiler.
 #endif
 #define AlignPow2(x,b) (((x) + (b) - 1)&(~((b) - 1)))
-
-// Push/Pop warnings
-#if COMPILER_GNU
-# define NO_WARNINGS_BEGIN \
-_Pragma("GCC diagnostic push") \
-_Pragma("GCC diagnostic ignored \"-Wall\"") \
-_Pragma("GCC diagnostic ignored \"-Wextra\"") \
-_Pragma("GCC diagnostic ignored \"-Wshadow\"") \
-_Pragma("GCC diagnostic ignored \"-Wconversion\"") \
-_Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"") \
-_Pragma("GCC diagnostic ignored \"-Wsign-conversion\"") \
-_Pragma("GCC diagnostic ignored \"-Wsign-compare\"") \
-_Pragma("GCC diagnostic ignored \"-Wdouble-promotion\"") \
-_Pragma("GCC diagnostic ignored \"-Wimplicit-fallthrough\"")
-# define NO_WARNINGS_END _Pragma("GCC diagnostic pop")
-#elif COMPILER_CLANG
-# define NO_WARNINGS_BEGIN \
-_Pragma("clang diagnostic push") \
-_Pragma("clang diagnostic ignored \"-Weverything\"")
-# define NO_WARNINGS_END _Pragma("clang diagnostic pop")
-#elif COMPILER_MSVC
-# define NO_WARNINGS_BEGIN \
-__pragma(warning(push)) \
-__pragma(warning(disable: 4267 4996 4146)) // NOTE: Add specific warning numbers to disable as needed
-# define NO_WARNINGS_END __pragma(warning(pop))
-#else
-# error "No compatible compiler found"
-#endif
 
 #define Pi32    3.1415927410125732f
 #define Euler32 2.7182817459106445f
@@ -405,6 +425,8 @@ typedef s32 rune; // utf8 codepoint
 typedef float f32;
 typedef double f64;
 typedef unsigned int uint;
+typedef unsigned long ulong;
+typedef unsigned char uchar;
 
 #define U8Max 0xff
 #define U16Max 0xffff
@@ -421,6 +443,6 @@ typedef unsigned int uint;
 global_variable b32 GlobalDebuggerIsAttached;
 
 //~ Functions
-internal void DbgBrk() { DebugBreak(); }
+internal void DbgBrk(void) { DebugBreak(); }
 
 #endif // BASE_CORE_H

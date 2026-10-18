@@ -17,8 +17,8 @@ C_LINKAGE_BEGIN
 //# define XXH_INLINE_ALL
 
 #else
-void GLADDisableCallbacks();
-void GLADEnableCallbacks();
+void GLADDisableCallbacks(void);
+void GLADEnableCallbacks(void);
 #endif
 
 NO_WARNINGS_BEGIN

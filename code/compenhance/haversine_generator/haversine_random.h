@@ -138,7 +138,7 @@ RandomF64(haversine_random *Series)
 	 * whether there are leading zeros: there's a fifty-fifty
 	 * chance, if RandomU64() is uniformly distributed.
 	 */
-	Shift = CountLeadingZeroes64(Significand);
+	Shift = (s32)CountLeadingZeroes64(Significand);
 	if (Shift != 0) {
 		Exponent -= Shift;
 		Significand <<= Shift;

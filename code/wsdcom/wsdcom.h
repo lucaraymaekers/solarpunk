@@ -114,15 +114,15 @@ POSSIBILITY OF SUCH DAMAGE.
 typedef struct
 {
  // All of these options are taken from the Configuration File
- unsigned long  XTAL;                 // default = 11.0592MHz crystal
- unsigned long  CodeSize;             // size of code memory
- unsigned long  DataSize;             // size of the data memory
- unsigned long  T3CON;                // baudrate cfg 115200 (if allowed)
- unsigned long  T3FD;                 // baudrate cfg 115200 (if allowed)
- unsigned long  T3CON9600;            // baudrate cfg 9600
- unsigned long  T3FD9600;             // baudrate cfg 9600
- unsigned long  fcore;                // default
- unsigned long  ClkAdjust;            // For checking of max. kernel bauds
+ ulong  XTAL;                 // default = 11.0592MHz crystal
+ ulong  CodeSize;             // size of code memory
+ ulong  DataSize;             // size of the data memory
+ ulong  T3CON;                // baudrate cfg 115200 (if allowed)
+ ulong  T3FD;                 // baudrate cfg 115200 (if allowed)
+ ulong  T3CON9600;            // baudrate cfg 9600
+ ulong  T3FD9600;             // baudrate cfg 9600
+ ulong  fcore;                // default
+ ulong  ClkAdjust;            // For checking of max. kernel bauds
  b32           QuickDownloadOption; // Allow Quick Download Protocol
  b32           FastBROption;  // Allow change to Fast Baudrate
  b32           SecurityBitsOption;  // Allow Download to Security Bits
@@ -132,35 +132,35 @@ typedef struct
 
 typedef struct
 {
- unsigned long  XTAL;                 // default = 11.0592MHz crystal
+ ulong  XTAL;                 // default = 11.0592MHz crystal
  char           szCodeHexF[MAX_PATH];   // hex file for code flash
  char           szDataHexF[MAX_PATH];   // hex file for data flash
  unsigned int   iComPort;               // COM Port required
  b32           bEraseData;             // Erase the data flash ?
  b32           bRun;                   // Run the program after downloading
- unsigned long  ulRunAdr;               // Run Address
+ ulong  ulRunAdr;               // Run Address
  b32           bVerify;                // Verify after download
- unsigned long  fcore;                  // Crystal frequency in Hz
+ ulong  fcore;                  // Crystal frequency in Hz
  b32           bBootLoad;              // Bootload Option, runs from 0xE000
- unsigned long  DownloadMode;           // Download mode
+ ulong  DownloadMode;           // Download mode
  b32           SecurityLockMode;       // Security Mode
  b32           SecuritySerialSafeMode; // Security Mode
  b32           SecuritySecureMode;     // Security Mode
- unsigned long  ulTimeOpen;             // Time Program Remains Open for
+ ulong  ulTimeOpen;             // Time Program Remains Open for
  int            iXMITBytes;             // Number of bytes to send at a time
  b32           bPromptForFiles;        // Do I need to prompt for the files to download?
  b32           bVerifyCSUM;            // Do I need to verify the hex file checksum
- unsigned long  ulHexCSUM;              // Expected Hex file checksum
- unsigned long  ulActualCodeFCSum;      // Actual hex file checksum
- unsigned long  fcoreLimit;             // Threshold above which kernel will detect fast clock
+ ulong  ulHexCSUM;              // Expected Hex file checksum
+ ulong  ulActualCodeFCSum;      // Actual hex file checksum
+ ulong  fcoreLimit;             // Threshold above which kernel will detect fast clock
  b32           bConfirmSerialSafe;     // Do I need to confirm serial safe mode
 } TyCmdLineOpts;  // Options specified on the invocation line
 
 typedef struct
 {
- unsigned long  FastBR;          // Baudrate for fast download
- unsigned long  ADSlowBR;      // ADuC baud rate (slow mode)
- unsigned long  PCSlowBR;        // PC baud rate (slow mode)
+ ulong  FastBR;          // Baudrate for fast download
+ ulong  ADSlowBR;      // ADuC baud rate (slow mode)
+ ulong  PCSlowBR;        // PC baud rate (slow mode)
 }  TyBaudRates;
 
 int  decodeCommandLine

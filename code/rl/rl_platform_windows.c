@@ -104,7 +104,7 @@ MIDI_InCallback(HMIDIIN Device, UINT Msg, DWORD_PTR Instance, DWORD_PTR Param1, 
   if(Param1 != 254) DebugBreak();
 #endif
   
-  Message.U32[0] = Param1;
+  Message.U32[0] = (DWORD)Param1;
   
   u8 Status = Message.U8[0];
   u8 Data1  = Message.U8[1];
@@ -117,7 +117,7 @@ MIDI_InCallback(HMIDIIN Device, UINT Msg, DWORD_PTR Instance, DWORD_PTR Param1, 
   app_midi_event *Event = NotesQueue->Events + WritePos;
   NotesQueue->WritePos += 1;
   Event->Timestamp = (f32)OS_GetWallClock();
-  Event->Message = Param1;
+  Event->Message = (u32)Param1;
  }
 }
 
@@ -240,8 +240,8 @@ global_variable b32 SelectedOutOpened = false;
 typedef struct win32_platform_midi_device win32_platform_midi_device;
 struct win32_platform_midi_device
 {
- u64 OutPort;
- u64 InPort;
+ u32 OutPort;
+ u32 InPort;
 };
 
 global_variable win32_platform_midi_device *MIDIDevices;
@@ -254,7 +254,7 @@ PLATFORM_MIDI_GET_DEVICES(P_MIDIGetDevices)
  Result.Devices = PushArrayZero(FrameArena, platform_midi_device, MaxDevicesCount);
  MIDIDevices = PushArrayZero(FrameArena, win32_platform_midi_device, MaxDevicesCount);
  
- u64 OutDevicesCount = midiOutGetNumDevs();
+ u32 OutDevicesCount = midiOutGetNumDevs();
  for EachIndex(Idx, OutDevicesCount)
  {    
   platform_midi_device *Device = Result.Devices + Result.Count;
@@ -274,7 +274,7 @@ PLATFORM_MIDI_GET_DEVICES(P_MIDIGetDevices)
   Device->IsOutput = true;
  }
  
- u64 InDevicesCount = midiInGetNumDevs();
+ u32 InDevicesCount = midiInGetNumDevs();
  for EachIndex(Idx, InDevicesCount)
  {        
   MIDIINCAPS Caps;
@@ -317,7 +317,7 @@ PLATFORM_MIDI_GET_DEVICES(P_MIDIGetDevices)
 
 PLATFORM_MIDI_SEND(P_MIDISend) 
 {
- u64 Port = MIDIDevices[Device.Id].OutPort;
+ u32 Port = MIDIDevices[Device.Id].OutPort;
  
  if(Port != SelectedOutPort)
  {
@@ -337,7 +337,7 @@ PLATFORM_MIDI_SEND(P_MIDISend)
  
  if(!SelectedOutOpened)
  {
-  MMRESULT Code = midiOutOpen(&SelectedOut, Port, 0, 0, CALLBACK_NULL);
+  MMRESULT Code = midiOutOpen(&SelectedOut, (uint)Port, 0, 0, CALLBACK_NULL);
   MIDI_LogIfError(Code, false);
   SelectedOutOpened = true;
  }
@@ -353,7 +353,7 @@ PLATFORM_MIDI_SEND(P_MIDISend)
 
 PLATFORM_MIDI_LISTEN(P_MIDIListen)
 {
- u64 Port = MIDIDevices[Device.Id].InPort;
+ u32 Port = MIDIDevices[Device.Id].InPort;
  
  if(Port != SelectedInPort)
  {
@@ -670,7 +670,7 @@ P_PROCESS_MESSAGES()
     case WM_KEYDOWN:
     case WM_KEYUP:
     {
-     s32 VKCode = Message.wParam;
+     s32 VKCode = (s32)Message.wParam;
      s32 ScanCode = (Message.lParam >> 16) & 0xFF;
      
      b32 WasDown = ((Message.lParam & (1 << 30)) != 0);
@@ -705,7 +705,7 @@ P_PROCESS_MESSAGES()
 #endif
        for EachElement(Idx, Symbols)
        {
-        if(VKCode == Symbols[Idx]) ProcessKeyPress(&Input->MIDI.Buttons[Idx], IsDown);
+        if((uint)VKCode == Symbols[Idx]) ProcessKeyPress(&Input->MIDI.Buttons[Idx], IsDown);
        }
        
        
@@ -755,14 +755,14 @@ P_PROCESS_MESSAGES()
        if(CharCount > 0)
        {
         rune Codepoint = (rune)UnicodeBuffer[0];
-        if(IsPrintable(Codepoint))
+        if(IsPrintable((u8)Codepoint))
         {
          Key->Codepoint = Codepoint;
         }
-        else if (Codepoint > 0 && IsPrintable(VKCode))
+        else if (Codepoint > 0 && IsPrintable((u8)VKCode))
         {
          // NOTE(luca): VKCodes are uppercase by default
-         if(IsAlpha(VKCode)) VKCode += 32;
+         if(IsAlpha((u8)VKCode)) VKCode += 32;
          Key->Codepoint = VKCode;
         }
         else
@@ -804,16 +804,16 @@ P_PROCESS_MESSAGES()
          Key->IsSymbol = false;
          Key->Codepoint = L',';
         }
-        else if(IsPrintable(VKCode))
+        else if(IsPrintable((u8)VKCode))
         {
          Key->IsSymbol = false;
-         if(IsAlpha(VKCode)) VKCode += 32;
+         if(IsAlpha((u8)VKCode)) VKCode += 32;
          Key->Codepoint = VKCode;
         }
         else
         {
          char KeyName[64] = {0};
-         GetKeyNameTextA(Message.lParam, KeyName, sizeof(KeyName));
+         GetKeyNameTextA((LONG)Message.lParam, KeyName, sizeof(KeyName));
          Log("Unhandled key(%d): %s\n", VKCode, KeyName);
          Input->Text.Count -= 1;
          Handled = false;

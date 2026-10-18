@@ -119,7 +119,7 @@ typedef void *HANDLE;
 struct HINSTANCE__;
 typedef struct HINSTANCE__ *HMODULE;
 typedef __int64 INT_PTR;
-typedef INT_PTR (*FARPROC)();
+typedef INT_PTR (*FARPROC)(HANDLE,PCWSTR);
 
 //- prototypes
 
