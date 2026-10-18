@@ -88,7 +88,7 @@ struct os_dir
 typedef ENTRY_POINT(entry_point_func);
 
 #define BASE_ENTRY_POINT() C_LINKAGE ENTRY_POINT(EntryPoint)
-C_LINKAGE BASE_ENTRY_POINT();
+BASE_ENTRY_POINT();
 raddbg_entry_point(EntryPoint);
 
 internal void  OS_PrintFormat(char *Format, ...);

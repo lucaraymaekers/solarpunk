@@ -57,7 +57,7 @@ internal str8 Str8Fmt(const char *Format, ...);
 internal u64  U64HashFromSeedStr8(u64 Seed, str8 String);
 internal u64  U64HashFromStr8(str8 String);
 
-internal str8_array *PushS8Array(arena *Arena, u64 Capacity);
+internal str8_array PushS8Array(arena *Arena, u64 Capacity);
 internal void S8ArrayAppendTo(str8_array *Array, str8 String);
 internal str8 S8ArrayJoinFrom(arena *Arena, str8_array *Array, u8 Char);
 

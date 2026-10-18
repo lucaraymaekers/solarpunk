@@ -197,25 +197,25 @@ BASE_ENTRY_POINT()
  
  arena *Arena = GetScratch();
  
- str8_array *Help = PushS8Array(Arena, 256);
+ str8_array Help = PushS8Array(Arena, 256);
  
 #if LSD_INTERNAL
  Prof_Profile()
 #endif
  {
-  Verbose = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("verbose"), S8("Increase verbosity"));
-  Run = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("run"), S8("Run program after download"));
-  Udev = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("udev"), S8("Print udev rule for setting usb latency timer automatically"));
+  Verbose = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("verbose"), S8("Increase verbosity"));
+  Run = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("Run program after download"));
+  Udev = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("udev"), S8("Print udev rule for setting usb latency timer automatically"));
   
   
-  ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("h"), S8("Print out help")) ||
+  ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("h"), S8("Print out help")) ||
               ShowHelp);
-  ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("-help"), S8("Print out help")) ||
+  ShowHelp = (CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("-help"), S8("Print out help")) ||
               ShowHelp);
   if(ShowHelp) ShouldQuit = true;
   
   {  
-   cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1"));
+   cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1"));
    if(!IsNilCmdLineEntry(Entry))
    {
     DeviceFileName = CSS8(Entry->First->V);
@@ -745,7 +745,7 @@ BASE_ENTRY_POINT()
        "\n"
        "Options:\n", Params->Args[0]);
    
-   str8 HelpText = S8ArrayJoinFrom(Arena, Help, '\n');
+   str8 HelpText = S8ArrayJoinFrom(Arena, &Help, '\n');
    Log("%S\n", HelpText);
   }
   

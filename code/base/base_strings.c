@@ -259,10 +259,23 @@ Str8VFmt(const char *Format, va_list Args)
  
  S8OverPush(Arena, Result, KB(64), Result.Size - 1)
  {  
+  // TODO(luca): stbsp doesn't work with ASAN enabled, we should fix that.
+#if !ASAN_ENABLED
   Result.Size = (u64)stbsp_vsprintf((char *)Result.Data, Format, Args);
-  
-  // Null terminate just in case.
   Result.Data[Result.Size] = 0;
+#else
+  int Size = vsprintf((char *)Result.Data, Format, Args);
+  if(Size == -1)
+  {
+   Result.Size = 1;
+  }
+  else
+  {
+   Result.Size = (u64)Size;
+   // Null terminate, useful when cstring is needed out of str8.
+   Result.Data[Result.Size] = 0;
+  }
+#endif
   
   Assert(Result.Size > 0);
  }
@@ -311,12 +324,12 @@ U64HashFromStr8(str8 String)
 }
 
 //~ String arrays
-internal str8_array *
+internal str8_array
 PushS8Array(arena *Arena, u64 Capacity)
 {
- str8_array *Result = PushArray(Arena, str8_array, 1);
- Result->Capacity = Capacity;
- Result->Strings = PushArray(Arena, str8, Result->Capacity);
+ str8_array Result = {0};
+ Result.Capacity = Capacity;
+ Result.Strings = PushArray(Arena, str8, Result.Capacity);
  return Result;
 }
 
@@ -336,7 +349,7 @@ S8ArrayJoinFrom(arena *Arena, str8_array *Array, u8 Char)
 {
  str8 Result = {0};
  
- if(Array)
+ if(Array && Array->Count)
  {    
   u64 TotalSize = 0;
   for EachIndex(Idx, Array->Count)

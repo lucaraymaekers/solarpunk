@@ -146,7 +146,8 @@ Swap(t& A, t& B) { t T = A; A = B; B = T; }
 # define ZeroStruct {}
 #endif
 
-#define Nil(type) &((type){0})
+#define Nil(type) (type){0}
+#define NilP(type) &(Nil(type))
 
 #if OS_LINUX || OS_ANDROID
 # define OS_SlashChar '/'
