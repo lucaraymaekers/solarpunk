@@ -263,6 +263,7 @@ Cng_Build__(str8 BuildName,
                         "-Wno-missing-field-initializers "
                         "-Wno-unused-parameter "
                         "-Wno-unused-variable "
+                        "-Wno-unused-value "
                         "-Wno-unused-function "));
    
    
@@ -815,9 +816,11 @@ LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command, char *Env[])
  return Result;
 }
 
-internal void 
+internal cng_command_result
 LinuxRunCommand(char *Args[])
 {
+ cng_command_result Result = {0};
+ 
  int Ret = 0;
  int WaitStatus = 0;
  b32 Error = false;
@@ -831,11 +834,18 @@ LinuxRunCommand(char *Args[])
    {
     Log("Could not execute %s.\n", Args[0]);
     PrintErrnoIf(true);
+    _exit(127);
    }
   }
   else
   {
-   wait(&WaitStatus);
+   Ret = waitpid(ChildPID, &WaitStatus, 0);
+   Assert(Ret == ChildPID);
+   if(WIFEXITED(WaitStatus))
+   {
+    Result.Succeeded = (WEXITSTATUS(WaitStatus) == 0);
+   }
+   
   }
  }
  else
@@ -843,6 +853,7 @@ LinuxRunCommand(char *Args[])
   PrintErrnoIf(true);
  }
  
+ return Result;
 }
 
 //- OS implementation
@@ -898,7 +909,7 @@ Cng_RunCommand(str8 Command)
   }
  }
  
- LinuxRunCommand(Args);
+ Result = LinuxRunCommand(Args);
  
  return Result;
 }
@@ -934,16 +945,15 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   
   Cng_Build(S8("Cling"), NilP(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)));
   
-  // NOTE(luca): LinuxRunCommand expects Args to have {Args[0], Args[0], Arg1, Arg2, ..., 0} format
-  char **Arguments = PushArray(Arena, char *, (u64)(ArgCount + 3));
+  // NOTE(luca): LinuxRunCommand expects Args to have {Args[0], Arg1, Arg2, ..., 0} format
+  char **Arguments = PushArray(Arena, char *, (u64)(ArgCount + 2));
   {
    Arguments[0] = Args[0];
-   Arguments[1] = Args[0];
    for EachIndex(Idx, ArgCount)
    {
-    Arguments[Idx + 2] = Args[Idx];
+    Arguments[Idx + 1] = Args[Idx];
    }
-   Arguments[ArgCount + 2] = 0;
+   Arguments[ArgCount + 1] = 0;
   }
   LinuxRunCommand(Arguments);;
   

@@ -11,7 +11,9 @@ mkdir -p ../build
 if [ ! -x "../build/cling" ]
 then
 	printf '%s\n' cling.c
-	cc -g -Wno-write-strings -D_GNU_SOURCE=1 -I. -o ../build/cling ./cling/cling.c
+	cc -g -D_GNU_SOURCE=1 -I. \
+		-Wno-unused-value -Wno-initializer-overrides -Wno-write-strings \
+		-o ../build/cling ./cling/cling.c
 fi
 
 CLING_NOREBUILD=1 ../build/cling "$@"

@@ -603,7 +603,7 @@ BASE_ENTRY_POINT()
   }
   else if(Cng_IsOS(CngOS_Linux))
   {
-   Cng_Run("asm51 -n -o main.hex ../code/school/aduc832/main.asm") &&
+   Cng_Run("asm51 -n -a -o main.hex ../code/school/aduc832/main.asm") &&
     Cng_Run("./lsd main.hex");
   }
   
