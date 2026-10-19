@@ -576,11 +576,12 @@ BASE_ENTRY_POINT()
   DidWork = true;
   Cng_Build(S8("LSD"), &BuildOptions, S8ArrayLit(S8("../code/lsd/lsd.c")));
  }
- //~ Linux Serial Downloader
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Serial"), S8("Target")))
+ 
+ //~ School
+ if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("School"), S8("Target")))
  {
   DidWork = true;
-  Cng_Build(S8("Serial"), &BuildOptions, S8ArrayLit(S8("../code/samples/sample_w32_serial.c")));
+  Cng_Build(S8("School"), &BuildOptions, S8ArrayLit(S8("../code/samples/school.c")));
  }
  
  //~ WSDCOM
