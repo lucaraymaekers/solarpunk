@@ -1,16 +1,38 @@
-#define BASE_FORCE_THREADS_COUNT 1
-#include "base/base.h"
-#include "base/base.c"
+//-
+// School sample for doing exercises
+//-
 
-#define Width 3
-#define Height 5
-BASE_ENTRY_POINT()
+//~ Libraries
+#define _CRT_SECURE_NO_WARNINGS 1
+#include <stdio.h>
+
+//~ Constants
+#define MaxHeight 8
+
+//~ API
+void FillMatrix(int *Matrix, int Width, int Height);
+void PrintMatrix(int *Matrix, int Width, int Height);
+
+//~ Entrypoint
+int main(void)
 {
- int Matrix[3][5] = {0};
-
-		for(int Y = 0; Y < Width; Y += 1)
-			for(int X = 0; X < Height; X += 1)
-				Matrix[Y][X] = X + 10*Y;
+ int Matrix[MaxHeight*MaxHeight] = {0};
+ 
+ for(int Y = 0; Y < MaxHeight; Y += 1)
+ {
+  
+  for(int X = 0; X < Y; X += 1)
+  {
+   int Value = 1;
+   if(Y == 0)
+   {
+    
+   }
+   Matrix[Y * MaxHeight + X]  = Value;
+   
+  }
+  
+ }
  
  return 0;
 }

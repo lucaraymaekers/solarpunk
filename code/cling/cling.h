@@ -53,7 +53,7 @@ struct cng_build_options
 typedef struct cng_command_result cng_command_result; 
 struct cng_command_result
 {
- b32 Success;
+ b32 Succeeded;
 };
 
 //~ Globals
@@ -516,6 +516,10 @@ Cng_RunCommandAsync(str8 Command, b32 Async)
   {
    WaitForSingleObject(ProcessInfo.hProcess, INFINITE);
   }
+  DWORD Code = 0;
+  GetExitCodeProcess(ProcessInfo.hProcess, &Code);
+  Result.Succeeded = (Code == 0);
+  
   CloseHandle(ProcessInfo.hProcess);
   CloseHandle(ProcessInfo.hThread);
  } 

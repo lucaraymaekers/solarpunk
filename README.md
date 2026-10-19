@@ -28,9 +28,9 @@ It runs on Linux and Windows (OpenGL) with nice platform debug features such as 
 A POC GUI text editor.
 
 ## LSD (-LSD)
-Linux only!
+My attempt at making a Serial Downloader for the ADuC832 board.  Achieves 2x speed improvements over WSD.
 
-A Linux Serial Downloader for my ADuC832 school board.
+For now it only supports the ADuC832, but I could easily add support for your board.  Just send me a request at `luca@keyfried.com`..
 
 ## WSDCOM (-WSD)
 Windows only!

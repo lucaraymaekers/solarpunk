@@ -3,19 +3,37 @@ LSD_OpenPort(str8 DeviceFileName)
 {
  lsd_port_handle Result = {0};
  
+ HANDLE Port = INVALID_HANDLE_VALUE;
+ 
  if(DeviceFileName.Size == 0)
  {
-  // TODO(luca): Enumerate com ports instead.
-  DeviceFileName = S8("\\\\.\\COM4");
+  // NOTE(luca): If no device name was provided, enumerate from high port number backwards
+  // and use the first valid one found.
+  s32 Idx = 16; // arbitrary
+  while(Port == INVALID_HANDLE_VALUE &&
+        Idx > 0)
+  {
+   DeviceFileName = Str8Fmt("\\\\.\\COM%d", Idx);
+   Port = CreateFile(CSS8(DeviceFileName),
+                     GENERIC_READ|GENERIC_WRITE,
+                     0,
+                     0,
+                     OPEN_EXISTING,
+                     0,
+                     NULL);
+   Idx -= 1;
+  }
  }
- 
- HANDLE Port = CreateFile(CSS8(DeviceFileName),
-                          GENERIC_READ|GENERIC_WRITE,
-                          0,
-                          0,
-                          OPEN_EXISTING,
-                          0,
-                          NULL);
+ else
+ {
+  Port = CreateFile(CSS8(Str8Fmt("\\\\.\\COM%S", DeviceFileName)),
+                    GENERIC_READ|GENERIC_WRITE,
+                    0,
+                    0,
+                    OPEN_EXISTING,
+                    0,
+                    NULL);
+ }
  
  if(Port != INVALID_HANDLE_VALUE)
  {

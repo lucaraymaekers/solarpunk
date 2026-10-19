@@ -577,11 +577,35 @@ BASE_ENTRY_POINT()
   Cng_Build(S8("LSD"), &BuildOptions, S8ArrayLit(S8("../code/lsd/lsd.c")));
  }
  
- //~ School
+ //~ Samples: School
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("School"), S8("Target")))
  {
   DidWork = true;
   Cng_Build(S8("School"), &BuildOptions, S8ArrayLit(S8("../code/samples/school.c")));
+ }
+ 
+ //~ Samples: ADuC 832
+ if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Aduc"), S8("Target")))
+ {
+  DidWork = true;
+#define Command(String) Cng_RunCommand(S8(String)).Succeeded
+  
+  Log("[Aduc]\n");
+  
+  if(0) {}
+  else if(Cng_IsOS(CngOS_Windows))
+  {   
+   Log("main_sdcc.asm\n");
+   Command("sdas8051 -plosgff main.rel ../code/school/aduc832/main_sdcc.asm") &&
+    Command("sdld -n -i main.ihx main.rel") &&
+    Command("lsd main.ihx");
+  }
+  else if(Cng_IsOS(CngOS_Linux))
+  {
+   Command("asm51 -n -o main.hex ../code/school/aduc832/main.asm") &&
+    Command("./lsd main.hex");
+  }
+  
  }
  
  //~ WSDCOM

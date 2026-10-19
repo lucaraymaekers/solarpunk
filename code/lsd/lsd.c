@@ -199,7 +199,7 @@ BASE_ENTRY_POINT()
   if(ShowHelp) ShouldQuit = true;
   
   {  
-   cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("device"), S8("Select device e.g., -device=/dev/ttyUSB1 (linux) or -device=COM1 (windows)"));
+   cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("device"), S8("Select device e.g., (linux:) -device=/dev/ttyUSB1 or (windows:) -device=4 for COM4"));
    if(!IsNilCmdLineEntry(Entry))
    {
     DeviceFileName = Entry->First->V;
@@ -211,6 +211,8 @@ BASE_ENTRY_POINT()
   if(HexFileName)
   {
    DidWork = true;
+   
+   Log("Uploading %s\n", HexFileName);
    
    Prof_TimeScope("Open terminal")
    {
