@@ -596,9 +596,10 @@ BASE_ENTRY_POINT()
   else if(Cng_IsOS(CngOS_Windows))
   {   
    Log("main_sdcc.asm\n");
-   Command("sdas8051 -plosgff main.rel ../code/school/aduc832/main_sdcc.asm") &&
-    Command("sdld -n -i main.ihx main.rel") &&
-    Command("lsd main.ihx");
+   Command("c51asm.exe "
+           "--nopaging --quiet --columns "
+           "--outfile main.hex --include ../code/school/aduc832 " "../code/school/aduc832/main_sdcc.asm") &&
+    Command("lsd -run main.hex");
   }
   else if(Cng_IsOS(CngOS_Linux))
   {

@@ -136,7 +136,7 @@ Cng_GetBaseFileName(str8 FileName)
 .Strings  = (str8[]){__VA_ARGS__}, \
 })
 
-
+// NOTE(luca): OutputName is without extension, it will be appended based on build type.
 internal cng_command_result
 Cng_Build__(str8 BuildName, 
             cng_build_type Type, 
@@ -563,7 +563,6 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
  {
   GlobalCurrentOS = CngOS_Windows;
   GlobalEnv = Env;
-  SetStringsScratch(Arena);
  }
  
  str8 NoRebuildString = Win32GetEnvironmentVar(CLING_ARG_NOREBUILD);
@@ -629,15 +628,10 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
    // Make new
    {
     str8 BuildDirPath = Cng_PathFromExe(ExePath, S8(CLING_BUILD_PATH));
-    str8 ClingSourcePath = Cng_PathFromExe(ExePath, S8(CLING_SOURCE_PATH));
-    str8 ClingCodePath = Cng_PathFromExe(ExePath, S8(CLING_CODE_PATH));
-    
     // NOTE(luca): So that build artifacts end up in the right directory.
-    OS_ChangeDirectory((char *)BuildDirPath.Data);
+    OS_ChangeDirectory(CSS8(BuildDirPath));
     
-    Cng_Build(S8("Cling"), NilP(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)),
-              .OutputName = NewPath);
-    
+    Cng_Build(S8("Cling"), NilP(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)));
    }
    
    RunPath = NewPath;
@@ -918,7 +912,6 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
  {
   GlobalCurrentOS = CngOS_Linux;
   GlobalEnv = Env;
-  SetStringsScratch(Arena);
  }
  
  str8 OutputBuffer = PushS8(Arena, KB(2));

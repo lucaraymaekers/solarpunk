@@ -20,6 +20,8 @@ ENTRY_POINT(OS_EntryPoint)
 {
  arena *Arena = GetScratch();
  
+ SetStringsScratch(Arena);
+ 
  // NOTE(luca): Disable line buffering, (workaround for cling and 4coder)
  setvbuf(stdout, NULL, _IONBF, 0);
  
