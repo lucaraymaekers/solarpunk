@@ -31,23 +31,6 @@
 # include "lsd/lsd_windows.c"
 #endif
 
-//~ Types
-typedef struct command command;
-struct command
-{
- command_kind Kind;
- 
- u64 BufferCount;
- u8 Buffer[256];
- u8 CheckSum;
- s32 Baud;
- 
- u64 StartTSC;
- 
- u8 ExpectedBytesReturned;
- b32 Written;
-};
-
 //~ Globals
 
 // Constants
@@ -188,10 +171,9 @@ BASE_ENTRY_POINT()
  str8 DeviceFileName = S8("");
  char *HexFileName = 0;
  b32 DidWork = false;
- b32 Verbose = false;
  b32 Run = false;
- b32 ShowHelp = false;
  b32 Udev = false;
+ b32 ShowHelp = false;
  
  b32 ShouldQuit = false;
  
@@ -205,7 +187,7 @@ BASE_ENTRY_POINT()
  Prof_Profile()
 #endif
  {
-  Verbose = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("verbose"), S8("Increase verbosity"));
+  GlobalVerbose = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("verbose"), S8("Increase verbosity"));
   Run = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("Run program after download"));
   Udev = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("udev"), S8("Print udev rule for setting usb latency timer automatically"));
   
@@ -380,7 +362,7 @@ BASE_ENTRY_POINT()
      u8 WriteBuffer_[KB(64)] = {0};
      u8 *WriteBuffer = WriteBuffer_;
      
-     if(!Verbose) Pad.Size = 1;
+     if(!GlobalVerbose) GlobalPad.Size = 1;
      
      s64 TotalBytesSent = 0;
      
@@ -458,7 +440,7 @@ BASE_ENTRY_POINT()
            //tcdrain(TerminalHandle);
            
            Command->Written = true;
-           if(Verbose) 
+           if(GlobalVerbose) 
            {
             Log("Command: %S (%lld bytes)\n", CommandDescriptions[Command->Kind], Write.Count);
            }
@@ -472,9 +454,9 @@ BASE_ENTRY_POINT()
           }
           else
           {
-           Log("%SError: Could not write command.\n", Pad);
+           Log("%SError: Could not write command.\n", GlobalPad);
 #if OS_LINUX
-           if(Verbose) PrintErrnoIf(true);
+           if(GlobalVerbose) PrintErrnoIf(true);
 #endif
            ShouldQuit = true;
           }
@@ -514,30 +496,30 @@ BASE_ENTRY_POINT()
              str8 Identifier = S8To(Response, 10);
              str8 Version = S8FromTo(Response, 10, 14);
              
-             if(Verbose)
+             if(GlobalVerbose)
               Log("%SID:        %S\n"
                   "%SVersion:   %S\n"
                   "%SHardware:  0x%x%x\n", 
-                  Pad, Identifier,
-                  Pad, Version,
-                  Pad, Response.Data[16], Response.Data[17]);
+                  GlobalPad, Identifier,
+                  GlobalPad, Version,
+                  GlobalPad, Response.Data[16], Response.Data[17]);
              
              u8 ResponseCheckSum = Response.Data[24];
              u8 CheckSum = GetCheckSum(24, Response.Data);
              
              if(!S8Match(Identifier, S8("ADI 832"), true))
              {
-              Log("%SError: Board not supported.\n", Pad);
+              Log("%SError: Board not supported.\n", GlobalPad);
               ShouldQuit = true;
              } 
              else if(CheckSum != ResponseCheckSum)
              {
-              Log("%SError: Checksum failed, has: %x wanted: %x\n", Pad, CheckSum, ResponseCheckSum);
+              Log("%SError: Checksum failed, has: %x wanted: %x\n", GlobalPad, CheckSum, ResponseCheckSum);
               ShouldQuit = true;
              }
              else
              {
-              Log("%SLoader connected.\n", Pad);
+              Log("%SLoader connected.\n", GlobalPad);
              }
              
             } break;
@@ -552,7 +534,7 @@ BASE_ENTRY_POINT()
              {
               if(ReadBuffer[0] == 0x07)
               {
-               Log("%SFailed: NAK.\n", Pad);
+               Log("%SFailed: NAK.\n", GlobalPad);
                ShouldQuit = true;
               }
               if(ReadBuffer[0] == 0x06)
@@ -563,13 +545,13 @@ BASE_ENTRY_POINT()
                u64 Elapsed = ReadCPUTimer() - Command->StartTSC;
                // NOTE(luca): Set Manually
                u64 CPUFreq = Prof_GuessCPUFreq(OS_ReadTimer() - Prof.OSStart, Elapsed, OS_GetTimerFreq());
-               if(Verbose) Log("%Stook %fms\n", Pad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
+               if(GlobalVerbose) Log("%Stook %fms\n", GlobalPad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
 #endif
                
                if(0) {}
                else if(Command->Kind == CommandKind_ChangeBaud)
                {
-                if(Verbose) Log("%SSet baud rate to %d.\n", Pad, Command->Baud);
+                if(GlobalVerbose) Log("%SSet baud rate to %d.\n", GlobalPad, Command->Baud);
                 LSD_SetBaudRate(TerminalHandle, Command->Baud);
                }
               }
@@ -594,7 +576,7 @@ BASE_ENTRY_POINT()
      
      if(TotalBytesSent)
      {
-      if(Verbose) Log("\nCommand count: %llu.\n", CommandCount);
+      if(GlobalVerbose) Log("\nCommand count: %llu.\n", CommandCount);
       Log("Total bytes sent: %lld.\n", TotalBytesSent);
      }
     }
@@ -604,7 +586,7 @@ BASE_ENTRY_POINT()
   if(Udev)
   {
    DidWork = true;
-   if(Verbose)
+   if(GlobalVerbose)
     Log("E.g., copy to /etc/udev/rules.d/99-usb-serial-latency.rules\n\n");
    Log("ACTION==\"add\", SUBSYSTEM==\"usb-serial\", ATTR{latency_timer}=\"1\"\n");
   }

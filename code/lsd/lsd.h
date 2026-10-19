@@ -3,13 +3,23 @@
 #ifndef LSD_H
 #define LSD_H
 
-global_variable str8 Pad =
+//~ Types
+typedef struct command command;
+struct command
 {
- .Data =  (u8 *)"          ",
- .Size = sizeof("          ") - 1,
+ command_kind Kind;
+ 
+ u64 BufferCount;
+ u8 Buffer[256];
+ u8 CheckSum;
+ s32 Baud;
+ 
+ u64 StartTSC;
+ 
+ u8 ExpectedBytesReturned;
+ b32 Written;
 };
 
-//~ OS abstraction API
 typedef struct lsd_port_handle lsd_port_handle;
 struct lsd_port_handle
 {
@@ -25,6 +35,17 @@ struct lsd_rw_result
  u64 Count;
 };
 
+//~ Globals
+global_variable str8 GlobalPad =
+{
+ .Data =  (u8 *)"          ",
+ .Size = sizeof("          ") - 1,
+};
+
+global_variable b32 GlobalVerbose;
+
+
+//~ API
 internal lsd_port_handle LSD_OpenPort(str8 DeviceFileName);
 internal lsd_rw_result   LSD_Read (lsd_port_handle Handle, u8 *Buffer, u64 BufferSize);
 internal lsd_rw_result   LSD_Write(lsd_port_handle Handle, u8 *Buffer, u64 BufferSize);

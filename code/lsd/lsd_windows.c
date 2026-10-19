@@ -68,7 +68,7 @@ LSD_OpenPort(str8 DeviceFileName)
  }
  else
  {
-  Win32Log();
+  if(GlobalVerbose) Win32Log();
   Log("Error: Could not open '%S', make sure device is present.\n", DeviceFileName);
  }
  
@@ -84,8 +84,8 @@ LSD_SetBaudRate(lsd_port_handle Handle, s32 Baud)
  Options->BaudRate = Baud;
  if(!SetCommState(Port, Options))
  {
-  Log("Failed to set baud rate.\n");
-  Win32Log();
+  Log("Error: Failed to set baud rate.\n");
+  if(GlobalVerbose) Win32Log();
  }
 }
 

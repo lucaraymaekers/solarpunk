@@ -111,13 +111,13 @@ LSD_OpenPort(str8 DeviceFileName)
    if(Ret == -1)
    {
     Log("Could not set options for port.\n");
-    PrintErrnoIf(true);
+    PrintErrnoIf(GlobalVerbose);
    }
   }
  }
  else
  {
-  PrintErrnoIf(true);
+  PrintErrnoIf(GlobalVerbose);
   str8 HelpText = S8("make sure device is present");
   if(0) {}
   if(errno == EACCES) HelpText = S8("make sure you have access permission");
@@ -197,6 +197,6 @@ LSD_SetBaudRate(lsd_port_handle Handle, s32 Baud)
  if(Ret == -1)
  {
   Log("Error: Could not set baud rate.\n");
-  PrintErrnoIf(true);
+  PrintErrnoIf(GlobalVerbose);
  }
 }
