@@ -52,20 +52,46 @@ load_paths =
 
 commands =
 {
- .build = 
+ .build_wsdcom = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh norebuild -Meta -LSD",
+  .win = ".\\code\\build.bat -WSD -compile -copy",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_aduc = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -Aduc",
   .win = ".\\code\\build.bat -Aduc",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
  },
- .build_m51 = 
+ .build_muze = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh norebuild -Meta -M51",
-  .win = ".\\code\\build.bat -Meta -M51",
+  .linux = "./code/build.sh -Meta -Muze",
+  .win = ".\\code\\build.bat -Meta -Muze",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_editor = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -Meta -Editor",
+  .win = ".\\code\\build.bat -Meta -Editor",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_lsd = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -Meta -LSD",
+  .win = ".\\code\\build.bat -Meta -LSD",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -73,7 +99,6 @@ commands =
  .run = 
  {
   .out = "*compilation*", 
-  .linux = "./build/editor",
   .win = "raddbg.exe --ipc run",
   .save_dirty_files = false,
   .footer_panel = false,
@@ -101,7 +126,7 @@ commands =
 
 fkey_command =
 {
- .F1 = "build",
+ .F1 = "build_lsd",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",

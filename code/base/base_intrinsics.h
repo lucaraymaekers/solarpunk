@@ -36,8 +36,6 @@ internal u64 rdtsc(void)
 #define rdtsc() __rdtsc()
 #endif
 
-#define ReadCPUTimer() rdtsc()
-
 internal inline f64
 SinF64(f64 X)
 {

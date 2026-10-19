@@ -588,7 +588,7 @@ BASE_ENTRY_POINT()
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Aduc"), S8("Target")))
  {
   DidWork = true;
-#define Command(String) Cng_RunCommand(S8(String)).Succeeded
+#define Cng_Run(String) Cng_RunCommand(S8(String)).Succeeded
   
   Log("[Aduc]\n");
   
@@ -596,15 +596,15 @@ BASE_ENTRY_POINT()
   else if(Cng_IsOS(CngOS_Windows))
   {   
    Log("main_sdcc.asm\n");
-   Command("c51asm.exe "
+   Cng_Run("c51asm.exe "
            "--nopaging --quiet --columns "
-           "--outfile main.hex --include ../code/school/aduc832 " "../code/school/aduc832/main_sdcc.asm") &&
-    Command("lsd -run main.hex");
+           "--outfile main_sdcc.hex --include ../code/school/aduc832 " "../code/school/aduc832/main_sdcc.asm") &&
+    Cng_Run("lsd -run main_sdcc.hex");
   }
   else if(Cng_IsOS(CngOS_Linux))
   {
-   Command("asm51 -n -o main.hex ../code/school/aduc832/main.asm") &&
-    Command("./lsd main.hex");
+   Cng_Run("asm51 -n -o main.hex ../code/school/aduc832/main.asm") &&
+    Cng_Run("./lsd main.hex");
   }
   
  }

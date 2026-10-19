@@ -61,7 +61,7 @@ Prof_BlockBegin(char *Label, u64 MarkerIdx)
  Result.OldTSCElapsedInclusive = Marker->TSCElapsedInclusive; 
  
  Result.ParentIdx = Prof.ParentIdx;
- Result.StartTSC = ReadCPUTimer();
+ Result.StartTSC = rdtsc();
  Prof.ParentIdx = MarkerIdx;
  Prof.Indent += 1;
  
@@ -74,7 +74,7 @@ Prof_BlockBegin(char *Label, u64 MarkerIdx)
 internal void
 Prof_BlockEnd(prof_block Block)
 {
- u64 Elapsed = ReadCPUTimer() - Block.StartTSC;
+ u64 Elapsed = rdtsc() - Block.StartTSC;
  Prof.ParentIdx = Block.ParentIdx;
  
  prof_marker *Parent = Prof.Markers + Block.ParentIdx;
@@ -104,14 +104,14 @@ Prof_GuessCPUFreq(u64 OSElapsed, u64 CPUElapsed, u64 OSFreq)
 internal void
 Prof_StartProfile(void)
 {
- Prof.StartTSC = ReadCPUTimer();
+ Prof.StartTSC = rdtsc();
  Prof.OSStart = OS_ReadTimer();
 }
 
 internal void
 Prof_EndProfileAndPrint(void)
 {
- u64 TotalTSCElapsed = ReadCPUTimer() - Prof.StartTSC;
+ u64 TotalTSCElapsed = rdtsc() - Prof.StartTSC;
  u64 OSElapsed = OS_ReadTimer() - Prof.OSStart;
  
  u64 OSFreq = OS_GetTimerFreq();

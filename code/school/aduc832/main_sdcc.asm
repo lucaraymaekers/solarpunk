@@ -10,7 +10,6 @@ loop:
 
 	mov a, p0
  xrl a, #0xFF
-
 	mov p2, a
 
  mov a, #10

@@ -32,6 +32,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "base/base.h"
 #include "base/base.c"
 
+#include "rl/rl_profile.h"
+
 // NOTE(luca): If you want to log output to the command line
 //#define LOGGING_ENABLED 1
 
@@ -514,299 +516,303 @@ int main(int argc, char *argv[])
  TyCfgFileOpt   CfgOpts        = {0x0}; // Part Configuration File Options
  TyCmdLineOpts  CmdOpts        = {0x0}; // Command line options
  TyBaudRates    Bauds     = {ADUC_BAUD_115200,ADUC_BAUD_9600,ADUC_BAUD_9600};
- b32           bSuccess = false;
+ b32            bSuccess = false;
+ int            ReturnVal = 0x1;
  
  SetStringsScratch(ArenaAlloc());
  
- SetStage(CONNECT_STAGE);
- 
- InitSessionStructs(&CfgOpts,&CmdOpts);
- 
- if(argc == 0x1)
-  showInstructions();
- 
- UpdateCurStageTxt("Decoding command line");
- if(decodeCommandLine(argc,argv, &CmdOpts))
+#if LSD_INTERNAL
+ Prof_Profile()
+#endif
  {
-  fprintf(stderr, "Uploading %s\n", CmdOpts.szCodeHexF);
+  SetStage(CONNECT_STAGE);
   
-  //bSuccess = (DoActions(&CmdOpts, &CfgOpts, &Bauds) == 0);
+  InitSessionStructs(&CfgOpts,&CmdOpts);
+  
+  if(argc == 0x1)
+   showInstructions();
+  
+  UpdateCurStageTxt("Decoding command line");
+  if(decodeCommandLine(argc,argv, &CmdOpts))
   {
-   char           szMessage[0x80];
-   int            rMajor         = 0;
-   int            rMinor         = 0;    // rev number of the target firmware
-   char           sanatizedSig[100];
-   DWORD          dwStartTime    = 0;
-   char           cVHi = 0, cVMid = 0, cVLo = 0;
-   DWORD          dwEndTime      = 0;
-   DWORD          dwDnwldTime    = 0;
-   DWORD          dwVerifyTime   = 0;
-   int            iRetVal        = Undefined_error;
+   fprintf(stderr, "Uploading %s\n", CmdOpts.szCodeHexF);
    
-   UpdateCurStageTxt("Validating command line");
-   if(validateParameters(&CmdOpts,&iRetVal))
+   //bSuccess = (DoActions(&CmdOpts, &CfgOpts, &Bauds) == 0);
    {
-    UpdateCurStageTxt("Calculating baudrates to be used");
-    Bauds = getCorrectBauds(&CmdOpts,0);
+    char           szMessage[0x80];
+    int            rMajor         = 0;
+    int            rMinor         = 0;    // rev number of the target firmware
+    char           sanatizedSig[100];
+    DWORD          dwStartTime    = 0;
+    char           cVHi = 0, cVMid = 0, cVLo = 0;
+    DWORD          dwEndTime      = 0;
+    DWORD          dwDnwldTime    = 0;
+    DWORD          dwVerifyTime   = 0;
+    int            iRetVal        = Undefined_error;
     
-    UpdateScreenInfo(&CmdOpts, &Bauds);
-    
-    UpdateCurStageTxt("Connecting to ADuC8xx");
-    // Reset the target device (hopefully into loader mode)
-    iRetVal = Communication_error;
-    bSuccess = reset(&rMajor,
-                     &rMinor,
-                     sanatizedSig,
-                     Bauds.PCSlowBR,
-                     &CmdOpts,
-                     &cVHi,
-                     &cVMid,
-                     &cVLo,
-                     2,
-                     &Bauds);
-    
-    if(bSuccess)
+    UpdateCurStageTxt("Validating command line");
+    if(validateParameters(&CmdOpts,&iRetVal))
     {
-     bSuccess=(CommOpen(CmdOpts.iComPort, Bauds.PCSlowBR)==1);
-    }
-    
-    if(bSuccess)
-    {
-     sprintf(szMessage," %s V%c.%c.%c",sanatizedSig,cVHi,cVMid,cVLo);
-     UpdateTxt(szMessage,COL_1_X_FLD_ST,PART_Y,COL_1_FLD_LEN);
-     UpdateCurStageTxt("Reading configuration information");
-     iRetVal = File_error;
-     bSuccess = bSuccess && UpdateCfgData(sanatizedSig,&CfgOpts);
+     UpdateCurStageTxt("Calculating baudrates to be used");
+     Bauds = getCorrectBauds(&CmdOpts,0);
      
-     // A quick check to see if the user has specified security bits
-     // and the connected processor does not support it
-     if(bSuccess && !CfgOpts.SecurityBitsOption)
+     UpdateScreenInfo(&CmdOpts, &Bauds);
+     
+     UpdateCurStageTxt("Connecting to ADuC8xx");
+     // Reset the target device (hopefully into loader mode)
+     iRetVal = Communication_error;
+     bSuccess = reset(&rMajor,
+                      &rMinor,
+                      sanatizedSig,
+                      Bauds.PCSlowBR,
+                      &CmdOpts,
+                      &cVHi,
+                      &cVMid,
+                      &cVLo,
+                      2,
+                      &Bauds);
+     
+     if(bSuccess)
      {
-      if(CmdOpts.SecurityLockMode || CmdOpts.SecuritySecureMode || CmdOpts.SecuritySerialSafeMode)
-      {
-       UpdateCurOpTxt("Checking security feature available");
-       UpdateCurStatTxt("Security specified but unavailable.");
-       iRetVal = Undefined_error;
-       bSuccess = false;
-      }
+      bSuccess=(CommOpen(CmdOpts.iComPort, Bauds.PCSlowBR)==1);
      }
      
      if(bSuccess)
      {
-      // Now that we know which part we are targetting it may be
-      // possible to switch to using faster baud rates if the ADuC8xx
-      // can support this
-      Bauds = getCorrectBauds(&CmdOpts,&CfgOpts);
+      sprintf(szMessage," %s V%c.%c.%c",sanatizedSig,cVHi,cVMid,cVLo);
+      UpdateTxt(szMessage,COL_1_X_FLD_ST,PART_Y,COL_1_FLD_LEN);
+      UpdateCurStageTxt("Reading configuration information");
+      iRetVal = File_error;
+      bSuccess = bSuccess && UpdateCfgData(sanatizedSig,&CfgOpts);
       
-      // Update crystal frequency now that we actually know
-      // what it is
-      sprintf(szMessage,"%d Hz",CmdOpts.fcore);
-      UpdateTxt(szMessage,COL_1_X_FLD_ST,CRYSTAL_Y,COL_1_FLD_LEN);
-      
-      
-      // Use the fastest baud rate that is supported to speed up download
-      if(CfgOpts.FastBROption)
+      // A quick check to see if the user has specified security bits
+      // and the connected processor does not support it
+      if(bSuccess && !CfgOpts.SecurityBitsOption)
       {
-       UpdateCurStageTxt("Changing to fast baudrate");
-       iRetVal = Communication_error;
-       bSuccess = ChangeBaudrate(Bauds.FastBR,
-                                 &CmdOpts,
-                                 &CfgOpts,&Bauds);
-       
-       // We have just changed the baud rate so it is possible that
-       // we now have lost comms with the ADuC8xx. 
-       
-       UpdateCurStageTxt("Erasing Flash");
-       SetStage(ERASE_STAGE);
-       // 
-       // First operation is to erase the code flash. The data flash may
-       // need to be erased as well
-       bSuccess = bSuccess && EraseFlash(&CmdOpts);
-       
-       if(!bSuccess)
+       if(CmdOpts.SecurityLockMode || CmdOpts.SecuritySecureMode || CmdOpts.SecuritySerialSafeMode)
        {
-        // Assume now that it was due to the comms
-        UpdateCurStageTxt("Changing to fast baudrate");
-        UpdateCurStatTxt("Lost contact after changing the baudrate");
+        UpdateCurOpTxt("Checking security feature available");
+        UpdateCurStatTxt("Security specified but unavailable.");
+        iRetVal = Undefined_error;
+        bSuccess = false;
        }
-       
       }
-      else
-      {
-       UpdateCurStageTxt("Erasing Flash");
-       SetStage(ERASE_STAGE);
-       // First operation is to erase the code flash. The data flash may
-       // need to be erased as well
-       bSuccess = bSuccess && EraseFlash(&CmdOpts);
-       iRetVal = Erase_error;
-      }
-     }
-     
-     iRetVal = Undefined_error;
-     SetStage(DOWNLOAD_STAGE);
-     
-     // Do we need to download to code flash?
-     if(bSuccess && (CmdOpts.DownloadMode != DWN_DATA_ONLY_MODE))
-     {
-      UpdateCurStageTxt("Downloading bytes to code flash");
-      dwStartTime = GetTickCount();
-      bSuccess = bSuccess && DoDownloadCodeFlash(&CfgOpts,
-                                                 &CmdOpts) ;
-      
-      dwEndTime = GetTickCount();
-      
-      dwDnwldTime    = dwEndTime-dwStartTime;
-      dwVerifyTime   = 0;
       
       if(bSuccess)
       {
-       sprintf(szMessage,
-               "Download completed in %d seconds",
-               (dwEndTime-dwStartTime)/1000);
-       UpdateCurStatTxt(szMessage);
+       // Now that we know which part we are targetting it may be
+       // possible to switch to using faster baud rates if the ADuC8xx
+       // can support this
+       Bauds = getCorrectBauds(&CmdOpts,&CfgOpts);
        
-       sprintf(szMessage,
-               "%s (%d\\%d) [Csum:%d]",
-               FieldCrop(CmdOpts.szCodeHexF,COL_1_FLD_LEN_EX - 25),
-               dwDnwldTime/1000,
-               dwVerifyTime/1000,
-               CmdOpts.ulActualCodeFCSum);
-       UpdateTxt(szMessage,COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
+       // Update crystal frequency now that we actually know
+       // what it is
+       sprintf(szMessage,"%d Hz",CmdOpts.fcore);
+       UpdateTxt(szMessage,COL_1_X_FLD_ST,CRYSTAL_Y,COL_1_FLD_LEN);
        
-       // Should we verify now?
-       if(CmdOpts.bVerify && CfgOpts.VerifyAfterDownloadOption)
+       
+       // Use the fastest baud rate that is supported to speed up download
+       if(CfgOpts.FastBROption)
        {
-        UpdateCurStageTxt("Verifying Code Flash");
-        SetStage(VERIFY_STAGE);
+        UpdateCurStageTxt("Changing to fast baudrate");
+        iRetVal = Communication_error;
+        bSuccess = ChangeBaudrate(Bauds.FastBR,
+                                  &CmdOpts,
+                                  &CfgOpts,&Bauds);
         
-        dwStartTime = GetTickCount();
-        bSuccess = bSuccess && verifyfile(&CmdOpts);
-        dwEndTime = GetTickCount();
+        // We have just changed the baud rate so it is possible that
+        // we now have lost comms with the ADuC8xx. 
         
-        if(bSuccess)
+        UpdateCurStageTxt("Erasing Flash");
+        SetStage(ERASE_STAGE);
+        // 
+        // First operation is to erase the code flash. The data flash may
+        // need to be erased as well
+        bSuccess = bSuccess && EraseFlash(&CmdOpts);
+        
+        if(!bSuccess)
         {
-         dwVerifyTime    = dwEndTime-dwStartTime;
+         // Assume now that it was due to the comms
+         UpdateCurStageTxt("Changing to fast baudrate");
+         UpdateCurStatTxt("Lost contact after changing the baudrate");
+        }
+        
+       }
+       else
+       {
+        UpdateCurStageTxt("Erasing Flash");
+        SetStage(ERASE_STAGE);
+        // First operation is to erase the code flash. The data flash may
+        // need to be erased as well
+        bSuccess = bSuccess && EraseFlash(&CmdOpts);
+        iRetVal = Erase_error;
+       }
+      }
+      
+      iRetVal = Undefined_error;
+      SetStage(DOWNLOAD_STAGE);
+      
+      // Do we need to download to code flash?
+      if(bSuccess && (CmdOpts.DownloadMode != DWN_DATA_ONLY_MODE))
+      {
+       UpdateCurStageTxt("Downloading bytes to code flash");
+       dwStartTime = GetTickCount();
+       bSuccess = bSuccess && DoDownloadCodeFlash(&CfgOpts,
+                                                  &CmdOpts) ;
+       
+       dwEndTime = GetTickCount();
+       
+       dwDnwldTime    = dwEndTime-dwStartTime;
+       dwVerifyTime   = 0;
+       
+       if(bSuccess)
+       {
+        sprintf(szMessage,
+                "Download completed in %d seconds",
+                (dwEndTime-dwStartTime)/1000);
+        UpdateCurStatTxt(szMessage);
+        
+        sprintf(szMessage,
+                "%s (%d\\%d) [Csum:%d]",
+                FieldCrop(CmdOpts.szCodeHexF,COL_1_FLD_LEN_EX - 25),
+                dwDnwldTime/1000,
+                dwVerifyTime/1000,
+                CmdOpts.ulActualCodeFCSum);
+        UpdateTxt(szMessage,COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
+        
+        // Should we verify now?
+        if(CmdOpts.bVerify && CfgOpts.VerifyAfterDownloadOption)
+        {
+         UpdateCurStageTxt("Verifying Code Flash");
+         SetStage(VERIFY_STAGE);
          
-         sprintf(szMessage,
-                 "Verify completed in %d seconds",
-                 (dwEndTime-dwStartTime)/1000);
-         UpdateCurStatTxt(szMessage);
-         sprintf(szMessage,
-                 "%s (%d\\%d) [Csum:%d]",
-                 FieldCrop(CmdOpts.szCodeHexF,COL_1_FLD_LEN_EX - 25),
-                 dwDnwldTime/1000,
-                 dwVerifyTime/1000,
-                 CmdOpts.ulActualCodeFCSum);
-         UpdateTxt(szMessage,COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
+         dwStartTime = GetTickCount();
+         bSuccess = bSuccess && verifyfile(&CmdOpts);
+         dwEndTime = GetTickCount();
+         
+         if(bSuccess)
+         {
+          dwVerifyTime    = dwEndTime-dwStartTime;
+          
+          sprintf(szMessage,
+                  "Verify completed in %d seconds",
+                  (dwEndTime-dwStartTime)/1000);
+          UpdateCurStatTxt(szMessage);
+          sprintf(szMessage,
+                  "%s (%d\\%d) [Csum:%d]",
+                  FieldCrop(CmdOpts.szCodeHexF,COL_1_FLD_LEN_EX - 25),
+                  dwDnwldTime/1000,
+                  dwVerifyTime/1000,
+                  CmdOpts.ulActualCodeFCSum);
+          UpdateTxt(szMessage,COL_1_X_FLD_ST,CODE_Y,COL_1_FLD_LEN_EX);
+         }
         }
        }
       }
-     }
-     
-     // Do we need to download to data flash?
-     if(bSuccess && (CmdOpts.DownloadMode != DWN_CODE_ONLY_MODE))
-     {
-      SetStage(DOWNLOAD_STAGE);
-      UpdateCurStageTxt("Downloading bytes to data flash");
-      bSuccess = bSuccess && DoDownloadDataFlash(&CmdOpts);
-     }
-     
-     // Do we need to send down the security bits
-     if(bSuccess && CfgOpts.SecurityBitsOption)
-     {
-      if(CmdOpts.SecurityLockMode || CmdOpts.SecuritySecureMode || CmdOpts.SecuritySerialSafeMode)
+      
+      // Do we need to download to data flash?
+      if(bSuccess && (CmdOpts.DownloadMode != DWN_CODE_ONLY_MODE))
       {
-       SetStage(SECURE_STAGE);
-       UpdateCurStageTxt("Downloading Security Bits");
-       bSuccess = bSuccess && DoSecurity(&CmdOpts);
+       SetStage(DOWNLOAD_STAGE);
+       UpdateCurStageTxt("Downloading bytes to data flash");
+       bSuccess = bSuccess && DoDownloadDataFlash(&CmdOpts);
       }
-     }
-     
-     // Do we need to enable the bootload option
-     // Bootload Option
-     if(bSuccess && CfgOpts.BootloadOption)
-     {
-      SetStage(BOOTLOAD_STAGE);
-      UpdateCurStageTxt("Configuring Bootload Options");
-      bSuccess = bSuccess && DoBootloadOption(&CmdOpts);
-     }
-     
-     // Change back to the standard baud rate now if we had changed it
-     if(bSuccess && CfgOpts.FastBROption)
-     {
-      UpdateCurStageTxt("Changing back to original baudrate");
-      bSuccess = ChangeBaudrate(Bauds.PCSlowBR,&CmdOpts,&CfgOpts,&Bauds);
-     }
-     else
-     {
-      if(&CfgOpts.FastBROption)
+      
+      // Do we need to send down the security bits
+      if(bSuccess && CfgOpts.SecurityBitsOption)
       {
-       // An error has happened but we may stil be able to change
-       // the uC baud rate back to the default ready for the next
-       // attempt. Try this now but don't lose the existing status
-       
-       // Take a copy of the existing strings and restore them
-       // at the end 
-       char szCurOpTextBKUp   [sizeof(szCurOpText   )];
-       char szCurStatTextBKUp [sizeof(szCurStatText)];
-       char szCurStageTextBKUp[sizeof(szCurStageText)];
-       
-       strcpy(szCurOpTextBKUp   ,szCurOpText   );
-       strcpy(szCurStatTextBKUp ,szCurStatText );
-       strcpy(szCurStageTextBKUp,szCurStageText);
-       
+       if(CmdOpts.SecurityLockMode || CmdOpts.SecuritySecureMode || CmdOpts.SecuritySerialSafeMode)
+       {
+        SetStage(SECURE_STAGE);
+        UpdateCurStageTxt("Downloading Security Bits");
+        bSuccess = bSuccess && DoSecurity(&CmdOpts);
+       }
+      }
+      
+      // Do we need to enable the bootload option
+      // Bootload Option
+      if(bSuccess && CfgOpts.BootloadOption)
+      {
+       SetStage(BOOTLOAD_STAGE);
+       UpdateCurStageTxt("Configuring Bootload Options");
+       bSuccess = bSuccess && DoBootloadOption(&CmdOpts);
+      }
+      
+      // Change back to the standard baud rate now if we had changed it
+      if(bSuccess && CfgOpts.FastBROption)
+      {
        UpdateCurStageTxt("Changing back to original baudrate");
-       (void)ChangeBaudrate(Bauds.PCSlowBR,&CmdOpts,&CfgOpts,&Bauds);
+       bSuccess = ChangeBaudrate(Bauds.PCSlowBR,&CmdOpts,&CfgOpts,&Bauds);
+      }
+      else
+      {
+       if(&CfgOpts.FastBROption)
+       {
+        // An error has happened but we may stil be able to change
+        // the uC baud rate back to the default ready for the next
+        // attempt. Try this now but don't lose the existing status
+        
+        // Take a copy of the existing strings and restore them
+        // at the end 
+        char szCurOpTextBKUp   [sizeof(szCurOpText   )];
+        char szCurStatTextBKUp [sizeof(szCurStatText)];
+        char szCurStageTextBKUp[sizeof(szCurStageText)];
+        
+        strcpy(szCurOpTextBKUp   ,szCurOpText   );
+        strcpy(szCurStatTextBKUp ,szCurStatText );
+        strcpy(szCurStageTextBKUp,szCurStageText);
+        
+        UpdateCurStageTxt("Changing back to original baudrate");
+        (void)ChangeBaudrate(Bauds.PCSlowBR,&CmdOpts,&CfgOpts,&Bauds);
+        
+        UpdateCurStatTxt (szCurStatTextBKUp   );
+        UpdateCurStageTxt(szCurStageTextBKUp );
+        UpdateCurOpTxt   (szCurOpTextBKUp);
+       }
        
-       UpdateCurStatTxt (szCurStatTextBKUp   );
-       UpdateCurStageTxt(szCurStageTextBKUp );
-       UpdateCurOpTxt   (szCurOpTextBKUp);
+       
       }
       
       
+      // Set the ADuC8xx executing now if required
+      if(bSuccess && CmdOpts.bRun)
+      {
+       SetStage(RUN_STAGE);
+       UpdateCurStageTxt("Starting execution of ADuC8xx");
+       bSuccess = bSuccess && run(&CmdOpts,&Bauds);
+      }
      }
-     
-     
-     // Set the ADuC8xx executing now if required
-     if(bSuccess && CmdOpts.bRun)
-     {
-      SetStage(RUN_STAGE);
-      UpdateCurStageTxt("Starting execution of ADuC8xx");
-      bSuccess = bSuccess && run(&CmdOpts,&Bauds);
-     }
+     CommClose();
     }
-    CommClose();
+    SetStage(COMPLETE_STAGE);
+    
+    if(bSuccess)
+    {
+     iRetVal = Success;
+     fprintf(stderr, "SUCCESS\n");
+    }
+    else
+     fprintf(stderr, "FAILED\n");
+    
+    bSuccess = iRetVal;
    }
-   SetStage(COMPLETE_STAGE);
    
-   if(bSuccess)
-   {
-    iRetVal = Success;
-    fprintf(stderr, "SUCCESS\n");
-   }
-   else
-    fprintf(stderr, "FAILED\n");
-   
-   bSuccess = iRetVal;
   }
   
+  if(bSuccess)
+  {
+   // Completion Line
+   // Completion Line
+   // And clear the other status lines as well
+   UpdateCurOpTxt("Complete");
+   UpdateCurStatTxt("Success");
+   UpdateCurStageTxt("Complete");
+   
+   ReturnVal = 0x0;
+  }
  }
  
- if(!bSuccess)
- {
-  // Completion Line
-  return 0x1;
- }
- else
- {
-  // Completion Line
-  // And clear the other status lines as well
-  
-  UpdateCurOpTxt("Complete");
-  UpdateCurStatTxt("Success");
-  UpdateCurStageTxt("Complete");
-  return 0x0;
- }
+ return ReturnVal;
 }
 
 // Function     : decodeCommandLine

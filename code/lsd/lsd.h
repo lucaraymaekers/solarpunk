@@ -10,13 +10,13 @@ struct command
  command_kind Kind;
  
  u64 BufferCount;
- u8 Buffer[256];
+ u8 Buffer[512];
  u8 CheckSum;
  s32 Baud;
  
  u64 StartTSC;
  
- u8 ExpectedBytesReturned;
+ u64 ExpectedBytesReturned;
  b32 Written;
 };
 

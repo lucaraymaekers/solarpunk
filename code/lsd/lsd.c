@@ -359,14 +359,14 @@ BASE_ENTRY_POINT()
      
      u8 ReadBuffer_[KB(64)] = {0};
      u8 *ReadBuffer = ReadBuffer_;
-     s64 ReadBufferIdx = 0;
+     u64 ReadBufferIdx = 0;
      
      u8 WriteBuffer_[KB(64)] = {0};
      u8 *WriteBuffer = WriteBuffer_;
      
      if(!GlobalVerbose) GlobalPad.Size = 1;
      
-     s64 TotalBytesSent = 0;
+     u64 TotalBytesSent = 0;
      
      Prof_TimeScope("Commands")
      {
@@ -439,7 +439,13 @@ BASE_ENTRY_POINT()
           }
           if(Write.Count == PacketSize)
           {
-           //tcdrain(TerminalHandle);
+#if 0           
+#if OS_LINUX
+           tcdrain(TerminalHandle)
+#elif OS_WINDOWS
+           FlushFileBuffers((HANDLE)TerminalHandle.Device);
+#endif
+#endif
            
            Command->Written = true;
            if(GlobalVerbose) 
@@ -452,7 +458,7 @@ BASE_ENTRY_POINT()
            }
            TotalBytesSent += Write.Count;
            
-           Command->StartTSC = ReadCPUTimer();
+           Command->StartTSC = rdtsc();
           }
           else
           {
@@ -544,10 +550,9 @@ BASE_ENTRY_POINT()
                // NOTE(luca): "ACK"
                
 #if LSD_INTERNAL
-               u64 Elapsed = ReadCPUTimer() - Command->StartTSC;
-               // NOTE(luca): Set Manually
-               u64 CPUFreq = Prof_GuessCPUFreq(OS_ReadTimer() - Prof.OSStart, Elapsed, OS_GetTimerFreq());
-               if(GlobalVerbose) Log("%Stook %fms\n", GlobalPad, 1000.0*(f64)Elapsed/(f64)CPUFreq);
+               u64 TSCElapsed = rdtsc() - Command->StartTSC;
+               u64 CPUFreq = 2304001541;
+               if(GlobalVerbose) Log("%Stook %fms\n", GlobalPad, 1000.0*(f64)TSCElapsed/(f64)CPUFreq);
 #endif
                
                if(0) {}
@@ -560,7 +565,7 @@ BASE_ENTRY_POINT()
              }
              else
              {
-              Log("Error: Too many bytes, expected 1.\n");
+              Log("Error: Received %llu, expected 1.\n", Read.Count);
               ShouldQuit = true;
              }
             } break;
