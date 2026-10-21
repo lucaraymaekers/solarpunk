@@ -25,6 +25,12 @@ LSD_OpenPort(str8 DeviceFileName)
    }
   }
   
+  // NOTE(luca): This is for better error message
+  if(DeviceFileName.Size == 0)
+  {
+   DeviceFileName = S8("/dev/ttyUSB0");
+  }
+  
   TerminalHandle = open(CSS8(DeviceFileName), O_RDWR | O_NOCTTY | O_NDELAY);
  }
  else
