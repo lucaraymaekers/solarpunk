@@ -5,34 +5,69 @@
 //~ Libraries
 #define _CRT_SECURE_NO_WARNINGS 1
 #include <stdio.h>
+#include <ctype.h>
 
-//~ Constants
-#define MaxHeight 8
-
-//~ API
-void FillMatrix(int *Matrix, int Width, int Height);
-void PrintMatrix(int *Matrix, int Width, int Height);
+//~ Prototypes
+int IsPalindrome(char *);
 
 //~ Entrypoint
 int main(void)
 {
- int Matrix[MaxHeight*MaxHeight] = {0};
+ char *String = "Was it a car or a cat I saw?";
  
- for(int Y = 0; Y < MaxHeight; Y += 1)
+ printf("\"%s\" is ", String);
+ if(!IsPalindrome(String))
  {
-  
-  for(int X = 0; X < Y; X += 1)
-  {
-   int Value = 1;
-   if(Y == 0)
-   {
-    
-   }
-   Matrix[Y * MaxHeight + X]  = Value;
-   
-  }
-  
+  printf("not ");
  }
  
- return 0;
+ printf("a palindrome.\n");
+}
+
+//~ Functions
+int IsPalindrome(char *String)
+{
+ int Result = 1;
+ int Size = 0;
+ int Half = 0;
+ int StartIdx = 0;
+ int EndIdx = 0;
+ 
+ Size = (int)strlen(String);
+ if(Size > 0)
+ {
+  // NOTE(luca): Will round down which we want in this case.  Strings with an odd size
+  // will be traversed up until the middle.
+  Half = Size/2;
+  
+  EndIdx = Size - 1;
+  
+  while(StartIdx < Size && EndIdx > 0)
+  {
+   while(EndIdx > 0 && 
+         (ispunct(String[EndIdx]) || 
+          isspace(String[EndIdx])))
+   {
+    EndIdx -= 1;
+   }
+   
+   while(StartIdx < Size &&
+         (ispunct(String[StartIdx]) ||
+          isspace(String[StartIdx])))
+   {
+    StartIdx += 1;
+   }
+   
+   if(toupper(String[StartIdx]) != toupper(String[EndIdx]))
+   {
+    Result = 0;
+    break;
+   }
+   
+   StartIdx += 1;
+   EndIdx -= 1;
+  }
+ }
+ 
+ return Result;
 }
