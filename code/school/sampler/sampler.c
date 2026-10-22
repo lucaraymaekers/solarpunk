@@ -21,13 +21,26 @@ BASE_ENTRY_POINT()
  
  type_kind Type = Type_c;
  
- b32 ShowHelp = true;
- b32 ShouldQuit = false;
- 
  u64 MaxSampleCount = 128;
- str8 ChapterIdx = {0};
+ b32 ShouldQuit = false;
+ b32 ShowHelp = false;
  
+ str8 ChapterIdx = {0};
+ b32 HasExplicitIdx = false;
+ u64 ExplicitIdx = {0};
+ b32 New = false;
+ b32 Last = false;
+ b32 Copy = false;
+ 
+ //- Command line options 
  cmd_line *CmdLine = &Params->CmdLine;
+ 
+ New = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("new"), S8("create new sample, after the last one found"));
+ Last = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("last"), S8("use last sample"));
+ Copy = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("copy"), S8("copy previous sample when creating"));
+ if(Copy) Last = true;
+ if(Copy) New  = true;
+ 
  cmd_line_entry *TypeEntry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("type"), S8("Set sample type e.g., asm/c"));
  if(!IsNilCmdLineEntry(TypeEntry))
  {
@@ -57,10 +70,31 @@ BASE_ENTRY_POINT()
   }
  }
  
- cmd_line_entry *ChapterIdxEntry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("chapter"), S8("Use this chapter idx when -type=c is used"));
- if(!IsNilCmdLineEntry(ChapterIdxEntry))
- {
+ // Chapter Idx
+ { 
+  cmd_line_entry *ChapterIdxEntry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("chapter"), S8("Use this chapter idx when -type=c is used"));
   ChapterIdx = ChapterIdxEntry->First->V;
+ }
+ 
+ // Explicit Idx
+ { 
+  cmd_line_entry *FileIdxEntry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("idx"), S8("use this explicit index"));
+  str8 String = FileIdxEntry->First->V;
+  HasExplicitIdx = (String.Size != 0);
+  for EachIndex(Idx, String.Size)
+  {
+   if('0' <= String.Data[Idx] && String.Data[Idx] <= '9')
+   {
+    ExplicitIdx *= 10;
+    ExplicitIdx += String.Data[Idx] - '0';
+   }
+   else
+   {
+    Log("Error: Please provide a valid number for the idx.\n");
+    ShouldQuit = true;
+    break;
+   }
+  }
  }
  
  str8 ExeDirPath = S8CutFromChar(CmdLine->ExePath, OS_SlashChar, false);
@@ -70,11 +104,10 @@ BASE_ENTRY_POINT()
  //- Type specific inits 
  if(Type == Type_c)
  {
-  //ChapterIdx = S8("6_4");
   if(ChapterIdx.Size == 0) 
   {
    Log("Error: No chapter index supplied, please provide one with -chapter=...\n");
-   ShouldQuit = true;
+   ShowHelp = true;
   }
  }
  
@@ -92,41 +125,52 @@ BASE_ENTRY_POINT()
   FileNameFormat = Str8Fmt("raymaekersLuca_%S_%%llu.c", ChapterIdx);
   TemplateText = CTemplateText;
  }
+ // school/type_path/file_name_%llu.ext
  str8 LogFormat = Str8Fmt("school" SLASH "%%S" SLASH "%S\n", FileNameFormat); 
- //- 
  
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("new"), S8("create new sample")))
+ if(TemplateText.Size == 0)
  {
-  if(!ShouldQuit)
-  {
-   ShowHelp = false;
-   
-   str8 FilePathFormat = Str8Fmt("%%S" SLASH "%S", FileNameFormat); 
-   
-   str8 LastPath = {0};
-   u64 LastIdx = 0;
-   for EachIndex(Idx, MaxSampleCount)
-   {
-    str8 Path = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
-    if(OS_FileExists(CSS8(Path)))
-    {
-     LastIdx = Idx + 1;
-    }
-   }
-   
-   if(TemplateText.Size)
-   {
-    LastPath = Str8Fmt(CSS8(FilePathFormat), PrefixPath, LastIdx);
-    Log(CSS8(LogFormat), TypePaths[Type], LastIdx);
-    OS_WriteEntireFile(CSS8(LastPath), TemplateText);
-   }
-   else
-   {
-    Log("Error: No template for this type.\n");
-   }
-  }
+  Log("Error: No template for this type.\n");
+  ShouldQuit = true;
  }
  
+ //- Do all command-line options 
+ if(!ShouldQuit && !ShowHelp)
+ {
+  ShowHelp = false;
+  
+  u64 LastIdx = 0;
+  // %s/file_name_%llu.ext
+  str8 FilePathFormat = Str8Fmt("%%S" SLASH "%S", FileNameFormat); 
+  b32 FileFound = false;
+  
+  //- Find the file idx 
+  for EachIndex(Idx, MaxSampleCount)
+  {
+   str8 Path = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
+   if(OS_FileExists(CSS8(Path)))
+   {
+    LastIdx = Idx + !!(!Last);
+    FileFound = true;
+   }
+  }
+  
+  if(New)
+  {
+   if(Copy && FileFound)
+   {
+    str8 LastPath = Str8Fmt(CSS8(FilePathFormat), PrefixPath, LastIdx);
+    TemplateText = OS_ReadEntireFileIntoMemory(CSS8(LastPath));
+   }
+   
+   if(Copy) LastIdx += 1;
+   
+   u64 Idx = (HasExplicitIdx ? ExplicitIdx : LastIdx);
+   str8 Path = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
+   Log(CSS8(LogFormat), TypePaths[Type], Idx);
+   OS_WriteEntireFile(CSS8(Path), TemplateText);
+  }
+ }
  
  //~ Help 
  if(ShowHelp)
