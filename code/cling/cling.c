@@ -1,6 +1,6 @@
-
-//~ Defines
-#define CLING_BUILD_PATH "../build/"
+//-
+// Cling is a build script and metaprogram for this codebase..
+//-
 
 //~ Libaries
 #define BASE_FORCE_THREADS_COUNT 1
@@ -13,8 +13,6 @@ NO_WARNINGS_BEGIN
 #include "lib/metadesk/md.c"
 NO_WARNINGS_END
 
-#define CLING_CODE_PATH "../code/"
-#define CLING_SOURCE_PATH CLING_CODE_PATH "cling/cling.c"
 #include "cling/cling.h"
 
 //~ Types

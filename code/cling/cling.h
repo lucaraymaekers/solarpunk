@@ -1,13 +1,15 @@
+//-
+// Cling library
+//-
+// Useful functions are:
+// - Cng_Build()      : Builds a c or cpp program
+// - Cng_RunCommand() : Runs a command
+//-
+
 //~ Libraries
-#if !defined(CLING_SOURCE_PATH)
-# error "You must define CLING_SOURCE_PATH"
-#endif
-#if !defined(CLING_CODE_PATH)
-# error "You must define CLING_CODE_PATH"
-#endif
-#if !defined(CLING_BUILD_PATH)
-# error "You must define CLING_BUILD_PATH"
-#endif
+#define CLING_BUILD_PATH "../build/"
+#define CLING_CODE_PATH "../code/"
+#define CLING_SOURCE_PATH CLING_CODE_PATH "cling/cling.c"
 
 #define CLING_ARG_NOREBUILD "CLING_NOREBUILD"
 #define CLING_ARG_PARENTPID "CLING_PARENTPID"

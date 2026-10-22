@@ -5,32 +5,39 @@
 // - 4coder plugin to create new sample and open new file in buffer.
 //   - This plugin must also close all other samples, because otherwise the indexing will be
 //     wrong.
+// - compile
+// - run
 //-
 
+//~ Libraries
 #define BASE_CONSOLE_APPLICATION 1
 #define BASE_FORCE_THREADS_COUNT 1
 #include "base/base.h"
 #include "base/base.c"
 
+#include "cling/cling.h"
+
 #include "school/sampler/generated/sampler.meta.c"
 
+//~ EntryPoint
 BASE_ENTRY_POINT()
 {
  arena *Arena = GetScratch();
  str8_array Help = PushS8Array(Arena, 256);
  
- type_kind Type = Type_c;
- 
  u64 MaxSampleCount = 128;
  b32 ShouldQuit = false;
  b32 ShowHelp = false;
  
+ type_kind Type = Type_c;
  str8 ChapterIdx = {0};
  b32 HasExplicitIdx = false;
  u64 ExplicitIdx = {0};
  b32 New = false;
  b32 Last = false;
  b32 Copy = false;
+ b32 Compile = false;
+ b32 Run = false;
  
  //- Command line options 
  cmd_line *CmdLine = &Params->CmdLine;
@@ -38,7 +45,10 @@ BASE_ENTRY_POINT()
  New = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("new"), S8("create new sample, after the last one found"));
  Last = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("last"), S8("use last sample"));
  Copy = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("copy"), S8("copy previous sample when creating"));
- if(Copy) Last = true;
+ Compile = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("compile"), S8("compile sample"));
+ Run = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("run sample"));
+ 
+ if(Copy || Compile || Run) Last = true;
  if(Copy) New  = true;
  
  cmd_line_entry *TypeEntry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("type"), S8("Set sample type e.g., asm/c"));
@@ -98,8 +108,11 @@ BASE_ENTRY_POINT()
  }
  
  str8 ExeDirPath = S8CutFromChar(CmdLine->ExePath, OS_SlashChar, false);
- str8 PrefixPath = Str8Fmt("%S" SLASH ".." SLASH "code" SLASH "school" SLASH "%S", 
-                           ExeDirPath, TypePaths[Type]);
+ str8 PrefixPath = Str8Fmt(".." SLASH "code" SLASH "school" SLASH "%S", 
+                           TypePaths[Type]);
+ // Change directory to ./build so artifacts get placed there
+ str8 BuildPath = Str8Fmt("%S", ExeDirPath);
+ OS_ChangeDirectory(CSS8(BuildPath));
  
  //- Type specific inits 
  if(Type == Type_c)
@@ -155,20 +168,34 @@ BASE_ENTRY_POINT()
    }
   }
   
+  u64 Idx = (HasExplicitIdx ? ExplicitIdx : LastIdx);
+  if(Copy && Last) Idx += 1;
+  
+  str8 Path = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
+  
   if(New)
   {
    if(Copy && FileFound)
    {
+    // If Copy and there is a file to copy, we use this file as the template text instead.
     str8 LastPath = Str8Fmt(CSS8(FilePathFormat), PrefixPath, LastIdx);
     TemplateText = OS_ReadEntireFileIntoMemory(CSS8(LastPath));
    }
    
-   if(Copy) LastIdx += 1;
-   
-   u64 Idx = (HasExplicitIdx ? ExplicitIdx : LastIdx);
-   str8 Path = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
    Log(CSS8(LogFormat), TypePaths[Type], Idx);
    OS_WriteEntireFile(CSS8(Path), TemplateText);
+  }
+  
+  if(Compile) 
+  {
+   Cng_Build(S8("Sampler"), NilP(cng_build_options), S8ArrayLit(Path));
+  }
+  
+  if(Run)
+  {
+   str8 FileName = Str8Fmt(CSS8(FileNameFormat), Idx);
+   str8 PathWithoutExtension = S8CutFromChar(FileName, '.', false);
+   Cng_RunCommand(PathWithoutExtension);
   }
  }
  
