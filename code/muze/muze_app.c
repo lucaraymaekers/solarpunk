@@ -2713,8 +2713,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
    { 
     ui_box *Hot = UI_BoxFromKey(UI_State->Hot);
     ui_box *Active = UI_BoxFromKey(UI_State->Active);
-    str8 ActiveString = Active->String;
-    str8 HotString = Hot->String;
+    str8 ActiveString = Active->DisplayString;
+    str8 HotString = Hot->DisplayString;
     if(ActiveString.Size == 0) ActiveString = S8("null");
     if(HotString.Size == 0) HotString = S8("null");
     
@@ -3181,7 +3181,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
              piece *Piece = (Panel->Piece ? Panel->Piece : PieceAlloc(App));
              Panel->Piece = Piece;
              
-#if MUZE_INTERNAL && 1
+#if MUZE_INTERNAL && 0
              Piece->RecordLength = 0.f;
              Piece->NoteCount = 0;
              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
@@ -3499,10 +3499,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
                    PushCommand(App, Command_ToggleVirtualKeyboardInput);
                   }
                   
-                  str8 Name = Str8Fmt("Set MIDI Input device  - \"%S\"###MIDIInput", Devices.Devices[App->In.Id].Name);
+                  str8 Name = Str8Fmt("Set MIDI Input device  - \"%S\"", Devices.Devices[App->In.Id].Name);
                   
                   ui_button_result Click = UI_ButtonWithToggle(Name, App->InputMIDIEnabled,
-                                                               ItemPadding, Color_Yellow);
+                                                               ItemPadding, Color_Yellow,
+                                                               .String = S8("MIDIInput"));
                   if(Click.Toggled)
                   {
                    PushCommand(App, Command_ToggleMIDIInput);
@@ -3519,10 +3520,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 {
                  // Select MIDI output device
                  {
-                  str8 Name = Str8Fmt("Set MIDI Output device - \"%S\"###MIDIOutput", Devices.Devices[App->Out.Id].Name);
+                  str8 Name = Str8Fmt("Set MIDI Output device - \"%S\"", Devices.Devices[App->Out.Id].Name);
                   
                   ui_button_result Click = UI_ButtonWithToggle(Name, App->OutputMIDIEnabled, 
-                                                               ItemPadding, Color_Yellow);
+                                                               ItemPadding, Color_Yellow,
+                                                               .String = S8("MIDIOutput"));
                   if(Click.Pressed)
                   {
                    PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_MIDIOutput;
@@ -3540,9 +3542,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
                                App->InstrumentNames[App->SelectedVoice->PresetIdx] : 
                                S8("No soundfont loaded."));
                   
-                  Text = Str8Fmt("Set synth instrument   - \"%S\"###Synth", Text);
+                  Text = Str8Fmt("Set synth instrument   - \"%S\"", Text);
                   
-                  ui_button_result Click = UI_ButtonWithToggle(Text, App->OutputSynthEnabled, ItemPadding, Color_Yellow);
+                  ui_button_result Click = UI_ButtonWithToggle(Text, App->OutputSynthEnabled, ItemPadding, Color_Yellow, .String = S8("Synth"));
                   
                   App->OutputSynthEnabled ^= Click.Toggled;
                   if(Click.Pressed)
