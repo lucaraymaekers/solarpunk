@@ -601,12 +601,12 @@ BASE_ENTRY_POINT()
   ShowHelp = (ShowHelp || !DidWork);
   if(ShowHelp)
   {
+   str8 HelpText = S8ArrayJoinFrom(Arena, &Help, '\n');
+   
    Log("Usage: lsd [options] file.hex\n"
        "\n"
-       "Options:\n", Params->Args[0]);
-   
-   str8 HelpText = S8ArrayJoinFrom(Arena, &Help, '\n');
-   Log("%S\n", HelpText);
+       "Options:\n"
+       "%S\n", HelpText);
   }
   
  }
