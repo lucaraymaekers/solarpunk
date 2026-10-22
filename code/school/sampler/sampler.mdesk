@@ -1,0 +1,74 @@
+@table(Name, Path)
+S_Types:
+{
+ { asm "embedded_fundamentals" }
+ { c   "c_fundamentals"        }
+}
+
+
+@data_enum("type_kind")
+TypeKindEnum:
+{
+ @expand(S_Types)
+  ```Type_$(Name),
+ ```;
+ `Type_Count`;
+}
+
+@data_table("str8")
+TypeStrings:
+{
+ @expand(S_Types) @strings
+  ```{$(Name)},
+ ```;
+}
+
+@data_table("str8")
+TypePaths:
+{
+ @expand(S_Types) @strings
+  ```{$(Path)},
+ ```;
+}
+
+@data
+AsmSample:
+{
+ "str8 AsmTemplateText = {(u8 *)";
+ @strings @cstring_lit
+  """
+  $NOMOD51
+  
+  ;~ Inits
+  .org 0x0000
+  mov sp, 0x7F
+  
+  ;~ EntryPoint
+  loop:
+ 
+ ljmp loop
+  
+  ;~ Includes
+  $include "aducgd1.asm"
+  """;
+  "};";
+}
+
+@data
+CSample:
+{
+ "str8 CTemplateText = {(u8 *)";
+ @strings @cstring_lit
+  """
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+ 
+ int main(int ArgCount, char **Args)
+ {
+  
+  return 0;
+ }
+ 
+ """;
+  "};";
+}

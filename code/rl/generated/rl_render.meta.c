@@ -1,3 +1,4 @@
+
 NO_STRUCT_PADDING_BEGIN
 typedef struct rect_instance rect_instance;
 struct rect_instance

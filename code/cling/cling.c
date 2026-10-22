@@ -380,6 +380,8 @@ BASE_ENTRY_POINT()
            {
             MD_Node *ExpandTag = MD_TagFromString(Row, S8("expand"), 0);
             b32 GenStrings = MD_NodeHasTag(Row, S8("strings"), 0);
+            b32 GenCStringLiteral = MD_NodeHasTag(Row, S8("cstring_lit"), 0);
+            
             if(!MD_NodeIsNil(ExpandTag))
             {
              str8 TableName = ExpandTag->first_child->string;
@@ -391,8 +393,7 @@ BASE_ENTRY_POINT()
              for(MD_EachNode(TableRow, TableHash->Table->first_child))
              {
               
-              str8 String;
-              
+              str8 String = {0};
               S8OverPush(Arena, String, KB(4), String.Size)
               {
                u64 StringIdx = 0;
@@ -472,6 +473,64 @@ BASE_ENTRY_POINT()
               
               RowCount += 1;
              }
+            }
+            else if(GenCStringLiteral)
+            {
+             u64 Extra = 0;
+             str8 String = {0};
+             S8OverPush(Arena, String, KB(4), String.Size)
+             {
+              String.Size = 0;
+              
+              String.Data[String.Size] = '"';
+              String.Size += 1;
+              Extra += 1;
+              
+              u8 Char = 0;
+              for EachIndex(Idx, Row->string.Size)
+              {
+               if(Char == '\n')
+               {
+                String.Data[String.Size] = '"';
+                String.Size += 1;
+                Extra += 1;
+               }
+               
+               Char = Row->string.Data[Idx];
+               
+               if(0) {}
+               else if(Char == '"' || Char == '\\')
+               {
+                String.Data[String.Size] = '\\';
+                String.Size += 1;
+                Extra += 1;
+               }
+               else if(Char == '\n')
+               {
+                String.Data[String.Size] = '\\';
+                String.Size += 1;
+                String.Data[String.Size] = 'n';
+                String.Size += 1;
+                String.Data[String.Size] = '"';
+                String.Size += 1;
+                Extra += 3; // one for the newline and one for the quote
+                // One more for the newline that's coming
+               }
+               
+               String.Data[String.Size] = Char;
+               String.Size += 1;
+              }
+              String.Data[String.Size] = '"';
+              String.Size += 1;
+              Extra += 1;
+              
+              S8ListPush(String);
+             }
+             
+             if(GenStrings)
+             {
+              S8ListPush(Str8Fmt(", %llu", String.Size - Extra));
+             }
              
             }
             else
@@ -480,30 +539,31 @@ BASE_ENTRY_POINT()
             }
            }
            
-           // Add footers 
-           {           
-            if(!MD_NodeIsNil(GenDataTable) ||
-               !MD_NodeIsNil(GenDataStruct))
-            {
-             S8ListPush(S8("\n};\n")); 
-            }
-            
-            if(!MD_NodeIsNil(GenDataEnum))
-            {
-             S8ListPush(Str8Fmt("\n};\n"
-                                "typedef enum %S %S;\n", TypeName, TypeName));
-            }
-            
-            if(NoPadding)
-            {
-             S8ListPush(S8("NO_STRUCT_PADDING_END\n"));
-            }
-            
+          }
+          
+          // Add footers 
+          {           
+           if(!MD_NodeIsNil(GenDataTable) ||
+              !MD_NodeIsNil(GenDataStruct))
+           {
+            S8ListPush(S8("\n};\n")); 
            }
            
-           // Pretty
-           S8ListPush(S8("\n"));
+           if(!MD_NodeIsNil(GenDataEnum))
+           {
+            S8ListPush(Str8Fmt("\n};\n"
+                               "typedef enum %S %S;\n", TypeName, TypeName));
+           }
+           
+           if(NoPadding)
+           {
+            S8ListPush(S8("NO_STRUCT_PADDING_END\n"));
+           }
+           
           }
+          
+          // Pretty
+          S8ListPush(S8("\n"));
          }
          
          //- NOTE(luca): Footer "file" tag  
@@ -577,13 +637,6 @@ BASE_ENTRY_POINT()
   Cng_Build(S8("LSD"), &BuildOptions, S8ArrayLit(S8("../code/lsd/lsd.c")));
  }
  
- //~ Samples: School
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("School"), S8("Target")))
- {
-  DidWork = true;
-  Cng_Build(S8("School"), &BuildOptions, S8ArrayLit(S8("../code/samples/school.c")));
- }
- 
  //~ Samples: ADuC 832
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Aduc"), S8("Target")))
  {
@@ -655,12 +708,17 @@ BASE_ENTRY_POINT()
                  "compdef _cling cling\n");
   Log("%S\n", Text);
  }
+ 
+ //~ Sampler
+ if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Sampler"), S8("Target")))
+ {
+  Cng_Build(S8("Sampler"), &BuildOptions, S8ArrayLit(S8("../code/school/sampler/sampler.c")));
+ }
+ 
  //~ School
  S8ArrayAppendTo(&Help, S8(" "));
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("School"), S8("(See subcommands with -School)")))
  {
-  Cng_Scratch();
-  
   b32 Compile  = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("compile"), S8("Compile the source file"));
   b32 Run      = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("Run the built program"));
   b32 Last     = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("last"), S8("Use the last found source file as input"));
@@ -674,7 +732,7 @@ BASE_ENTRY_POINT()
   str8 TemplateText = S8(
                          "#define _CRT_SECURE_NO_WARNINGS\n"
                          "#include <stdio.h>\n"
-                         "\n"
+                         ."\n"
                          "int main(int ArgCount, char **Args)\n"
                          "{\n"
                          "\tprintf(\"Hello, world!\\n\");\n"

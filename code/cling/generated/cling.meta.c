@@ -1,3 +1,4 @@
+
 #define Cng_ConfigMatchers(Name, Value) \
 if(0) {} \
   else if(ConfigMatch(Name, S8("Asan"), Value)) Asan = true; \
@@ -16,6 +17,7 @@ if(0) {} \
   b32 GCC = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("GCC"), S8("Use GCC (Linux only)")); \
   b32 Wine = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("Wine"), S8("Build with wine (Linux only)")); \
   b32 CPP = CmdLineHasEntryAndAddHelp(CmdLine, Help, S8("CPP"), S8("Source code is CPP"));
+
 
   internal field_hash_node *
   GetFieldHashNode(str8 String, u64 Seed, u64 ArraySize, field_hash_node *Array)

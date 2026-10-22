@@ -1,3 +1,4 @@
+
 enum command_kind
 {
 CommandKind_None,

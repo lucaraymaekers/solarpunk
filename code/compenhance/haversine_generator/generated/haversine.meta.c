@@ -1,3 +1,4 @@
+
 enum generation_method
 {
 Method_None,Method_Uniform,Method_Cluster,Method_Count
