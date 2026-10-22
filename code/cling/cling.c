@@ -595,7 +595,7 @@ BASE_ENTRY_POINT()
   if(0) {}
   else if(Cng_IsOS(CngOS_Windows))
   {   
-   Log("main_sdcc.asm\n");
+   Log("Compiling main_sdcc.asm");
    Cng_Run("c51asm.exe "
            "--nopaging --quiet --columns "
            "--outfile main_sdcc.hex --include ../code/school/aduc832 " "../code/school/aduc832/main_sdcc.asm") &&

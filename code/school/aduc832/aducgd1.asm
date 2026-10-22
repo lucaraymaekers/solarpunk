@@ -170,20 +170,20 @@ blue		equ	60h		;used for color settings
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftinit:	push	psw			;BACK UP REGISTERS ONTO STACK
-		push	acc			;back up accu
-		push	b			;needed for loop counting
-		push	00h			;pointer is needed for loading memory f0h-ffh
-		mov	pllcon,#00h		;set system clock to 16.777216 MHz
+push	acc			;back up accu
+push	b			;needed for loop counting
+push	00h			;pointer is needed for loading memory f0h-ffh
+mov	pllcon,#00h		;set system clock to 16.777216 MHz
 ; on power on the tft module needs to be reset with a pulse >10us.
-		setb	cs			;disable display module
-		clr	reset			;hardware reset display module
-		mov	a,#100			;accu used as loopcouter (should also work on ADuC841)
-		djnz	acc,$			;repeat (total time should be >10us)
-		setb	reset			;end hardware reset of display module
-		mov	a,#3			;after reset 120ms delay is needed
-		lcall	delaya0k05s		;done
+setb	cs			;disable display module
+clr	reset			;hardware reset display module
+mov	a,#100			;accu used as loopcouter (should also work on ADuC841)
+djnz	acc,$			;repeat (total time should be >10us)
+setb	reset			;end hardware reset of display module
+mov	a,#3			;after reset 120ms delay is needed
+lcall	delaya0k05s		;done
 ; The microcontroller SPI interface needs to be enabled and configured
-		mov	spicon,#00110001b
+mov	spicon,#00110001b
 ; Interrupt bit cleared, clear collision error, enable SPI, Enable master mode, clock
 ; idles low, trailing (rising) edge clocks data in slave, use xxxx shift clock.
 ; The display module allows 10MHz SPI write clock, but the SPI read clock cannot exceed 6.6MHz.
@@ -193,45 +193,45 @@ tftinit:	push	psw			;BACK UP REGISTERS ONTO STACK
 
 ; Default settings of the ILI9341:
 
-		mov	a,#11h			;write sleep out command
-		lcall	tftwrcbyte		;done
+mov	a,#11h			;write sleep out command
+lcall	tftwrcbyte		;done
 
 ; This command demands a delay of minimal 120ms. Standard delay is used
 
-		mov	a,#3			;delay 50ms used 3 times
-		lcall	delaya0k05s		;done
+mov	a,#3			;delay 50ms used 3 times
+lcall	delaya0k05s		;done
 
-		mov	a,#29h			;write display on command
-		lcall	tftwrcbyte		;done
+mov	a,#29h			;write display on command
+lcall	tftwrcbyte		;done
 
-		mov	a,#3ah			;pixel format set (number of bits/pixel)
-		lcall	tftwrcbyte		;done
-		mov	a,#01010101b		;16 bit per pixel
-		lcall	tftwrdbyte		;done
-		mov	a,#36h			;memory access control
-		lcall	tftwrcbyte		;send command
-		mov	a,#11101000b		;my writing left to right
-						;mx writing top down
-						;mv row and column are excanged
-						;ml reset value
-						;bgr set to rgb
-						;mh reset value
-						;00 last 2 bits are zero
-		lcall	tftwrdbyte		;send as parameter
-		mov	red,#00h		;red color minimal
-		mov	green,#00h		;green color minimal
-		mov	blue,#00h		;blue color minimal
-		lcall	tftsetbgcolor		;write colors as 16 bit value in bgcolor registers
-		mov	red,#00;011111b	;red color maximum
-		mov	green,#00111111b	;green color maximum
-		mov	blue,#0;0011111b	;blue color maximum
-		lcall	tftsetfrcolor		;write colors as 16 bit value in bgcolor registers
-		lcall	tftclear		;clear=fill all pixels with background color		
-		pop	00h			;restoring used registers	
-		pop	b
-		pop	acc
-		pop	psw
-		ret
+mov	a,#3ah			;pixel format set (number of bits/pixel)
+lcall	tftwrcbyte		;done
+mov	a,#01010101b		;16 bit per pixel
+lcall	tftwrdbyte		;done
+mov	a,#36h			;memory access control
+lcall	tftwrcbyte		;send command
+mov	a,#11101000b		;my writing left to right
+;mx writing top down
+;mv row and column are excanged
+;ml reset value
+;bgr set to rgb
+;mh reset value
+;00 last 2 bits are zero
+lcall	tftwrdbyte		;send as parameter
+mov	red,#00h		;red color minimal
+mov	green,#00h		;green color minimal
+mov	blue,#00h		;blue color minimal
+lcall	tftsetbgcolor		;write colors as 16 bit value in bgcolor registers
+mov	red,#00;011111b	;red color maximum
+mov	green,#00111111b	;green color maximum
+mov	blue,#0;0011111b	;blue color maximum
+lcall	tftsetfrcolor		;write colors as 16 bit value in bgcolor registers
+lcall	tftclear		;clear=fill all pixels with background color		
+pop	00h			;restoring used registers	
+pop	b
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -250,16 +250,16 @@ tftclear:
 ; We use a function tftdrawbgc to fill the display. This function needs start and ending coordinates
 ; of the display plane to be filled.
 
-		mov	tftxhs,#00h		;starting address high display
-		mov	tftxls,#00h		;starting address low display
-		mov	tftxhe,#01h		;ending address high
-		mov	tftxle,#3fh		;ending address low
-		mov	tftys,#00h		;only use 8 bits for y
-		mov	tftye,#0efh		;see above
-		mov	tftxpos,#00h		;reset tftxpos
-		mov	tftypos,#00h		;reset tftypos
-		lcall	tftdrawbgc		;write plane
-		ret
+mov	tftxhs,#00h		;starting address high display
+mov	tftxls,#00h		;starting address low display
+mov	tftxhe,#01h		;ending address high
+mov	tftxle,#3fh		;ending address low
+mov	tftys,#00h		;only use 8 bits for y
+mov	tftye,#0efh		;see above
+mov	tftxpos,#00h		;reset tftxpos
+mov	tftypos,#00h		;reset tftypos
+lcall	tftdrawbgc		;write plane
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -275,29 +275,29 @@ tftclear:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftsetbgcolor:	push	psw		;save registers onto stack
-			push	acc
-			push	b
-			mov	a,red		;read red info
-			rl	a		;shift 3 times to the left
-			rl	a
-			rl	a		;bits are in significant position
-			mov	b,a		;store result
-			mov	a,green		;read green info
-			rl	a		;shift info left (3 significant bits are in the upper nibble)
-			swap	a		;place them in the lower position
-			anl	a,#00000111b	;clear all other bits
-			orl	a,b		;merge red and 3 bits green=upper byte to be written
-			mov	tftbgcolorh,a	;store data in memory
-			mov	a,green		;read green again
-			anl	a,#00000111b	;reset all bits except the lower 3
-			swap	a		;put them in de upper nibble
-			rl	a		;shift left once, now they occupy the 3 highest bits
-			orl	a,blue		;merge with blue
-			mov	tftbgcolorl,a	;store in memory
-			pop	b
-			pop	acc
-			pop	psw
-			ret
+push	acc
+push	b
+mov	a,red		;read red info
+rl	a		;shift 3 times to the left
+rl	a
+rl	a		;bits are in significant position
+mov	b,a		;store result
+mov	a,green		;read green info
+rl	a		;shift info left (3 significant bits are in the upper nibble)
+swap	a		;place them in the lower position
+anl	a,#00000111b	;clear all other bits
+orl	a,b		;merge red and 3 bits green=upper byte to be written
+mov	tftbgcolorh,a	;store data in memory
+mov	a,green		;read green again
+anl	a,#00000111b	;reset all bits except the lower 3
+swap	a		;put them in de upper nibble
+rl	a		;shift left once, now they occupy the 3 highest bits
+orl	a,blue		;merge with blue
+mov	tftbgcolorl,a	;store in memory
+pop	b
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -313,29 +313,29 @@ tftsetbgcolor:	push	psw		;save registers onto stack
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftsetfrcolor:	push	psw		;save registers onto stack
-			push	acc
-			push	b
-			mov	a,red		;read red info
-			rl	a		;shift 3 times to the left
-			rl	a
-			rl	a		;bits are in significant position
-			mov	b,a		;store result
-			mov	a,green		;read green info
-			rl	a		;shift info left (3 significant bits are in the upper nibble)
-			swap	a		;place them in the lower position
-			anl	a,#00000111b	;clear all other bits
-			orl	a,b		;merge red and 3 bits green=upper byte to be written
-			mov	tftfrcolorh,a	;store data in memory
-			mov	a,green		;read green again
-			anl	a,#00000111b	;reset all bits except the lower 3
-			swap	a		;put them in de upper nibble
-			rl	a		;shift left once, now they occupy the 3 highest bits
-			orl	a,blue		;merge with blue
-			mov	tftfrcolorl,a	;store in memory
-			pop	b
-			pop	acc
-			pop	psw
-			ret
+push	acc
+push	b
+mov	a,red		;read red info
+rl	a		;shift 3 times to the left
+rl	a
+rl	a		;bits are in significant position
+mov	b,a		;store result
+mov	a,green		;read green info
+rl	a		;shift info left (3 significant bits are in the upper nibble)
+swap	a		;place them in the lower position
+anl	a,#00000111b	;clear all other bits
+orl	a,b		;merge red and 3 bits green=upper byte to be written
+mov	tftfrcolorh,a	;store data in memory
+mov	a,green		;read green again
+anl	a,#00000111b	;reset all bits except the lower 3
+swap	a		;put them in de upper nibble
+rl	a		;shift left once, now they occupy the 3 highest bits
+orl	a,blue		;merge with blue
+mov	tftfrcolorl,a	;store in memory
+pop	b
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -351,29 +351,29 @@ tftsetfrcolor:	push	psw		;save registers onto stack
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftsetcolor:		push	psw		;save registers onto stack
-			push	acc
-			push	b
-			mov	a,red		;read red info
-			rl	a		;shift 3 times to the left
-			rl	a
-			rl	a		;bits are in significant position
-			mov	b,a		;store result
-			mov	a,green		;read green info
-			rl	a		;shift info left (3 significant bits are in the upper nibble)
-			swap	a		;place them in the lower position
-			anl	a,#00000111b	;clear all other bits
-			orl	a,b		;merge red and 3 bits green=upper byte to be written
-			mov	tftcolorh,a	;store data in memory
-			mov	a,green		;read green again
-			anl	a,#00000111b	;reset all bits except the lower 3
-			swap	a		;put them in de upper nibble
-			rl	a		;shift left once, now they occupy the 3 highest bits
-			orl	a,blue		;merge with blue
-			mov	tftcolorl,a	;store in memory
-			pop	b
-			pop	acc
-			pop	psw
-			ret
+push	acc
+push	b
+mov	a,red		;read red info
+rl	a		;shift 3 times to the left
+rl	a
+rl	a		;bits are in significant position
+mov	b,a		;store result
+mov	a,green		;read green info
+rl	a		;shift info left (3 significant bits are in the upper nibble)
+swap	a		;place them in the lower position
+anl	a,#00000111b	;clear all other bits
+orl	a,b		;merge red and 3 bits green=upper byte to be written
+mov	tftcolorh,a	;store data in memory
+mov	a,green		;read green again
+anl	a,#00000111b	;reset all bits except the lower 3
+swap	a		;put them in de upper nibble
+rl	a		;shift left once, now they occupy the 3 highest bits
+orl	a,blue		;merge with blue
+mov	tftcolorl,a	;store in memory
+pop	b
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -392,10 +392,10 @@ tftsetcolor:		push	psw		;save registers onto stack
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftdrawbgc:	mov	tftcolorl,tftbgcolorl
-		mov	tftcolorh,tftbgcolorh
-		lcall	tftdrawc
-		ret
-		
+mov	tftcolorh,tftbgcolorh
+lcall	tftdrawc
+ret
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; tftdrawfrc
@@ -413,9 +413,9 @@ tftdrawbgc:	mov	tftcolorl,tftbgcolorl
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftdrawfrc:	mov	tftcolorl,tftfrcolorl
-		mov	tftcolorh,tftfrcolorh
-		lcall	tftdrawc
-		ret
+mov	tftcolorh,tftfrcolorh
+lcall	tftdrawc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -434,87 +434,87 @@ tftdrawfrc:	mov	tftcolorl,tftfrcolorl
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftdrawc:	push	psw		;regs saved on stack
-		push	acc
-		push	b
-		push	00h
-		push	01h
+push	acc
+push	b
+push	00h
+push	01h
 
 ; We need to load internal address pointers to define the window we will fill.
 
-		mov	a,#2ah		;set column address limits (x coordinates)
-		lcall	tftwrcbyte
-		mov	a,tftxhs	;start address (high and low byte)
-		lcall	tftwrdbyte
-		mov	a,tftxls
-		lcall	tftwrdbyte	;2 parameters 
-		mov	a,tftxhe		;high address (high and low byte)
-		lcall	tftwrdbyte
-		mov	a,tftxle
-		lcall	tftwrdbyte	;done
-		mov	a,#2bh		;set page address (y coordinates)
-		lcall	tftwrcbyte
-		mov	a,#00h		;starting address is 00xxh
-		lcall	tftwrdbyte
-		mov	a,tftys
-		lcall	tftwrdbyte	;write high and low
-		mov	a,#00h		;ending is 00xxh
-		lcall	tftwrdbyte
-		mov	a,tftye
-		lcall	tftwrdbyte	;done
-		mov	a,#2ch		;give memory write command (sets internal pointers to starting address)
-		lcall	tftwrcbyte
+mov	a,#2ah		;set column address limits (x coordinates)
+lcall	tftwrcbyte
+mov	a,tftxhs	;start address (high and low byte)
+lcall	tftwrdbyte
+mov	a,tftxls
+lcall	tftwrdbyte	;2 parameters 
+mov	a,tftxhe		;high address (high and low byte)
+lcall	tftwrdbyte
+mov	a,tftxle
+lcall	tftwrdbyte	;done
+mov	a,#2bh		;set page address (y coordinates)
+lcall	tftwrcbyte
+mov	a,#00h		;starting address is 00xxh
+lcall	tftwrdbyte
+mov	a,tftys
+lcall	tftwrdbyte	;write high and low
+mov	a,#00h		;ending is 00xxh
+lcall	tftwrdbyte
+mov	a,tftye
+lcall	tftwrdbyte	;done
+mov	a,#2ch		;give memory write command (sets internal pointers to starting address)
+lcall	tftwrcbyte
 
 ; we need to calculate how many pixels have to be written. By substarcting xe-xs and ye-ys we know the
 ; dimensions of the window. Delta Y can be used in a djnz loop counter. Delta x ma exceed 8 bit thus requiring
 ; a 9 bit loopcounter. By using a user flag we can speed loop-counting
 
-		clr	c		;subb will follow
-		mov	a,tftye	;it's coming soon
-		subb	a,tftys	;told you so
-		mov	r0,a		;store it in r0 (will become loopcounter)
-		inc	r0		;0-0=0 but 1 line needs to be drawn!
+clr	c		;subb will follow
+mov	a,tftye	;it's coming soon
+subb	a,tftys	;told you so
+mov	r0,a		;store it in r0 (will become loopcounter)
+inc	r0		;0-0=0 but 1 line needs to be drawn!
 ; because endaddress and startaddress could be equal, de result of the substraction must be 1
 ; We increment the end address by 1
-		mov	a,tftxle	;start with low byte
-		add	a,#1
-		mov	r1,a		;need this later
-		mov	a,tftxhe	;but 16 bit addition
-		addc	a,#00h		;done
-		mov	b,a
-		clr	c		;x is next for substraction
-		mov	a,r1		;16 bit substraction
-		subb	a,tftxls	;a=low 8 bits of loopcounter
-		mov	r1,a		;and back up
-		mov	a,b		;high byte substract
-		subb	a,tftxhs		;done
+mov	a,tftxle	;start with low byte
+add	a,#1
+mov	r1,a		;need this later
+mov	a,tftxhe	;but 16 bit addition
+addc	a,#00h		;done
+mov	b,a
+clr	c		;x is next for substraction
+mov	a,r1		;16 bit substraction
+subb	a,tftxls	;a=low 8 bits of loopcounter
+mov	r1,a		;and back up
+mov	a,b		;high byte substract
+subb	a,tftxhs		;done
 
 ; if a not equal to zero more then 256 pixels are in the x range. Since the maximum is 320, this  means a reload
 ; of the b register as loopcounter is needed. This condition is stored in f0 (user flag PSW)
 
-		mov	c,acc.0	;bit zero = 0 then less trhan 256 loops needed
+mov	c,acc.0	;bit zero = 0 then less trhan 256 loops needed
 
-		mov	f1,c		;and in flag 1
+mov	f1,c		;and in flag 1
 
 ; Let's start filling memory!!
 
 tftdrawc0:	mov	b,r1			;load b register with delta xl
-		mov	c,f1			;store f1 in f0
-		mov	f0,c
-	
+mov	c,f1			;store f1 in f0
+mov	f0,c
+
 tftdrawc1:	mov	a,tftcolorh		;write high byte to display
-		lcall	tftwrdbyte
-		mov	a,tftcolorl		;write low byte to memory
-		lcall	tftwrdbyte
-		djnz	b,tftdrawc1	;repeat number in b
+lcall	tftwrdbyte
+mov	a,tftcolorl		;write low byte to memory
+lcall	tftwrdbyte
+djnz	b,tftdrawc1	;repeat number in b
 ; b is 0. If the f0 is set, we need to repeat 
-		jbc	f0,tftdrawc1	;another 256 times to go
-		djnz	r0,tftdrawc0	;reload b and f0 and restart filling
-		pop	01h		;restore registers from stack
-		pop	00h
-		pop	b
-		pop	acc
-		pop	psw
-		ret
+jbc	f0,tftdrawc1	;another 256 times to go
+djnz	r0,tftdrawc0	;reload b and f0 and restart filling
+pop	01h		;restore registers from stack
+pop	00h
+pop	b
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -529,12 +529,12 @@ tftdrawc1:	mov	a,tftcolorh		;write high byte to display
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftwrcbyte:	clr	cs			;activate slave SPI interface
-		clr	dc			;select control register
-		mov	spidat,a		;start transmission
+clr	dc			;select control register
+mov	spidat,a		;start transmission
 tftwrcbyte1:	jnb	ispi,tftwrcbyte1	;wait for transmission to end
-		clr	ispi			;clear bit
-		setb	cs			;end write session
-		ret
+clr	ispi			;clear bit
+setb	cs			;end write session
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -549,12 +549,12 @@ tftwrcbyte1:	jnb	ispi,tftwrcbyte1	;wait for transmission to end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftwrdbyte:	clr	cs			;activate slave SPI interface
-		setb	dc			;select data register
-		mov	spidat,a		;start transmission
+setb	dc			;select data register
+mov	spidat,a		;start transmission
 tftwrdbyte1:	jnb	ispi,tftwrdbyte1	;wait for transmission to end
-		clr	ispi			;clear bit
-		setb	cs			;end write session
-		ret
+clr	ispi			;clear bit
+setb	cs			;end write session
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -582,37 +582,37 @@ tftwrdbyte1:	jnb	ispi,tftwrdbyte1	;wait for transmission to end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftoutchar:	push	psw			;save regs on stack
-		push	acc
-		push	b
-		push	acc			;back up ascii code
+push	acc
+push	b
+push	acc			;back up ascii code
 ; tftoutchar uses the tftxpos and tftypos registers. This part of the routine calculates
 ; the real coordinates and stores them in the appropriate registers.
 ; The font used is 16x32 pixels. tftypos is multiplied by 32 for the real position
-		mov	a,tftypos
-		mov	b,#32			;multiplier
-		mul	ab			;done
-		mov	tfty,a			;done
+mov	a,tftypos
+mov	b,#32			;multiplier
+mul	ab			;done
+mov	tfty,a			;done
 ; tftxpos is multiplied by 16
-		mov	a,tftxpos
-		mov	b,#16			;multiplier
-		mul	ab			;done
-		mov	tftxh,b		;store in correct registers
-		mov	tftxl,a
-		pop	acc			;restore ascii code
-		lcall	tftoutcharf		;this function does the actual printing
+mov	a,tftxpos
+mov	b,#16			;multiplier
+mul	ab			;done
+mov	tftxh,b		;store in correct registers
+mov	tftxl,a
+pop	acc			;restore ascii code
+lcall	tftoutcharf		;this function does the actual printing
 ; Printing is done. tftxpos needs to be updated
-		inc	tftxpos		;point to next location
-		mov	a,tftxpos		;cjne does not work with direct addressable register
-		cjne	a,#20,tftoutchar1	;if value 20, reset to 0 and update tftypos
-		mov	tftxpos,#0		;restore to 0
-		inc	tftypos		;increment y position (next line)
-		mov	a,tftypos		;cjne does not work with direct addressable register
-		cjne	a,#7,tftoutchar1	;if value 7, restore to 0
-		mov	tftypos,#0
+inc	tftxpos		;point to next location
+mov	a,tftxpos		;cjne does not work with direct addressable register
+cjne	a,#20,tftoutchar1	;if value 20, reset to 0 and update tftypos
+mov	tftxpos,#0		;restore to 0
+inc	tftypos		;increment y position (next line)
+mov	a,tftypos		;cjne does not work with direct addressable register
+cjne	a,#7,tftoutchar1	;if value 7, restore to 0
+mov	tftypos,#0
 tftoutchar1:	pop	b			;restore regs from stack
-		pop	acc
-		pop	psw
-		ret
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -638,110 +638,110 @@ tftoutchar1:	pop	b			;restore regs from stack
 
 
 tftoutcharf:	push	psw			;save regs on stack
-		push	acc
-		push	b
-		push	00h
-		push	01h
-		push	02h
-		push	dph
-		push	dpl
-		push	acc		;needed!!(back up ASCII code)
-		mov	a,#2ah		;set column address limits (x coordinates)
-		lcall	tftwrcbyte
-		mov	a,tftxh	;start address (high and low byte)
-		lcall	tftwrdbyte
-		mov	a,tftxl
-		lcall	tftwrdbyte	;2 parameters 
+push	acc
+push	b
+push	00h
+push	01h
+push	02h
+push	dph
+push	dpl
+push	acc		;needed!!(back up ASCII code)
+mov	a,#2ah		;set column address limits (x coordinates)
+lcall	tftwrcbyte
+mov	a,tftxh	;start address (high and low byte)
+lcall	tftwrdbyte
+mov	a,tftxl
+lcall	tftwrdbyte	;2 parameters 
 ; We need to calculate the end of the window
-		mov	a,tftxl	;we need to add 15 (window is 16 pixels wide, but 0 counts as 1)
-		add	a,#15		;add\
-		mov	tftxl,a	;store
-		mov	a,tftxh	;carry needs to be recovered
-		addc	a,#00h
-		mov	tftxh,a	;store	high byte	
-		lcall	tftwrdbyte
-		mov	a,tftxl	;low byte
-		lcall	tftwrdbyte	;done
-		mov	a,#2bh		;set page address (y coordinates)
-		lcall	tftwrcbyte
-		mov	a,#00h		;starting address is 00xxh
-		lcall	tftwrdbyte
-		mov	a,tfty
-		lcall	tftwrdbyte	;write high and low
-		mov	a,#00h		;ending is 00xxh
-		lcall	tftwrdbyte
+mov	a,tftxl	;we need to add 15 (window is 16 pixels wide, but 0 counts as 1)
+add	a,#15		;add\
+mov	tftxl,a	;store
+mov	a,tftxh	;carry needs to be recovered
+addc	a,#00h
+mov	tftxh,a	;store	high byte	
+lcall	tftwrdbyte
+mov	a,tftxl	;low byte
+lcall	tftwrdbyte	;done
+mov	a,#2bh		;set page address (y coordinates)
+lcall	tftwrcbyte
+mov	a,#00h		;starting address is 00xxh
+lcall	tftwrdbyte
+mov	a,tfty
+lcall	tftwrdbyte	;write high and low
+mov	a,#00h		;ending is 00xxh
+lcall	tftwrdbyte
 ; end of y window needs to be calculated. Window is 32 pixels but we only add 31 (pixel 0 is teh 32nd)
-		mov	a,tfty
-		add	a,#31
-		mov	tfty,a		;store result
-		lcall	tftwrdbyte	;done
-		mov	a,#2ch		;give memory write command (sets internal pointers to starting address)
-		lcall	tftwrcbyte
-		pop	acc		;restore ascii code in a
+mov	a,tfty
+add	a,#31
+mov	tfty,a		;store result
+lcall	tftwrdbyte	;done
+mov	a,#2ch		;give memory write command (sets internal pointers to starting address)
+lcall	tftwrcbyte
+pop	acc		;restore ascii code in a
 ; if the ascii code is 0ch, the we need to clear the display.
-		cjne	a,#0ch,tftoutcharf1
-		lcall	tftclear	;clear display
+cjne	a,#0ch,tftoutcharf1
+lcall	tftclear	;clear display
 tftoutcharf3:	pop	dpl		;restore regs from stack
-		pop	dph
-		pop	01h
-		pop	02h		
-		pop	00h
-		pop	b
-		pop	acc
-		pop	psw
-		ret
+pop	dph
+pop	01h
+pop	02h		
+pop	00h
+pop	b
+pop	acc
+pop	psw
+ret
 
 ; ascii code is not form feed. We eliminate codes larger then 7fh by clearing the msb.
 ; To avoid further errors we discart codes smaller than 20h
 
 tftoutcharf1:	clr	acc.7		;msb=0
-		cjne	a,#20h,tftoutcharf2	; testing for to low values
+cjne	a,#20h,tftoutcharf2	; testing for to low values
 tftoutcharf2:	jc	tftoutcharf3	;if carry ==1 then invalid codes, end function
 
 ; The ascii code is (made) valid. We need to calculate the offset in the lookup table
 
-		clr	c		;we substract the ascii offset (20h)
-		subb	a,#20h		;done
-		mov	b,#64		;each character has 64 bytes code
-		mul	ab		;ba contains the offset
-		mov	dptr,#chr_20	;load in dptr starting address of the look-up table
-		add	a,dpl		;16 bit add
-		mov	dpl,a
-		mov	a,b		;store high byte in accu
-		addc	a,dph		;done
-		mov	dph,a		;dptr == address code for ascii code
+clr	c		;we substract the ascii offset (20h)
+subb	a,#20h		;done
+mov	b,#64		;each character has 64 bytes code
+mul	ab		;ba contains the offset
+mov	dptr,#chr_20	;load in dptr starting address of the look-up table
+add	a,dpl		;16 bit add
+mov	dpl,a
+mov	a,b		;store high byte in accu
+addc	a,dph		;done
+mov	dph,a		;dptr == address code for ascii code
 ; Let printing commence
-		mov	b,#64		;number of bytes for 1 character
+mov	b,#64		;number of bytes for 1 character
 tftoutcharf4:	mov	r0,#8		;bitcounter
-		clr	a
-		movc	a,@a+dptr
+clr	a
+movc	a,@a+dptr
 tftoutcharf5:	rlc	a		;test bits
-		jnc	tftoutcharf6
-		push	acc
-		mov	a,tftfrcolorh
-		lcall	tftwrdbyte
-		mov	a,tftfrcolorl
-		lcall	tftwrdbyte
-		sjmp 	tftoutcharf7
+jnc	tftoutcharf6
+push	acc
+mov	a,tftfrcolorh
+lcall	tftwrdbyte
+mov	a,tftfrcolorl
+lcall	tftwrdbyte
+sjmp 	tftoutcharf7
 tftoutcharf6:	push	acc
-		mov	a,tftbgcolorh
-		lcall	tftwrdbyte
-		mov	a,tftbgcolorl
-		lcall	tftwrdbyte
+mov	a,tftbgcolorh
+lcall	tftwrdbyte
+mov	a,tftbgcolorl
+lcall	tftwrdbyte
 tftoutcharf7:	pop	acc
-		djnz	r0,tftoutcharf5
-		inc	dptr
-		djnz	b,tftoutcharf4
-		pop	dpl		;restore regs from stack
-		pop	dph
-		pop	02h
-		pop	01h
-		pop	00h
-		pop	b
-		pop	acc
-		pop	psw
-		ret
-		
+djnz	r0,tftoutcharf5
+inc	dptr
+djnz	b,tftoutcharf4
+pop	dpl		;restore regs from stack
+pop	dph
+pop	02h
+pop	01h
+pop	00h
+pop	b
+pop	acc
+pop	psw
+ret
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; tftoutmsga
@@ -757,20 +757,20 @@ tftoutcharf7:	pop	acc
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftoutmsga:	push	psw		;save registerds on stack
-		push	acc
-		push	dpl
-		push	dph
+push	acc
+push	dpl
+push	dph
 tftoutmsga1:	clr	a		;needed for movc instruction
-		movc	a,@a+dptr	;load ascii code from external memory (code memory)
-		jz	tftoutmsga2	;if code==00h end function
-		lcall	tftoutchar	;print character
-		inc	dptr		;increment datapointer to string
-		sjmp	tftoutmsga1	;repeat action
+movc	a,@a+dptr	;load ascii code from external memory (code memory)
+jz	tftoutmsga2	;if code==00h end function
+lcall	tftoutchar	;print character
+inc	dptr		;increment datapointer to string
+sjmp	tftoutmsga1	;repeat action
 tftoutmsga2:	pop	dph		;restore registers
-		pop	dpl
-		pop	acc
-		pop	psw
-		ret
+pop	dpl
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -785,11 +785,11 @@ tftoutmsga2:	pop	dph		;restore registers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftoutnib:	push	acc		;save register on stack
-		anl	a,#0fh		;separate lower nibble
-		lcall	batrans	;transform into ascii code
-		lcall	tftoutchar	;print
-		pop	acc		;restore registers
-		ret
+anl	a,#0fh		;separate lower nibble
+lcall	batrans	;transform into ascii code
+lcall	tftoutchar	;print
+pop	acc		;restore registers
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -805,12 +805,12 @@ tftoutnib:	push	acc		;save register on stack
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 tftoutbyte:	push	acc		;save registers on stack
-		swap	a		;swap nibbles
-		lcall	tftoutnib	;print high nibble
-		swap	a		;swap nibbles
-		lcall	tftoutnib
-		pop	acc		;restore registers from stack
-		ret
+swap	a		;swap nibbles
+lcall	tftoutnib	;print high nibble
+swap	a		;swap nibbles
+lcall	tftoutnib
+pop	acc		;restore registers from stack
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -837,7 +837,7 @@ backsp        equ    008h          ;ascii code voor het bs karakter
 beep          equ    007h          ;ascii code voor een beep
 
 wissen:       db     backsp,blank,backsp,000h    ;string wissen karakter
-                                                        ;van het scherm
+;van het scherm
 
 strtbuf       equ     040h         ;start adres van de buffer
 endbuf        equ     06fh         ;laatst gebruikte locatie (kan cr bevatten)
@@ -855,29 +855,29 @@ endbuf        equ     06fh         ;laatst gebruikte locatie (kan cr bevatten)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 sioinit:	push   acc           ;registers op de stack zetten
-              mov    a,pllcon      ;we lezen het pllcon SFR uit
-              anl    a,#007h       ;alleen de laagste 3 bits tellen
-              cjne   a,#006h,initsio1        ;005h is maximaal toegelaten
+mov    a,pllcon      ;we lezen het pllcon SFR uit
+anl    a,#007h       ;alleen de laagste 3 bits tellen
+cjne   a,#006h,initsio1        ;005h is maximaal toegelaten
 initsio1:     jnc    initsioe      ;geen carry dan is waarde in pllcon >=6
 
 ; de waarde in pllcon is bruikbaar. We gebruiken de waarde om de inhoud van
 ; t3con te bepalen. t3fd is altijd 02dh voor 9600 baud.
 
-              mov    t3fd,#02dh    ;zie databoek t3 als baud rate generator
-              cpl    a             ;bitbangen om laten uit te komen
-              clr    c             ;verder doen
-              subb   a,#002h       ;laagste 3 bits zijn 0k
-              anl    a,#007h       ;hoogste 5 bits op 0
-              add    a,#080h       ;nu alles in orde
-              mov    t3con,a       ;baud rate klaar
-              mov    scon,#01010000b ;UART initialiseren
-              clr    c             ;aangeven init ok (overbodige instructie)
-              pop    acc
-              ret
+mov    t3fd,#02dh    ;zie databoek t3 als baud rate generator
+cpl    a             ;bitbangen om laten uit te komen
+clr    c             ;verder doen
+subb   a,#002h       ;laagste 3 bits zijn 0k
+anl    a,#007h       ;hoogste 5 bits op 0
+add    a,#080h       ;nu alles in orde
+mov    t3con,a       ;baud rate klaar
+mov    scon,#01010000b ;UART initialiseren
+clr    c             ;aangeven init ok (overbodige instructie)
+pop    acc
+ret
 
 initsioe:     setb   c             ;aangeven initialisatie niet mogelijk
-              pop    acc
-              ret
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -891,8 +891,8 @@ initsioe:     setb   c             ;aangeven initialisatie niet mogelijk
 
 siooutchar:	MOV    SBUF,A        ;KARAKTER VERZENDEN
 OUTCHAR1:     JNB    TI,OUTCHAR1   ;WACHT TOT ZENDER BESCHIKBAAR
-              CLR    TI            ;LAAG MAKEN VAN DE BIT
-              RET
+CLR    TI            ;LAAG MAKEN VAN DE BIT
+RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -904,14 +904,14 @@ OUTCHAR1:     JNB    TI,OUTCHAR1   ;WACHT TOT ZENDER BESCHIKBAAR
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 siooutnib:	push   acc           ;registers op de stack
-              push   psw
-              ANL    A,#00FH       ;AFZONDEREN
-              LCALL  BATRANS       ;OMZETTEN IN ASCII CODE
-              LCALL  sioOUTCHAR       ;VERSTUREN
-              LCALL  XONXOFF       ;FLOW CONTROL
-              pop    psw           ;registers herstellen
-              pop    acc
-              RET
+push   psw
+ANL    A,#00FH       ;AFZONDEREN
+LCALL  BATRANS       ;OMZETTEN IN ASCII CODE
+LCALL  sioOUTCHAR       ;VERSTUREN
+LCALL  XONXOFF       ;FLOW CONTROL
+pop    psw           ;registers herstellen
+pop    acc
+RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -923,15 +923,15 @@ siooutnib:	push   acc           ;registers op de stack
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 siooutbyte:	push   acc           ;registers op de stack zetten
-              push   psw
-              PUSH   ACC           ;BACK UP NEMEN VAN DE ACCU
-              SWAP   A             ;EERST HOOGSTE DEEL
-              LCALL  sioOUTNIB        ;NIBBLE NAAR HET SCHERM
-              POP    ACC           ;HERSTELLEN VAN DE ACCU
-              LCALL  sioOUTNIB        ;NIBBLE NAAR HET SCHERM
-              pop    psw           ;registers herstellen
-              pop    acc
-              RET
+push   psw
+PUSH   ACC           ;BACK UP NEMEN VAN DE ACCU
+SWAP   A             ;EERST HOOGSTE DEEL
+LCALL  sioOUTNIB        ;NIBBLE NAAR HET SCHERM
+POP    ACC           ;HERSTELLEN VAN DE ACCU
+LCALL  sioOUTNIB        ;NIBBLE NAAR HET SCHERM
+pop    psw           ;registers herstellen
+pop    acc
+RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -943,14 +943,14 @@ siooutbyte:	push   acc           ;registers op de stack zetten
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 siodispdptr:	push   acc           ;registers op de stack zetten
-              push   psw
-              MOV    A,DPH         ;EERST HOOGSTE DEEL OP SCHERM
-              LCALL  sioOUTBYTE       ;BYTE IN ASCII NAAR HET SCHERM
-              MOV    A,DPL         ;MINST BEDUIDENDE DEEL VERZENDEN
-              LCALL  sioOUTBYTE       ;WEG ER MEE
-              pop    psw           ;registers herstellen
-              pop    acc
-              RET                  ;EINDE
+push   psw
+MOV    A,DPH         ;EERST HOOGSTE DEEL OP SCHERM
+LCALL  sioOUTBYTE       ;BYTE IN ASCII NAAR HET SCHERM
+MOV    A,DPL         ;MINST BEDUIDENDE DEEL VERZENDEN
+LCALL  sioOUTBYTE       ;WEG ER MEE
+pop    psw           ;registers herstellen
+pop    acc
+RET                  ;EINDE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -962,21 +962,21 @@ siodispdptr:	push   acc           ;registers op de stack zetten
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 siooutmsga:	push   acc           ;alles op de stack zetten
-              push   psw
-              push   dpl
-              push   dph
+push   psw
+push   dpl
+push   dph
 outmsga2:     CLR    A             ;ACCU LEEG MAKEN
-              MOVC   A,@A+DPTR     ;EERSTE CODE OPHALEN
-              JZ     OUTMSGA1      ;ALS NUL DAN EINDE
-              LCALL  sioOUTCHAR       ;KARAKTER NAAR HET SCHERM
-              LCALL  XONXOFF       ;SOFTWARE HANDSHAKE
-              INC    DPTR          ;DPTR AANPASSEN
-              SJMP   OUTMSGA2      ;HERHAAL TOT EINDE
+MOVC   A,@A+DPTR     ;EERSTE CODE OPHALEN
+JZ     OUTMSGA1      ;ALS NUL DAN EINDE
+LCALL  sioOUTCHAR       ;KARAKTER NAAR HET SCHERM
+LCALL  XONXOFF       ;SOFTWARE HANDSHAKE
+INC    DPTR          ;DPTR AANPASSEN
+SJMP   OUTMSGA2      ;HERHAAL TOT EINDE
 OUTMSGA1:     pop    dph           ;alles herstellen
-              pop    dpl
-              pop    psw
-              pop    acc
-              RET                  ;EINDE ROUTINE
+pop    dpl
+pop    psw
+pop    acc
+RET                  ;EINDE ROUTINE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -990,15 +990,15 @@ OUTMSGA1:     pop    dph           ;alles herstellen
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 XONXOFF:      push   acc           ;registers op de stack zetten
-              push   psw
-              JBC    RI,XONXOFF1   ;GA NA KARAKTER ONTVANGEN
+push   psw
+JBC    RI,XONXOFF1   ;GA NA KARAKTER ONTVANGEN
 XONXOFF2:     pop    psw           ;registers herstellen
-              pop    acc
-              RET                  ;ANDERS EINDE
+pop    acc
+RET                  ;ANDERS EINDE
 XONXOFF1:     MOV    A,SBUF        ;ZO JA, KARAKTER LADEN IN ACCU
-              CJNE   A,#XOFF,XONXOFF2     ;ALS NIET XOFF DAN VERDER
+CJNE   A,#XOFF,XONXOFF2     ;ALS NIET XOFF DAN VERDER
 XONXOFF3:     JBC    RI,XONXOFF2   ;WACHTEN OP WILLEKEURIG KARAKTER
-              SJMP   XONXOFF3      ;EN DAN RIBBE EN DE BIE
+SJMP   XONXOFF3      ;EN DAN RIBBE EN DE BIE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1010,9 +1010,9 @@ XONXOFF3:     JBC    RI,XONXOFF2   ;WACHTEN OP WILLEKEURIG KARAKTER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 sioinchar:	JNB    RI,sioINCHAR            ;BLIJF WACHTEN OP HET KARAKTER
-              CLR    RI                   ;BIT LAAG MAKEN
-              MOV    A,SBUF               ;KARAKTER IN DE ACCU
-              RET
+CLR    RI                   ;BIT LAAG MAKEN
+MOV    A,SBUF               ;KARAKTER IN DE ACCU
+RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1026,16 +1026,16 @@ sioinchar:	JNB    RI,sioINCHAR            ;BLIJF WACHTEN OP HET KARAKTER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 sioinbyte:	LCALL  sioINCHAR               ;EERSTE KARAKTER INLEZEN
-              LCALL  LOWUPTR
-              LCALL  ASCBINTRANS          ;OMZETTEN NAAR HEX GETAL
-              JC     INBYTE1              ;BIJ ERROR AKTIE ONDERNEMEN
-              SWAP   A                    ;IS HOOGSTE NIBBLE
-              MOV    R0,A                 ;ACCU TIJDELIJK BEWAREN
-              LCALL  sioINCHAR               ;TWEEDE KARAKTER OPHALEN
-              LCALL  LOWUPTR
-              LCALL  ASCBINTRANS          ;OMZETTEN NAAR BIN GETAL
-              JC     INBYTE1              ;BIJ ERROR ....
-              ORL    A,R0                 ;BIJDE GETALLEN SAMEN VOEGEN
+LCALL  LOWUPTR
+LCALL  ASCBINTRANS          ;OMZETTEN NAAR HEX GETAL
+JC     INBYTE1              ;BIJ ERROR AKTIE ONDERNEMEN
+SWAP   A                    ;IS HOOGSTE NIBBLE
+MOV    R0,A                 ;ACCU TIJDELIJK BEWAREN
+LCALL  sioINCHAR               ;TWEEDE KARAKTER OPHALEN
+LCALL  LOWUPTR
+LCALL  ASCBINTRANS          ;OMZETTEN NAAR BIN GETAL
+JC     INBYTE1              ;BIJ ERROR ....
+ORL    A,R0                 ;BIJDE GETALLEN SAMEN VOEGEN
 INBYTE1:      RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1057,32 +1057,32 @@ INBYTE1:      RET
 
 sioinbufa:	MOV    R0,#STRTBUF          ;START ADRES VAN DE BUFFER LADEN
 INBUFA2:      LCALL  sioINCHAR               ;KARAKTER LEZEN
-              ANL    A,#07FH              ;KARAKTERS OMVORMEN TOT ASCII 0
+ANL    A,#07FH              ;KARAKTERS OMVORMEN TOT ASCII 0
 ; ALVORENS EEN ECHO NAAR HET SCHERM TE VERSTUREN, MOET NAGEGAAN WORDEN DAT HET
 ; BEKOMEN KARAKTER AAN DE TE VERWACHTEN KARAKTERS VOLDOET. DE ENIGE TOEGELATEN
 ; CONTROLEKARAKTERS ZIJN 'CR' EN 'BACKSPACE'. VOOR AL DE ANDERE KARAKTERS
 ; WORDT EEN BEEP NAAR HET SCHERM GESTUURD. DE CONTROLE WORDT DOOR ASCCTR UIT-
 ; GEVOERD.
-              LCALL  LOWUPTR              ;WEL EFFE IN CAPS TE ZETTEN
-              CJNE   A,#CR,INBUFA1        ;CR INGEGEVEN?
-              MOV    @R0,A                ;IN GEHEUGEN ZETTEN
-              RET                         ;EINDE VAN DE ROUTINE
+LCALL  LOWUPTR              ;WEL EFFE IN CAPS TE ZETTEN
+CJNE   A,#CR,INBUFA1        ;CR INGEGEVEN?
+MOV    @R0,A                ;IN GEHEUGEN ZETTEN
+RET                         ;EINDE VAN DE ROUTINE
 INBUFA1:      CJNE   A,#BACKSP,INBUFA6    ;NAGAAN BACK SPACE INDRUKKEN
-              CJNE   R0,#STRTBUF,INBUFA3  ;STAAT DE BUFFER ONDERAAN,DAN BEEP
+CJNE   R0,#STRTBUF,INBUFA3  ;STAAT DE BUFFER ONDERAAN,DAN BEEP
 INBUFA4:      MOV    A,#BEEP
 INBUFA7:      LCALL  sioOUTCHAR
-              SJMP   INBUFA2              ;NIEUW KARAKTER OPHALEN
+SJMP   INBUFA2              ;NIEUW KARAKTER OPHALEN
 INBUFA3:      DEC    R0                   ;ENTRY UIT BUFFER HALEN
-              MOV    DPTR,#wissen         ;WIS KARAKTER DATA NAAR SCHERM
-              LCALL  sioOUTMSGA
-              SJMP   INBUFA2              ;WACHT OP VOLGENDE INGAVE
+MOV    DPTR,#wissen         ;WIS KARAKTER DATA NAAR SCHERM
+LCALL  sioOUTMSGA
+SJMP   INBUFA2              ;WACHT OP VOLGENDE INGAVE
 INBUFA6:      LCALL  ASCCTR               ;ALS CARRY DAN NIET GELDIG
-              JC     INBUFA4              ;BEEP NAAR SCHERM
-              CJNE   R0,#ENDBUF-1,INBUFA5 ;BUFFER OP HET EINDE DAN ERROR
-              SJMP   INBUFA4              ;BEEP NAAR HET SCHERM
+JC     INBUFA4              ;BEEP NAAR SCHERM
+CJNE   R0,#ENDBUF-1,INBUFA5 ;BUFFER OP HET EINDE DAN ERROR
+SJMP   INBUFA4              ;BEEP NAAR HET SCHERM
 INBUFA5:      MOV    @R0,A                ;KARAKTER IN DE BUFFER
-              INC    R0                   ;BUFFER POINTER AANPASSEN
-              SJMP   INBUFA7              ;KARAKTER IN BUFFER, VOLGENDE ?
+INC    R0                   ;BUFFER POINTER AANPASSEN
+SJMP   INBUFA7              ;KARAKTER IN BUFFER, VOLGENDE ?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1093,15 +1093,15 @@ INBUFA5:      MOV    @R0,A                ;KARAKTER IN DE BUFFER
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 BDELETE:      MOV    R0,#STRTBUF          ;START ADRES IN R0
-              MOV    R1,#STRTBUF          ;START ADRES IN R1
+MOV    R1,#STRTBUF          ;START ADRES IN R1
 BDELETE1:     MOV    A,@R0                ;LEES KARAKTER
-              CJNE   A,#BLANK,BDELETE2    ;KARAKTER GEEN BLANKO,DAN BDELETE2
+CJNE   A,#BLANK,BDELETE2    ;KARAKTER GEEN BLANKO,DAN BDELETE2
 BDELETE3:     INC    R0                   ;VOLGENDE KARAKTER OPHALEN
-              CJNE   R0,#ENDBUF+1,BDELETE1 ;ALS NIET EINDE DAN VERDER
-              RET                         ;EINDE VAN DE ROUTINE
+CJNE   R0,#ENDBUF+1,BDELETE1 ;ALS NIET EINDE DAN VERDER
+RET                         ;EINDE VAN DE ROUTINE
 BDELETE2:     MOV    @R1,A                ;KARAKTER NAAR BUFFER STUREN
-              INC    R1
-              SJMP   BDELETE3
+INC    R1
+SJMP   BDELETE3
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1116,12 +1116,12 @@ BDELETE2:     MOV    @R1,A                ;KARAKTER NAAR BUFFER STUREN
 
 ASCCTR:       CJNE   A,#020H,ASCCTR1      ;NAGAAN KARAKTER KLEINER DAN
 ASCCTR1:      JC     ASCCTR3              ;CARRY, DAN ERROR
-              CJNE   A,#07FH,ASCCTR2      ;GROTER DAN 7EH
+CJNE   A,#07FH,ASCCTR2      ;GROTER DAN 7EH
 ASCCTR2:      JNC    ASCCTR3              ;GEEN CARRY DAN ERROR
-              CLR    C                    ;AANGEVEN GEEN FOUT
-              RET
+CLR    C                    ;AANGEVEN GEEN FOUT
+RET
 ASCCTR3:      SETB   C                    ;AANGEVEN FOUT TOESTAND
-              RET
+RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1136,9 +1136,9 @@ ASCCTR3:      SETB   C                    ;AANGEVEN FOUT TOESTAND
 
 LOWUPTR:      CJNE   A,#07BH,LOWUPTR1     ;BOVENSTE GRENS
 LOWUPTR1:     JNC    LOWUPTR2             ;GEEN CARRY DAN GEEN OMZETTING
-              CJNE   A,#061H,LOWUPTR3     ;ONDERSTE GRENS NAGAAN
+CJNE   A,#061H,LOWUPTR3     ;ONDERSTE GRENS NAGAAN
 LOWUPTR3:     JC     LOWUPTR2             ;CARRY DAN GEEN OMZETTING
-              SUBB   A,#020H              ;OMZETTING
+SUBB   A,#020H              ;OMZETTING
 LOWUPTR2:     RET                         ;EINDE OMZETTING
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1152,9 +1152,9 @@ LOWUPTR2:     RET                         ;EINDE OMZETTING
 
 BATRANS:      CJNE   A,#00AH,BATRANS1     ;NAGAAN 30 OF 37 MOETEN BIJ OPTELLEN
 BATRANS1:     JC     BATRANS2             ;CARRY=1 DAN SLECHTS 30
-              ADD    A,#007H              ;ANDERS 30+7=37
+ADD    A,#007H              ;ANDERS 30+7=37
 BATRANS2:     ADD    A,#030H              ;30 BIJ OPTELLEN
-              RET
+RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1167,15 +1167,15 @@ BATRANS2:     ADD    A,#030H              ;30 BIJ OPTELLEN
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ASCBINTRANS:  CLR    C                    ;CARRY LAAG MAKEN VOOR BEREKENINGEN
-              SUBB   A,#030H              ;NAGAAN GETAL BINNEN GRENZEN
-              JC     ASCBINTRANS1         ;ALS C=1 DAN FOUT
-              CJNE   A,#00AH,ASCBINTRANS3 ;GETAL TUSSEN 0 EN 9 ?
+SUBB   A,#030H              ;NAGAAN GETAL BINNEN GRENZEN
+JC     ASCBINTRANS1         ;ALS C=1 DAN FOUT
+CJNE   A,#00AH,ASCBINTRANS3 ;GETAL TUSSEN 0 EN 9 ?
 ASCBINTRANS3: JC     ASCBINTRANS2         ;ALS CARRY DAN ALLES OK
-              SUBB   A,#007H              ;VERDER MET DE OMZETTING
-              JC     ASCBINTRANS1         ;ALS CARRY DAN ERROR
-              CJNE   A,#010H,ASCBINTRANS4 ;CONTROLE OP TE GROTE GETALLEN
+SUBB   A,#007H              ;VERDER MET DE OMZETTING
+JC     ASCBINTRANS1         ;ALS CARRY DAN ERROR
+CJNE   A,#010H,ASCBINTRANS4 ;CONTROLE OP TE GROTE GETALLEN
 ASCBINTRANS4: CPL    C                    ;CARRY COMPLEMENTEREN
-              JC     ASCBINTRANS1         ;ALS CARRY DAN FOUT IN HET GETAL
+JC     ASCBINTRANS1         ;ALS CARRY DAN FOUT IN HET GETAL
 ASCBINTRANS2: CLR    C                    ;CARRY LAAG MAKEN
 ASCBINTRANS1: RET
 
@@ -1189,8 +1189,8 @@ ASCBINTRANS1: RET
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ASCII1:       MOV    A,@R0                ;KARAKTER OPHALEN
-              LCALL  ASCBINTRANS          ;OMZETTING ASCII NAAR BINAIR
-              RET                         ;EINDE OMZETTING
+LCALL  ASCBINTRANS          ;OMZETTING ASCII NAAR BINAIR
+RET                         ;EINDE OMZETTING
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1203,13 +1203,13 @@ ASCII1:       MOV    A,@R0                ;KARAKTER OPHALEN
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ASCII2:       LCALL  ASCII1               ;OMZETTEN
-              JC     ASCII21              ;CARRY 1 DAN OMZETTING NIET MOGELIJK
-              SWAP   A                    ;NIBBLE VAN PLAATS VERANDEREN
-              MOV    R1,A                 ;TIJDELIJK WEG STOPPEN
-              INC    R0                   ;NAAR VOLGENDE KARAKTER WIJZEN
-              LCALL  ASCII1               ;KARAKTER OMZETTEN
-              JC     ASCII21               ;WEG ALS C=1
-              ORL    A,R1                 ;GETALLEN BIJ ELKAAR VOEGEN
+JC     ASCII21              ;CARRY 1 DAN OMZETTING NIET MOGELIJK
+SWAP   A                    ;NIBBLE VAN PLAATS VERANDEREN
+MOV    R1,A                 ;TIJDELIJK WEG STOPPEN
+INC    R0                   ;NAAR VOLGENDE KARAKTER WIJZEN
+LCALL  ASCII1               ;KARAKTER OMZETTEN
+JC     ASCII21               ;WEG ALS C=1
+ORL    A,R1                 ;GETALLEN BIJ ELKAAR VOEGEN
 ASCII21:      RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1224,12 +1224,12 @@ ASCII21:      RET
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ASCII4:       LCALL  ASCII2               ;OMZETTEN EERSTE TWEE ASCII BYTES
-              JC     ASCII41              ;IN GEVAL VAN ERROR DAN WEG
-              MOV    DPH,A                ;HEX GETAL IN DE DPTRH
-              INC    R0                   ;WIIJST NU NAAR VOLGENDE GROEP VAN 2
-              LCALL  ASCII2               ;OMZETTEN VOLGENDE TWEE BYTES
-              JC     ASCII41              ;BIJ FOUT DAN WEG
-              MOV    DPL,A                ;IN DPTR LADEN
+JC     ASCII41              ;IN GEVAL VAN ERROR DAN WEG
+MOV    DPH,A                ;HEX GETAL IN DE DPTRH
+INC    R0                   ;WIIJST NU NAAR VOLGENDE GROEP VAN 2
+LCALL  ASCII2               ;OMZETTEN VOLGENDE TWEE BYTES
+JC     ASCII41              ;BIJ FOUT DAN WEG
+MOV    DPL,A                ;IN DPTR LADEN
 ASCII41:      RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1304,116 +1304,116 @@ h12           equ    07fh
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 mul32:        push   acc                  ;registers op de stack zetten
-              push   psw
+push   psw
 
 ; eerst moeten de hulpregisters klaar gezet worden
 
-              mov    h0,#000h
-              mov    h1,#000h
-              mov    h2,#000h
-              mov    h3,#000h
-              mov    h4,#000h
-              mov    h5,#000h
-              mov    h6,#000h
-              mov    h7,#000h
-              mov    h8,#000h
-              mov    h9,#000h
-              mov    h10,#000h
-              mov    h11,#000h
-              mov    h12,#32              ;loopcounter
+mov    h0,#000h
+mov    h1,#000h
+mov    h2,#000h
+mov    h3,#000h
+mov    h4,#000h
+mov    h5,#000h
+mov    h6,#000h
+mov    h7,#000h
+mov    h8,#000h
+mov    h9,#000h
+mov    h10,#000h
+mov    h11,#000h
+mov    h12,#32              ;loopcounter
 
 ; volgende lus moet 32 keer doorlopen worden om de berekening te maken
 
 ; nu wordt de vermenigvuldiger naar rechts in de carry geshift
 
 mul321:       mov    a,r3
-              rrc    a
-              mov    r3,a
-              mov    a,r2
-              rrc    a
-              mov    r2,a
-              mov    a,r1
-              rrc    a
-              mov    r1,a
-              mov    a,r0
-              rrc    a
-              mov    r0,a                 ;32 bit shift klaar
+rrc    a
+mov    r3,a
+mov    a,r2
+rrc    a
+mov    r2,a
+mov    a,r1
+rrc    a
+mov    r1,a
+mov    a,r0
+rrc    a
+mov    r0,a                 ;32 bit shift klaar
 
 ;als de carry 1 is moet het 64 bit getal h3-r4 opgeteld worden bij h11-h4
 
-              jnc    mul322               ;optelling niet nodig
+jnc    mul322               ;optelling niet nodig
 
 ; hier staat en 64 bit optelling
 
-              mov    a,r4
-              add    a,h4
-              mov    h4,a
-              mov    a,r5
-              addc   a,h5
-              mov    h5,a
-              mov    a,r6
-              addc   a,h6
-              mov    h6,a
-              mov    a,r7
-              addc   a,h7
-              mov    h7,a
-              mov    a,h0
-              addc   a,h8
-              mov    h8,a
-              mov    a,h1
-              addc   a,h9
-              mov    h9,a
-              mov    a,h2
-              addc   a,h10
-              mov    h10,a
-              mov    a,h3
-              addc   a,h11
-              mov    h11,a                ;optelling klaar
+mov    a,r4
+add    a,h4
+mov    h4,a
+mov    a,r5
+addc   a,h5
+mov    h5,a
+mov    a,r6
+addc   a,h6
+mov    h6,a
+mov    a,r7
+addc   a,h7
+mov    h7,a
+mov    a,h0
+addc   a,h8
+mov    h8,a
+mov    a,h1
+addc   a,h9
+mov    h9,a
+mov    a,h2
+addc   a,h10
+mov    h10,a
+mov    a,h3
+addc   a,h11
+mov    h11,a                ;optelling klaar
 
 ; het getal h3-r4 moet met twee vermenigvuldigd worden
 
 mul322:       clr    c                    ;moet op 0 staan
-              mov    a,r4
-              rlc    a
-              mov    r4,a
-              mov    a,r5
-              rlc    a
-              mov    r5,a
-              mov    a,r6
-              rlc    a
-              mov    r6,a
-              mov    a,r7
-              rlc    a
-              mov    r7,a
-              mov    a,h0
-              rlc    a
-              mov    h0,a
-              mov    a,h1
-              rlc    a
-              mov    h1,a
-              mov    a,h2
-              rlc    a
-              mov    h2,a
-              mov    a,h3
-              rlc    a
-              mov    h3,a
+mov    a,r4
+rlc    a
+mov    r4,a
+mov    a,r5
+rlc    a
+mov    r5,a
+mov    a,r6
+rlc    a
+mov    r6,a
+mov    a,r7
+rlc    a
+mov    r7,a
+mov    a,h0
+rlc    a
+mov    h0,a
+mov    a,h1
+rlc    a
+mov    h1,a
+mov    a,h2
+rlc    a
+mov    h2,a
+mov    a,h3
+rlc    a
+mov    h3,a
 
-              djnz   h12,mul321           ;herhaal 32 keer
+djnz   h12,mul321           ;herhaal 32 keer
 
 ; de uitkomst moet in de juiste registers komen
 
-              mov    r0,h4
-              mov    r1,h5
-              mov    r2,h6
-              mov    r3,h7
-              mov    r4,h8
-              mov    r5,h9
-              mov    r6,h10
-              mov    r7,h11               ;klaar
+mov    r0,h4
+mov    r1,h5
+mov    r2,h6
+mov    r3,h7
+mov    r4,h8
+mov    r5,h9
+mov    r6,h10
+mov    r7,h11               ;klaar
 
-		pop    psw			;registers herstellen
-              pop    acc
-              ret
+pop    psw			;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1427,75 +1427,75 @@ mul322:       clr    c                    ;moet op 0 staan
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 mul16:        push   acc                  ;registers op de stack zetten
-              push   psw
+push   psw
 
 ; eerst registers laden met startwaarden. h0 en h1 zijn het verlengstuk
 ; van r3 en r2. h2, h3, h4, h5 worden gebruikt voor sommatie.
 ; h6 is de loopcounter.
 
-              mov    h0,#000h
-              mov    h1,#000h
-              mov    h2,#000h
-              mov    h3,#000h
-              mov    h4,#000h
-              mov    h5,#000h
-              mov    h6,#16               ;loopcounter
-              
+mov    h0,#000h
+mov    h1,#000h
+mov    h2,#000h
+mov    h3,#000h
+mov    h4,#000h
+mov    h5,#000h
+mov    h6,#16               ;loopcounter
+
 ; hier staat de lus die 16 keer doorlopen wordt voor het uitvoeren van de
 ; berekening
 
 mul161:       mov    a,r1                 ;getal 1 1*rechts in carry
-              rrc    a
-              mov    r1,a
-              mov    a,r0
-              rrc    a
-              mov    r0,a                 ;ok
+rrc    a
+mov    r1,a
+mov    a,r0
+rrc    a
+mov    r0,a                 ;ok
 
 ; als carry 1 dan h1, h0, r3, r2 optellen bij h5, h4, h3, h2
 
-              jnc    mul162
+jnc    mul162
 
-              mov    a,r2
-              add    a,h2
-              mov    h2,a                 ;32 bit som uitvoeren
-              mov    a,r3
-              addc   a,h3
-              mov    h3,a
-              mov    a,h0
-              addc   a,h4
-              mov    h4,a
-              mov    a,h1
-              addc   a,h5
-              mov    h5,a                 ;klaar
+mov    a,r2
+add    a,h2
+mov    h2,a                 ;32 bit som uitvoeren
+mov    a,r3
+addc   a,h3
+mov    h3,a
+mov    a,h0
+addc   a,h4
+mov    h4,a
+mov    a,h1
+addc   a,h5
+mov    h5,a                 ;klaar
 
 ; het te vermenigvuldige getal maal 2 (1*links shiften)
 
 mul162:       clr    c
-              mov    a,r2
-              rlc    a
-              mov    r2,a                 ;ook 32 bit getal
-              mov    a,r3
-              rlc    a
-              mov    r3,a
-              mov    a,h0
-              rlc    a
-              mov    h0,a
-              mov    a,h1
-              rlc    a
-              mov    h1,a                 ;klaar
+mov    a,r2
+rlc    a
+mov    r2,a                 ;ook 32 bit getal
+mov    a,r3
+rlc    a
+mov    r3,a
+mov    a,h0
+rlc    a
+mov    h0,a
+mov    a,h1
+rlc    a
+mov    h1,a                 ;klaar
 
-              djnz   h6,mul161            ;herhaal 16 keer
+djnz   h6,mul161            ;herhaal 16 keer
 
 ; de vermenigvuldiging is klaar. Nu uitkomstregisters laden
 
-              mov    r0,h2
-              mov    r1,h3
-              mov    r2,h4
-              mov    r3,h5                ;klaar
+mov    r0,h2
+mov    r1,h3
+mov    r2,h4
+mov    r3,h5                ;klaar
 
-              pop    psw			;registers herstellen
-              pop    acc
-              ret
+pop    psw			;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1511,110 +1511,110 @@ mul162:       clr    c
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 div32:        push   acc                  ;registers op de stack zetten
-              push   psw
-             
+push   psw
+
 ; eerst alles voorladen
 
-              mov    h0,#000h
-              mov    h1,#000h
-              mov    h2,#000h
-              mov    h3,#000h
-              mov    h4,#000h
-              mov    h5,#000h
-              mov    h6,#000h
-              mov    h7,#000h
-              mov    h8,#000h
-              mov    h9,#000h
-              mov    h10,#000h
-              mov    h11,#000h
-              mov    h12,#32              ;loopcounter
+mov    h0,#000h
+mov    h1,#000h
+mov    h2,#000h
+mov    h3,#000h
+mov    h4,#000h
+mov    h5,#000h
+mov    h6,#000h
+mov    h7,#000h
+mov    h8,#000h
+mov    h9,#000h
+mov    h10,#000h
+mov    h11,#000h
+mov    h12,#32              ;loopcounter
 
 ; we gaan het te delen getal in de passende hulpregisters shiften
 
 ; deze lus moet 32 keer heraald worden
 
 div321:       mov    a,r0                 ;h3-r0 is te delen getal
-              rlc    a
-              mov    r0,a
-              mov    a,r1
-              rlc    a
-              mov    r1,a
-              mov    a,r2
-              rlc    a
-              mov    r2,a
-              mov    a,r3
-              rlc    a
-              mov    r3,a
-              mov    a,h0
-              rlc    a
-              mov    h0,a
-              mov    a,h1
-              rlc    a
-              mov    h1,a
-              mov    a,h2
-              rlc    a
-              mov    h2,a
-              mov    a,h3
-              rlc    a
-              mov    h3,a
+rlc    a
+mov    r0,a
+mov    a,r1
+rlc    a
+mov    r1,a
+mov    a,r2
+rlc    a
+mov    r2,a
+mov    a,r3
+rlc    a
+mov    r3,a
+mov    a,h0
+rlc    a
+mov    h0,a
+mov    a,h1
+rlc    a
+mov    h1,a
+mov    a,h2
+rlc    a
+mov    h2,a
+mov    a,h3
+rlc    a
+mov    h3,a
 
 ; nu testen of het deeltal in h3-h0 past, tussenuitkomst in h7-h4
 
-              clr    c                    ;zit in de weg
-              mov    a,h0			
-              subb   a,r4
-              mov    h4,a
-              mov    a,h1
-              subb   a,r5
-              mov    h5,a
-              mov    a,h2
-              subb   a,r6
-              mov    h6,a
-              mov    a,h3
-              subb   a,r7
-              mov    h7,a
+clr    c                    ;zit in de weg
+mov    a,h0			
+subb   a,r4
+mov    h4,a
+mov    a,h1
+subb   a,r5
+mov    h5,a
+mov    a,h2
+subb   a,r6
+mov    h6,a
+mov    a,h3
+subb   a,r7
+mov    h7,a
 
 ; als er geen carry is, dan is het verschil succesvol, en moeten h3-h0
 ; vervangen worden door h7-h4
 
-              jc     div322               ;niet vervangen
+jc     div322               ;niet vervangen
 
-              mov    h0,h4
-              mov    h1,h5
-              mov    h2,h6
-              mov    h3,h7                ;vervanging klaar
+mov    h0,h4
+mov    h1,h5
+mov    h2,h6
+mov    h3,h7                ;vervanging klaar
 
 div322:       cpl    c                    ;dit moet in h11-h8 (uitkomst)
-              mov    a,h8
-              rlc    a
-              mov    h8,a
-              mov    a,h9
-              rlc    a
-              mov    h9,a
-              mov    a,h10
-              rlc    a
-              mov    h10,a
-              mov    a,h11
-              rlc    a
-              mov    h11,a                ;qoutient aangepast
+mov    a,h8
+rlc    a
+mov    h8,a
+mov    a,h9
+rlc    a
+mov    h9,a
+mov    a,h10
+rlc    a
+mov    h10,a
+mov    a,h11
+rlc    a
+mov    h11,a                ;qoutient aangepast
 
-              djnz   h12,div321           ;32 keer herhalen
+djnz   h12,div321           ;32 keer herhalen
 
 ; de berekening is klaar. uitkomstregisters nog laden
 
-              mov    r4,h8
-              mov    r5,h9
-              mov    r6,h10
-              mov    r7,h11               ;uitkomst geladen
+mov    r4,h8
+mov    r5,h9
+mov    r6,h10
+mov    r7,h11               ;uitkomst geladen
 
-              mov    r0,h0                ;rest laden
-              mov    r1,h1
-              mov    r2,h2
-              mov    r3,h3
+mov    r0,h0                ;rest laden
+mov    r1,h1
+mov    r2,h2
+mov    r3,h3
 
-              pop    psw			;registers herstellen
-              pop    acc
-              ret
+pop    psw			;registers herstellen
+pop    acc
+ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1629,73 +1629,73 @@ div322:       cpl    c                    ;dit moet in h11-h8 (uitkomst)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 div16:        push   acc                  ;registers op de stack zetten
-              push   psw
-              
+push   psw
+
 ; registers voorladen
 
-              mov    h0,#000h
-              mov    h1,#000h
-              mov    h2,#000h
-              mov    h3,#000h
-              mov    h4,#000h
-              mov    h5,#000h
-              mov    h6,#16               ;loopcounter
-              
+mov    h0,#000h
+mov    h1,#000h
+mov    h2,#000h
+mov    h3,#000h
+mov    h4,#000h
+mov    h5,#000h
+mov    h6,#16               ;loopcounter
+
 ; eerst te delen getal 1*links shiften in hulpregisters
 
 ; deze lus moet 16 keer herhaald worden
 
 div161:       mov    a,r0                 ;32 bit shift in h1-r0
-              rlc    a
-              mov    r0,a
-              mov    a,r1
-              rlc    a
-              mov    r1,a
-              mov    a,h0
-              rlc    a
-              mov    h0,a
-              mov    a,h1
-              rlc    a
-              mov    h1,a
+rlc    a
+mov    r0,a
+mov    a,r1
+rlc    a
+mov    r1,a
+mov    a,h0
+rlc    a
+mov    h0,a
+mov    a,h1
+rlc    a
+mov    h1,a
 
 ; nagaan of in h1-h0 de deler past r3-r2. h3-h2 wordt gebruikt voor
 ; het tussenresultaat.
 
-              clr    c
-              mov    a,h0
-              subb   a,r2
-              mov    h2,a
-              mov    a,h1
-              subb   a,r3
-              mov    h3,a
+clr    c
+mov    a,h0
+subb   a,r2
+mov    h2,a
+mov    a,h1
+subb   a,r3
+mov    h3,a
 
-              jc     div162               ;als carry dan h1-h0 niet vervangen
-                                          ;door h3,h2
-              mov    h0,h2
-              mov    h1,h3                ;vervanging klaar
+jc     div162               ;als carry dan h1-h0 niet vervangen
+;door h3,h2
+mov    h0,h2
+mov    h1,h3                ;vervanging klaar
 
 ; uitkomst moet aangepast worden
 
 div162:       cpl    c                    ;truuk
-              mov    a,h4
-              rlc    a
-              mov    h4,a
-              mov    a,h5
-              rlc    a
-              mov    h5,a
-              djnz   h6,div161            ;16 keer herhalen
+mov    a,h4
+rlc    a
+mov    h4,a
+mov    a,h5
+rlc    a
+mov    h5,a
+djnz   h6,div161            ;16 keer herhalen
 
 ; de berekening is klaar. uitkomsten in passende registers
 
-              mov    r2,h4                ;quotient
-              mov    r3,h5
+mov    r2,h4                ;quotient
+mov    r3,h5
 
-              mov    r0,h0                ;rest
-              mov    r1,h1
+mov    r0,h0                ;rest
+mov    r1,h1
 
-              pop    psw			;registers herstellen
-              pop    acc
-              ret
+pop    psw			;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1710,25 +1710,25 @@ div162:       cpl    c                    ;truuk
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 add32:        push   acc                  ;registers op de stack zetten
-              push   psw
-              mov    a,r0                 ;eerste 8 bit
-              add    a,r4
-              mov    r0,a                 ;klaar
-              mov    a,r1                 ;volgende 8 bit
-              addc   a,r5
-              mov    r1,a                 ;klaar
-              mov    a,r2                 ;volgende 8 bit
-              addc   a,r6
-              mov    r2,a                 ;klaar
-              mov    a,r3                 ;laatste 8 bit
-              addc   a,r7
-              mov    r3,a                 ;32 bit klaar
-              mov    a,#000h
-              addc   a,#000h              ;carry verrekenen
-              mov    r4,a
-              pop    psw                  ;registers herstellen
-              pop    acc
-              ret
+push   psw
+mov    a,r0                 ;eerste 8 bit
+add    a,r4
+mov    r0,a                 ;klaar
+mov    a,r1                 ;volgende 8 bit
+addc   a,r5
+mov    r1,a                 ;klaar
+mov    a,r2                 ;volgende 8 bit
+addc   a,r6
+mov    r2,a                 ;klaar
+mov    a,r3                 ;laatste 8 bit
+addc   a,r7
+mov    r3,a                 ;32 bit klaar
+mov    a,#000h
+addc   a,#000h              ;carry verrekenen
+mov    r4,a
+pop    psw                  ;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1743,19 +1743,19 @@ add32:        push   acc                  ;registers op de stack zetten
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 add16:        push   acc                  ;geen registers gebruiken behalve rx
-              push   psw
-              mov    a,r0                 ;starten met de optelling
-              add    a,r2                 ;8 bit klaar
-              mov    r0,a                 ;uitkomst wegschrijven
-              mov    a,r1                 ;volgende 8 bit
-              addc   a,r3                 ;16 bit klaar
-              mov    r1,a                 ;uitkomst weggeschreven
-              mov    a,#000h              ;carry verrekenen
-              addc   a,#000h
-              mov    r2,a                 ;24 bit klaar
-              pop    psw                  ;registers herstellen
-              pop    acc
-              ret
+push   psw
+mov    a,r0                 ;starten met de optelling
+add    a,r2                 ;8 bit klaar
+mov    r0,a                 ;uitkomst wegschrijven
+mov    a,r1                 ;volgende 8 bit
+addc   a,r3                 ;16 bit klaar
+mov    r1,a                 ;uitkomst weggeschreven
+mov    a,#000h              ;carry verrekenen
+addc   a,#000h
+mov    r2,a                 ;24 bit klaar
+pop    psw                  ;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1770,26 +1770,26 @@ add16:        push   acc                  ;geen registers gebruiken behalve rx
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 sub32:        push   acc                  ;registers bewaren
-              push   psw                  ;ook de vlaggen
-              clr    c                    ;zit nog effe in de weg
-              mov    a,r0                 ;eerste 8 bit
-              subb   a,r4
-              mov    r0,a
-              mov    a,r1                 ;tweede 8 bit
-              subb   a,r5
-              mov    r1,a
-              mov    a,r2                 ;volgende 8 bit
-              subb   a,r6
-              mov    r2,a
-              mov    a,r3                 ;laatste 8 bit
-              subb   a,r7
-              mov    r3,a
-              mov    a,#000h              ;nu nog de carry
-              subb   a,#000h
-              mov    r4,a                 ;40 bit klaar
-              pop    psw                  ;registers herstellen
-              pop    acc
-              ret
+push   psw                  ;ook de vlaggen
+clr    c                    ;zit nog effe in de weg
+mov    a,r0                 ;eerste 8 bit
+subb   a,r4
+mov    r0,a
+mov    a,r1                 ;tweede 8 bit
+subb   a,r5
+mov    r1,a
+mov    a,r2                 ;volgende 8 bit
+subb   a,r6
+mov    r2,a
+mov    a,r3                 ;laatste 8 bit
+subb   a,r7
+mov    r3,a
+mov    a,#000h              ;nu nog de carry
+subb   a,#000h
+mov    r4,a                 ;40 bit klaar
+pop    psw                  ;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1804,20 +1804,20 @@ sub32:        push   acc                  ;registers bewaren
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 sub16:        push   acc                  ;registers bewaren
-              push   psw
-              clr    c                    ;mag nog niet meespelen
-              mov    a,r0                 ;eerste 8 bit verschil
-              subb   a,r2
-              mov    r0,a                 ;klaar
-              mov    a,r1
-              subb   a,r3                 ;16 bit klaar
-              mov    r1,a
-              mov    a,#000h
-              subb   a,#000h              ;eventuele carry verrekenen
-              mov    r2,a                 ;24 bit klaar
-              pop    psw                  ;registers herstellen
-              pop    acc
-              ret
+push   psw
+clr    c                    ;mag nog niet meespelen
+mov    a,r0                 ;eerste 8 bit verschil
+subb   a,r2
+mov    r0,a                 ;klaar
+mov    a,r1
+subb   a,r3                 ;16 bit klaar
+mov    r1,a
+mov    a,#000h
+subb   a,#000h              ;eventuele carry verrekenen
+mov    r2,a                 ;24 bit klaar
+pop    psw                  ;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1830,39 +1830,39 @@ sub16:        push   acc                  ;registers bewaren
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 hexbcd16:     push   acc                  ;registers effe bewaren op de stack
-              push   psw
+push   psw
 
-              mov    h9,#005h             ;loopcounter
-              
+mov    h9,#005h             ;loopcounter
+
 hexbcd161:    mov    r3,#000h
-              mov    r2,#00ah             ;hierdoor delen we
-              lcall  div16                ;deling uitvoeren
-              mov    a,r0                 ;rest
-              push   acc                  ;op stack zetten
-              mov    a,r2
-              mov    r0,a
-              mov    a,r3
-              mov    r1,a                 ;uitkomst terug delen
-              djnz   h9,hexbcd161
+mov    r2,#00ah             ;hierdoor delen we
+lcall  div16                ;deling uitvoeren
+mov    a,r0                 ;rest
+push   acc                  ;op stack zetten
+mov    a,r2
+mov    r0,a
+mov    a,r3
+mov    r1,a                 ;uitkomst terug delen
+djnz   h9,hexbcd161
 
-              pop    acc                  ;hoogste bits van de stack
-              mov    r2,a                 ;klaar
-              pop    acc
-              swap   a
-              mov    h9,a
-              pop    acc
-              add    a,h9
-              mov    r1,a                 ;volgende 8 klaar
-              pop    acc
-              swap   a
-              mov    h9,a
-              pop    acc
-              add    a,h9
-              mov    r0,a                 ;klaar
+pop    acc                  ;hoogste bits van de stack
+mov    r2,a                 ;klaar
+pop    acc
+swap   a
+mov    h9,a
+pop    acc
+add    a,h9
+mov    r1,a                 ;volgende 8 klaar
+pop    acc
+swap   a
+mov    h9,a
+pop    acc
+add    a,h9
+mov    r0,a                 ;klaar
 
-              pop    psw                  ;registers herstellen
-              pop    acc
-              ret
+pop    psw                  ;registers herstellen
+pop    acc
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1873,14 +1873,14 @@ hexbcd161:    mov    r3,#000h
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 hexbcd8:      push   psw                  ;registers op stack zetten
-              push   b
-              mov    b,#00ah              ;hierdoor delen
-              div    ab                   ;in accu qoutient in b rest
-              swap   a
-              add    a,b                  ;bcd getal klaar
-              pop    b
-              pop    psw
-              ret
+push   b
+mov    b,#00ah              ;hierdoor delen
+div    ab                   ;in accu qoutient in b rest
+swap   a
+add    a,b                  ;bcd getal klaar
+pop    b
+pop    psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1893,56 +1893,56 @@ hexbcd8:      push   psw                  ;registers op stack zetten
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 bcdhex16:     push   b                    ;hebben we nodig
-              push   acc
-              push   psw
+push   acc
+push   psw
 
-              mov    a,r0
-              anl    a,#00fh              ;eenheden
-              push   acc                  ;effe bewaren
+mov    a,r0
+anl    a,#00fh              ;eenheden
+push   acc                  ;effe bewaren
 
-              mov    a,r0
-              swap   a
-              anl    a,#00fh              ;tientallen
-              mov    b,#00ah              ;waarde berekenen
-              mul    ab                   ;klaar
-              pop    b                    ;truukje
-              add    a,b                  ;a is lage deel hex getal
-              push   acc                  ;straks nodig
+mov    a,r0
+swap   a
+anl    a,#00fh              ;tientallen
+mov    b,#00ah              ;waarde berekenen
+mul    ab                   ;klaar
+pop    b                    ;truukje
+add    a,b                  ;a is lage deel hex getal
+push   acc                  ;straks nodig
 
-              mov    a,r1                 ;hoge deel 
-              anl    a,#0f0h
-              swap   a
-              push   acc                  ;straks nodig
+mov    a,r1                 ;hoge deel 
+anl    a,#0f0h
+swap   a
+push   acc                  ;straks nodig
 
-              mov    a,r1
-              anl    a,#00fh              ;gaan we verder bewerken
-              mov    b,#100               ;waarde uitrekenen
-              mul    ab
-              mov    r1,b
-              mov    r0,a
+mov    a,r1
+anl    a,#00fh              ;gaan we verder bewerken
+mov    b,#100               ;waarde uitrekenen
+mul    ab
+mov    r1,b
+mov    r0,a
 
-              pop    acc
-              mov    b,#10 
-              mul    ab                   ;kan nog in a
-              mov    b,#100               ;*10*100=*1000
-              mul    ab
-              add    a,r0
-              mov    r0,a
-              mov    a,r1
-              addc   a,b
-              mov    r1,a
+pop    acc
+mov    b,#10 
+mul    ab                   ;kan nog in a
+mov    b,#100               ;*10*100=*1000
+mul    ab
+add    a,r0
+mov    r0,a
+mov    a,r1
+addc   a,b
+mov    r1,a
 
-              pop    acc
-              add    a,r0
-              mov    r0,a
-              mov    a,#000h
-              addc   a,r1
-              mov    r1,a                 ;klaar
+pop    acc
+add    a,r0
+mov    r0,a
+mov    a,#000h
+addc   a,r1
+mov    r1,a                 ;klaar
 
-              pop    psw
-              pop    acc
-              pop    b
-              ret
+pop    psw
+pop    acc
+pop    b
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1953,19 +1953,19 @@ bcdhex16:     push   b                    ;hebben we nodig
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 bcdhex8:      push   psw                  ;registers op de stack zetten
-              push   b
-              push   h0
-              mov    h0,a                 ;effe bewaren
-              anl    h0,#00fh             ;alleen 4 laagste bits
-              anl    a,#0f0h              ;hier alleen 4 hoogste bits
-              swap   a
-              mov    b,#00ah              ;berekenen waarde 4 hoogste bits
-              mul    ab
-              add    a,h0                 ;eenheden bijtellen
-              pop    h0
-              pop    b
-              pop    psw
-              ret
+push   b
+push   h0
+mov    h0,a                 ;effe bewaren
+anl    h0,#00fh             ;alleen 4 laagste bits
+anl    a,#0f0h              ;hier alleen 4 hoogste bits
+swap   a
+mov    b,#00ah              ;berekenen waarde 4 hoogste bits
+mul    ab
+add    a,h0                 ;eenheden bijtellen
+pop    h0
+pop    b
+pop    psw
+ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1997,26 +1997,26 @@ bcdhex8:      push   psw                  ;registers op de stack zetten
 ; iicinit       is een subroutine die de iic van de ADuC als master instelt
 initiic:
 iicinit:        setb    mdo             ;data moet hoog wakker worden
-                setb    mco             ;klok moet hoog wakker worden
-                setb    mde             ;data wordt als output geschakeld
-                setb    i2cm            ;master mode inschakelen
-                ret
+setb    mco             ;klok moet hoog wakker worden
+setb    mde             ;data wordt als output geschakeld
+setb    i2cm            ;master mode inschakelen
+ret
 
 ; iicstart      is een subroutine die de start conditie op de pinnen plaatst
 
 iicstart:       setb    mco             ;zeker zijn dat de klok hoog is
-                clr     mdo             ;data moet laag worden
-                setb    mde             ;data pin enable
-                clr     mco             ;klok laag maken
-                ret
+clr     mdo             ;data moet laag worden
+setb    mde             ;data pin enable
+clr     mco             ;klok laag maken
+ret
 
 ; iicstop       is een subroutine die de stop conditie opwekt.
 
 iicstop:        clr     mdo             ;data moet laag worden
-                setb    mde             ;data mag naar buiten
-                setb    mco             ;nu moet de klok omhoog
-                setb    mdo             ;nu data pin hoog maken
-                ret                
+setb    mde             ;data mag naar buiten
+setb    mco             ;nu moet de klok omhoog
+setb    mdo             ;nu data pin hoog maken
+ret                
 
 ; iicoutbyte    zal de accu naar buiten sturen, msb eerst.
 ;               De routine gebruikt geen registers, behalve de psw
@@ -2024,65 +2024,65 @@ iicstop:        clr     mdo             ;data moet laag worden
 ;               uitvoeren van de routine.
 
 iicoutbyte:     push    acc             ;worden effe op stack bewaard
-                push    b
-                mov     b,#008h         ;loopcounter
+push    b
+mov     b,#008h         ;loopcounter
 iicoutbyte1:    rlc     a               ;bit in de carry plaatsen
-		  mov     mdo,c           ;carry naar de mdo pin
-                setb    mde             ;pin als output activeren
-                setb    mco             ;klokpukls hoog
-                clr     mco             ;klokpuls laag
-                djnz    b,iicoutbyte1   ;volledige byte verzenden
-                clr     mde             ;iic data pin als input schakelen
-                setb    mco             ;klokpuls hoog
-                mov     c,mdi           ;data inlezen in de carry
-                clr     mco             ;klokpuls terug laag
-                pop     b
-                pop     acc             ;registers herstellen
-                ret
+mov     mdo,c           ;carry naar de mdo pin
+setb    mde             ;pin als output activeren
+setb    mco             ;klokpukls hoog
+clr     mco             ;klokpuls laag
+djnz    b,iicoutbyte1   ;volledige byte verzenden
+clr     mde             ;iic data pin als input schakelen
+setb    mco             ;klokpuls hoog
+mov     c,mdi           ;data inlezen in de carry
+clr     mco             ;klokpuls terug laag
+pop     b
+pop     acc             ;registers herstellen
+ret
 
 ; iicinbyteack  zal in de accu een byte inlezen, msb eerst.
 ;               De routine gebruikt geen registers. De routine zal als
 ;               negende bit een ack verzenden.
 
 iicinbyteack:   push    b               ;deze registers worden gebruikt
-                push    psw
-                mov     b,#008h         ;wordt gebruikt als loopcounter
+push    psw
+mov     b,#008h         ;wordt gebruikt als loopcounter
 iicinbytea1:    clr     mde             ;iic data pin als input schakelen
-                setb    mco             ;klokpuls hoog
-                mov     c,mdi           ;data inlezen in de carry
-                clr     mco             ;klokpuls terug laag
-                rlc     a               ;in accu shiften
-                djnz    b,iicinbytea1   ;volledige byte ontvangen
-                clr     c               ;ack verzenden
-		  mov     mdo,c           ;carry naar de mdo pin
-                setb    mde             ;pin als output activeren
-                setb    mco             ;klokpukls hoog
-                clr     mco             ;klokpuls laag
-                pop     psw             ;registers herstellen
-                pop     b
-                ret
+setb    mco             ;klokpuls hoog
+mov     c,mdi           ;data inlezen in de carry
+clr     mco             ;klokpuls terug laag
+rlc     a               ;in accu shiften
+djnz    b,iicinbytea1   ;volledige byte ontvangen
+clr     c               ;ack verzenden
+mov     mdo,c           ;carry naar de mdo pin
+setb    mde             ;pin als output activeren
+setb    mco             ;klokpukls hoog
+clr     mco             ;klokpuls laag
+pop     psw             ;registers herstellen
+pop     b
+ret
 
 ; iicinbytenack zal in de accu een byte inlezen, msb eerst.
 ;               De routine gebruikt geen registers. De routine zal als
 ;               negende bit een nack verzenden.
 
 iicinbytenack:  push    b               ;deze registers worden gebruikt
-                push    psw
-                mov     b,#008h         ;wordt gebruikt als loopcounter
+push    psw
+mov     b,#008h         ;wordt gebruikt als loopcounter
 iicinbyten1:    clr     mde             ;iic data pin als input schakelen
-                setb    mco             ;klokpuls hoog
-                mov     c,mdi           ;data inlezen in de carry
-                clr     mco             ;klokpuls terug laag
-                rlc     a               ;in accu shiften
-                djnz    b,iicinbyten1   ;volledige byte ontvangen
-                setb    c               ;nack verzenden
-		  mov     mdo,c           ;carry naar de mdo pin
-                setb    mde             ;pin als output activeren
-                setb    mco             ;klokpukls hoog
-                clr     mco             ;klokpuls laag
-                pop     psw             ;registers herstellen
-                pop     b
-                ret
+setb    mco             ;klokpuls hoog
+mov     c,mdi           ;data inlezen in de carry
+clr     mco             ;klokpuls terug laag
+rlc     a               ;in accu shiften
+djnz    b,iicinbyten1   ;volledige byte ontvangen
+setb    c               ;nack verzenden
+mov     mdo,c           ;carry naar de mdo pin
+setb    mde             ;pin als output activeren
+setb    mco             ;klokpukls hoog
+clr     mco             ;klokpuls laag
+pop     psw             ;registers herstellen
+pop     b
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -2099,39 +2099,39 @@ iicinbyten1:    clr     mde             ;iic data pin als input schakelen
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 delaya0k05s:	push	psw			;regs op stack
-		push	acc
-		push	b
-		push	00h
-		push	01h
-		push	acc			;needed to use PLLCON value and calculate time base
-		mov	b,pllcon		;read pllcon
-		anl	b,#00000111b		;retain PLL bits
+push	acc
+push	b
+push	00h
+push	01h
+push	acc			;needed to use PLLCON value and calculate time base
+mov	b,pllcon		;read pllcon
+anl	b,#00000111b		;retain PLL bits
 ; The smaller the number, the faster the clock is running (0=16MHz, 7=0.13Mhz).
 ; By substracting 8 with the pll value we get 8 for highest speed and 1 for lowest speed.
 ; This number is used to calculate the number of delay loops is needed.
-		mov	a,#08h			;base value
-		clr	c			;required for subb instruction
-		subb	a,b			;substract (a=power of two that indicates number of delay loops)
-		mov	b,a			;need accu
-		mov	a,#01h			;we need to calculate the power of 2 (shifting accu left number of times)
+mov	a,#08h			;base value
+clr	c			;required for subb instruction
+subb	a,b			;substract (a=power of two that indicates number of delay loops)
+mov	b,a			;need accu
+mov	a,#01h			;we need to calculate the power of 2 (shifting accu left number of times)
 delaya0k05s1: djnz	b,delaya0k05s2
-		sjmp	delaya0k05s3
+sjmp	delaya0k05s3
 delaya0k05s2:	rl	a			;multiply a by 2
-		sjmp	delaya0k05s1
+sjmp	delaya0k05s1
 delaya0k05s3: mov	01h,a			;store value in register 01h for back up
-		pop	acc			;restore original acc
+pop	acc			;restore original acc
 delaya0k05s4:	mov	00h,01h		;load loopcounter (number ranges between 1-128 in powers of 2)
 delaya0k05s5: mov	b,#0			;load loopcounter inner loop
 delaya0k05s6:	djnz	b,delaya0k05s6
-		djnz	00h,delaya0k05s5
-		djnz	acc,delaya0k05s4	;repeat standard time loop of 0.05s number a times
+djnz	00h,delaya0k05s5
+djnz	acc,delaya0k05s4	;repeat standard time loop of 0.05s number a times
 ; delay time=(((sysclok/24)*(register b))*(register 01))*(register a)
-		pop	01h			;restore used registers		
-		pop	00h
-		pop	b
-		pop	acc
-		pop	psw
-		ret
+pop	01h			;restore used registers		
+pop	00h
+pop	b
+pop	acc
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -2145,23 +2145,23 @@ delaya0k05s6:	djnz	b,delaya0k05s6
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 getadc:	push	psw			;regs op stack
-		push	b
-		mov	adccon1,#11001100b	;settings adc omvormer
-		anl	a,#0fh			;zorgen enkel kanaalnummer in accu
-		mov	adccon2,a		;in kanaalselectie plaatsen
-		setb	sconv			;meting starten
+push	b
+mov	adccon1,#11001100b	;settings adc omvormer
+anl	a,#0fh			;zorgen enkel kanaalnummer in accu
+mov	adccon2,a		;in kanaalselectie plaatsen
+setb	sconv			;meting starten
 getadc1:	jb	sconv,getadc1		;wacht op meting klaar
-		mov	a,adcdatah		;12 bit uitkomst omzetten naar 8 bit
-		mov	b,adcdatal
-		swap	a
-		anl	a,#0f0h
-		xch	a,b
-		swap	a
-		anl	a,#0fh
-		add	a,b
-		pop	b		;regs herstellen
-		pop	psw
-		ret
+mov	a,adcdatah		;12 bit uitkomst omzetten naar 8 bit
+mov	b,adcdatal
+swap	a
+anl	a,#0f0h
+xch	a,b
+swap	a
+anl	a,#0fh
+add	a,b
+pop	b		;regs herstellen
+pop	psw
+ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -2175,485 +2175,485 @@ getadc1:	jb	sconv,getadc1		;wacht op meting klaar
 
 colorascii:
 chr_20:
-        db 000h,000h,000h,000h,000h,000h,000h,0-00h,000h,000h,000h,000h,000h,000h,000h,000h
-	 db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-	 db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-	 db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,0-00h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_21:
-        db 000h,000h,000h,000h,003h,0F0h,003h,0F0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,000h,0C0h,000h,0C0h,000h,0C0h,000h,0C0h
-        db 000h,0C0h,000h,000h,000h,000h,000h,000h,000h,0C0h,001h,0E0h,003h,0F0h,003h,0F0h
-        db 001h,0E0h,000h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0F0h,003h,0F0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,000h,0C0h,000h,0C0h,000h,0C0h,000h,0C0h
+db 000h,0C0h,000h,000h,000h,000h,000h,000h,000h,0C0h,001h,0E0h,003h,0F0h,003h,0F0h
+db 001h,0E0h,000h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_22:
-        db 000h,000h,000h,000h,03Eh,07Ch,03Eh,07Ch,03Ch,03Ch,01Ch,038h,01Ch,038h,01Ch,038h
-        db 018h,018h,018h,018h,018h,018h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Eh,07Ch,03Eh,07Ch,03Ch,03Ch,01Ch,038h,01Ch,038h,01Ch,038h
+db 018h,018h,018h,018h,018h,018h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_23:
-        db 000h,000h,000h,000h,000h,000h,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch
-        db 00Fh,03Ch,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch
-        db 00Fh,03Ch,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch
-        db 00Fh,03Ch,00Fh,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch
+db 00Fh,03Ch,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch
+db 00Fh,03Ch,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch,00Fh,03Ch
+db 00Fh,03Ch,00Fh,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_24:
-        db 000h,000h,000h,000h,000h,0C0h,007h,0F0h,00Fh,0FCh,01Fh,0FEh,03Ch,0DEh,038h,0CEh
-        db 038h,0C0h,038h,0C0h,038h,0C0h,03Ch,0C0h,01Eh,0C0h,00Fh,0E0h,007h,0F8h,003h,0FCh
-        db 000h,0DEh,000h,0CEh,000h,0C6h,000h,0C6h,000h,0C6h,038h,0CEh,03Ch,0DEh,01Fh,0FCh
-        db 00Fh,0FCh,007h,0F0h,000h,0C0h,000h,0C0h,000h,0C0h,000h,0C0h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,0C0h,007h,0F0h,00Fh,0FCh,01Fh,0FEh,03Ch,0DEh,038h,0CEh
+db 038h,0C0h,038h,0C0h,038h,0C0h,03Ch,0C0h,01Eh,0C0h,00Fh,0E0h,007h,0F8h,003h,0FCh
+db 000h,0DEh,000h,0CEh,000h,0C6h,000h,0C6h,000h,0C6h,038h,0CEh,03Ch,0DEh,01Fh,0FCh
+db 00Fh,0FCh,007h,0F0h,000h,0C0h,000h,0C0h,000h,0C0h,000h,0C0h,000h,000h,000h,000h
 chr_25:
-        db 000h,000h,000h,000h,01Fh,000h,03Fh,080h,07Bh,0C0h,071h,0C0h,060h,0C2h,071h,0C6h
-        db 07Bh,0CEh,03Fh,09Eh,01Fh,03Ch,000h,078h,000h,0F0h,001h,0E0h,003h,0C0h,007h,080h
-        db 00Fh,000h,01Eh,000h,03Ch,000h,078h,0F8h,071h,0FCh,063h,0DEh,043h,08Eh,003h,006h
-        db 003h,08Eh,003h,0DEh,001h,0FCh,000h,0F8h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,01Fh,000h,03Fh,080h,07Bh,0C0h,071h,0C0h,060h,0C2h,071h,0C6h
+db 07Bh,0CEh,03Fh,09Eh,01Fh,03Ch,000h,078h,000h,0F0h,001h,0E0h,003h,0C0h,007h,080h
+db 00Fh,000h,01Eh,000h,03Ch,000h,078h,0F8h,071h,0FCh,063h,0DEh,043h,08Eh,003h,006h
+db 003h,08Eh,003h,0DEh,001h,0FCh,000h,0F8h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_26:
-        db 000h,000h,000h,000h,007h,0F0h,00Fh,0F8h,01Eh,038h,01Ch,01Ch,01Ch,01Ch,01Ch,01Ch
-        db 01Ch,01Ch,01Ch,038h,00Eh,078h,00Fh,0F0h,007h,0E0h,00Fh,086h,00Fh,0CEh,01Fh,0CEh
-        db 03Dh,0FCh,038h,0FCh,038h,078h,038h,070h,038h,078h,038h,078h,03Ch,0FCh,01Fh,0CEh
-        db 00Fh,0C6h,007h,006h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,00Fh,0F8h,01Eh,038h,01Ch,01Ch,01Ch,01Ch,01Ch,01Ch
+db 01Ch,01Ch,01Ch,038h,00Eh,078h,00Fh,0F0h,007h,0E0h,00Fh,086h,00Fh,0CEh,01Fh,0CEh
+db 03Dh,0FCh,038h,0FCh,038h,078h,038h,070h,038h,078h,038h,078h,03Ch,0FCh,01Fh,0CEh
+db 00Fh,0C6h,007h,006h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_27:
-        db 000h,000h,000h,000h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,007h,080h,007h,080h,00Fh,000h,00Eh,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,007h,080h,007h,080h,00Fh,000h,00Eh,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_28:
-        db 000h,000h,000h,000h,000h,01Ch,000h,03Ch,000h,078h,000h,0F0h,001h,0E0h,003h,0C0h
-        db 003h,0C0h,007h,080h,007h,080h,00Fh,000h,00Fh,000h,00Fh,000h,00Eh,000h,00Eh,000h
-        db 00Fh,000h,00Fh,000h,00Fh,000h,007h,080h,007h,0C0h,003h,0E0h,001h,0F0h,000h,0F0h
-        db 000h,078h,000h,03Ch,000h,01Ch,000h,00Ch,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,01Ch,000h,03Ch,000h,078h,000h,0F0h,001h,0E0h,003h,0C0h
+db 003h,0C0h,007h,080h,007h,080h,00Fh,000h,00Fh,000h,00Fh,000h,00Eh,000h,00Eh,000h
+db 00Fh,000h,00Fh,000h,00Fh,000h,007h,080h,007h,0C0h,003h,0E0h,001h,0F0h,000h,0F0h
+db 000h,078h,000h,03Ch,000h,01Ch,000h,00Ch,000h,000h,000h,000h,000h,000h,000h,000h
 chr_29:
-        db 000h,000h,000h,000h,00Eh,000h,00Fh,000h,007h,080h,003h,0C0h,001h,0E0h,000h,0F0h
-        db 000h,0F0h,000h,078h,000h,078h,000h,03Ch,000h,03Ch,000h,03Ch,000h,01Ch,000h,01Ch
-        db 000h,03Ch,000h,03Ch,000h,03Ch,000h,078h,000h,0F8h,001h,0F0h,003h,0E0h,003h,0C0h
-        db 007h,080h,00Fh,000h,00Eh,000h,00Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,00Eh,000h,00Fh,000h,007h,080h,003h,0C0h,001h,0E0h,000h,0F0h
+db 000h,0F0h,000h,078h,000h,078h,000h,03Ch,000h,03Ch,000h,03Ch,000h,01Ch,000h,01Ch
+db 000h,03Ch,000h,03Ch,000h,03Ch,000h,078h,000h,0F8h,001h,0F0h,003h,0E0h,003h,0C0h
+db 007h,080h,00Fh,000h,00Eh,000h,00Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_2A:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,038h,01Ch,03Ch,03Ch,03Eh,07Ch
-        db 01Fh,0F8h,00Fh,0F0h,007h,0E0h,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,007h,0E0h,00Fh,0F0h
-        db 01Fh,0F8h,03Eh,07Ch,03Ch,03Ch,038h,01Ch,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,038h,01Ch,03Ch,03Ch,03Eh,07Ch
+db 01Fh,0F8h,00Fh,0F0h,007h,0E0h,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,007h,0E0h,00Fh,0F0h
+db 01Fh,0F8h,03Eh,07Ch,03Ch,03Ch,038h,01Ch,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_2B:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,001h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,001h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,001h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_2C:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,001h,0C0h,003h,0E0h,003h,0E0h,003h,0E0h
-        db 003h,0E0h,001h,0E0h,001h,0C0h,003h,0C0h,003h,080h,007h,080h,00Fh,000h,00Ch,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,001h,0C0h,003h,0E0h,003h,0E0h,003h,0E0h
+db 003h,0E0h,001h,0E0h,001h,0C0h,003h,0C0h,003h,080h,007h,080h,00Fh,000h,00Ch,000h
 chr_2D:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_2E:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,007h,080h,00Fh,0C0h,00Fh,0C0h,00Fh,0C0h
-        db 00Fh,0C0h,007h,080h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,007h,080h,00Fh,0C0h,00Fh,0C0h,00Fh,0C0h
+db 00Fh,0C0h,007h,080h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_2F:
-        db 000h,000h,000h,000h,000h,00Eh,000h,00Eh,000h,01Eh,000h,01Eh,000h,03Eh,000h,03Ch
-        db 000h,07Ch,000h,078h,000h,0F8h,000h,0F0h,001h,0F0h,001h,0E0h,003h,0E0h,003h,0C0h
-        db 007h,0C0h,007h,080h,00Fh,080h,00Fh,000h,01Fh,000h,01Eh,000h,03Eh,000h,03Ch,000h
-        db 07Ch,000h,078h,000h,0F8h,000h,0F0h,000h,0F0h,000h,0E0h,000h,0E0h,000h,0C0h,000h
+db 000h,000h,000h,000h,000h,00Eh,000h,00Eh,000h,01Eh,000h,01Eh,000h,03Eh,000h,03Ch
+db 000h,07Ch,000h,078h,000h,0F8h,000h,0F0h,001h,0F0h,001h,0E0h,003h,0E0h,003h,0C0h
+db 007h,0C0h,007h,080h,00Fh,080h,00Fh,000h,01Fh,000h,01Eh,000h,03Eh,000h,03Ch,000h
+db 07Ch,000h,078h,000h,0F8h,000h,0F0h,000h,0F0h,000h,0E0h,000h,0E0h,000h,0C0h,000h
 chr_30:
-        db 000h,000h,000h,000h,003h,0F0h,00Fh,0FCh,01Fh,0FCh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Ch,07Eh,03Ch,0FEh,03Dh,0EEh,03Fh,0CEh,03Fh,08Eh
-        db 03Fh,00Eh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 00Fh,0FCh,003h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0F0h,00Fh,0FCh,01Fh,0FCh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Ch,07Eh,03Ch,0FEh,03Dh,0EEh,03Fh,0CEh,03Fh,08Eh
+db 03Fh,00Eh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 00Fh,0FCh,003h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_31:
-        db 000h,000h,000h,000h,000h,030h,000h,070h,000h,0F0h,001h,0F0h,003h,0F0h,007h,0F0h
-        db 00Fh,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
-        db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
-        db 000h,0F0h,000h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,030h,000h,070h,000h,0F0h,001h,0F0h,003h,0F0h,007h,0F0h
+db 00Fh,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
+db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
+db 000h,0F0h,000h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_32:
-        db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Fh,0FCh,03Eh,03Eh,03Ch,01Eh,03Ch,00Eh
-        db 000h,00Eh,000h,00Eh,000h,01Eh,000h,03Eh,000h,07Ch,001h,0FCh,003h,0F0h,00Fh,0E0h
-        db 01Fh,080h,01Eh,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Fh,0FCh,03Eh,03Eh,03Ch,01Eh,03Ch,00Eh
+db 000h,00Eh,000h,00Eh,000h,01Eh,000h,03Eh,000h,07Ch,001h,0FCh,003h,0F0h,00Fh,0E0h
+db 01Fh,080h,01Eh,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_33:
-        db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Fh,0FCh,03Ch,01Eh,038h,00Eh,000h,00Eh
-        db 000h,00Eh,000h,01Eh,000h,03Ch,003h,0FCh,003h,0F8h,003h,0F8h,003h,0FCh,000h,03Ch
-        db 000h,01Eh,000h,00Eh,000h,00Eh,000h,00Eh,038h,00Eh,03Ch,01Eh,03Fh,0FCh,01Fh,0FCh
-        db 00Fh,0F8h,003h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Fh,0FCh,03Ch,01Eh,038h,00Eh,000h,00Eh
+db 000h,00Eh,000h,01Eh,000h,03Ch,003h,0FCh,003h,0F8h,003h,0F8h,003h,0FCh,000h,03Ch
+db 000h,01Eh,000h,00Eh,000h,00Eh,000h,00Eh,038h,00Eh,03Ch,01Eh,03Fh,0FCh,01Fh,0FCh
+db 00Fh,0F8h,003h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_34:
-        db 000h,000h,000h,000h,000h,03Ch,000h,07Ch,000h,07Ch,000h,0FCh,001h,0FCh,001h,0FCh
-        db 003h,0FCh,003h,0BCh,007h,0BCh,00Fh,03Ch,00Eh,03Ch,01Eh,03Ch,03Ch,03Ch,038h,03Ch
-        db 070h,03Ch,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch
-        db 000h,03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,03Ch,000h,07Ch,000h,07Ch,000h,0FCh,001h,0FCh,001h,0FCh
+db 003h,0FCh,003h,0BCh,007h,0BCh,00Fh,03Ch,00Eh,03Ch,01Eh,03Ch,03Ch,03Ch,038h,03Ch
+db 070h,03Ch,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch
+db 000h,03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_35:
-        db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,038h,01Eh,000h,00Eh,000h,00Eh,000h,00Eh
-        db 000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,038h,00Eh,03Ch,01Eh,03Eh,03Eh,01Fh,0FCh
-        db 00Fh,0F8h,003h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,038h,01Eh,000h,00Eh,000h,00Eh,000h,00Eh
+db 000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,038h,00Eh,03Ch,01Eh,03Eh,03Eh,01Fh,0FCh
+db 00Fh,0F8h,003h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_36:
-        db 000h,000h,000h,000h,003h,0F8h,00Fh,0FCh,01Fh,0FEh,01Eh,00Eh,03Ch,006h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Eh,01Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,01Eh,01Eh,01Fh,0FCh
-        db 00Fh,0FCh,003h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0F8h,00Fh,0FCh,01Fh,0FEh,01Eh,00Eh,03Ch,006h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Eh,01Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,01Eh,01Eh,01Fh,0FCh
+db 00Fh,0FCh,003h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_37:
-        db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,01Eh,000h,01Eh,000h,03Ch
-        db 000h,03Ch,000h,03Ch,000h,078h,000h,078h,000h,070h,000h,0F0h,000h,0F0h,001h,0E0h
-        db 001h,0E0h,003h,0C0h,003h,0C0h,007h,080h,007h,080h,007h,000h,00Fh,000h,00Eh,000h
-        db 01Eh,000h,01Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,01Eh,000h,01Eh,000h,03Ch
+db 000h,03Ch,000h,03Ch,000h,078h,000h,078h,000h,070h,000h,0F0h,000h,0F0h,001h,0E0h
+db 001h,0E0h,003h,0C0h,003h,0C0h,007h,080h,007h,080h,007h,000h,00Fh,000h,00Eh,000h
+db 01Eh,000h,01Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_38:
-        db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Eh,03Ch,03Ch,01Eh,038h,00Eh,038h,00Eh
-        db 038h,00Eh,03Ch,01Eh,01Eh,03Ch,00Fh,0F8h,007h,0F0h,00Fh,0F8h,01Eh,03Ch,03Ch,01Eh
-        db 038h,00Eh,038h,00Eh,038h,00Eh,038h,00Eh,038h,00Eh,03Ch,01Eh,03Eh,03Eh,01Fh,0FCh
-        db 00Fh,0F8h,003h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Eh,03Ch,03Ch,01Eh,038h,00Eh,038h,00Eh
+db 038h,00Eh,03Ch,01Eh,01Eh,03Ch,00Fh,0F8h,007h,0F0h,00Fh,0F8h,01Eh,03Ch,03Ch,01Eh
+db 038h,00Eh,038h,00Eh,038h,00Eh,038h,00Eh,038h,00Eh,03Ch,01Eh,03Eh,03Eh,01Fh,0FCh
+db 00Fh,0F8h,003h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_39:
-        db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Eh,03Ch,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,01Fh,0FEh,01Fh,0FEh,00Fh,0FEh
-        db 003h,0EEh,000h,00Eh,000h,00Eh,000h,00Eh,000h,01Eh,000h,03Eh,00Fh,0FCh,00Fh,0FCh
-        db 00Fh,0F0h,00Fh,080h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,01Eh,03Ch,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,01Fh,0FEh,01Fh,0FEh,00Fh,0FEh
+db 003h,0EEh,000h,00Eh,000h,00Eh,000h,00Eh,000h,01Eh,000h,03Eh,00Fh,0FCh,00Fh,0FCh
+db 00Fh,0F0h,00Fh,080h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_3A:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,001h,080h
-        db 003h,0C0h,007h,0E0h,007h,0E0h,003h,0C0h,001h,080h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,001h,080h,003h,0C0h,007h,0E0h,007h,0E0h,003h,0C0h,001h,080h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,001h,080h
+db 003h,0C0h,007h,0E0h,007h,0E0h,003h,0C0h,001h,080h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,001h,080h,003h,0C0h,007h,0E0h,007h,0E0h,003h,0C0h,001h,080h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_3B:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,001h,0C0h
-        db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,001h,0C0h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,001h,0C0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0C0h,003h,0C0h,00Fh,080h,00Fh,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,001h,0C0h
+db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,001h,0C0h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,001h,0C0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0C0h,003h,0C0h,00Fh,080h,00Fh,000h,000h,000h,000h,000h
 chr_3C:
-        db 000h,000h,000h,000h,000h,006h,000h,00Eh,000h,01Eh,000h,03Eh,000h,07Eh,000h,0FCh
-        db 001h,0F8h,003h,0F0h,007h,0E0h,00Fh,0C0h,01Fh,080h,03Fh,000h,03Fh,000h,01Fh,080h
-        db 00Fh,0C0h,007h,0E0h,003h,0F0h,001h,0F8h,000h,0FCh,000h,07Eh,000h,03Eh,000h,01Eh
-        db 000h,00Eh,000h,006h,000h,002h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,006h,000h,00Eh,000h,01Eh,000h,03Eh,000h,07Eh,000h,0FCh
+db 001h,0F8h,003h,0F0h,007h,0E0h,00Fh,0C0h,01Fh,080h,03Fh,000h,03Fh,000h,01Fh,080h
+db 00Fh,0C0h,007h,0E0h,003h,0F0h,001h,0F8h,000h,0FCh,000h,07Eh,000h,03Eh,000h,01Eh
+db 000h,00Eh,000h,006h,000h,002h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_3D:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_3E:
-        db 000h,000h,000h,000h,030h,000h,038h,000h,03Ch,000h,03Eh,000h,01Fh,000h,00Fh,080h
-        db 007h,0C0h,003h,0E0h,001h,0F0h,000h,0F8h,000h,07Ch,000h,03Eh,000h,03Eh,000h,07Ch
-        db 000h,0F8h,001h,0F0h,003h,0E0h,007h,0C0h,00Fh,080h,01Fh,000h,03Eh,000h,03Ch,000h
-        db 038h,000h,030h,000h,020h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,030h,000h,038h,000h,03Ch,000h,03Eh,000h,01Fh,000h,00Fh,080h
+db 007h,0C0h,003h,0E0h,001h,0F0h,000h,0F8h,000h,07Ch,000h,03Eh,000h,03Eh,000h,07Ch
+db 000h,0F8h,001h,0F0h,003h,0E0h,007h,0C0h,00Fh,080h,01Fh,000h,03Eh,000h,03Ch,000h
+db 038h,000h,030h,000h,020h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_3F:
-        db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,03Fh,0FEh,03Ch,01Eh,038h,00Eh,000h,00Eh
-        db 000h,00Eh,000h,01Eh,000h,03Eh,000h,07Ch,000h,0F8h,001h,0F0h,003h,0E0h,003h,0C0h
-        db 003h,0C0h,000h,000h,000h,000h,000h,000h,001h,080h,003h,0C0h,007h,0E0h,007h,0E0h
-        db 003h,0C0h,001h,080h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,01Fh,0FCh,03Fh,0FEh,03Ch,01Eh,038h,00Eh,000h,00Eh
+db 000h,00Eh,000h,01Eh,000h,03Eh,000h,07Ch,000h,0F8h,001h,0F0h,003h,0E0h,003h,0C0h
+db 003h,0C0h,000h,000h,000h,000h,000h,000h,001h,080h,003h,0C0h,007h,0E0h,007h,0E0h
+db 003h,0C0h,001h,080h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_40:
-        db 000h,000h,000h,000h,007h,0F0h,00Fh,0FCh,01Fh,0FEh,03Eh,00Eh,03Ch,006h,03Ch,07Eh
-        db 03Ch,0FEh,03Ch,0EEh,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h
-        db 03Ch,0C6h,03Ch,0EEh,03Ch,0FEh,03Ch,07Ch,03Ch,000h,03Eh,000h,03Fh,0FCh,01Fh,0FCh
-        db 01Fh,0FCh,007h,0FCh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F0h,00Fh,0FCh,01Fh,0FEh,03Eh,00Eh,03Ch,006h,03Ch,07Eh
+db 03Ch,0FEh,03Ch,0EEh,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h,03Ch,0C6h
+db 03Ch,0C6h,03Ch,0EEh,03Ch,0FEh,03Ch,07Ch,03Ch,000h,03Eh,000h,03Fh,0FCh,01Fh,0FCh
+db 01Fh,0FCh,007h,0FCh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_41:
-        db 000h,000h,000h,000h,003h,0E0h,007h,0F0h,00Fh,0F8h,01Fh,03Ch,03Eh,01Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0E0h,007h,0F0h,00Fh,0F8h,01Fh,03Ch,03Eh,01Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_42:
-        db 000h,000h,000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FCh,03Fh,0F8h,03Fh,0F8h,03Fh,0FCh,03Ch,01Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FEh
-        db 03Fh,0FCh,03Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FCh,03Fh,0F8h,03Fh,0F8h,03Fh,0FCh,03Ch,01Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FEh
+db 03Fh,0FCh,03Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_43:
-        db 000h,000h,000h,000h,007h,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,00Eh,03Eh,01Eh,01Fh,0FEh,01Fh,0FCh
-        db 00Fh,0FCh,003h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,00Eh,03Eh,01Eh,01Fh,0FEh,01Fh,0FCh
+db 00Fh,0FCh,003h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_44:
-        db 000h,000h,000h,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Ch,03Eh,03Ch,01Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Fh,0FEh,03Fh,0FCh
-        db 03Fh,0F8h,03Fh,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Ch,03Eh,03Ch,01Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Fh,0FEh,03Fh,0FCh
+db 03Fh,0F8h,03Fh,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_45:
-        db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0F0h,03Fh,0F0h,03Fh,0F0h,03Fh,0F0h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0F0h,03Fh,0F0h,03Fh,0F0h,03Fh,0F0h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_46:
-        db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0F0h,03Fh,0F0h,03Fh,0F0h
-        db 03Fh,0F0h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0F0h,03Fh,0F0h,03Fh,0F0h
+db 03Fh,0F0h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_47:
-        db 000h,000h,000h,000h,007h,0F8h,00Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,03Eh,03Ch,03Eh,03Ch,03Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 00Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F8h,00Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,03Eh,03Ch,03Eh,03Ch,03Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 00Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_48:
-        db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_49:
-        db 000h,000h,000h,000h,003h,0F8h,003h,0F8h,003h,0F8h,000h,0E0h,000h,0E0h,000h,0E0h
-        db 000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h
-        db 000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,003h,0F8h,003h,0F8h
-        db 003h,0F8h,003h,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0F8h,003h,0F8h,003h,0F8h,000h,0E0h,000h,0E0h,000h,0E0h
+db 000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h
+db 000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,000h,0E0h,003h,0F8h,003h,0F8h
+db 003h,0F8h,003h,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_4A:
-        db 000h,000h,000h,000h,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
-        db 000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
-        db 000h,00Eh,000h,00Eh,000h,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
+db 000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
+db 000h,00Eh,000h,00Eh,000h,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_4B:
-        db 000h,000h,000h,000h,03Ch,006h,03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Ch,07Ch,03Ch,0F8h
-        db 03Dh,0F0h,03Fh,0E0h,03Fh,0C0h,03Fh,080h,03Fh,000h,03Eh,000h,03Fh,000h,03Fh,080h
-        db 03Fh,0C0h,03Fh,0E0h,03Dh,0F0h,03Ch,0F8h,03Ch,07Ch,03Ch,03Eh,03Ch,01Eh,03Ch,00Eh
-        db 03Ch,006h,03Ch,002h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,006h,03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Ch,07Ch,03Ch,0F8h
+db 03Dh,0F0h,03Fh,0E0h,03Fh,0C0h,03Fh,080h,03Fh,000h,03Eh,000h,03Fh,000h,03Fh,080h
+db 03Fh,0C0h,03Fh,0E0h,03Dh,0F0h,03Ch,0F8h,03Ch,07Ch,03Ch,03Eh,03Ch,01Eh,03Ch,00Eh
+db 03Ch,006h,03Ch,002h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_4C:
-        db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_4D:
-        db 000h,000h,000h,000h,078h,00Eh,078h,00Eh,07Ch,01Eh,07Ch,01Eh,07Eh,03Eh,07Eh,03Eh
-        db 07Fh,07Eh,07Fh,07Eh,07Fh,07Eh,07Fh,0FEh,07Bh,0EEh,07Bh,0EEh,079h,0CEh,079h,0CEh
-        db 078h,08Eh,078h,08Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh
-        db 078h,00Eh,078h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,078h,00Eh,078h,00Eh,07Ch,01Eh,07Ch,01Eh,07Eh,03Eh,07Eh,03Eh
+db 07Fh,07Eh,07Fh,07Eh,07Fh,07Eh,07Fh,0FEh,07Bh,0EEh,07Bh,0EEh,079h,0CEh,079h,0CEh
+db 078h,08Eh,078h,08Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh
+db 078h,00Eh,078h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_4E:
-        db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Eh,00Eh,03Fh,00Eh,03Fh,00Eh
-        db 03Fh,00Eh,03Fh,08Eh,03Fh,08Eh,03Fh,0CEh,03Fh,0CEh,03Dh,0EEh,03Dh,0EEh,03Ch,0FEh
-        db 03Ch,0FEh,03Ch,07Eh,03Ch,07Eh,03Ch,07Eh,03Ch,03Eh,03Ch,03Eh,03Ch,01Eh,03Ch,01Eh
-        db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Eh,00Eh,03Fh,00Eh,03Fh,00Eh
+db 03Fh,00Eh,03Fh,08Eh,03Fh,08Eh,03Fh,0CEh,03Fh,0CEh,03Dh,0EEh,03Dh,0EEh,03Ch,0FEh
+db 03Ch,0FEh,03Ch,07Eh,03Ch,07Eh,03Ch,07Eh,03Ch,03Eh,03Ch,03Eh,03Ch,01Eh,03Ch,01Eh
+db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_4F:
-        db 000h,000h,000h,000h,00Fh,0F8h,01Fh,0FCh,03Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,03Fh,0FEh
-        db 01Fh,0FCh,00Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,00Fh,0F8h,01Fh,0FCh,03Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,03Fh,0FEh
+db 01Fh,0FCh,00Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_50:
-        db 000h,000h,000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FEh,03Fh,0FCh
-        db 03Fh,0F8h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FEh,03Fh,0FCh
+db 03Fh,0F8h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_51:
-        db 000h,000h,000h,000h,007h,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,0EEh,03Dh,0FEh,03Ch,0FEh,03Fh,0FEh,01Fh,0FEh
-        db 01Fh,0FCh,007h,0F8h,000h,07Eh,000h,03Eh,000h,01Eh,000h,006h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,0EEh,03Dh,0FEh,03Ch,0FEh,03Fh,0FEh,01Fh,0FEh
+db 01Fh,0FCh,007h,0F8h,000h,07Eh,000h,03Eh,000h,01Eh,000h,006h,000h,000h,000h,000h
 chr_52:
-        db 000h,000h,000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Ch,03Ch,03Fh,0FCh,03Fh,0F8h,03Fh,0FCh
-        db 03Fh,0FCh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Ch,03Ch,03Fh,0FCh,03Fh,0F8h,03Fh,0FCh
+db 03Fh,0FCh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_53:
-        db 000h,000h,000h,000h,00Fh,0F8h,01Fh,0FCh,03Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
-        db 03Eh,000h,03Fh,000h,01Fh,080h,00Fh,0C0h,007h,0E0h,003h,0F0h,001h,0F8h,000h,0FCh
-        db 000h,07Eh,000h,03Eh,000h,01Eh,000h,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FEh
-        db 01Fh,0FCh,00Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,00Fh,0F8h,01Fh,0FCh,03Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
+db 03Eh,000h,03Fh,000h,01Fh,080h,00Fh,0C0h,007h,0E0h,003h,0F0h,001h,0F8h,000h,0FCh
+db 000h,07Eh,000h,03Eh,000h,01Eh,000h,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FEh
+db 01Fh,0FCh,00Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_54:
-        db 000h,000h,000h,000h,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,01Fh,0FEh,01Fh,0FEh,01Fh,0FEh,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_55:
-        db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_56:
-        db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,01Eh,01Eh,00Fh,03Ch,00Fh,03Ch,007h,0F8h,007h,0F8h,003h,0F0h,001h,0E0h
-        db 000h,0C0h,000h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,01Eh,01Eh,00Fh,03Ch,00Fh,03Ch,007h,0F8h,007h,0F8h,003h,0F0h,001h,0E0h
+db 000h,0C0h,000h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_57:
-        db 000h,000h,000h,000h,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,08Eh,078h,08Eh
-        db 078h,08Eh,079h,0CEh,079h,0CEh,07Bh,0CEh,07Bh,0EEh,07Bh,0EEh,07Fh,0FEh,07Fh,0FEh
-        db 07Fh,07Eh,07Fh,07Eh,07Eh,03Eh,07Eh,03Eh,07Eh,03Eh,07Ch,01Eh,07Ch,01Eh,07Ch,01Eh
-        db 078h,00Eh,078h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,078h,08Eh,078h,08Eh
+db 078h,08Eh,079h,0CEh,079h,0CEh,07Bh,0CEh,07Bh,0EEh,07Bh,0EEh,07Fh,0FEh,07Fh,0FEh
+db 07Fh,07Eh,07Fh,07Eh,07Eh,03Eh,07Eh,03Eh,07Eh,03Eh,07Ch,01Eh,07Ch,01Eh,07Ch,01Eh
+db 078h,00Eh,078h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_58:
-        db 000h,000h,000h,000h,038h,00Eh,03Ch,01Eh,01Ch,01Eh,01Eh,03Ch,00Eh,03Ch,00Eh,038h
-        db 00Fh,078h,007h,070h,007h,0F0h,007h,0F0h,003h,0E0h,003h,0E0h,003h,0E0h,007h,0F0h
-        db 007h,0F0h,007h,070h,00Fh,078h,00Fh,078h,00Eh,03Ch,01Eh,03Ch,01Ch,01Ch,03Ch,01Eh
-        db 038h,00Eh,038h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,038h,00Eh,03Ch,01Eh,01Ch,01Eh,01Eh,03Ch,00Eh,03Ch,00Eh,038h
+db 00Fh,078h,007h,070h,007h,0F0h,007h,0F0h,003h,0E0h,003h,0E0h,003h,0E0h,007h,0F0h
+db 007h,0F0h,007h,070h,00Fh,078h,00Fh,078h,00Eh,03Ch,01Eh,03Ch,01Ch,01Ch,03Ch,01Eh
+db 038h,00Eh,038h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_59:
-        db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,01Fh,03Eh,00Fh,0FCh,007h,0F8h,003h,0F0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,01Fh,03Eh,00Fh,0FCh,007h,0F8h,003h,0F0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_5A:
-        db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,01Eh,000h,03Eh,000h,03Ch
-        db 000h,07Ch,000h,078h,000h,0F0h,000h,0F0h,001h,0E0h,001h,0E0h,003h,0C0h,003h,0C0h
-        db 007h,080h,00Fh,080h,00Fh,000h,01Eh,000h,01Eh,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,01Eh,000h,03Eh,000h,03Ch
+db 000h,07Ch,000h,078h,000h,0F0h,000h,0F0h,001h,0E0h,001h,0E0h,003h,0C0h,003h,0C0h
+db 007h,080h,00Fh,080h,00Fh,000h,01Eh,000h,01Eh,000h,03Ch,000h,03Fh,0FEh,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_5B:
-        db 000h,000h,000h,000h,003h,0FCh,003h,0FCh,003h,0FCh,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0FCh,003h,0FCh,003h,0FCh,003h,0FCh,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0FCh,003h,0FCh,003h,0FCh,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0FCh,003h,0FCh,003h,0FCh,003h,0FCh,000h,000h,000h,000h,000h,000h
 chr_5C:
-        db 000h,000h,000h,000h,0E0h,000h,0E0h,000h,0F0h,000h,070h,000h,078h,000h,038h,000h
-        db 03Ch,000h,01Ch,000h,01Eh,000h,00Eh,000h,00Fh,000h,007h,000h,007h,080h,003h,080h
-        db 003h,0C0h,001h,0C0h,001h,0E0h,000h,0E0h,000h,0F0h,000h,070h,000h,078h,000h,038h
-        db 000h,03Ch,000h,01Ch,000h,01Eh,000h,00Eh,000h,00Eh,000h,006h,000h,006h,000h,002h
+db 000h,000h,000h,000h,0E0h,000h,0E0h,000h,0F0h,000h,070h,000h,078h,000h,038h,000h
+db 03Ch,000h,01Ch,000h,01Eh,000h,00Eh,000h,00Fh,000h,007h,000h,007h,080h,003h,080h
+db 003h,0C0h,001h,0C0h,001h,0E0h,000h,0E0h,000h,0F0h,000h,070h,000h,078h,000h,038h
+db 000h,03Ch,000h,01Ch,000h,01Eh,000h,00Eh,000h,00Eh,000h,006h,000h,006h,000h,002h
 chr_5D:
-        db 000h,000h,000h,000h,00Fh,0F0h,00Fh,0F0h,00Fh,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
-        db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
-        db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
-        db 000h,0F0h,00Fh,0F0h,00Fh,0F0h,00Fh,0F0h,00Fh,0F0h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,00Fh,0F0h,00Fh,0F0h,00Fh,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
+db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
+db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h
+db 000h,0F0h,00Fh,0F0h,00Fh,0F0h,00Fh,0F0h,00Fh,0F0h,000h,000h,000h,000h,000h,000h
 chr_5E:
-        db 000h,000h,000h,000h,000h,0C0h,001h,0E0h,003h,0F0h,007h,0F8h,00Fh,0FCh,01Fh,03Eh
-        db 01Eh,01Eh,01Ch,00Eh,018h,006h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,0C0h,001h,0E0h,003h,0F0h,007h,0F8h,00Fh,0FCh,01Fh,03Eh
+db 01Eh,01Eh,01Ch,00Eh,018h,006h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_5F:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 0FFh,0FEh,0FFh,0FEh,0FFh,0FEh,0FFh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 0FFh,0FEh,0FFh,0FEh,0FFh,0FEh,0FFh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h
 chr_60:
-        db 000h,000h,000h,000h,003h,0E0h,001h,0E0h,001h,0F0h,000h,0F0h,000h,0F0h,000h,078h
-        db 000h,078h,000h,03Ch,000h,01Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0E0h,001h,0E0h,001h,0F0h,000h,0F0h,000h,0F0h,000h,078h
+db 000h,078h,000h,03Ch,000h,01Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_61:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,00Fh,0F8h,00Fh,0FCh,00Fh,0FEh,00Fh,0FEh,000h,00Eh,000h,00Eh,007h,0FEh
-        db 01Fh,0FEh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
-        db 01Fh,0FEh,007h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,00Fh,0F8h,00Fh,0FCh,00Fh,0FEh,00Fh,0FEh,000h,00Eh,000h,00Eh,007h,0FEh
+db 01Fh,0FEh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
+db 01Fh,0FEh,007h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_62:
-        db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FCh
-        db 03Fh,0FCh,03Fh,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FCh
+db 03Fh,0FCh,03Fh,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_63:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,007h,0F0h,01Fh,0FCh,01Fh,0FCh,03Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,007h,0F0h,01Fh,0FCh,01Fh,0FCh,03Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_64:
-        db 000h,000h,000h,000h,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
-        db 000h,00Eh,007h,0FEh,01Fh,0FEh,01Fh,0FEh,03Fh,0FEh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,01Fh,0FEh,01Fh,0FEh
-        db 00Fh,0FEh,003h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
+db 000h,00Eh,007h,0FEh,01Fh,0FEh,01Fh,0FEh,03Fh,0FEh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,01Fh,0FEh,01Fh,0FEh
+db 00Fh,0FEh,003h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_65:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,007h,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh
-        db 03Fh,0FCh,03Fh,0F8h,03Ch,000h,03Ch,000h,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,007h,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh
+db 03Fh,0FCh,03Fh,0F8h,03Ch,000h,03Ch,000h,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_66:
-        db 000h,000h,000h,000h,001h,0F8h,003h,0FCh,003h,0FEh,003h,0DEh,003h,0CEh,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,001h,0F8h,003h,0FCh,003h,0FEh,003h,0DEh,003h,0CEh,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_67:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,007h,0FEh,01Fh,0FEh,01Fh,0FEh,03Fh,0FEh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
-        db 01Fh,0FEh,007h,0FEh,000h,00Eh,000h,00Eh,000h,01Eh,00Fh,0FEh,00Fh,0FCh,00Fh,0F8h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,007h,0FEh,01Fh,0FEh,01Fh,0FEh,03Fh,0FEh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
+db 01Fh,0FEh,007h,0FEh,000h,00Eh,000h,00Eh,000h,01Eh,00Fh,0FEh,00Fh,0FCh,00Fh,0F8h
 chr_68:
-        db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_69:
-        db 000h,000h,000h,000h,000h,0C0h,001h,0E0h,001h,0E0h,000h,0C0h,000h,000h,000h,000h
-        db 000h,000h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
-        db 001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,0C0h,001h,0E0h,001h,0E0h,000h,0C0h,000h,000h,000h,000h
+db 000h,000h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h,001h,0E0h
+db 001h,0E0h,001h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_6A:
-        db 000h,000h,000h,000h,000h,01Ch,000h,03Eh,000h,03Eh,000h,01Ch,000h,000h,000h,000h
-        db 000h,000h,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh
-        db 000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh
-        db 000h,01Eh,000h,01Eh,01Ch,01Eh,01Eh,03Eh,01Fh,0FEh,00Fh,0FCh,00Fh,0F8h,003h,0E0h
+db 000h,000h,000h,000h,000h,01Ch,000h,03Eh,000h,03Eh,000h,01Ch,000h,000h,000h,000h
+db 000h,000h,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh
+db 000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh,000h,01Eh
+db 000h,01Eh,000h,01Eh,01Ch,01Eh,01Eh,03Eh,01Fh,0FEh,00Fh,0FCh,00Fh,0F8h,003h,0E0h
 chr_6B:
-        db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Ch,07Ch,03Ch,0F8h,03Dh,0F0h,03Fh,0E0h
-        db 03Fh,0C0h,03Fh,080h,03Fh,0C0h,03Fh,0E0h,03Dh,0F0h,03Ch,0F8h,03Ch,07Ch,03Ch,03Eh
-        db 03Ch,01Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,00Eh,03Ch,01Eh,03Ch,03Eh,03Ch,07Ch,03Ch,0F8h,03Dh,0F0h,03Fh,0E0h
+db 03Fh,0C0h,03Fh,080h,03Fh,0C0h,03Fh,0E0h,03Dh,0F0h,03Ch,0F8h,03Ch,07Ch,03Ch,03Eh
+db 03Ch,01Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_6C:
-        db 000h,000h,000h,000h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0E0h
-        db 001h,0FEh,000h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0E0h
+db 001h,0FEh,000h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_6D:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Eh,03Ch,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,079h,0CEh,079h,0CEh
-        db 079h,0CEh,079h,0CEh,079h,0CEh,079h,0CEh,079h,0CEh,079h,0CEh,078h,00Eh,078h,00Eh
-        db 078h,00Eh,078h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Eh,03Ch,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,07Fh,0FEh,079h,0CEh,079h,0CEh
+db 079h,0CEh,079h,0CEh,079h,0CEh,079h,0CEh,079h,0CEh,079h,0CEh,078h,00Eh,078h,00Eh
+db 078h,00Eh,078h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_6E:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Fh,0F8h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_6F:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,003h,0F0h,00Fh,0FCh,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
-        db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,003h,0F0h,00Fh,0FCh,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,03Fh,0FEh,01Fh,0FCh
+db 01Fh,0FCh,007h,0F0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_70:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FCh
-        db 03Fh,0FCh,03Fh,0F0h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Fh,0F0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,01Eh,03Fh,0FEh,03Fh,0FCh
+db 03Fh,0FCh,03Fh,0F0h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
 chr_71:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,007h,0FEh,01Fh,0FEh,01Fh,0FEh,03Fh,0FEh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
-        db 01Fh,0FEh,007h,0FEh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,007h,0FEh,01Fh,0FEh,01Fh,0FEh,03Fh,0FEh,03Eh,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
+db 01Fh,0FEh,007h,0FEh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh,000h,00Eh
 chr_72:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Dh,0F8h,03Fh,0FCh,03Fh,0FEh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,000h
-        db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
-        db 03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Dh,0F8h,03Fh,0FCh,03Fh,0FEh,03Fh,0FEh,03Ch,01Eh,03Ch,00Eh,03Ch,000h
+db 03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h,03Ch,000h
+db 03Ch,000h,03Ch,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_73:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,00Fh,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Eh,00Eh,01Fh,080h
-        db 00Fh,0E0h,007h,0F8h,001h,0FCh,000h,0FEh,03Ch,03Eh,03Ch,00Eh,03Eh,01Eh,01Fh,0FEh
-        db 01Fh,0FCh,00Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,00Fh,0F8h,01Fh,0FCh,01Fh,0FEh,03Eh,01Eh,03Ch,00Eh,03Eh,00Eh,01Fh,080h
+db 00Fh,0E0h,007h,0F8h,001h,0FCh,000h,0FEh,03Ch,03Eh,03Ch,00Eh,03Eh,01Eh,01Fh,0FEh
+db 01Fh,0FCh,00Fh,0F8h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_74:
-        db 000h,000h,000h,000h,000h,000h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,003h,0C0h,003h,0C0h,003h,0C0h
-        db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0CEh,003h,0CEh,003h,0FEh,001h,0FEh
-        db 001h,0FCh,000h,078h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,03Fh,0FCh,003h,0C0h,003h,0C0h,003h,0C0h
+db 003h,0C0h,003h,0C0h,003h,0C0h,003h,0C0h,003h,0CEh,003h,0CEh,003h,0FEh,001h,0FEh
+db 001h,0FCh,000h,078h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_75:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
-        db 01Fh,0FEh,007h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
+db 01Fh,0FEh,007h,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_76:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,01Fh,03Eh,00Fh,0FCh,007h,0F8h,003h,0F0h
-        db 001h,0E0h,000h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,01Eh,01Fh,03Eh,00Fh,0FCh,007h,0F8h,003h,0F0h
+db 001h,0E0h,000h,0C0h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_77:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,079h,0CEh,079h,0CEh,079h,0CEh
-        db 079h,0CEh,079h,0CEh,079h,0CEh,07Bh,0EEh,07Fh,0FEh,03Fh,0FEh,01Fh,07Ch,01Eh,03Ch
-        db 00Ch,018h,008h,008h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,078h,00Eh,078h,00Eh,078h,00Eh,078h,00Eh,079h,0CEh,079h,0CEh,079h,0CEh
+db 079h,0CEh,079h,0CEh,079h,0CEh,07Bh,0EEh,07Fh,0FEh,03Fh,0FEh,01Fh,07Ch,01Eh,03Ch
+db 00Ch,018h,008h,008h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_78:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,070h,00Eh,078h,00Eh,07Ch,01Eh,03Eh,03Eh,01Fh,07Ch,00Fh,0FCh,00Fh,0F8h
-        db 007h,0F0h,003h,0E0h,007h,0F0h,00Fh,0F8h,01Fh,0FCh,01Fh,07Ch,03Eh,03Eh,07Ch,01Eh
-        db 078h,00Eh,070h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,070h,00Eh,078h,00Eh,07Ch,01Eh,03Eh,03Eh,01Fh,07Ch,00Fh,0FCh,00Fh,0F8h
+db 007h,0F0h,003h,0E0h,007h,0F0h,00Fh,0F8h,01Fh,0FCh,01Fh,07Ch,03Eh,03Eh,07Ch,01Eh
+db 078h,00Eh,070h,00Eh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_79:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
-        db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
-        db 01Fh,0FEh,007h,0FEh,000h,00Eh,000h,00Eh,000h,01Eh,000h,03Eh,00Fh,0FCh,00Fh,0F8h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh
+db 03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Ch,00Eh,03Eh,00Eh,03Fh,0FEh,01Fh,0FEh
+db 01Fh,0FEh,007h,0FEh,000h,00Eh,000h,00Eh,000h,01Eh,000h,03Eh,00Fh,0FCh,00Fh,0F8h
 chr_7A:
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,03Eh,000h,07Ch,000h,0F8h
-        db 001h,0F0h,003h,0E0h,007h,0C0h,00Fh,080h,01Fh,000h,03Eh,000h,03Fh,0FEh,03Fh,0FEh
-        db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,03Fh,0FEh,000h,03Eh,000h,07Ch,000h,0F8h
+db 001h,0F0h,003h,0E0h,007h,0C0h,00Fh,080h,01Fh,000h,03Eh,000h,03Fh,0FEh,03Fh,0FEh
+db 03Fh,0FEh,03Fh,0FEh,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_7B:
-        db 000h,000h,000h,000h,001h,0F8h,003h,0F0h,007h,0C0h,007h,080h,007h,000h,007h,080h
-        db 007h,080h,003h,0C0h,003h,0C0h,003h,080h,007h,080h,00Fh,000h,03Fh,000h,03Fh,000h
-        db 00Fh,000h,007h,080h,003h,080h,003h,0C0h,003h,0C0h,007h,080h,007h,080h,007h,000h
-        db 007h,080h,007h,0C0h,003h,0F0h,001h,0F8h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,001h,0F8h,003h,0F0h,007h,0C0h,007h,080h,007h,000h,007h,080h
+db 007h,080h,003h,0C0h,003h,0C0h,003h,080h,007h,080h,00Fh,000h,03Fh,000h,03Fh,000h
+db 00Fh,000h,007h,080h,003h,080h,003h,0C0h,003h,0C0h,007h,080h,007h,080h,007h,000h
+db 007h,080h,007h,0C0h,003h,0F0h,001h,0F8h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_7C:
-        db 000h,000h,000h,000h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
-        db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
-        db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
-        db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,000h,000h
+db 000h,000h,000h,000h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
+db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
+db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h
+db 003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,003h,0E0h,000h,000h
 chr_7D:
-        db 000h,000h,000h,000h,007h,0E0h,003h,0F0h,000h,0F8h,000h,078h,000h,078h,000h,078h
-        db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,078h,000h,07Ch,000h,03Eh,000h,03Eh
-        db 000h,07Ch,000h,078h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,078h,000h,078h
-        db 000h,078h,000h,0F8h,003h,0F0h,007h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0E0h,003h,0F0h,000h,0F8h,000h,078h,000h,078h,000h,078h
+db 000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,078h,000h,07Ch,000h,03Eh,000h,03Eh
+db 000h,07Ch,000h,078h,000h,0F0h,000h,0F0h,000h,0F0h,000h,0F0h,000h,078h,000h,078h
+db 000h,078h,000h,0F8h,003h,0F0h,007h,0E0h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_7E:
-        db 000h,000h,000h,000h,000h,000h,007h,00Eh,01Fh,09Eh,01Fh,0FEh,03Fh,0FCh,03Ch,0FCh
-        db 038h,070h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,007h,00Eh,01Fh,09Eh,01Fh,0FEh,03Fh,0FCh,03Ch,0FCh
+db 038h,070h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 chr_7F:
-        db 000h,000h,000h,000h,007h,0E0h,01Fh,0F8h,01Fh,0F8h,03Eh,07Ch,03Ch,03Ch,03Ch,03Ch
-        db 03Ch,03Ch,03Eh,07Ch,01Fh,0F8h,01Fh,0F8h,007h,0E0h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
-        db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,007h,0E0h,01Fh,0F8h,01Fh,0F8h,03Eh,07Ch,03Ch,03Ch,03Ch,03Ch
+db 03Ch,03Ch,03Eh,07Ch,01Fh,0F8h,01Fh,0F8h,007h,0E0h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
+db 000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h,000h
 
 ;REV.  1.1    31 October 2002
 ;ADuC831   Apps, Analog Devices Inc.
