@@ -55,13 +55,12 @@ struct cng_build_options
 typedef struct cng_command_result cng_command_result; 
 struct cng_command_result
 {
- b32 Succeeded;
+    b32 Succeeded;
 };
 
 //~ Globals
 global_variable str8_array *GlobalSelectedArray = 0;
 global_variable char **GlobalEnv = 0;
-global_variable cng_os_kind GlobalCurrentOS = 0;
 
 //~ Platform API
 // NOTE(luca): Implement these when adding a new platform.
@@ -69,12 +68,6 @@ internal void Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[]);
 internal cng_command_result Cng_RunCommand(str8 Command);
 
 //~ Functions
-internal b32
-Cng_IsOS(cng_os_kind Kind)
-{
- b32 Result = (GlobalCurrentOS == Kind);
- return Result;
-}
 
 //- Strings
 internal void Cng_SetSelectedArray(str8_array Value) 
@@ -96,7 +89,7 @@ S8ArrayAppendMultipleTo(GlobalSelectedArray, __VA_ARGS__)
 //- Helpers
 
 #if OS_LINUX
-internal str8 LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command, char *Env[]);
+internal str8 LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command);
 #endif
 
 internal str8
@@ -158,7 +151,7 @@ Cng_Build__(str8 BuildName,
    u8 Buffer_[PATH_MAX] = {0};
    u8 *Buffer = Buffer_;
    
-   str8 Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "cc", GlobalEnv);
+   str8 Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "cc");
    if(Command.Size)
    {
     // Find compiler cc is liked to.
@@ -195,14 +188,14 @@ Cng_Build__(str8 BuildName,
    else
    {
     // NOTE(luca): No cc, try "gcc" or "clang" if present.
-    Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "gcc", GlobalEnv);
+    Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "gcc");
     if(Command.Size) 
     {
      Options->Compiler = CngCompiler_GCC;
      goto CompilerFound;
     }
     
-    Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "clang", GlobalEnv);
+    Command = LinuxFindCommandInPATH(PATH_MAX, Buffer, "clang");
     if(Command.Size) 
     {
      Options->Compiler = CngCompiler_Clang;
@@ -235,7 +228,7 @@ Cng_Build__(str8 BuildName,
   else if(MSVC)  Compiler = S8("cl");
   else           Compiler = S8("cc");
   
-  if(Cng_IsOS(CngOS_Linux))
+  if(OS_Is(OSKind_Linux))
   {
    Cng_S8ArrayAppend(Compiler);
    
@@ -345,7 +338,7 @@ Cng_Build__(str8 BuildName,
    
    // LogBuildMode()
   }
-  else if(Cng_IsOS(CngOS_Windows))
+  else if(OS_Is(OSKind_Windows))
   {
 #if defined(CLING_MSVC_SETUP)
    Cng_S8ArrayAppend(S8("cmd /c \"" CLING_MSVC_SETUP));
@@ -425,7 +418,7 @@ Cng_Build__(str8 BuildName,
       Compiler, 
       (Debug ? S8("debug") : S8("release")));
   
-  if(Cng_IsOS(CngOS_Linux))
+  if(OS_Is(OSKind_Linux))
   {
    Log("%S\n", Cng_GetBaseFileName(Sources->Strings[0]));
   }
@@ -743,9 +736,9 @@ LinuxErrorWrapperRead(int File, void *Buffer, umm BytesToRead)
 
 // TODO(luca): Simplify
 internal str8 
-LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command, char *Env[])
+LinuxFindCommandInPATH(umm BufferSize, u8 *Buffer, char *Command)
 {
- u8 **VarAt = (u8 **)Env;
+ u8 **VarAt = (u8 **)environ;
  char Search[] = "PATH=";
  int MatchedSearch = false;
  
@@ -904,7 +897,7 @@ Cng_RunCommand(str8 Command)
  if(Args[0] && Args[0][0] != '/')
  {
   u8 Buffer[PATH_MAX] = {0};
-  str8 ExePath = LinuxFindCommandInPATH(sizeof(Buffer), Buffer, Args[0], GlobalEnv);
+  str8 ExePath = LinuxFindCommandInPATH(sizeof(Buffer), Buffer, Args[0]);
   if(ExePath.Size)
   {
    Args[0] = (char *)ExePath.Data;
@@ -920,12 +913,6 @@ internal void
 Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
 {
  arena *Arena = GetScratch();
- 
- // Globals
- {
-  GlobalCurrentOS = CngOS_Linux;
-  GlobalEnv = Env;
- }
  
  str8 OutputBuffer = PushS8(Arena, KB(2));
  str8 TempBuffer = PushS8(Arena, KB(2));

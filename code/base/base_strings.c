@@ -68,6 +68,13 @@ IsAlpha(u8 Char)
  return Result;
 }
 
+internal b32
+IsAlphaNum(u8 Char)
+{
+    b32 Result = ((Char >= 'A' && Char <= 'Z') || (Char >= 'a' && Char <= 'z') ||
+                  (Char >= '0' && Char <= '9'));
+    return Result;
+}
 
 internal b32
 IsWhiteSpace(u8 Char)
@@ -107,12 +114,15 @@ S8SkipLastSlash(str8 String)
 }
 
 internal b32
-S8Match(str8 A, str8 B, b32 BIsPrefix)
+S8Match(str8 A, str8 B, s8_match_flag Flags)
 {
  b32 Match = false;
  
  b32 Requirements = false;
- Requirements |= ( BIsPrefix && (B.Size <= A.Size));
+    
+    b32 BIsPrefix = (Flags & S8MatchFlag_Prefix);
+    
+    Requirements |= ( BIsPrefix && (B.Size <= A.Size));
  Requirements |= (!BIsPrefix && (B.Size == A.Size));
  
  u64 MinSize = Min(A.Size, B.Size);
@@ -121,8 +131,17 @@ S8Match(str8 A, str8 B, b32 BIsPrefix)
  {
   Match = true;
   for EachIndex(Idx, MinSize)
-  {
-   if((A.Data[Idx] != B.Data[Idx]))
+        {
+            u8 CharA = A.Data[Idx];
+            u8 CharB = B.Data[Idx];
+            
+            if(Flags & S8MatchFlag_CaseInsensitive)
+            {
+                CharA = ToLowercase(CharA);
+                CharB = ToLowercase(CharB);
+            }
+            
+            if((CharA != CharB))
    {
     Match = false;
     break;
@@ -218,7 +237,7 @@ Str8VFmt(const char *Format, va_list Args)
  
  arena *Arena = StringsScratch;
  
- S8OverPush(Arena, Result, KB(64), Result.Size - 1)
+ S8OverPush(Arena, Result, MB(1), Result.Size - 1)
  {  
   // TODO(luca): stbsp doesn't work with ASAN enabled, we should fix that.
 #if !ASAN_ENABLED

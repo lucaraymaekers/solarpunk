@@ -147,7 +147,7 @@ AppBuild(cng_build_options *BuildOptions,
                         AppName, ExeName);
  
  str8 LinkerFlags = {0};
- if(Cng_IsOS(CngOS_Linux)) LinkerFlags = S8("-lasound -lX11 -lGL -lGLX");
+ if(OS_Is(OSKind_Linux)) LinkerFlags = S8("-lasound -lX11 -lGL -lGLX");
  
  Cng_Build(Name, BuildOptions, 
            S8ArrayLit(S8("../code/rl/rl_platform.c"),
@@ -158,6 +158,16 @@ AppBuild(cng_build_options *BuildOptions,
            .OutputName = ExeName);
  
 };
+
+internal void
+AddHelpAndBuildSource(cmd_line *CmdLine, str8_array *Help, cng_build_options *Options, b32 *DidWork, str8 Name, str8 Source)
+{
+    if(CmdLineHasEntryAndAddHelp(CmdLine, Help, Name, S8("Target")))
+    {
+        *DidWork = true;
+        Cng_Build(Name, Options, S8ArrayLit(Source));
+    }
+}
 
 //~ Entrypoint
 BASE_ENTRY_POINT()
@@ -600,41 +610,21 @@ BASE_ENTRY_POINT()
  }
  
  //~ Sim86
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Sim86"), S8("Target")))
- {
-  DidWork = true;
-  
-  cng_build_options Options = BuildOptions;
-  Options.CPP = true;
-  Cng_Build(S8("Sim86"), &Options, S8ArrayLit(S8("../code/compenhance/sim86/sim86.cpp")));
- }
- 
+{    
+    cng_build_options Options = BuildOptions;
+    Options.CPP = true;
+    AddHelpAndBuildSource(CmdLine, &Help, &Options, &DidWork, S8("Sim86"), S8("../code/compenhance/sim86/sim86.cpp"));
+    }
+
  //~ Haversine Generator
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("HaversineGenerator"), S8("Target")))
- {
-  DidWork = true;
-  
-  Cng_Build(S8("Haversine Generator"), &BuildOptions,
-            S8ArrayLit(S8("../code/compenhance/haversine_generator/haversine_generator.c")));
- }
+    AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("HaversineGenerator"), S8("../code/compenhance/haversine_generator/haversine_generator.c"));
  
  //~ Haversine Processor
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("HaversineProcessor"), S8("Target")))
- {
-  DidWork = true;
-  
-  Cng_Build(S8("Haversine Processor"), &BuildOptions,
-            S8ArrayLit(S8("../code/compenhance/haversine_processor/haversine_processor.c")));
-  
- }
+    AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("HaversineProcessor"), S8("../code/compenhance/haversine_processor/haversine_processor.c"));
  
  //~ Linux Serial Downloader
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("LSD"), S8("Target")))
- {
-  DidWork = true;
-  Cng_Build(S8("LSD"), &BuildOptions, S8ArrayLit(S8("../code/lsd/lsd.c")));
- }
- 
+    AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("LSD"), S8("../code/lsd/lsd.c"));
+    
  //~ Samples: ADuC 832
  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Aduc"), S8("Target")))
  {
@@ -644,7 +634,7 @@ BASE_ENTRY_POINT()
   Log("[Aduc]\n");
   
   if(0) {}
-  else if(Cng_IsOS(CngOS_Windows))
+  else if(OS_Is(OSKind_Windows))
   {   
    Log("Compiling main_sdcc.asm");
    Cng_Run("c51asm.exe "
@@ -652,7 +642,7 @@ BASE_ENTRY_POINT()
            "--outfile main_sdcc.hex --include ../code/school/aduc832 " "../code/school/aduc832/main_sdcc.asm") &&
     Cng_Run("lsd -run main_sdcc.hex");
   }
-  else if(Cng_IsOS(CngOS_Linux))
+  else if(OS_Is(OSKind_Linux))
   {
    Log("Compiling main.asm\n");
    Cng_Run("asm51 -n -a -o main.hex ../code/school/aduc832/main.asm") &&
@@ -680,180 +670,40 @@ BASE_ENTRY_POINT()
  }
  S8ArrayAppendTo(&Help, S8(" "));
  
- //~ ZSH
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Zsh"), S8("Print out zsh completions")))
- {
-  DidWork = true;
-  str8 Text = S8("_cling() \n"
-                 "{\n"
-                 "local cmd=\"${words[1]}\"\n"
-                 "local help_output line token desc\n"
-                 "local -a candidates\n"
-                 "\n"
-                 "help_output=\"$(CLING_NOREBUILD=1 \"$cmd\" -h 2>&1)\"\n"
-                 "\n"
-                 "# Extract entries formatted like:\n"
-                 "# -Asan : Enable address sanitizer\n"
-                 "while IFS= read -r line; do\n"
-                 "if [[ \"$line\" =~ '^[[:space:]]*([^[:space:]]+)[[:space:]]*:[[:space:]]*(.*)$' ]]; then\n"
-                 "token=\"${match[1]}\"\n"
-                 "desc=\"${match[2]}\"\n"
-                 "candidates+=(\"$token:$desc\")\n"
-                 "fi\n"
-                 "done <<< \"$help_output\"\n"
-                 "_describe 'cling arguments' candidates\n"
-                 "}\n"
-                 "compdef _cling cling\n");
-  Log("%S\n", Text);
- }
- 
- //~ Sampler
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Sampler"), S8("Target")))
- {
-  Cng_Build(S8("Sampler"), &BuildOptions, S8ArrayLit(S8("../code/school/sampler/sampler.c")));
- }
- 
- //~ School
- S8ArrayAppendTo(&Help, S8(" "));
- if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("School"), S8("(See subcommands with -School)")))
- {
-  b32 Compile  = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("compile"), S8("Compile the source file"));
-  b32 Run      = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("Run the built program"));
-  b32 Last     = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("last"), S8("Use the last found source file as input"));
-  b32 All      = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("all"), S8("Use all source files as input"));
-  b32 Template = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("template"), S8("Create a template source file"));
-  b32 Print    = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("print"), S8("Print the source file path"));
-  b32 Convert  = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("convert"), S8("Convert spaces to tabs in the source file"));
-  
-  if(All) Last = true;
-  
-  str8 TemplateText = S8(
-                         "#define _CRT_SECURE_NO_WARNINGS\n"
-                         "#include <stdio.h>\n"
-                         ."\n"
-                         "int main(int ArgCount, char **Args)\n"
-                         "{\n"
-                         "\tprintf(\"Hello, world!\\n\");\n"
-                         "\treturn 0;\n"
-                         "}\n"
-                         );
-  
-  // Sanitization
-  {
-   b32 Error = false;
-   if(Template)
-   {
-    if(Compile) { Log("ERROR: -compile is incompatible with -template.\n"); Error = true; } 
-    if(Run)     { Log("ERROR: -run is incompatible with -template.\n"); Error = true; }
-   }
-   
-   if(Error)
-   {
-    Compile = false;
-    Run = false;
-    Template = false;
-    Last = false;
-   }
-  }
-  
-  str8 NamePrefix = S8("raymaekersLuca");
-  str8 Hoofdstuk = S8("6");
-  
-  char *PathFormat = (char *)Str8Fmt("../code/school/les1_%S/%S_%S_%%S.c", 
-                                     Hoofdstuk, NamePrefix, Hoofdstuk).Data;
-  
-  arena *Arena = GetScratch();
-  if(Last)
-  {
-   u64 MaxLastIdx = 64;
-   u64 LastIdx = 1;
-   for(u64 Idx = LastIdx; Idx < MaxLastIdx; Idx += 1)
-   {
-    str8 LastIdxString = Str8Fmt("%llu", Idx);
+    //~ Sampler
+    AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("Sampler"), S8("../code/school/sampler/sampler.c"));
     
-    str8 Path = Str8Fmt(PathFormat, LastIdxString);
-    if(OS_FileExists((char *)Path.Data))
+    //~ PP
+    AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("PP"), S8("../code/pp/pp.c"));
+    
+    //~ ZSH
+    if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Zsh"), S8("Print out zsh completions")))
     {
-     str8_node *Node = PushArray(Arena, str8_node, 1);
-     DLLAppendNil(Node, CmdLine->FirstFile, CmdLine->LastFile, NilS8Node);
-     Node->V = LastIdxString; 
-     
-     LastIdx = Idx;
+        DidWork = true;
+        str8 Text = S8("_cling() \n"
+                       "{\n"
+                       "local cmd=\"${words[1]}\"\n"
+                       "local help_output line token desc\n"
+                       "local -a candidates\n"
+                       "\n"
+                       "help_output=\"$(CLING_NOREBUILD=1 \"$cmd\" -h 2>&1)\"\n"
+                       "\n"
+                       "# Extract entries formatted like:\n"
+                       "# -Asan : Enable address sanitizer\n"
+                       "while IFS= read -r line; do\n"
+                       "if [[ \"$line\" =~ '^[[:space:]]*([^[:space:]]+)[[:space:]]*:[[:space:]]*(.*)$' ]]; then\n"
+                       "token=\"${match[1]}\"\n"
+                       "desc=\"${match[2]}\"\n"
+                       "candidates+=(\"$token:$desc\")\n"
+                       "fi\n"
+                       "done <<< \"$help_output\"\n"
+                       "_describe 'cling arguments' candidates\n"
+                       "}\n"
+                       "compdef _cling cling\n");
+        Log("%S\n", Text);
     }
     
-    Assert(LastIdx < MaxLastIdx);
-   }
-  }
-  
-  b32 StartAtLast = (Last && !All);
-  str8_node *First = (!StartAtLast ? CmdLine->FirstFile : CmdLine->LastFile);
-  
-  for(str8_node *Node = First; !IsNilS8Node(Node); Node = Node->Next)
-  {
-   str8 Path = Str8Fmt(PathFormat, Node->V);
-   
-   if(Print)
-   {
-    Log("%S\n", Path);
-   }
-   
-   if(Template)
-   {
-    OS_WriteEntireFile((char *)Path.Data, TemplateText);
-   }
-   
-   if(Convert)
-   {
-    str8 File = OS_ReadEntireFileIntoMemory((char *)Path.Data);
-    
-    str8 Out = PushS8(Arena, File.Size);
-    
-    // Convert tab to spaces.
-    b32 OnStartOfLine = true;
-    for EachIndex(Idx, File.Size)
-    {
-     u8 Char = File.Data[Idx];
-     
-     if(0) {}
-     else if(Char == '\n') OnStartOfLine = true;
-     else if(Char != ' ') OnStartOfLine = false;
-     else
-     {
-      if(OnStartOfLine) Char = '\t';
-     }
-     
-     Out.Data[Idx] = Char;
-    }
-    
-    OS_WriteEntireFile((char *)Path.Data, Out);
-    OS_FreeFileMemory(File);
-   }
-   
-   if(Compile)
-   {
-    Cng_Build(S8("Les1"), &BuildOptions, S8ArrayLit(Path));
-   }
-   
-   if(Run)
-   {
-    if(!GlobalSelectedArray) Cng_Scratch();
-    GlobalSelectedArray->Count = 0;
-    
-    S8ArrayTemp(GlobalSelectedArray)
-    {
-     str8 BuildPath = Str8Fmt("../build/%S_%S_%S.exe", NamePrefix, Hoofdstuk, Node->V);
-     
-     Cng_S8ArrayAppend(BuildPath);
-     RunCommand();
-    }
-   }
-   
-   DidWork = true;
-  }
- }
- 
  //~ Show help
- 
  if(!DidWork)
  {
   str8 HelpText = Cng_S8ArrayJoinFrom(&Help, '\n');

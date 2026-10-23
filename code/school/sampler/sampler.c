@@ -5,8 +5,7 @@
 // - 4coder plugin to create new sample and open new file in buffer.
 //   - This plugin must also close all other samples, because otherwise the indexing will be
 //     wrong.
-// - compile
-// - run
+// - convert spaces to tabs
 //-
 
 //~ Libraries
@@ -185,17 +184,48 @@ BASE_ENTRY_POINT()
    Log(CSS8(LogFormat), TypePaths[Type], Idx);
    OS_WriteEntireFile(CSS8(Path), TemplateText);
   }
-  
+        
+        str8 FileName = Str8Fmt(CSS8(FileNameFormat), Idx);
+        str8 FileNameWithoutExt = S8CutFromChar(FileName, '.', false);
+        
   if(Compile) 
   {
-   Cng_Build(S8("Sampler"), NilP(cng_build_options), S8ArrayLit(Path));
+            if(0) {}
+            else if(Type == Type_c)
+{                
+                if(!Cng_Build(S8("Sampler"), NilP(cng_build_options), S8ArrayLit(Path)).Succeeded) 
+                    goto Fail;
+            }
+            else if(Type == Type_asm)
+            {
+                if(OS_Is(OSKind_Linux))
+{
+                    Log("[Sampler asm51]\n"
+                        "Compiling %S\n", FileName);
+                    
+                    cng_command_result CommandResult = Cng_RunCommand(Str8Fmt("./pp -o %S.pp %S", FileNameWithoutExt, Path));
+                    if(!CommandResult.Succeeded)
+                        goto Fail;
+                    
+                    if(!Cng_RunCommand(Str8Fmt("asm51 -n -a -o %S.hex %S.pp", 
+                                               FileNameWithoutExt, FileNameWithoutExt)).Succeeded) 
+                    goto Fail;
+}
+            }
   }
   
   if(Run)
-  {
-   str8 FileName = Str8Fmt(CSS8(FileNameFormat), Idx);
-   str8 PathWithoutExtension = S8CutFromChar(FileName, '.', false);
-   Cng_RunCommand(PathWithoutExtension);
+        {
+            if(0) {}
+            else if(Type == Type_c)
+{
+            str8 ExeFilePath = S8Cat(S8("." SLASH), FileNameWithoutExt);
+   Cng_RunCommand(ExeFilePath);
+            }
+            else if(Type == Type_asm)
+            {
+                Cng_RunCommand(Str8Fmt("." SLASH "lsd -run %S.hex", FileNameWithoutExt));
+            }
   }
  }
  
@@ -209,6 +239,8 @@ BASE_ENTRY_POINT()
       "%S\n", 
       HelpText);
  }
- 
+    
+    Fail:;
+    
  return 0;
 }

@@ -104,11 +104,20 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
- .build_sampler = 
+    .build_sampler = 
+    {
+        .out = "*compilation*", 
+        .linux = "./code/build.sh -Meta -Sampler",
+        .win = ".\\code\\build.bat -Meta -Sampler",
+        .save_dirty_files = true,
+        .footer_panel = false,
+        .cursor_at_end = false,
+    },
+    .build_pp = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -Sampler",
-  .win = ".\\code\\build.bat -Meta -Sampler",
+  .linux = "./code/build.sh -Meta -PP",
+  .win = ".\\code\\build.bat -Meta -PP",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -144,7 +153,7 @@ commands =
 
 fkey_command =
 {
- .F1 = "build_sampler",
+ .F1 = "build_pp",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",

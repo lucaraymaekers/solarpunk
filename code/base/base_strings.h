@@ -32,6 +32,14 @@ struct str8_array
 };
 typedef struct str8_array str8_array;
 
+enum s8_match_flag
+{
+    S8MatchFlag_None            = (0 << 0),
+    S8MatchFlag_Prefix          = (1 << 0),
+    S8MatchFlag_CaseInsensitive = (1 << 1),
+};
+typedef enum s8_match_flag s8_match_flag;
+
 //~ Globals
 
 #define IsNilS8Node(Node) CheckNil(Node, NilS8Node)
@@ -47,7 +55,7 @@ internal b32 IsWhiteSpace(u8 Char);
 internal u8  ToLowercase(u8 Char);
 
 internal str8 S8SkipLastSlash(str8 String);
-internal b32  S8Match(str8 A, str8 B, b32 BIsPrefix);
+internal b32  S8Match(str8 A, str8 B, s8_match_flag Flags);
 internal u64  StringLength(char *String);
 internal str8 S8Cat(str8 Prefix, str8 Suffix);
 internal u64  S8FindChar(str8 String, u8 Char, b32 FromStart, b32 Next);

@@ -12,6 +12,14 @@ struct cmd_line_entry
  str8 Name;
 };
 
+enum os_kind
+{
+    OSKind_Unknown,
+    OSKind_Linux,
+    OSKind_Windows,
+};
+typedef enum os_kind os_kind;
+
 typedef struct cmd_line cmd_line;
 struct cmd_line
 {
@@ -91,7 +99,6 @@ typedef ENTRY_POINT(entry_point_func);
 BASE_ENTRY_POINT();
 raddbg_entry_point(EntryPoint);
 
-internal void  OS_PrintFormat(char *Format, ...);
 //- Memory 
 internal void *OS_AllocateAtOffset(u64 Size, u64 Offset);
 internal void *OS_Allocate(u64 Size);
@@ -116,12 +123,13 @@ internal os_dir *OS_WalkDirPush(str8 Path, os_dir *Current);
 internal os_dir *OS_WalkDirPop(os_dir *Dir);
 internal os_dir_entry *OS_WalkDirGetNext(os_dir *Dir);
 
-
 //- OS agnostic, implemented in `base_os.c`.
 internal f64  OS_SecondsElapsed(f64 Start, f64 End);
 internal f64  OS_MSElapsed(f64 Start, f64 End);
 internal void OS_ProfileInit(char *Prefix);
 internal void OS_ProfileAndPrint(char *Label);
+internal void OS_PrintFormat(char *Format, ...);
+internal b32  OS_Is(os_kind Kind);
 
 #define Log(Format, ...)      OS_PrintFormat((char *)(Format), ##__VA_ARGS__)
 // NOTE(luca): Append '\n', because this macro might be redefined into a visual error log.

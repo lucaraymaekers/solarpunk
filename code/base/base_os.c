@@ -6,6 +6,14 @@ global_variable u8 LogBuffer[KB(64)];
 global_variable os_profiler GlobalProfiler = {0}; 
 global_variable char *GlobalProfilerPrefix; 
 
+#if OS_LINUX
+global_variable read_only os_kind OS_Kind = OSKind_Linux;
+#elif OS_WINDOWS
+global_variable read_only os_kind OS_Kind = OSKind_Windows;
+#else
+global_variable read_only os_kind OS_Kind = OSKind_Unknown;
+#endif
+
 #if BASE_PROFILE
 global_variable b32 GlobalIsProfiling = true;
 #else
@@ -206,4 +214,11 @@ OS_PrintFormat(char *Format, ...)
  // NOTE(luca): Writing to stderr disables line buffering.
  str8 String = Str8VFmt(Format, Args);
  fwrite(String.Data, 1, String.Size, stdout);
+}
+
+internal b32
+OS_Is(os_kind Kind)
+{
+    b32 Result = (OS_Kind == Kind);
+    return Result;
 }
