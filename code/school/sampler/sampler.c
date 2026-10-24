@@ -200,13 +200,14 @@ BASE_ENTRY_POINT()
             {
                 if(OS_Is(OSKind_Linux))
 {
-                    Log("[Sampler asm51]\n"
-                        "Compiling %S\n", FileName);
+                    Log("[Sampler asm51]\n");
                     
-                    cng_command_result CommandResult = Cng_RunCommand(Str8Fmt("./pp -o %S.pp %S", FileNameWithoutExt, Path));
+                    Log("Preprocessing %S\n", FileName);
+                    cng_command_result CommandResult = Cng_RunCommand(Str8Fmt("./pp -o=%S.pp %S", FileNameWithoutExt, Path));
                     if(!CommandResult.Succeeded)
                         goto Fail;
                     
+                    Log("Compiling %S\n", FileName);
                     if(!Cng_RunCommand(Str8Fmt("asm51 -n -a -o %S.hex %S.pp", 
                                                FileNameWithoutExt, FileNameWithoutExt)).Succeeded) 
                     goto Fail;

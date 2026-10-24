@@ -37,19 +37,25 @@ AsmSample:
  "str8 AsmTemplateText = {(u8 *)";
  @strings @cstring_lit
   """
-  $NOMOD51
-  
-  ;~ Inits
-  .org 0x0000
-  mov sp, 0x7F
-  
-  ;~ EntryPoint
-  loop:
- 
- ljmp loop
-  
-  ;~ Includes
-  $include "aducgd1.asm"
+        $NOMOD51
+        
+        ;~ Defines
+        $include "aducgd1def.asm"
+        
+        ;~ Inits
+        .org 0x0000
+        
+        ;~ EntryPoint
+        mov sp, #0x7F
+    
+    loop: 
+    
+    ljmp loop
+        
+        ;~ Libraries
+        $include "aducgd1inc.asm"
+        
+        end
   """;
   "};";
 }

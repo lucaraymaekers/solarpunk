@@ -1,17 +1,21 @@
 $NOMOD51
 
-;~ Includes
-$include "aducgd1.asm"
+        ;~ Defines
+$include "aducgd1def.asm"
 
-  ;~ Inits
-  .org 0x0000
-  mov sp, 0x7F
-  
+;~ Inits
+.org 0x0000
+
   ;~ EntryPoint
-  loop:
+mov sp, #0x7F
+mov p2, #0xAA
 
-mov p2, p0
+loop: 
 
- ljmp loop
+ljmp loop
 
-end
+;~ Libraries
+$include "aducgd1inc.asm"
+        
+        end
+  

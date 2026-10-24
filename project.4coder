@@ -34,12 +34,13 @@ paths =
  { .path = "code/lib",     .recursive = true,  .relative = true, },
  { .path = "code/rl/",     .recursive = true,  .relative = true, },
  { .path = "code/cling/",  .recursive = true,  .relative = true, },
- //{ .path = "code/muze/",        .recursive = true,  .relative = true, },
- //{ .path = "code/editor/",      .recursive = true,  .relative = true, },
- { .path = "code/school/sampler", .recursive = true,  .relative = true, },
- //{ .path = "code/compenhance/", .recursive = true,  .relative = true, },
- //{ .path = "code/wsdcom/",      .recursive = true,  .relative = true, },
- //{ .path = "code/lsd/",         .recursive = true,  .relative = true, },
+ //{ .path = "code/muze/",          .recursive = true,  .relative = true, },
+ //{ .path = "code/editor/",        .recursive = true,  .relative = true, },
+ //{ .path = "code/compenhance/",   .recursive = true,  .relative = true, },
+ //{ .path = "code/wsdcom/",        .recursive = true,  .relative = true, },
+ //{ .path = "code/lsd/",           .recursive = true,  .relative = true, },
+ //{ .path = "code/pp/",            .recursive = true,  .relative = true, },
+ //{ .path = "code/school/sampler", .recursive = true,  .relative = true, },
 };
 
 load_paths =
@@ -122,7 +123,17 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
- 
+    
+    .sampler =
+    {
+        .out = "*compilation*",
+        .linux = "./build/sampler -type=asm -compile -run",
+        .win = ".\build\sampler -type=asm -compile -run",
+        .save_dirty_files = true,
+        .footer_panel = false,
+        .cursor_at_end = false,
+    },
+    
  .run = 
  {
   .out = "*compilation*", 

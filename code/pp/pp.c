@@ -9,40 +9,56 @@ BASE_ENTRY_POINT()
     b32 ShowHelp = true;
     b32 ShouldQuit = false;
     str8 OutFileName = {0};
+    str8 InFileName = {0};
     
     arena *Arena = GetScratch();
     str8_array Help = PushS8Array(Arena, 256);
     
     //- Parse command line arguments 
+{
+    InFileName = CmdLine->FirstFile->V;
+}
+
+{    
     cmd_line_entry *Entry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("o"), S8("output file"));
-    OutFileName = Entry->First->V;
-    if(OutFileName.Size)
-    {
-        OutFileName = S8CutFromChar(OutFileName, '.', false);
+        OutFileName = Entry->First->V;
+        if(!OutFileName.Size)
+        {
+            str8 FileNameWithoutExt = S8CutFromChar(InFileName, '.', false);
+            OutFileName = Str8Fmt("%S.pp", FileNameWithoutExt);
+        }
     }
     
-    //- Preprocess all files 
-    for(str8_node *Node = CmdLine->FirstFile;
-        !IsNilS8Node(Node);
-        Node = Node->Next)
+    //- Preprocess 
     {
-            ShowHelp = false;
-        
-        str8 File = OS_ReadEntireFileIntoMemory(CSS8(Node->V));
-        str8 FileDir = S8CutFromChar(Node->V, '/', false);
+            
+        str8 File = OS_ReadEntireFileIntoMemory(CSS8(InFileName));
+        str8 FileDir = S8CutFromChar(InFileName, '/', false);
         
         str8 String;
         S8OverPush(Arena, String, KB(512), String.Size)
         {
             String.Size = 0;
             for(u64 Idx = 0; Idx < File.Size && !ShouldQuit; Idx += 1)
-        {
+            {
+                ShowHelp = false;
+                
                 u8 Char = File.Data[Idx];
                 
                 if(0) {}
+                else if(Char == ';')
+                {
+                    // Skip comments
+                    for(Idx += 1;
+                        Idx < File.Size && File.Data[Idx] != '\n';
+                        Idx += 1);
+                    String.Data[String.Size] = '\n';
+                    String.Size += 1;
+                }
                 else if(Char == '.')
                 {
                     // Skip
+                    // TODO(luca): Only if next is org or equ
                     // makes .org -> org ; .equ ->equ
                 }
                 else if(Char == '$')
@@ -109,7 +125,7 @@ BASE_ENTRY_POINT()
     if(ShowHelp)
     {
         str8 HelpText = S8ArrayJoinFrom(Arena, &Help, '\n');
-        Log("Usage: pp file1.asm [file2.asm ...]\n"
+        Log("Usage: pp [options] file1.asm\n"
             "%S\n", HelpText);
     }
     
