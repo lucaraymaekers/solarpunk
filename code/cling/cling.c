@@ -136,11 +136,14 @@ AppBuild(cng_build_options *BuildOptions,
             .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=1")),
             .OutputName = LibFileName);
  }
- 
+    
+    str8 AppDLLName = Str8Fmt("%S.%S", AppName, (OS_Is(OSKind_Linux) ? S8("so") : S8("dll")));
+    
  Cng_Build(Name, BuildOptions, 
            S8ArrayLit(AppSource, LibFileName),
            .Type = CngBuildType_DLL,
-           .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0")));
+              .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0")),
+              .OutputName = AppDLLName);
  
  str8 Defines = Str8Fmt("-DRL_PLATFORM_APP_NAME=%S "
                         "-DRL_PLATFORM_WINDOW_NAME=%S",
@@ -608,7 +611,15 @@ BASE_ENTRY_POINT()
   DidWork = true;
   AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"));
  }
- 
+    //~ Wordled
+    if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Wordled"), S8("Target")))
+    {
+        DidWork = true;
+        cng_build_options Options = BuildOptions;
+        Options.CPP = true;
+        AppBuild(&Options, S8("Wordled"), S8("../code/wordled/wordled_app.cpp"), S8("wordled_app"), S8("wordled"));
+    }
+    
  //~ Sim86
 {    
     cng_build_options Options = BuildOptions;

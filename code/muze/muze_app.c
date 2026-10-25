@@ -1508,7 +1508,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   { 
    v2 BarPos = StaffPos;
    
-#if MUZE_INTERNAL
+#if 0 && MUZE_INTERNAL
    {
     v2 P = BarPos;
     

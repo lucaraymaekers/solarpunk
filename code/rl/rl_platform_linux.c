@@ -1111,7 +1111,7 @@ P_PROCESS_MESSAGES()
        app_key *Key = Input->Text.Buffer + Id;
        Input->Text.Count += 1;
        b32 Handled = true;
-       
+                            
        if(Shift)   Key->Modifiers |= PlatformKeyModifier_Shift;
        if(Control) Key->Modifiers |= PlatformKeyModifier_Control;
        if(Alt)     Key->Modifiers |= PlatformKeyModifier_Alt;
@@ -1230,7 +1230,7 @@ P_PROCESS_MESSAGES()
         else
         {
          Input->Text.Count -= 1;
-         DebugBreakMsg("Unhandled special key(%lu): %s (Consider adding it to the if statement above)", Symbol, LinuxReturnStringForSymbol(Symbol));
+         DebugBreakMsg("Unhandled special key(%lu): %s (Consider adding it to the if statement above\n)", Symbol, LinuxReturnStringForSymbol(Symbol));
          Handled = false;
         }
        }
@@ -1454,10 +1454,8 @@ P_LOAD_APP_CODE()
  
  if(Size && (!Code->Loaded || WasWritten))
  {
-  Code->LastWriteTime = CurrentWriteTime;
-  
-  
-  
+        Code->LastWriteTime = CurrentWriteTime;
+        
   if(KeepOldDLLsAllocated)
   {
    str8 TempDLLFileName;

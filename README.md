@@ -37,5 +37,10 @@ Windows only!
 
 My C port of the wsdcom utility.
 
+## Wordled (-Wordled)
+Impress your friends with Wordle drawings!
+
+`Wordled` is a GUI application that lets you draw patterns such that you can later input them in the [Wordle](https://www.nytimes.com/games/wordle/index.html) game.  It will then generate the guesses to achieve the required pattern.
+
 ## Cling
 The self-hosting C build script and metaprogram for all projects. 

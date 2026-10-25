@@ -352,7 +352,7 @@ LinuxSetDebuggerAttached()
  for EachIndex(Idx, Out.Size)
  {
   str8 Search = S8From(Out, Idx);
-  if(S8Match(Search, TracerPidKey, true))
+  if(S8Match(Search, TracerPidKey, S8MatchFlag_Prefix))
   {
    Idx += TracerPidKey.Size;
    

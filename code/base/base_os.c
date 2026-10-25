@@ -122,7 +122,7 @@ CmdLineGetEntry(cmd_line *CmdLine, str8 Flag)
  {
   cmd_line_entry *Entry = CmdLine->Entries + Idx;
   
-  if(S8Match(Entry->Name, Flag, false))
+  if(S8Match(Entry->Name, Flag, S8MatchFlag_None))
   {
    Result = Entry;
    break;
