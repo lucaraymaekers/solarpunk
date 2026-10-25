@@ -40,7 +40,7 @@ paths =
  //{ .path = "code/wsdcom/",        .recursive = true,  .relative = true, },
  //{ .path = "code/lsd/",           .recursive = true,  .relative = true, },
  //{ .path = "code/pp/",            .recursive = true,  .relative = true, },
- //{ .path = "code/school/sampler", .recursive = true,  .relative = true, },
+ { .path = "code/school/sampler", .recursive = true,  .relative = true, },
 };
 
 load_paths =
@@ -105,16 +105,16 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
-    .build_sampler = 
-    {
-        .out = "*compilation*", 
-        .linux = "./code/build.sh -Meta -Sampler",
-        .win = ".\\code\\build.bat -Meta -Sampler",
-        .save_dirty_files = true,
-        .footer_panel = false,
-        .cursor_at_end = false,
-    },
-    .build_pp = 
+ .build_sampler = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -Meta -Sampler",
+  .win = ".\\code\\build.bat -Meta -Sampler",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_pp = 
  {
   .out = "*compilation*", 
   .linux = "./code/build.sh -Meta -PP",
@@ -123,17 +123,26 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
-    
-    .sampler =
-    {
-        .out = "*compilation*",
-        .linux = "./build/sampler -type=asm -compile -run",
-        .win = ".\build\sampler -type=asm -compile -run",
-        .save_dirty_files = true,
-        .footer_panel = false,
-        .cursor_at_end = false,
-    },
-    
+ 
+ .sampler_asm =
+ {
+  .out = "*compilation*",
+  .linux = "./build/sampler -type=asm -compile -run",
+  .win = ".\build\sampler -type=asm -compile -run",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .sampler_c =
+ {
+  .out = "*compilation*",
+  .linux = "./build/sampler -type=c -compile",
+  .win = ".\build\sampler -type=c -compile",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ 
  .run = 
  {
   .out = "*compilation*", 
@@ -164,7 +173,7 @@ commands =
 
 fkey_command =
 {
- .F1 = "build_pp",
+ .F1 = "sampler_c",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",

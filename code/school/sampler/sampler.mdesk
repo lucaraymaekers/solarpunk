@@ -1,3 +1,4 @@
+//~ Tables
 @table(Name, Path)
 S_Types:
 {
@@ -5,7 +6,14 @@ S_Types:
  { c   "c_fundamentals"        }
 }
 
+@table(Name)
+S_Config:
+{
+ { "12" }
+}
 
+//~ Data
+//- S_Types 
 @data_enum("type_kind")
 TypeKindEnum:
 {
@@ -31,31 +39,41 @@ TypePaths:
  ```;
 }
 
+//- Config 
+@data_table("str8")
+ConfigTable:
+{
+ @expand(S_Config) @strings
+  ```{$(Name)},
+ ```;
+}
+
+//- Templates 
+
 @data
 AsmSample:
 {
  "str8 AsmTemplateText = {(u8 *)";
  @strings @cstring_lit
-  """
-        $NOMOD51
-        
-        ;~ Defines
-        $include "aducgd1def.asm"
-        
-        ;~ Inits
-        .org 0x0000
-        
-        ;~ EntryPoint
-        mov sp, #0x7F
-    
-    loop: 
-    
-    ljmp loop
-        
-        ;~ Libraries
-        $include "aducgd1inc.asm"
-        
-        end
+  """$NOMOD51
+  
+  ;~ Defines
+  $include "aducgd1def.asm"
+  
+  ;~ Inits
+  .org 0x0000
+  
+  ;~ EntryPoint
+  mov sp, #0x7F
+ 
+ loop: 
+ 
+ ljmp loop
+  
+  ;~ Libraries
+  $include "aducgd1inc.asm"
+  
+  end
   """;
   "};";
 }
@@ -65,8 +83,7 @@ CSample:
 {
  "str8 CTemplateText = {(u8 *)";
  @strings @cstring_lit
-  """
-#define _CRT_SECURE_NO_WARNINGS
+  """#define _CRT_SECURE_NO_WARNINGS 1
 #include <stdio.h>
  
  int main(int ArgCount, char **Args)

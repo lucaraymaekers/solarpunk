@@ -37,6 +37,7 @@ BASE_ENTRY_POINT()
  b32 Copy = false;
  b32 Compile = false;
  b32 Run = false;
+ b32 Convert = false;
  
  //- Command line options 
  cmd_line *CmdLine = &Params->CmdLine;
@@ -46,7 +47,7 @@ BASE_ENTRY_POINT()
  Copy = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("copy"), S8("copy previous sample when creating"));
  Compile = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("compile"), S8("compile sample"));
  Run = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("run sample"));
- 
+ Convert = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("convert"), S8("convert spaces to tabs in sample"));
  if(Copy || Compile || Run) Last = true;
  if(Copy) New  = true;
  
@@ -83,6 +84,7 @@ BASE_ENTRY_POINT()
  { 
   cmd_line_entry *ChapterIdxEntry = CmdLineGetEntryAndAddHelp(CmdLine, &Help, S8("chapter"), S8("Use this chapter idx when -type=c is used"));
   ChapterIdx = ChapterIdxEntry->First->V;
+  if(!ChapterIdx.Size) ChapterIdx = ConfigTable[0];
  }
  
  // Explicit Idx
@@ -170,7 +172,7 @@ BASE_ENTRY_POINT()
   u64 Idx = (HasExplicitIdx ? ExplicitIdx : LastIdx);
   if(Copy && Last) Idx += 1;
   
-  str8 Path = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
+  str8 FilePath = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
   
   if(New)
   {
@@ -182,51 +184,92 @@ BASE_ENTRY_POINT()
    }
    
    Log(CSS8(LogFormat), TypePaths[Type], Idx);
-   OS_WriteEntireFile(CSS8(Path), TemplateText);
-  }
-        
-        str8 FileName = Str8Fmt(CSS8(FileNameFormat), Idx);
-        str8 FileNameWithoutExt = S8CutFromChar(FileName, '.', false);
-        
-  if(Compile) 
-  {
-            if(0) {}
-            else if(Type == Type_c)
-{                
-                if(!Cng_Build(S8("Sampler"), NilP(cng_build_options), S8ArrayLit(Path)).Succeeded) 
-                    goto Fail;
-            }
-            else if(Type == Type_asm)
-            {
-                if(OS_Is(OSKind_Linux))
-{
-                    Log("[Sampler asm51]\n");
-                    
-                    Log("Preprocessing %S\n", FileName);
-                    cng_command_result CommandResult = Cng_RunCommand(Str8Fmt("./pp -o=%S.pp %S", FileNameWithoutExt, Path));
-                    if(!CommandResult.Succeeded)
-                        goto Fail;
-                    
-                    Log("Compiling %S\n", FileName);
-                    if(!Cng_RunCommand(Str8Fmt("asm51 -n -a -o %S.hex %S.pp", 
-                                               FileNameWithoutExt, FileNameWithoutExt)).Succeeded) 
-                    goto Fail;
-}
-            }
+   OS_WriteEntireFile(CSS8(FilePath), TemplateText);
   }
   
-  if(Run)
-        {
-            if(0) {}
-            else if(Type == Type_c)
-{
-            str8 ExeFilePath = S8Cat(S8("." SLASH), FileNameWithoutExt);
-   Cng_RunCommand(ExeFilePath);
-            }
-            else if(Type == Type_asm)
-            {
-                Cng_RunCommand(Str8Fmt("." SLASH "lsd -run %S.hex", FileNameWithoutExt));
-            }
+  if(Convert)
+  {
+   str8 InFile = OS_ReadEntireFileIntoMemory(CSS8(FilePath));
+   str8 OutFile = PushS8(Arena, InFile.Size);
+   b32 OnLineStart = true;
+   for EachIndex(At, InFile.Size)
+   {
+    if(OnLineStart && InFile.Data[At] == ' ')
+    {
+     OutFile.Data[At] = '\t';
+    }
+    else
+    {
+     OutFile.Data[At] = InFile.Data[At];
+    }
+    
+    if(InFile.Data[At] == '\n')
+    {
+     OnLineStart = true;
+    }
+    else if(!IsWhiteSpace(InFile.Data[At]))
+    {
+     OnLineStart = false;
+    }
+   }
+   
+   OS_FreeFileMemory(InFile);
+   OS_WriteEntireFile(CSS8(FilePath), OutFile);
+  }
+  
+  str8 FileName = Str8Fmt(CSS8(FileNameFormat), Idx);
+  str8 FileNameWithoutExt = S8CutFromChar(FileName, '.', false);
+  
+  if(Compile) 
+  {
+   if(0) {}
+   else if(Type == Type_c)
+   {                
+    if(!Cng_Build(S8("Sampler"), NilP(cng_build_options), S8ArrayLit(FilePath)).Succeeded) 
+     goto Fail;
+   }
+   else if(Type == Type_asm)
+   {
+    if(OS_Is(OSKind_Linux))
+    {
+     Log("[Sampler asm51]\n");
+     
+     Log("Preprocessing %S\n", FileName);
+     cng_command_result CommandResult = Cng_RunCommand(Str8Fmt("./pp -o=%S.pp %S", FileNameWithoutExt, FilePath));
+     if(!CommandResult.Succeeded)
+      goto Fail;
+     
+     Log("Compiling %S\n", FileName);
+     if(!Cng_RunCommand(Str8Fmt("asm51 -n -a -o %S.hex %S.pp", 
+                                FileNameWithoutExt, FileNameWithoutExt)).Succeeded) 
+      goto Fail;
+    }
+    else if(OS_Is(OSKind_Windows))
+    {
+     Log("Compiling %S\n", FileName);
+     str8 BuildCommand = Str8Fmt("c51asm.exe "
+                                 "--quiet "
+                                 "--include %S "
+                                 "-o %S.hex %S",
+                                 PrefixPath, FileNameWithoutExt, FilePath);
+     if(!Cng_RunCommand(BuildCommand).Succeeded)
+      goto Fail;
+    }
+   }
+  }
+  
+  if(!ShouldQuit && Run)
+  {
+   if(0) {}
+   else if(Type == Type_c)
+   {
+    str8 ExeFilePath = S8Cat(S8("." SLASH), FileNameWithoutExt);
+    Cng_RunCommand(ExeFilePath);
+   }
+   else if(Type == Type_asm)
+   {
+    Cng_RunCommand(Str8Fmt("." SLASH "lsd -run %S.hex", FileNameWithoutExt));
+   }
   }
  }
  
@@ -240,8 +283,8 @@ BASE_ENTRY_POINT()
       "%S\n", 
       HelpText);
  }
-    
-    Fail:;
-    
+ 
+ Fail:;
+ 
  return 0;
 }

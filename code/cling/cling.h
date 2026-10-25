@@ -55,12 +55,11 @@ struct cng_build_options
 typedef struct cng_command_result cng_command_result; 
 struct cng_command_result
 {
-    b32 Succeeded;
+ b32 Succeeded;
 };
 
 //~ Globals
 global_variable str8_array *GlobalSelectedArray = 0;
-global_variable char **GlobalEnv = 0;
 
 //~ Platform API
 // NOTE(luca): Implement these when adding a new platform.
@@ -554,12 +553,6 @@ internal void
 Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
 {
  arena *Arena = GetScratch();
- 
- // Globals
- {
-  GlobalCurrentOS = CngOS_Windows;
-  GlobalEnv = Env;
- }
  
  str8 NoRebuildString = Win32GetEnvironmentVar(CLING_ARG_NOREBUILD);
  str8 ParentPidString = Win32GetEnvironmentVar(CLING_ARG_PARENTPID);
