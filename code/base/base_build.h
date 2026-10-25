@@ -60,6 +60,9 @@
 //- Cling 
 // NOTE(luca): Default is not defined
 //#define CLING_MSVC_SETUP "C:\\msvc\\setup_x64.bat"
+#if !defined(CLING_INTERNAL)
+# define CLING_INTERNAL 0
+#endif
 
 //- Editor 
 #if !defined(EDITOR_INTERNAL)

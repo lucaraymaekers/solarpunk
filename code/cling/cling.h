@@ -141,7 +141,9 @@ Cng_Build__(str8 BuildName,
             str8 OutputName)
 {
  cng_command_result Result = {0};
- 
+    
+    Prof_TimeFunc()
+    {
 #if OS_LINUX
  // Find out compiler if it is CC.
  {
@@ -430,7 +432,8 @@ Cng_Build__(str8 BuildName,
   
   Result = Cng_RunCommand(Command);
  }
- 
+    }
+    
  return Result;
 };
 

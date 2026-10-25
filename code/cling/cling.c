@@ -13,6 +13,8 @@ NO_WARNINGS_BEGIN
 #include "lib/metadesk/md.c"
 NO_WARNINGS_END
 
+#include "rl/rl_profile.h"
+
 #include "cling/cling.h"
 
 //~ Types
@@ -175,7 +177,11 @@ AddHelpAndBuildSource(cmd_line *CmdLine, str8_array *Help, cng_build_options *Op
 //~ Entrypoint
 BASE_ENTRY_POINT()
 {
- Cng_InitAndRebuildSelf(Params->ArgCount, Params->Args, Params->Env);
+#if CLING_INTERNAL
+    Prof_Profile()
+#endif
+    {
+    Cng_InitAndRebuildSelf(Params->ArgCount, Params->Args, Params->Env);
  
  // Change to build directory
  {        
@@ -720,6 +726,7 @@ BASE_ENTRY_POINT()
   str8 HelpText = Cng_S8ArrayJoinFrom(&Help, '\n');
   Log("\nNo target provided.\n\n%S\n", HelpText);
  }
- 
+    }
+    
  return 0;
 }

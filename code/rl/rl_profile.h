@@ -33,20 +33,19 @@ struct prof_block
  prof_marker *Marker;
 };
 
-
 //~ Globals 
 global_variable prof_profiler Prof; 
 
 //~ Macros
-#define Prof_TimeScope__(Block, I, Label) \
-for(prof_block Block = Prof_BlockBegin(Label, __COUNTER__ + 1), *I = 0;\
-I == 0; \
-Prof_BlockEnd(Block), I = (prof_block *)1)
-#define Prof_TimeScope_(Label, Counter) \
-Prof_TimeScope__(Glue(Block, Counter), Glue(BlockI, Counter), Label)
-#define Prof_TimeScope(Label) Prof_TimeScope_(Label, __COUNTER__)
-#define Prof_TimeScopeFunc() Prof_TimeScope(__FUNCTION__)
+#define _Prof_TimeScope(Label, Counter) \
+for(prof_block Glue(Block, Counter) = Prof_BlockBegin(Label, Counter + 1), \
+*Glue(I, Counter) = 0; \
+Glue(I, Counter) == 0; \
+Prof_BlockEnd(Glue(Block, Counter)), \
+Glue(I, Counter) = (prof_block *)1)
 
+#define Prof_TimeScope(Label) _Prof_TimeScope(Label, __COUNTER__)
+#define Prof_TimeFunc() Prof_TimeScope(__FUNCTION__)
 #define Prof_Profile() DeferLoop(Prof_StartProfile(), Prof_EndProfileAndPrint())
 
 //~ Functions
