@@ -462,7 +462,7 @@ P_INIT()
   }
  }
  
-#if RL_PLATFORM_FORCE_X11
+#if RL_PLATFORM_FORCE_SOFTWARE_RENDERING
  b32 OpenGLMode = false;
 #else
  b32 OpenGLMode = true;
@@ -1111,7 +1111,7 @@ P_PROCESS_MESSAGES()
        app_key *Key = Input->Text.Buffer + Id;
        Input->Text.Count += 1;
        b32 Handled = true;
-                            
+       
        if(Shift)   Key->Modifiers |= PlatformKeyModifier_Shift;
        if(Control) Key->Modifiers |= PlatformKeyModifier_Control;
        if(Alt)     Key->Modifiers |= PlatformKeyModifier_Alt;
@@ -1454,8 +1454,8 @@ P_LOAD_APP_CODE()
  
  if(Size && (!Code->Loaded || WasWritten))
  {
-        Code->LastWriteTime = CurrentWriteTime;
-        
+  Code->LastWriteTime = CurrentWriteTime;
+  
   if(KeepOldDLLsAllocated)
   {
    str8 TempDLLFileName;

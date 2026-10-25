@@ -29,10 +29,10 @@ typedef HGLRC WINAPI wglCreateContextAttribsARBProc(HDC hDC,
 global_variable wglCreateContextAttribsARBProc *wglCreateContextAttribsARB;
 
 //~ Types
-
 typedef struct win32_context win32_context;
 struct win32_context
 {
+ BITMAPINFO BitmapInfo;
  HWND Window;
  HDC OwnDC;
  u8 ClipboardBuffer[KB(64)];
@@ -479,8 +479,10 @@ P_INIT()
    {
     HDC OwnDC = GetDC(Window);
     
+    // TODO(luca): ?
     int Win32RefreshRate = GetDeviceCaps(OwnDC, VREFRESH);
     
+#if !RL_PLATFORM_FORCE_SOFTWARE_RENDERING    
     PIXELFORMATDESCRIPTOR PixelFormat = {0};
     PixelFormat.nSize = sizeof(PixelFormat);
     PixelFormat.nVersion = 1;
@@ -522,6 +524,16 @@ P_INIT()
     wglMakeCurrent(OwnDC, GLContext);
 #endif
     
+#else
+    // NOTE(luca): Negative height means the image is top-down.
+    Context->BitmapInfo.bmiHeader.biSize = sizeof(Context->BitmapInfo.bmiHeader);
+    Context->BitmapInfo.bmiHeader.biWidth = Buffer->Dim.X;
+    Context->BitmapInfo.bmiHeader.biHeight = -Buffer->Dim.Y;
+    Context->BitmapInfo.bmiHeader.biPlanes = 1;
+    Context->BitmapInfo.bmiHeader.biBitCount = 32;
+    Context->BitmapInfo.bmiHeader.biCompression = BI_RGB;
+#endif
+    
     Context->OwnDC = OwnDC;
     Context->Window = Window;
     
@@ -538,7 +550,16 @@ P_UPDATE_IMAGE()
  win32_context *Win32 = (win32_context *)Context; 
  if(Win32)
  {
+#if RL_PLATFORM_FORCE_SOFTWARE_RENDERING
+  StretchDIBits(Win32->OwnDC,
+                0, 0, Buffer->Dim.X, Buffer->Dim.Y,
+                0, 0, Buffer->Dim.X, Buffer->Dim.Y,
+                Buffer->Pixels,
+                &Win32->BitmapInfo,
+                DIB_RGB_COLORS, SRCCOPY);
+#else
   SwapBuffers(Win32->OwnDC);
+#endif
  }
 }
 

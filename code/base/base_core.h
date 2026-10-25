@@ -213,7 +213,11 @@ Swap(t& A, t& B) { t T = A; A = B; B = T; }
 #endif
 
 #define Nil(type) (type){0}
-#define NilP(type) &(Nil(type))
+#if LANG_C
+# define NilP(type) &(Nil(type))
+#else
+# define NilP(type) 0
+#endif
 
 #if OS_LINUX || OS_ANDROID
 # define OS_SlashChar '/'
