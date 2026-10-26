@@ -9,7 +9,7 @@ S_Types:
 @table(Name)
 S_Config:
 {
- { "12" }
+ { "0" }
 }
 
 //~ Data

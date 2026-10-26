@@ -5,7 +5,6 @@
 // - 4coder plugin to create new sample and open new file in buffer.
 //   - This plugin must also close all other samples, because otherwise the indexing will be
 //     wrong.
-// - convert spaces to tabs
 //-
 
 //~ Libraries
@@ -109,10 +108,12 @@ BASE_ENTRY_POINT()
  }
  
  str8 ExeDirPath = S8CutFromChar(CmdLine->ExePath, OS_SlashChar, false);
- str8 PrefixPath = Str8Fmt(".." SLASH "code" SLASH "school" SLASH "%S", 
-                           TypePaths[Type]);
  // Change directory to ./build so artifacts get placed there
+ // NOTE(luca): Null-terminate
  str8 BuildPath = Str8Fmt("%S", ExeDirPath);
+ 
+ str8 PrefixPath = Str8Fmt("%S" SLASH ".." SLASH "code" SLASH "school" SLASH "%S", 
+                           BuildPath, TypePaths[Type]);
  OS_ChangeDirectory(CSS8(BuildPath));
  
  //- Type specific inits 
