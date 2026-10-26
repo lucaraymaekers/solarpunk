@@ -122,7 +122,7 @@ Button_((ui_button_params){ \
 .Padding = UI_SizePx(0.f, 1.f), \
 .TextColor = Color_ButtonText, \
 .BackgroundColor = Color_ButtonBackground, \
-.DisabledBackgroundColor = {U32ToV4Arg(0xFF616E88)}, \
+.DisabledBackgroundColor = Color_Night3, \
 ##__VA_ARGS__})
 
 typedef struct ui_button_result ui_button_result;

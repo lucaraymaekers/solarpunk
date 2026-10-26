@@ -1,3 +1,7 @@
+//-
+// Platform layer
+//-
+
 //~ Libraries 
 #define BASE_EXTERNAL_LIBS 1
 #define BASE_CONSOLE_APPLICATION 0
@@ -240,9 +244,16 @@ BASE_ENTRY_POINT()
   u64 PlatformMemorySize = GB(4);
   u64 AppMemorySize = GB(1);
   
-  // NOTE(luca): Total memory also for game.
-  arena *PermanentArena = ArenaAlloc(.Size = PlatformMemorySize, .Offset = TB(0));
-  FrameArena = ArenaAlloc();
+  // NOTE(luca): Total memory for platform and app.
+  u64 PermanentMemoryOffset = TB(2);
+  u64 ReadOnlyMemoryOffset = TB(3);
+#if OS_LINUX
+  PermanentMemoryOffset = 0;
+  ReadOnlyMemoryOffset = 0;
+#endif
+  
+  arena *PermanentArena = ArenaAlloc(.Size = PlatformMemorySize, .Offset = PermanentMemoryOffset);
+  FrameArena = PushArena(PermanentArena, ArenaAllocDefaultSize, false);
   
   SetStringsScratch(FrameArena);
   
@@ -320,10 +331,10 @@ BASE_ENTRY_POINT()
   
   str8 LibraryPath = Str8Fmt(Stringify(RL_PLATFORM_APP_NAME) ".%s", (CurrentOSLinux ? "so" : "dll"));
   Code.LibraryPath = PathFromExe(PermanentArena, LibraryPath);
-        
+  
   //- Debug UI 
   b32 ShowDebugUI = false;
-        
+  
 #if RL_PLATFORM_DEBUG_UI
   v2 DebugUIOffset = {0};
   v2 DebugUIDragOffset = {0};
@@ -341,20 +352,20 @@ BASE_ENTRY_POINT()
    InitFont(&TextFont, FontPath);
    
    gladLoaderLoadGL();
-
+   
 #if 1   
    GLint Major, Minor;
    glGetIntegerv(GL_MAJOR_VERSION, &Major);
    glGetIntegerv(GL_MINOR_VERSION, &Minor);
    Log("Loaded OpenGL %d.%d\n", Major, Minor);
-   #endif
-
+#endif
+   
    RenderInit(&DebugRender);
    arena *FontAtlasArena = PushArena(PermanentArena, MB(150), false);
    // TODO(luca): Building this atlas is slow and tanks our startup time.  So we should speed it up by using a glyph cache.
    RenderBuildAtlas(FontAtlasArena, &DebugRenderAtlas, &TextFont, &IconsFont, DebugHeightPx);
    
-   arena *ROArena = ArenaAlloc();
+   arena *ROArena = ArenaAlloc(.Offset = ReadOnlyMemoryOffset);
    
    // Init UI state
    {
@@ -567,20 +578,20 @@ BASE_ENTRY_POINT()
       RemoveTextButton(NewInput, Id);
      }
     }
-                
+    
 #if RL_PLATFORM_DEBUG_UI
-                if(Replay.IsStepping)
-                {
-                    // NOTE(luca): Draw a Shadow cursor
-                    app_input *AppInput = (app_input *)((u8 *)Replay.Buffer + Replay.PlayingPos);
-                    
-                    v4 Dest = RectFromCenterDim(V2V2S32(AppInput->Mouse.Pos), V2(5.f, 5.f)); 
-                    DrawRect(Dest, V4F32(1.f), 0.f, 0.f, 0.f);
-                    DrawRect(Dest, Color_Black, 0.f, 1.f, 0.f);
-                }
-                
+    if(Replay.IsStepping)
+    {
+     // NOTE(luca): Draw a Shadow cursor
+     app_input *AppInput = (app_input *)((u8 *)Replay.Buffer + Replay.PlayingPos);
+     
+     v4 Dest = RectFromCenterDim(V2V2S32(AppInput->Mouse.Pos), V2(5.f, 5.f)); 
+     DrawRect(Dest, V4F32(1.f), 0.f, 0.f, 0.f);
+     DrawRect(Dest, Color_Black, 0.f, 1.f, 0.f);
+    }
+    
     if(ShowDebugUI)
-                {
+    {
      if(DebugUIBox == 0) DebugUIBox = UI_BoxAlloc(UI_State->Arena);
      ui_box *Root = DebugUIBox;
      Root->FixedSize = V2V2S32(WindowBuffer.Dim);

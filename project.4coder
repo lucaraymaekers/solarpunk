@@ -28,16 +28,16 @@ blacklist_patterns =
 
 paths = 
 {
-    //- Libs
-    { .path = ".",            .recursive = false, .relative = true, },
+ //- Libs
+ { .path = ".",            .recursive = false, .relative = true, },
  { .path = "code",         .recursive = false, .relative = true, },
  { .path = "code/base",    .recursive = true,  .relative = true, },
  { .path = "code/lib",     .recursive = true,  .relative = true, },
  { .path = "code/rl/",     .recursive = true,  .relative = true, },
  { .path = "code/cling/",  .recursive = true,  .relative = true, },
-    
-    //- Targets
-    //{ .path = "code/muze/",          .recursive = true,  .relative = true, },
+ 
+ //- Targets
+ //{ .path = "code/muze/",          .recursive = true,  .relative = true, },
  { .path = "code/wordled/",       .recursive = true,  .relative = true, },
  //{ .path = "code/editor/",        .recursive = true,  .relative = true, },
  //{ .path = "code/compenhance/",   .recursive = true,  .relative = true, },
@@ -82,16 +82,16 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
-    .build_wordled = 
-    {
-        .out = "*compilation*", 
-        .linux = "./code/build.sh -Meta -Wordled",
-        .win = ".\\code\\build.bat -Meta -Wordled",
-        .save_dirty_files = true,
-        .footer_panel = false,
-        .cursor_at_end = false,
-    },
-    .build_editor = 
+ .build_wordled = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -Meta -Wordled",
+  .win = ".\\code\\build.bat -Meta -Wordled",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_editor = 
  {
   .out = "*compilation*", 
   .linux = "./code/build.sh -Meta -Editor",
