@@ -247,7 +247,7 @@ BASE_ENTRY_POINT()
   // NOTE(luca): Total memory for platform and app.
   u64 PermanentMemoryOffset = TB(2);
   u64 ReadOnlyMemoryOffset = TB(3);
-#if OS_LINUX
+#if !RL_PLATFORM_INTERNAL
   PermanentMemoryOffset = 0;
   ReadOnlyMemoryOffset = 0;
 #endif
