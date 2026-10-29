@@ -56,7 +56,9 @@
 #if !defined(RL_LIBS_IMPLEMENTATION)
 # define RL_LIBS_IMPLEMENTATION 0
 #endif
-
+#if !defined(RL_PROFILE)
+# define RL_PROFILE 0
+#endif
 //- Incompatible options 
 #if defined(RL_PLATFORM_FORCE_SOFTWARE_RENDERING) && RL_PLATFORM_FORCE_SOFTWARE_RENDERING
 # if defined(RL_PLATFORM_DEBUG_UI)

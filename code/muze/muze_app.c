@@ -34,7 +34,7 @@ NO_WARNINGS_END
 # pragma comment(linker, "/export:UpdateAndRender")
 #endif
 
-//~ 
+//~ Macros
 #define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
 #define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
 #define IsNilNote(Note) CheckNil(Note, NilNote)
@@ -52,12 +52,6 @@ global_variable piece_note *NilPieceNote;
 global_variable piece *NilPiece;
 
 global_variable f32 *dtForFrame;
-
-global_variable b32 NotePianoColors[] =
-{
- true, false, true, false, true, true, false, true, false, true, false, true 
-};
-StaticAssert(ArrayCount(NotePianoColors) == Note_Count, NotePianoColorsSizeCheck);
 
 //~ Helpers
 internal f32
@@ -79,7 +73,6 @@ InitReadOnlyGlobals(arena *Arena)
 }
 
 //~ Panels
-
 global_variable arena *PanelArena = 0;
 global_variable b32 PanelAppendToParent = false;
 global_variable panel *PanelCurrent = 0;
@@ -1419,7 +1412,7 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
     AddNoteToSelection(&NoteInput, Dest, App, Voice, Sel, Note);
    }
    
-   b32 HasSharp = !NotePianoColors[PitchClass];
+   b32 HasSharp = !NoteIsWhite[PitchClass];
    if(HasSharp)
    {
     // TODO(luca): Draw sharp
@@ -1625,21 +1618,35 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
    MarkerPos.X = Pos.X + BarStart + Remainder*BeatWidth;
    
-   f32 Width = StaffLineWidth;
    if(Kind == PieceMarkerKind_PrevPlay)
    {
-    // NOTE(luca): By updating position afterwards we ensure that the first rectangle
-    // will be the full distance.  We swap in case Width would have been negative.
-    Width = AbsF32(Piece->PrevPlayPos.X - MarkerPos.X); 
-    if(MarkerPos.X > Piece->PrevPlayPos.X) Swap(Piece->PrevPlayPos.X, MarkerPos.X); 
+    // NOTE(luca): We draw first, then update the position.  This ensures that the first
+    // trail will start from the end.
+    
+    f32 Width = AbsF32(Piece->PrevPlayPos.X - MarkerPos.X); 
+    {
+     // The whole width is a bit much
+     Width = Min(Width, 50.f);
+     // This gets rid of the wobbly cursor when the width is near 0
+     if(Width <= 20.f) Width = 0.f;
+    }
+    
+    // Draw trail
+    {
+     v2 TrailPos = Piece->PrevPlayPos;
+     if(Piece->PrevPlayPos.X > MarkerPos.X) TrailPos.X -= Width;
+     DrawFilledRect(TrailPos, V2(Width, StaffHeight), Color);
+    }
+    
+    // Update trail
     if(*dtForFrame > 0.f)
     {
      Piece->PrevPlayPos.X += (MarkerPos.X - Piece->PrevPlayPos.X)*UI_State->AnimSpeed;
+     Piece->PrevPlayPos.Y += (MarkerPos.Y - Piece->PrevPlayPos.Y)*UI_State->AnimSpeed;
     }
-    
    }
    
-   DrawFilledRect(MarkerPos, V2(Width, StaffHeight), Color);
+   DrawFilledRect(MarkerPos, V2(StaffLineWidth, StaffHeight), Color);
   }
  }
  
@@ -1712,7 +1719,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
      NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
      
-#if MUZE_INTERNAL && 1
+#if MUZE_INTERNAL && 0
      {
       v4 Colors[] = {Color_Blue, Color_Yellow};
       DrawFilledRect(NotePos, V2(BeatWidth, 4.f), Colors[DebugColorCounter%2]);
@@ -1870,7 +1877,7 @@ UI_CUSTOM_DRAW(CustomDrawPianoRoll)
     
     // NOTE(luca): Minus one for pedal
     u8 PitchClass = ((MinPitch + (u8)Idx)%Note_Count);
-    b32 White = NotePianoColors[PitchClass];
+    b32 White = NoteIsWhite[PitchClass];
     
     // NOTE(luca): First note is pedal.
     v4 KeyColor = (Idx == 0 ?
@@ -1938,7 +1945,7 @@ UI_CUSTOM_DRAW(CustomDrawPianoRoll)
                     (RollY + StartY));
     
     u8 PitchClass = (Note->Pitch%Note_Count);
-    b32 White = NotePianoColors[PitchClass];
+    b32 White = NoteIsWhite[PitchClass];
     
     note_node *Sel = FindSelForNote(Voice->NoteSel, Note);
     
@@ -3186,29 +3193,40 @@ UPDATE_AND_RENDER(UpdateAndRender)
              Piece->NoteCount = 0;
              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
              
-#if 1
+#if 0
              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 7.f);
              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 8.f);
-#elif 1
+#elif 0
              PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
+#elif 0
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
 #elif 1
-             
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
 #endif
              
 #endif
@@ -3279,7 +3297,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 
                }
                
-#if MUZE_INTERNAL     
+#if MUZE_INTERNAL && 0 
                UI_FontKind(FontKind_Text)
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                 if(M_Button(S8("Set to end")))
@@ -3744,7 +3762,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
                             UI_BoxFlag_DrawDisplayString|
                             UI_BoxFlag_CenterTextHorizontally|
                             UI_BoxFlag_CenterTextVertically)->DisplayString =
-                  Str8Fmt("Pos: %.2f PrevPos: %.2f", Piece->PlayPos, Piece->PrevPlayPos);
+                  Str8Fmt("Pos: %.2f "
+                          "PrevPos: (%.2f,%.2f)", 
+                          Piece->PlayPos, 
+                          Piece->PrevPlayPos.X, Piece->PrevPlayPos.Y);
                 }
                 
                 

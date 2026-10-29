@@ -115,9 +115,10 @@ JSON_StringToFloat(str8 In)
 }
 
 
-json_token *JSON_ParseElement(str8 Buffer, u64 *Pos);
+internal json_token *JSON_ParseElement(str8 Buffer, u64 *Pos);
 
-void JSON_ParseList(str8 Buffer, json_token *Token, json_token_type Type, u64 *Pos, u8 EndChar)
+internal void 
+JSON_ParseList(str8 Buffer, json_token *Token, json_token_type Type, u64 *Pos, u8 EndChar)
 {
  Token->Type = Type;
  *Pos += 1;
@@ -138,11 +139,12 @@ void JSON_ParseList(str8 Buffer, json_token *Token, json_token_type Type, u64 *P
  }
 }
 
-json_token *JSON_ParseElement(str8 Buffer, u64 *Pos)
+internal json_token *
+JSON_ParseElement(str8 Buffer, u64 *Pos)
 {
  json_token *Token = (json_token *)malloc(sizeof(json_token));
  
- Prof_TimeScopeFunc()
+ Prof_TimeFunc()
  {
   Assert(Token);
   MemoryZero(Token);
@@ -253,7 +255,8 @@ json_token *JSON_ParseElement(str8 Buffer, u64 *Pos)
  return Token;
 }
 
-json_token *JSON_LookupIdentifierValue(json_token *Token, str8 Identifier)
+internal json_token *
+JSON_LookupIdentifierValue(json_token *Token, str8 Identifier)
 {
  json_token *Found = &JSON_NilToken;
  
@@ -355,7 +358,8 @@ void JSON_FreeTokensNoRecursion(json_token *Token)
 }
 #endif
 
-void JSON_FreeTokens(json_token *Token)
+internal void 
+JSON_FreeTokens(json_token *Token)
 {
  while(Token)
  {

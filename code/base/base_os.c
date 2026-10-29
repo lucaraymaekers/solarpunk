@@ -164,6 +164,16 @@ CmdLineHasEntryAndAddHelp(cmd_line *CmdLine, str8_array *Help, str8 Flag, str8 D
  return Result;
 }
 
+str8 OS_PathFromExe(cmd_line *CmdLine, str8 Path)
+{
+    str8 Result = {0};
+    
+    str8 ExeDirPath = S8CutFromChar(CmdLine->ExePath, OS_SlashChar, false);
+    Result = S8Cat(ExeDirPath, Path);
+    
+    return Result;
+}
+
 #if OS_LINUX || OS_ANDROID
 # include "base_os_linux.c"
 #elif OS_WINDOWS

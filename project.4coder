@@ -38,13 +38,13 @@ paths =
  
  //- Targets
  //{ .path = "code/muze/",          .recursive = true,  .relative = true, },
- { .path = "code/wordled/",       .recursive = true,  .relative = true, },
+ //{ .path = "code/wordled/",       .recursive = true,  .relative = true, },
  //{ .path = "code/editor/",        .recursive = true,  .relative = true, },
- //{ .path = "code/compenhance/",   .recursive = true,  .relative = true, },
+ { .path = "code/compenhance/",   .recursive = true,  .relative = true, },
  //{ .path = "code/wsdcom/",        .recursive = true,  .relative = true, },
  //{ .path = "code/lsd/",           .recursive = true,  .relative = true, },
  //{ .path = "code/pp/",            .recursive = true,  .relative = true, },
- { .path = "code/school/sampler", .recursive = true,  .relative = true, },
+ //{ .path = "code/school/sampler", .recursive = true,  .relative = true, },
 };
 
 load_paths =
@@ -76,8 +76,8 @@ commands =
  .build_muze = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -Muze",
-  .win = ".\\code\\build.bat -Meta -Muze",
+  .linux = "./code/build.sh -Muze",
+  .win = ".\\code\\build.bat -Muze",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -85,8 +85,8 @@ commands =
  .build_wordled = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -Wordled",
-  .win = ".\\code\\build.bat -Meta -Wordled",
+  .linux = "./code/build.sh -Wordled",
+  .win = ".\\code\\build.bat -Wordled",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -94,8 +94,8 @@ commands =
  .build_editor = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -Editor",
-  .win = ".\\code\\build.bat -Meta -Editor",
+  .linux = "./code/build.sh -Editor",
+  .win = ".\\code\\build.bat -Editor",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -103,8 +103,8 @@ commands =
  .build_lsd = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -LSD",
-  .win = ".\\code\\build.bat -Meta -LSD",
+  .linux = "./code/build.sh -LSD",
+  .win = ".\\code\\build.bat -LSD",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -112,8 +112,8 @@ commands =
  .build_school = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -School",
-  .win = ".\\code\\build.bat -Meta -School",
+  .linux = "./code/build.sh -School",
+  .win = ".\\code\\build.bat -School",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -121,8 +121,8 @@ commands =
  .build_sampler = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -Sampler",
-  .win = ".\\code\\build.bat -Meta -Sampler",
+  .linux = "./code/build.sh -Sampler",
+  .win = ".\\code\\build.bat -Sampler",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -130,27 +130,26 @@ commands =
  .build_pp = 
  {
   .out = "*compilation*", 
-  .linux = "./code/build.sh -Meta -PP",
-  .win = ".\\code\\build.bat -Meta -PP",
+  .linux = "./code/build.sh -PP",
+  .win = ".\\code\\build.bat -PP",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
  },
- 
- .sampler_asm =
+ .build_haversine_processor = 
  {
-  .out = "*compilation*",
-  .linux = "./build/sampler -type=asm -compile -run",
-  .win = ".\build\sampler -type=asm -compile -run",
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -HaversineProcessor",
+  .win = ".\\code\\build.bat -HaversineProcessor",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
  },
- .sampler_c =
+ .build_haversine_generator = 
  {
-  .out = "*compilation*",
-  .linux = "./build/sampler -type=c -compile",
-  .win = ".\build\sampler -type=c -compile",
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -HaversineGenerator",
+  .win = ".\\code\\build.bat -HaversineGenerator",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -186,7 +185,7 @@ commands =
 
 fkey_command =
 {
- .F1 = "build_wordled",
+ .F1 = "rl_compile_sample",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",

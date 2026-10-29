@@ -372,7 +372,7 @@ RemoveTextButton(app_input *Input, app_key_id Id)
 }
 
 #define EachTextButton(Key, Id, Input) \
-EachTextButton_(Key, Id, Input, Glue(Counter, __COUNTER__))
+EachTextButton_(Key, Id, Input, Var(Counter))
 #define EachTextButton_(Key, Id, Input, Counter) \
 (app_key_id Id = Input->Text.First; \
 Id != 0; \

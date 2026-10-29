@@ -924,22 +924,27 @@ iprof, more accurate attribution (e.g., profile call only when called from somep
 
 # 62. [Monday Q&A #20 (2023-07-17)](https://www.computerenhance.com/p/monday-q-and-a-20-2023-07-17)
 
-7:18
-
-
+9:00
 
 # 63. [A First Look at Profiling Overhead](https://www.computerenhance.com/p/a-first-look-at-profiling-overhead)
+Toggle profiling code at compile time so you can compare run and show profiler overhead.
+
 # 64. [New Q&A Process](https://www.computerenhance.com/p/new-q-and-a-process)
+
 # 65. [A Tale of Two Radio Shacks](https://www.computerenhance.com/p/a-tale-of-two-radio-shacks)
+
 # 66. [Comparing the Overhead of RDTSC and QueryPerformanceCounter](https://www.computerenhance.com/p/comparing-the-overhead-of-rdtsc-and)
+
 # 67. [Monday Q&A #21 (2023-07-31)](https://www.computerenhance.com/p/monday-q-and-a-21-2023-07-31) 
 # 68. [The Four Programming Questions from My 1994 Microsoft Internship Interview](https://www.computerenhance.com/p/the-four-programming-questions-from)
 # 69. [Microsoft Intern Interview Question #1: Rectangle Copy](https://www.computerenhance.com/p/microsoft-intern-interview-question)
 # 70. [Microsoft Intern Interview Question #2: String Copy](https://www.computerenhance.com/p/microsoft-intern-interview-question-ab7)
 # 71. [Microsoft Intern Interview Question #3: Flood Fill Detection](https://www.computerenhance.com/p/microsoft-intern-interview-question-a3f)
 # 72. [Efficient DDA Circle Outlines](https://www.computerenhance.com/p/efficient-dda-circle-outlines)
+
 # 73. [Q&A #22 (2023-08-15)](https://www.computerenhance.com/p/q-and-a-22-2023-08-15)
 # 74. [Measuring Data Throughput](https://www.computerenhance.com/p/measuring-data-throughput)
+
 # 75. [Q&A #23 (2023-08-21)](https://www.computerenhance.com/p/q-and-a-23-2023-08-21)
 # 76. [Repetition Testing](https://www.computerenhance.com/p/repetition-testing)
 # 77. [Q&A #24 (2023-08-28)](https://www.computerenhance.com/p/q-and-a-24-2023-08-28)

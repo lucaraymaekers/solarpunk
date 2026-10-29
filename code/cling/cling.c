@@ -13,8 +13,6 @@ NO_WARNINGS_BEGIN
 #include "lib/metadesk/md.c"
 NO_WARNINGS_END
 
-#include "rl/rl_profile.h"
-
 #include "cling/cling.h"
 
 //~ Types
@@ -145,9 +143,9 @@ AppBuild(cng_build_options *BuildOptions,
  Cng_Build(Name, BuildOptions, 
            S8ArrayLit(AppSource, LibFileName),
            .Type = CngBuildType_DLL,
-              .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
-                                               ExtraFlags),
-              .OutputName = AppDLLName);
+           .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
+                                            ExtraFlags),
+           .OutputName = AppDLLName);
  
  str8 Defines = Str8Fmt("-DRL_PLATFORM_APP_NAME=%S "
                         "-DRL_PLATFORM_WINDOW_NAME=%S",
@@ -160,10 +158,10 @@ AppBuild(cng_build_options *BuildOptions,
            S8ArrayLit(S8("../code/rl/rl_platform.c"),
                       LibFileName),
            .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
-                                               Defines,
-                                               ExtraFlags),
+                                            Defines,
+                                            ExtraFlags),
            .ExtraLinkerFlags   = S8ArrayLit(LinkerFlags),
-              .OutputName = ExeName,);
+           .OutputName = ExeName,);
  
 };
 
@@ -250,359 +248,361 @@ BASE_ENTRY_POINT()
   cmd_line *CmdLine = &Params->CmdLine;
   
   //~ Metaprogram
-  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Meta"), S8("Search all .mdesk files and generate code accordingly")))
+  
+  if(!CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("NoMeta"), S8("Do not search all .mdesk files and generate code accordingly")))
   {
-   DidWork = true;
-   
-   Log("Generating code...\n");
-   
-   arena *Arena = GetScratch();
-   
-   u64 HashArraySize = KB(4);
-   table_hash_node *TableHashArray = PushArrayZero(Arena, table_hash_node, HashArraySize);
-   field_hash_node *FieldHashArray = PushArrayZero(Arena, field_hash_node, HashArraySize);
-   
-   for(os_dir *Dir = OS_WalkDirPush(S8("../code"), 0);
-       Dir != 0;
-       )
+   Prof_TimeScope("Meta")
    {
-    os_dir_entry *Entry = OS_WalkDirGetNext(Dir);
+    Log("Generating code...\n");
     
-    if(Entry != 0)
+    arena *Arena = GetScratch();
+    
+    u64 HashArraySize = KB(4);
+    table_hash_node *TableHashArray = PushArrayZero(Arena, table_hash_node, HashArraySize);
+    field_hash_node *FieldHashArray = PushArrayZero(Arena, field_hash_node, HashArraySize);
+    
+    for(os_dir *Dir = OS_WalkDirPush(S8("../code"), 0);
+        Dir != 0;
+        )
     {
-     str8 Name = Entry->Name;
+     os_dir_entry *Entry = OS_WalkDirGetNext(Dir);
      
-     b32 InvalidDir = (S8Match(Entry->Name, S8("."), false) || 
-                       S8Match(Entry->Name, S8(".."), false));
-     if(!InvalidDir)
+     if(Entry != 0)
      {
-      if(0) {}
-      else if(Entry->Kind == OS_DirEntryKind_Directory)
+      str8 Name = Entry->Name;
+      
+      b32 InvalidDir = (S8Match(Entry->Name, S8("."), false) || 
+                        S8Match(Entry->Name, S8(".."), false));
+      if(!InvalidDir)
       {
-       Dir = OS_WalkDirPush(Entry->Name, Dir);
-      }
-      else if(Entry->Kind == OS_DirEntryKind_File)
-      {
-       str8 Ext = S8(".mdesk");
-       str8 Scan = S8From(Name, Name.Size - Ext.Size);
-       
-       b32 Match = (Name.Size > Ext.Size &&
-                    S8Match(Scan, Ext, false));
-       
-       if(Match)
+       if(0) {}
+       else if(Entry->Kind == OS_DirEntryKind_Directory)
        {
-        str8 NewDirPath = Str8Fmt("%S/generated", Dir->Path);
-        OS_MakeDirectory((char *)NewDirPath.Data);
+        Dir = OS_WalkDirPush(Entry->Name, Dir);
+       }
+       else if(Entry->Kind == OS_DirEntryKind_File)
+       {
+        str8 Ext = S8(".mdesk");
+        str8 Scan = S8From(Name, Name.Size - Ext.Size);
         
-        str8 BaseName = S8To(Name, Name.Size - Ext.Size);
-        str8 OutFile = Str8Fmt("%S.meta.c", BaseName); 
+        b32 Match = (Name.Size > Ext.Size &&
+                     S8Match(Scan, Ext, false));
         
-        MD_String8 FilePath = Str8Fmt("%S/%S", Dir->Path, Name);
-        MD_ParseResult FileParse = MD_ParseWholeFile(GlobalMDArena, FilePath);
-        
-        // Print metadesk errors
-        for(MD_Message *Message = FileParse.errors.first;
-            Message != 0;
-            Message = Message->next)
+        if(Match)
         {
-         MD_CodeLoc code_loc = MD_CodeLocFromNode(Message->node);
-         MD_PrintMessage(stderr, code_loc, Message->kind, Message->string);
-        }
-        if(FileParse.errors.max_message_kind < MD_MessageKind_Error)
-        {
-         MD_Node *Root = FileParse.node->first_child;
+         str8 NewDirPath = Str8Fmt("%S/generated", Dir->Path);
+         OS_MakeDirectory((char *)NewDirPath.Data);
          
-         PushStream(OutFile);
+         str8 BaseName = S8To(Name, Name.Size - Ext.Size);
+         str8 OutFile = Str8Fmt("%S.meta.c", BaseName); 
          
-         for(MD_EachNode(Node, Root))
+         MD_String8 FilePath = Str8Fmt("%S/%S", Dir->Path, Name);
+         MD_ParseResult FileParse = MD_ParseWholeFile(GlobalMDArena, FilePath);
+         
+         // Print metadesk errors
+         for(MD_Message *Message = FileParse.errors.first;
+             Message != 0;
+             Message = Message->next)
          {
-          //- NOTE(luca): Header "file" tag  
-          b32 FilePushed = false;
-          str8 FilePushedName = {0};
-          {
-           MD_Node *FileTag = MD_TagFromString(Node, S8("file"), 0);
-           if(!MD_NodeIsNil(FileTag))
-           {
-            FilePushedName = FileTag->first_child->string;
-            PushStream(FilePushedName);
-            FilePushed = true;
-           }
-          }
+          MD_CodeLoc code_loc = MD_CodeLocFromNode(Message->node);
+          MD_PrintMessage(stderr, code_loc, Message->kind, Message->string);
+         }
+         if(FileParse.errors.max_message_kind < MD_MessageKind_Error)
+         {
+          MD_Node *Root = FileParse.node->first_child;
           
-          //- NOTE(luca): Add tables
+          PushStream(OutFile);
+          
+          for(MD_EachNode(Node, Root))
           {
-           MD_Node *TableTag = MD_TagFromString(Node, S8("table"), 0);
-           if(!MD_NodeIsNil(TableTag))
+           //- NOTE(luca): Header "file" tag  
+           b32 FilePushed = false;
+           str8 FilePushedName = {0};
            {
-            str8 TableName = Node->string;
-            table_hash_node *TableHash = AddTableHashNode(Arena, TableName, 0, 
-                                                          HashArraySize, TableHashArray);
-            TableHash->Table = Node;
-            
-            u64 FieldIdx = 0;
-            for(MD_EachNode(Field, TableTag->first_child))
+            MD_Node *FileTag = MD_TagFromString(Node, S8("file"), 0);
+            if(!MD_NodeIsNil(FileTag))
             {
-             AddFieldHashNode(Arena, Field->string, TableHash->Key, 
-                              HashArraySize, FieldHashArray)->Idx = FieldIdx;
-             
-             FieldIdx += 1;
+             FilePushedName = FileTag->first_child->string;
+             PushStream(FilePushedName);
+             FilePushed = true;
             }
            }
-          }
-          
-          //- NOTE(luca): Gen data
-          {
-           b32 ToLower = MD_NodeHasTag(Node, S8("to_lower"), 0);
-           b32 GenData = MD_NodeHasTag(Node, S8("data"), 0);
-           b32 NoPadding = MD_NodeHasTag(Node, S8("no_padding"), 0);
-           MD_Node *GenDataTable = MD_TagFromString(Node, S8("data_table"), 0);
-           MD_Node *GenDataEnum = MD_TagFromString(Node, S8("data_enum"), 0);
-           MD_Node *GenDataStruct = MD_TagFromString(Node, S8("data_struct"), 0);
-           str8 TypeName = {0};
            
-           GenData |= (!MD_NodeIsNil(GenDataTable));
-           GenData |= (!MD_NodeIsNil(GenDataEnum));
-           GenData |= (!MD_NodeIsNil(GenDataStruct));
-           
-           if(GenData)
+           //- NOTE(luca): Add tables
            {
-            // Add headers
-            {                                                
-             if(NoPadding)
+            MD_Node *TableTag = MD_TagFromString(Node, S8("table"), 0);
+            if(!MD_NodeIsNil(TableTag))
+            {
+             str8 TableName = Node->string;
+             table_hash_node *TableHash = AddTableHashNode(Arena, TableName, 0, 
+                                                           HashArraySize, TableHashArray);
+             TableHash->Table = Node;
+             
+             u64 FieldIdx = 0;
+             for(MD_EachNode(Field, TableTag->first_child))
              {
-              S8ListPush(S8("NO_STRUCT_PADDING_BEGIN\n"));
+              AddFieldHashNode(Arena, Field->string, TableHash->Key, 
+                               HashArraySize, FieldHashArray)->Idx = FieldIdx;
+              
+              FieldIdx += 1;
+             }
+            }
+           }
+           
+           //- NOTE(luca): Gen data
+           {
+            b32 ToLower = MD_NodeHasTag(Node, S8("to_lower"), 0);
+            b32 GenData = MD_NodeHasTag(Node, S8("data"), 0);
+            b32 NoPadding = MD_NodeHasTag(Node, S8("no_padding"), 0);
+            MD_Node *GenDataTable = MD_TagFromString(Node, S8("data_table"), 0);
+            MD_Node *GenDataEnum = MD_TagFromString(Node, S8("data_enum"), 0);
+            MD_Node *GenDataStruct = MD_TagFromString(Node, S8("data_struct"), 0);
+            str8 TypeName = {0};
+            
+            GenData |= (!MD_NodeIsNil(GenDataTable));
+            GenData |= (!MD_NodeIsNil(GenDataEnum));
+            GenData |= (!MD_NodeIsNil(GenDataStruct));
+            
+            if(GenData)
+            {
+             // Add headers
+             {                                                
+              if(NoPadding)
+              {
+               S8ListPush(S8("NO_STRUCT_PADDING_BEGIN\n"));
+              }
+              
+              if(!MD_NodeIsNil(GenDataTable))
+              {
+               TypeName = GenDataTable->first_child->string;
+               S8ListPush(Str8Fmt("%S %S[] = {\n", TypeName, Node->string)); 
+              }
+              
+              if(!MD_NodeIsNil(GenDataStruct))
+              {
+               TypeName = GenDataStruct->first_child->string;
+               S8ListPush(Str8Fmt("typedef struct %S %S;\n"
+                                  "struct %S\n"
+                                  "{\n", TypeName, TypeName, TypeName)); 
+              }
+              
+              if(!MD_NodeIsNil(GenDataEnum))
+              {
+               TypeName = GenDataEnum->first_child->string;
+               S8ListPush(Str8Fmt("enum %S\n"
+                                  "{\n", TypeName, TypeName, TypeName)); 
+               
+              }
              }
              
-             if(!MD_NodeIsNil(GenDataTable))
+             for(MD_EachNode(Row, Node->first_child))
              {
-              TypeName = GenDataTable->first_child->string;
-              S8ListPush(Str8Fmt("%S %S[] = {\n", TypeName, Node->string)); 
+              MD_Node *ExpandTag = MD_TagFromString(Row, S8("expand"), 0);
+              b32 GenStrings = MD_NodeHasTag(Row, S8("strings"), 0);
+              b32 GenCStringLiteral = MD_NodeHasTag(Row, S8("cstring_lit"), 0);
+              
+              if(!MD_NodeIsNil(ExpandTag))
+              {
+               str8 TableName = ExpandTag->first_child->string;
+               
+               table_hash_node *TableHash = GetTableHashNode(TableName, 0, HashArraySize, TableHashArray);
+               Assert(TableHash);
+               
+               u64 RowCount = 0;
+               for(MD_EachNode(TableRow, TableHash->Table->first_child))
+               {
+                
+                str8 String = {0};
+                S8OverPush(Arena, String, KB(4), String.Size)
+                {
+                 u64 StringIdx = 0;
+                 
+                 str8 RowString = Row->string;
+                 
+                 for EachIndex(Idx, Row->string.Size)
+                 {
+                  if(RowString.Data[Idx] == '$')
+                  {
+                   Idx += 1;
+                   
+                   if(RowString.Data[Idx] == '(')
+                   {
+                    Idx += 1;
+                    
+                    u64 Start = Idx;
+                    
+                    while(RowString.Data[Idx] != ')') Idx += 1;
+                    
+                    str8 FieldName = S8FromTo(RowString, Start, Idx); 
+                    str8 OutString = {0};
+                    
+                    if(S8Match(FieldName, S8("_Idx"), false))
+                    {
+                     OutString = Str8Fmt("%llu", RowCount);
+                    }
+                    else
+                    {
+                     field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
+                     MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
+                     
+                     if(GenStrings)
+                     {
+                      OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
+                                          Field->string, Field->string.Size);
+                     }
+                     else
+                     {
+                      OutString = Field->string;
+                     }
+                     
+                    }
+                    
+                    // Output that string
+                    {                 
+                     for EachIndex(CharIdx, OutString.Size)
+                     {
+                      u8 Char = OutString.Data[CharIdx];
+                      if(ToLower)
+                      {
+                       Char = ToLowercase(Char);
+                      }
+                      String.Data[StringIdx] = Char;
+                      StringIdx += 1;
+                     }
+                    }
+                    
+                    if(OutString.Size == 0)
+                    {
+                     Log("ERROR: field \"%S\" not found\n", FieldName);
+                    }
+                    
+                   }
+                  }
+                  else
+                  {
+                   String.Data[StringIdx] = RowString.Data[Idx];
+                   StringIdx += 1;
+                  }
+                 }
+                 
+                 String.Size = StringIdx;
+                }
+                
+                S8ListPush(String);
+                
+                RowCount += 1;
+               }
+              }
+              else if(GenCStringLiteral)
+              {
+               u64 Extra = 0;
+               str8 String = {0};
+               S8OverPush(Arena, String, KB(4), String.Size)
+               {
+                String.Size = 0;
+                
+                String.Data[String.Size] = '"';
+                String.Size += 1;
+                Extra += 1;
+                
+                u8 Char = 0;
+                for EachIndex(Idx, Row->string.Size)
+                {
+                 if(Char == '\n')
+                 {
+                  String.Data[String.Size] = '"';
+                  String.Size += 1;
+                  Extra += 1;
+                 }
+                 
+                 Char = Row->string.Data[Idx];
+                 
+                 if(0) {}
+                 else if(Char == '"' || Char == '\\')
+                 {
+                  String.Data[String.Size] = '\\';
+                  String.Size += 1;
+                  Extra += 1;
+                 }
+                 else if(Char == '\n')
+                 {
+                  String.Data[String.Size] = '\\';
+                  String.Size += 1;
+                  String.Data[String.Size] = 'n';
+                  String.Size += 1;
+                  String.Data[String.Size] = '"';
+                  String.Size += 1;
+                  Extra += 3; // one for the newline and one for the quote
+                  // One more for the newline that's coming
+                 }
+                 
+                 String.Data[String.Size] = Char;
+                 String.Size += 1;
+                }
+                String.Data[String.Size] = '"';
+                String.Size += 1;
+                Extra += 1;
+                
+                S8ListPush(String);
+               }
+               
+               if(GenStrings)
+               {
+                S8ListPush(Str8Fmt(", %llu", String.Size - Extra));
+               }
+               
+              }
+              else
+              {
+               S8ListPush(Row->string);
+              }
              }
              
-             if(!MD_NodeIsNil(GenDataStruct))
+            }
+            
+            // Add footers 
+            {           
+             if(!MD_NodeIsNil(GenDataTable) ||
+                !MD_NodeIsNil(GenDataStruct))
              {
-              TypeName = GenDataStruct->first_child->string;
-              S8ListPush(Str8Fmt("typedef struct %S %S;\n"
-                                 "struct %S\n"
-                                 "{\n", TypeName, TypeName, TypeName)); 
+              S8ListPush(S8("\n};\n")); 
              }
              
              if(!MD_NodeIsNil(GenDataEnum))
              {
-              TypeName = GenDataEnum->first_child->string;
-              S8ListPush(Str8Fmt("enum %S\n"
-                                 "{\n", TypeName, TypeName, TypeName)); 
-              
+              S8ListPush(Str8Fmt("\n};\n"
+                                 "typedef enum %S %S;\n", TypeName, TypeName));
              }
-            }
-            
-            for(MD_EachNode(Row, Node->first_child))
-            {
-             MD_Node *ExpandTag = MD_TagFromString(Row, S8("expand"), 0);
-             b32 GenStrings = MD_NodeHasTag(Row, S8("strings"), 0);
-             b32 GenCStringLiteral = MD_NodeHasTag(Row, S8("cstring_lit"), 0);
              
-             if(!MD_NodeIsNil(ExpandTag))
+             if(NoPadding)
              {
-              str8 TableName = ExpandTag->first_child->string;
-              
-              table_hash_node *TableHash = GetTableHashNode(TableName, 0, HashArraySize, TableHashArray);
-              Assert(TableHash);
-              
-              u64 RowCount = 0;
-              for(MD_EachNode(TableRow, TableHash->Table->first_child))
-              {
-               
-               str8 String = {0};
-               S8OverPush(Arena, String, KB(4), String.Size)
-               {
-                u64 StringIdx = 0;
-                
-                str8 RowString = Row->string;
-                
-                for EachIndex(Idx, Row->string.Size)
-                {
-                 if(RowString.Data[Idx] == '$')
-                 {
-                  Idx += 1;
-                  
-                  if(RowString.Data[Idx] == '(')
-                  {
-                   Idx += 1;
-                   
-                   u64 Start = Idx;
-                   
-                   while(RowString.Data[Idx] != ')') Idx += 1;
-                   
-                   str8 FieldName = S8FromTo(RowString, Start, Idx); 
-                   str8 OutString = {0};
-                   
-                   if(S8Match(FieldName, S8("_Idx"), false))
-                   {
-                    OutString = Str8Fmt("%llu", RowCount);
-                   }
-                   else
-                   {
-                    field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
-                    MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
-                    
-                    if(GenStrings)
-                    {
-                     OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
-                                         Field->string, Field->string.Size);
-                    }
-                    else
-                    {
-                     OutString = Field->string;
-                    }
-                    
-                   }
-                   
-                   // Output that string
-                   {                 
-                    for EachIndex(CharIdx, OutString.Size)
-                    {
-                     u8 Char = OutString.Data[CharIdx];
-                     if(ToLower)
-                     {
-                      Char = ToLowercase(Char);
-                     }
-                     String.Data[StringIdx] = Char;
-                     StringIdx += 1;
-                    }
-                   }
-                   
-                   if(OutString.Size == 0)
-                   {
-                    Log("ERROR: field \"%S\" not found\n", FieldName);
-                   }
-                   
-                  }
-                 }
-                 else
-                 {
-                  String.Data[StringIdx] = RowString.Data[Idx];
-                  StringIdx += 1;
-                 }
-                }
-                
-                String.Size = StringIdx;
-               }
-               
-               S8ListPush(String);
-               
-               RowCount += 1;
-              }
+              S8ListPush(S8("NO_STRUCT_PADDING_END\n"));
              }
-             else if(GenCStringLiteral)
-             {
-              u64 Extra = 0;
-              str8 String = {0};
-              S8OverPush(Arena, String, KB(4), String.Size)
-              {
-               String.Size = 0;
-               
-               String.Data[String.Size] = '"';
-               String.Size += 1;
-               Extra += 1;
-               
-               u8 Char = 0;
-               for EachIndex(Idx, Row->string.Size)
-               {
-                if(Char == '\n')
-                {
-                 String.Data[String.Size] = '"';
-                 String.Size += 1;
-                 Extra += 1;
-                }
-                
-                Char = Row->string.Data[Idx];
-                
-                if(0) {}
-                else if(Char == '"' || Char == '\\')
-                {
-                 String.Data[String.Size] = '\\';
-                 String.Size += 1;
-                 Extra += 1;
-                }
-                else if(Char == '\n')
-                {
-                 String.Data[String.Size] = '\\';
-                 String.Size += 1;
-                 String.Data[String.Size] = 'n';
-                 String.Size += 1;
-                 String.Data[String.Size] = '"';
-                 String.Size += 1;
-                 Extra += 3; // one for the newline and one for the quote
-                 // One more for the newline that's coming
-                }
-                
-                String.Data[String.Size] = Char;
-                String.Size += 1;
-               }
-               String.Data[String.Size] = '"';
-               String.Size += 1;
-               Extra += 1;
-               
-               S8ListPush(String);
-              }
-              
-              if(GenStrings)
-              {
-               S8ListPush(Str8Fmt(", %llu", String.Size - Extra));
-              }
-              
-             }
-             else
-             {
-              S8ListPush(Row->string);
-             }
+             
             }
             
+            // Pretty
+            S8ListPush(S8("\n"));
            }
            
-           // Add footers 
-           {           
-            if(!MD_NodeIsNil(GenDataTable) ||
-               !MD_NodeIsNil(GenDataStruct))
-            {
-             S8ListPush(S8("\n};\n")); 
-            }
-            
-            if(!MD_NodeIsNil(GenDataEnum))
-            {
-             S8ListPush(Str8Fmt("\n};\n"
-                                "typedef enum %S %S;\n", TypeName, TypeName));
-            }
-            
-            if(NoPadding)
-            {
-             S8ListPush(S8("NO_STRUCT_PADDING_END\n"));
-            }
-            
+           //- NOTE(luca): Footer "file" tag  
+           if(FilePushed)
+           {
+            PopStream(NewDirPath);
            }
-           
-           // Pretty
-           S8ListPush(S8("\n"));
+           //- 
           }
           
-          //- NOTE(luca): Footer "file" tag  
-          if(FilePushed)
-          {
-           PopStream(NewDirPath);
-          }
-          //- 
+          PopStream(NewDirPath);
          }
-         
-         PopStream(NewDirPath);
         }
        }
       }
      }
-    }
-    else
-    {
-     Dir = OS_WalkDirPop(Dir);
+     else
+     {
+      Dir = OS_WalkDirPop(Dir);
+     }
     }
    }
   }
@@ -611,14 +611,14 @@ BASE_ENTRY_POINT()
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Editor"), S8("Target")))
   {
    DidWork = true;
-            AppBuild(&BuildOptions, S8("Editor"), S8("../code/editor/editor_app.c"), S8("editor_app"), S8("editor"), Nil(str8));
+   AppBuild(&BuildOptions, S8("Editor"), S8("../code/editor/editor_app.c"), S8("editor_app"), S8("editor"), Nil(str8));
   }
   
   //~ Muze
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Muze"), S8("Target")))
   {
    DidWork = true;
-            AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"), Nil(str8));
+   AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"), Nil(str8));
   }
   //~ Wordled
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Wordled"), S8("Target")))
@@ -626,7 +626,7 @@ BASE_ENTRY_POINT()
    DidWork = true;
    cng_build_options Options = BuildOptions;
    Options.CPP = true;
-            AppBuild(&Options, S8("Wordled"), S8("../code/wordled/wordled_app.cpp"), S8("wordled_app"), S8("wordled"), S8("-DRL_PLATFORM_FORCE_SOFTWARE_RENDERING=1"));
+   AppBuild(&Options, S8("Wordled"), S8("../code/wordled/wordled_app.cpp"), S8("wordled_app"), S8("wordled"), S8("-DRL_PLATFORM_FORCE_SOFTWARE_RENDERING=1"));
   }
   
   //~ Sim86
@@ -728,6 +728,10 @@ BASE_ENTRY_POINT()
   {
    str8 HelpText = Cng_S8ArrayJoinFrom(&Help, '\n');
    Log("\nNo target provided.\n\n%S\n", HelpText);
+  }
+  else
+  {
+   Log("Done.\n");
   }
  }
  

@@ -1,3 +1,4 @@
+
 //~ Libraries
 #define BASE_FORCE_THREADS_COUNT 1
 #define BASE_CONSOLE_APPLICATION 1
@@ -6,6 +7,9 @@
 
 //- External  
 #include "listing.c"
+
+#undef RL_PROFILE
+#define RL_PROFILE 1
 
 //- Project 
 #include "rl/rl_profile.h"
@@ -19,21 +23,17 @@ struct haversine_pair
 };
 
 //- Functions
-raddbg_entry_point(EntryPoint);
-ENTRY_POINT(EntryPoint)
+BASE_ENTRY_POINT()
 {
- if(LaneIndex() == 0)
+ char *JSONFileName = 0;
+ char *AnswersFileName = 0;
+ u64 PairCount = 0;
+ 
+ char **Args = Params->Args;
+ s32 ArgCount = Params->ArgCount;
+ 
+ Prof_Profile()
  {
-  char *JSONFileName = 0;
-  char *AnswersFileName = 0;
-  u64 PairCount = 0;
-  
-  char **Args = Params->Args;
-  s32 ArgCount = Params->ArgCount;
-  
-  // Profiler start code
-  Prof_StartProfile();
-  
   // Parse command line
   {    
    if(ArgCount >= 2)
@@ -66,17 +66,14 @@ ENTRY_POINT(EntryPoint)
     u64 Pos = 0;
     json_token *JSON = 0;
     
-    Prof_TimeScope("Parse")
-    {                
-     JSON = JSON_ParseElement(In, &Pos);
-    }
-    
     json_token *PairsArray = 0;
     haversine_pair *HaversinePairs = 0;
     
     // Parse haversine pairs
-    Prof_TimeScope("MiscSetup")
+    Prof_TimeScope("ParseHaversinePairs")
     {
+     JSON = JSON_ParseElement(In, &Pos);
+     
      PairsArray = JSON_LookupIdentifierValue(JSON, S8("\"pairs\""));
      
      // 30 bytes(characters) is the minimum for one pair
@@ -101,7 +98,10 @@ ENTRY_POINT(EntryPoint)
        Pair = Pair->Next;
       }
      }
-     JSON_FreeTokens(JSON);
+     Prof_TimeScope("FreeJSON")
+     {
+      JSON_FreeTokens(JSON);
+     }
     }
     
     f64 AverageSum = 0;
@@ -144,23 +144,6 @@ ENTRY_POINT(EntryPoint)
     }
     
     free(HaversinePairs);
-    
-    // Profiler end code
-    {    
-     Prof.EndTSC = ReadCPUTimer();
-     u64 OSEnd = ReadOSTimer();
-     u64 OSElapsed = OSEnd - Prof.OSStart;
-     
-     u64 TotalCPUElapsed = Prof.EndTSC - Prof.StartTSC;
-     
-     u64 OSFreq = GetOSTimerFreq();
-     u64 CPUFreq = Prof_GuessCPUFreq(OSElapsed, TotalCPUElapsed, OSFreq);
-     
-     Log("\nTotal time: %0.4fms (CPU freq %llu)\n", 
-         1000.0*((f64)TotalCPUElapsed/(f64)CPUFreq), CPUFreq);
-     
-     
-    }
    }
    else
    {
@@ -172,9 +155,6 @@ ENTRY_POINT(EntryPoint)
    Log("ERROR: No file provided.\n");
    Log("Usage: %s <data.json> [data.f64]\n", Args[0]); 
   }
-  
-  Prof_EndProfileAndPrint();
  }
- 
  return 0;
 }

@@ -45,7 +45,7 @@ internal void ArenaFree(arena *Arena, u64 Size);
 for(u64 BackPos = BeginScratch((Arena)), Idx = 0; \
 !Idx; \
 Idx += 1, (EndScratch(Arena, BackPos)))
-#define Scratch(Arena) Scratch_(Arena, Glue(BackPos, __COUNTER__), Glue(Idx, __COUNTER__))
+#define Scratch(Arena) Scratch_(Arena, Var(BackPos), Var(Idx))
 
 #define PushArray(Arena, t, Count) (t *)ArenaPush((Arena), (Count)*(sizeof(t)), AlignOf(t), false)
 #define PushArrayZero(Arena, t, Count) (t *)ArenaPush((Arena), (Count)*(sizeof(t)), AlignOf(t), true)

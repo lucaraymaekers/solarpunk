@@ -495,7 +495,6 @@ Cng_RunCommandAsync(str8 Command, b32 Async)
  
  PROCESS_INFORMATION ProcessInfo = {0};
  
- 
  arena *Arena = GetScratch();
  
  u8 *CommandCString = PushArray(Arena, u8, Command.Size + 1);

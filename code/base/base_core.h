@@ -190,6 +190,8 @@ Array[Idx] : (Log(ERROR_FMT "Out of bounds %s[%d]\n", ERROR_ARG, #Array, Idx), D
 #define Glue_(A,B) A##B
 #define Glue(A,B) Glue_(A,B)
 
+#define Var(Name) Glue(Name, __LINE__)
+
 //-
 #define Min(A, B) (((A) < (B)) ? (A) : (B))
 #define Max(A, B) (((A) > (B)) ? (A) : (B))
@@ -244,11 +246,10 @@ Swap(t& A, t& B) { t T = A; A = B; B = T; }
 #elif COMPILER_GNU || COMPILER_CLANG
 # define ReadWriteBarrier() __asm__ __volatile__ ("" : : : "memory")
 #endif
-#define NoOp() do { int Glue(X, __COUNTER__) = 3; } while(0)
+#define NoOp() do { int Var(X) = 3; } while(0)
 
 #define DebugBreak() do { if(GlobalDebuggerIsAttached) { Trap(); } } while(0)
 
-#define Var(Name) Glue(Name, __LINE__)
 #define DoOnce() local_persist s32 Var(X) = 0; Var(X) += 1; if(Var(X) < 2)
 #define DebugBreakOnce() do { DoOnce() { DebugBreak(); }; } while(0);
 
@@ -264,7 +265,7 @@ do { if(!(Expression)) DebugBreakMsg(Format, ##__VA_ARGS__); } while(0)
 
 //~ Loop macros
 
-#define DeferLoop(Begin, End) DeferLoop_(Begin, End, Glue(_i_, __COUNTER__))
+#define DeferLoop(Begin, End) DeferLoop_(Begin, End, Var(_i_))
 #define DeferLoop_(Begin, End, i) \
 for(int i = ((Begin), 0); !i; i += 1, (End))
 
@@ -277,7 +278,7 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 #define EachElement(Index, Array)         EachIndexType(umm, Index, ArrayCount(Array))
 #define EachInRange(Index, Range)         (TypeOf((Range).Min) Index = (Range).Min; Index < (Range).Max; Index += 1)
 #define EachNode(Node, t, First)      (t *Node = First; Node != 0; Node = Node->Next)
-#define EachCount(Count) EachIndex(Glue(_i_, __COUNTER__), Count)
+#define EachCount(Count) EachIndex(Var(_i_), Count)
 
 #define MemoryCopy(Dest, Source, Count) memmove(Dest, Source, Count)
 #define MemorySet(Dest, Value, Count)  memset(Dest, Value, Count)
@@ -442,11 +443,5 @@ typedef unsigned char uchar;
 
 #define false 0
 #define true  1
-
-//~ Globals
-global_variable b32 GlobalDebuggerIsAttached;
-
-//~ Functions
-internal void DbgBrk(void) { DebugBreak(); }
 
 #endif // BASE_CORE_H

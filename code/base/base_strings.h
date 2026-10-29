@@ -34,9 +34,9 @@ typedef struct str8_array str8_array;
 
 enum s8_match_flag
 {
-    S8MatchFlag_None            = (0 << 0),
-    S8MatchFlag_Prefix          = (1 << 0),
-    S8MatchFlag_CaseInsensitive = (1 << 1),
+ S8MatchFlag_None            = (0 << 0),
+ S8MatchFlag_Prefix          = (1 << 0),
+ S8MatchFlag_CaseInsensitive = (1 << 1),
 };
 typedef enum s8_match_flag s8_match_flag;
 
@@ -103,7 +103,7 @@ S8ArrayAppendMultiple_(Array, ArrayCount(Strings), Strings); \
 DeferLoop((Result = PushS8(Arena, MaxSize)), ArenaFree(Arena, MaxSize - EndSize))
 
 #define StringsScratchTemp(Arena) \
-StringsScratchTemp_(Arena, Glue(Counter, __COUNTER__), Glue(Temp, __COUNTER__))
+StringsScratchTemp_(Arena, Var(Counter), Var(Temp))
 #define StringsScratchTemp_(Arena, Counter, Temp) \
 for(arena *Temp, *Counter = 0; !Counter; Counter = (arena *)1)  \
 for(Temp = StringsScratch, SetStringsScratch(Arena); \

@@ -1,4 +1,6 @@
-//~ Types
+//-
+// Profiler 
+//-
 
 typedef struct prof_marker prof_marker;
 struct prof_marker
@@ -24,69 +26,9 @@ struct prof_profiler
  u64 ParentIdx;
 };
 
-typedef struct prof_block prof_block;
-struct prof_block
-{
- u64 StartTSC;
- u64 ParentIdx;
- u64 OldTSCElapsedInclusive;
- prof_marker *Marker;
-};
-
-//~ Globals 
 global_variable prof_profiler Prof; 
 
-//~ Macros
-#define _Prof_TimeScope(Label, Counter) \
-for(prof_block Glue(Block, Counter) = Prof_BlockBegin(Label, Counter + 1), \
-*Glue(I, Counter) = 0; \
-Glue(I, Counter) == 0; \
-Prof_BlockEnd(Glue(Block, Counter)), \
-Glue(I, Counter) = (prof_block *)1)
-
-#define Prof_TimeScope(Label) _Prof_TimeScope(Label, __COUNTER__)
-#define Prof_TimeFunc() Prof_TimeScope(__FUNCTION__)
 #define Prof_Profile() DeferLoop(Prof_StartProfile(), Prof_EndProfileAndPrint())
-
-//~ Functions
-internal prof_block
-Prof_BlockBegin(char *Label, u64 MarkerIdx)
-{
- prof_block Result = {0};
- 
- prof_marker *Marker = Prof.Markers + MarkerIdx;
- 
- Result.Marker = Marker;
- Result.OldTSCElapsedInclusive = Marker->TSCElapsedInclusive; 
- 
- Result.ParentIdx = Prof.ParentIdx;
- Result.StartTSC = rdtsc();
- Prof.ParentIdx = MarkerIdx;
- Prof.Indent += 1;
- 
- // NOTE(luca): Could be computed at compile time, but not in C.
- Marker->Label = Label;
- 
- return Result;
-}
-
-internal void
-Prof_BlockEnd(prof_block Block)
-{
- u64 Elapsed = rdtsc() - Block.StartTSC;
- Prof.ParentIdx = Block.ParentIdx;
- 
- prof_marker *Parent = Prof.Markers + Block.ParentIdx;
- prof_marker *Marker = Block.Marker;
- 
- Parent->TSCElapsedExclusive -= Elapsed;
- Marker->TSCElapsedExclusive += Elapsed;
- Marker->TSCElapsedInclusive = Block.OldTSCElapsedInclusive + Elapsed;
- Marker->HitCount += 1;
- Marker->Indent = Prof.Indent;
- 
- Prof.Indent -= 1;
-}
 
 internal u64 
 Prof_GuessCPUFreq(u64 OSElapsed, u64 CPUElapsed, u64 OSFreq)
@@ -142,3 +84,73 @@ Prof_EndProfileAndPrint(void)
  }
  
 }
+
+#if RL_PROFILE
+
+//~ Types
+typedef struct prof_block prof_block;
+struct prof_block
+{
+ u64 StartTSC;
+ u64 ParentIdx;
+ u64 OldTSCElapsedInclusive;
+ prof_marker *Marker;
+};
+
+//~ Macros
+#define _Prof_TimeScope(Label, Counter) \
+for(prof_block Var(Block) = Prof_BlockBegin(Label, Counter + 1), \
+*Var(I) = 0; \
+Var(I) == 0; \
+Prof_BlockEnd(Var(Block)), \
+Var(I) = (prof_block *)1)
+
+#define Prof_TimeScope(Label) _Prof_TimeScope(Label, __COUNTER__)
+#define Prof_TimeFunc() Prof_TimeScope(__FUNCTION__)
+
+//~ Functions
+internal prof_block
+Prof_BlockBegin(char *Label, u64 MarkerIdx)
+{
+ prof_block Result = {0};
+ 
+ prof_marker *Marker = Prof.Markers + MarkerIdx;
+ 
+ Result.Marker = Marker;
+ Result.OldTSCElapsedInclusive = Marker->TSCElapsedInclusive; 
+ 
+ Result.ParentIdx = Prof.ParentIdx;
+ Result.StartTSC = rdtsc();
+ Prof.ParentIdx = MarkerIdx;
+ Prof.Indent += 1;
+ 
+ // NOTE(luca): Could be computed at compile time, but not in C.
+ Marker->Label = Label;
+ 
+ return Result;
+}
+
+internal void
+Prof_BlockEnd(prof_block Block)
+{
+ u64 Elapsed = rdtsc() - Block.StartTSC;
+ Prof.ParentIdx = Block.ParentIdx;
+ 
+ prof_marker *Parent = Prof.Markers + Block.ParentIdx;
+ prof_marker *Marker = Block.Marker;
+ 
+ Parent->TSCElapsedExclusive -= Elapsed;
+ Marker->TSCElapsedExclusive += Elapsed;
+ Marker->TSCElapsedInclusive = Block.OldTSCElapsedInclusive + Elapsed;
+ Marker->HitCount += 1;
+ Marker->Indent = Prof.Indent;
+ 
+ Prof.Indent -= 1;
+}
+
+#else
+
+#define Prof_TimeScope(...)
+#define Prof_TimeFunc(...) 
+
+#endif
