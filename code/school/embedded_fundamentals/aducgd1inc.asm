@@ -264,7 +264,7 @@ ret
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; tftsetbgcolor
-; Is a subroutine that writes backround color information into dedicated registers
+; Is a subroutine that writes background color information into dedicated registers
 ;
 ; input:	red	5 bits red color
 ;		green	6 bits green color

@@ -235,8 +235,10 @@ BASE_ENTRY_POINT()
     {
      Log("[Sampler asm51]\n");
      
-     Log("Preprocessing %S\n", FileName);
-     cng_command_result CommandResult = Cng_RunCommand(Str8Fmt("./pp -o=%S.pp %S", FileNameWithoutExt, FilePath));
+                    Log("Preprocessing %S\n", FileName);
+                    str8 Command = OS_PathFromExe(CmdLine,
+                                                  Str8Fmt("/pp -o=%S.pp %S", FileNameWithoutExt, FilePath));
+                    cng_command_result CommandResult = Cng_RunCommand(Command);
      if(!CommandResult.Succeeded)
       goto Fail;
      
@@ -253,7 +255,7 @@ BASE_ENTRY_POINT()
                                  "--include %S "
                                  "-o %S.hex %S",
                                  PrefixPath, FileNameWithoutExt, FilePath);
-     if(!Cng_RunCommand(BuildCommand).Succeeded)
+                    if(!Cng_RunCommand(BuildCommand).Succeeded)
       goto Fail;
     }
    }
@@ -264,12 +266,14 @@ BASE_ENTRY_POINT()
    if(0) {}
    else if(Type == Type_c)
    {
-    str8 ExeFilePath = S8Cat(S8("." SLASH), FileNameWithoutExt);
+                str8 ExeFilePath = OS_PathFromExe(CmdLine, S8Cat(S8(SLASH), FileNameWithoutExt));
     Cng_RunCommand(ExeFilePath);
    }
    else if(Type == Type_asm)
-   {
-    Cng_RunCommand(Str8Fmt("." SLASH "lsd -run %S.hex", FileNameWithoutExt));
+            {
+                str8 Command = OS_PathFromExe(CmdLine,
+                                              Str8Fmt(SLASH "lsd -run %S.hex", FileNameWithoutExt));
+                Cng_RunCommand(Command);
    }
   }
  }

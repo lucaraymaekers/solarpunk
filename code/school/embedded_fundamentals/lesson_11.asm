@@ -1,31 +1,18 @@
 $NOMOD51
-
-; Template exersise 11 (runs on ADuC832 V3/4 board).
-; Usage of the display functions and arithmetic.
-; Show 2 16-bit counters (1 counts up by one, the other counts down by one).
-; Print the counter values in BCD and HEX on the display (4 different locations).
-;
-; Adjust the code so the value of the switches is added or subtracted?
-;
-; AS OF NOW ALL TEMPLATES WILL HAVE ERRORS. FIND AND CORRECT THEM!!
-;
-; Written by Roggemans M. (MGM) v2 on 02-02-2016
-; Revisited by MGM gd on 07-2022
-
-; The EQU directive is used to "declare" names to constants. This allows us to use names
-; instead of numbers as addresses for variables.
-
-;~ Equals
+  
+  ;~ Defines
+  $include "aducgd1def.asm"
 teller1h	equ	10h			;Address of first variable high byte
 teller1l	equ	11h			;Address of first variable low byte
 teller0h	equ	12h			;Address of second variable high byte
 teller0l	equ	13h			;Address of second variable low byte
 
-;~ Entry point
-.org 0x0000
-mov sp, 0x7F
+  ;~ Inits
+  .org 0x0000
+  
+  ;~ EntryPoint
+  mov sp, #0x7F
 
-;~ Inits
 lcall tftinit         ;initialize LCD display
 mov	  teller1h,#00h	  ;initialize both variables to their starting value
 mov	  teller1l,#00h	  ;idem
@@ -40,7 +27,7 @@ mov	  a,teller1h      ;print MSB variable in hex
 lcall tftoutbyte
 mov	  a,teller1l      ;print LSB variable in HEX
 lcall tftoutbyte      
-mov	  tftxpos,#10      ;reposition cursor
+mov	  tftxpos,#6      ;reposition cursor
 
 ; Translate the 16 bit hex value in variable into BCD value, and print it on the display.
 
@@ -70,7 +57,7 @@ mov	  a,teller0h      ;print MSB variable in hex
 lcall tftoutbyte
 mov	  a,teller0l      ;print LSB variable in HEX
 lcall tftoutbyte      
-mov	  tftxpos,#10      ;reposition cursor
+mov	  tftxpos,#6      ;reposition cursor
 
 ;idem BCD for variable 2 on second half second line.
 
@@ -108,4 +95,8 @@ next:
 
 ljmp  lus             ;infinite loop
 
-$include "aducgd1.asm"
+  ;~ Libraries
+  $include "aducgd1inc.asm"
+  
+  end
+  

@@ -1,22 +1,13 @@
 $NOMOD51
 
-; Template exersise 10 (runs on ADuC832 V3/4 board).
-; Usage of the display functions and arithmetic.
-; Show 2 8-bit counters (1 counts up by one, the other counts down by one).
-; Print the counter values in BCD and HEX on the display (4 different locations).
-;
-; This program will show wrong results. Why?
-; Avoid this by limiting the counters (see limitations of HEXBCD8).
-;
-; Remedy this by using HEXBCD16
-;
-; This template is used for the 3 tasks.
-;
-; Written by Roggemans M. (MGM) v2 on 02-02-2016
-; Revisited by MGM gd on 07-2022
+;~ Defines
+$include "aducgd1def.asm"
 
+;~ Inits
 .org 0x0000
-mov sp, 0x7F;
+
+;~ EntryPoint
+mov sp, #0x7F
 
 lcall tftinit 		 ;initialization of the TFT display
 mov	  r0, #000h		;Used for counting up
@@ -61,4 +52,7 @@ lcall tftoutbyte
 pop   acc
 ret
 
-#include "aducgd1.asm"
+;~ Libraries
+$include "aducgd1inc.asm"
+
+end

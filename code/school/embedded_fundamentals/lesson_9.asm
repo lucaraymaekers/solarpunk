@@ -1,15 +1,13 @@
 $NOMOD51
 
-; Template exersise 9 (runs on ADuC832 V3/4 board).
-; Usage of the "cjne" instruction.
-; Show a running light stored in a lookup table, Use a "forbidden code" to detect
-; the ending of the table.
-;
-; Written by Roggemans M. (MGM) v2 on 02-02-2016
-; Revisited by MGM gd on 07-2022
+;~ Defines
+$include "aducgd1def.asm"
 
+;~ Inits
 .org 0x0000
-mov sp, 0x7F;
+
+;~ EntryPoint
+mov sp, #0x7F
 
 lus0:		
 mov    dptr,#table		; starting address tabel in dptr
@@ -54,4 +52,7 @@ db	10101010b
 ;The value is in the range 00000000b en 11111111b.
 ;The value must be unique!
 
-#include "aducgd1.asm"
+;~ Libraries
+$include "aducgd1inc.asm"
+
+end
