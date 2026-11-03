@@ -412,20 +412,13 @@ cl = lg;                                 \
     *bf++ = f[0];
     ++f;
    }
+   
    for (;;) {
     // Check if the next 4 bytes contain %(0x25) or end of string.
     // Using the 'hasless' trick:
     // https://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
     stbsp__uint32 v, c;
-#if !ASAN_ENABLED
     v = *(stbsp__uint32 *)f;
-#else
-    // NOTE(luca): This is a workaround safe ASAN path.
-    if( f[0] ) { v |= f[1] << 8;
-     if( f[1] ) { v |= f[2] << 16;
-      if( f[2] ) { v |= f[3] << 24; }}}
-#endif
-    
     c = (~v) & 0x80808080;
     if (((v ^ 0x25252525) - 0x01010101) & c)
      goto schk1;
