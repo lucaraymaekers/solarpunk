@@ -26,6 +26,7 @@ lcall tftoutbyte
 ;-
 
 ; R0 has mask
+; start is for P2.7
 mov r0, #0b01111111
 ; B has pattern count
 mov b, #4

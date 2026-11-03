@@ -391,7 +391,8 @@ ret
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-tftdrawbgc:	mov	tftcolorl,tftbgcolorl
+tftdrawbgc:	
+mov	tftcolorl,tftbgcolorl
 mov	tftcolorh,tftbgcolorh
 lcall	tftdrawc
 ret
@@ -433,7 +434,8 @@ ret
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-tftdrawc:	push	psw		;regs saved on stack
+tftdrawc:	
+push	psw		;regs saved on stack
 push	acc
 push	b
 push	00h
@@ -447,7 +449,7 @@ mov	a,tftxhs	;start address (high and low byte)
 lcall	tftwrdbyte
 mov	a,tftxls
 lcall	tftwrdbyte	;2 parameters 
-mov	a,tftxhe		;high address (high and low byte)
+mov	a,tftxhe		;end address (high and low byte)
 lcall	tftwrdbyte
 mov	a,tftxle
 lcall	tftwrdbyte	;done
@@ -501,7 +503,8 @@ tftdrawc0:	mov	b,r1			;load b register with delta xl
 mov	c,f1			;store f1 in f0
 mov	f0,c
 
-tftdrawc1:	mov	a,tftcolorh		;write high byte to display
+tftdrawc1:	
+mov	a,tftcolorh		;write high byte to display
 lcall	tftwrdbyte
 mov	a,tftcolorl		;write low byte to memory
 lcall	tftwrdbyte
@@ -528,12 +531,13 @@ ret
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-tftwrcbyte:	clr	cs			;activate slave SPI interface
-clr	dc			;select control register
+tftwrcbyte:	
+clr	cs			     ;activate slave SPI interface
+clr	dc	     		;select control register
 mov	spidat,a		;start transmission
 tftwrcbyte1:	jnb	ispi,tftwrcbyte1	;wait for transmission to end
-clr	ispi			;clear bit
-setb	cs			;end write session
+clr	ispi			   ;clear bit
+setb	cs			    ;end write session
 ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -548,7 +552,8 @@ ret
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-tftwrdbyte:	clr	cs			;activate slave SPI interface
+tftwrdbyte:	
+clr	cs			;activate slave SPI interface
 setb	dc			;select data register
 mov	spidat,a		;start transmission
 tftwrdbyte1:	jnb	ispi,tftwrdbyte1	;wait for transmission to end
@@ -559,7 +564,7 @@ ret
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; tftoutchar
-; This function prints de symbol corresponding to the ASCII code in the accu
+; This function prints the corresponding symbol for the ASCII code in the accu
 ; on the tft display.
 ;
 ; ASCII codes 20h-7fh are valid.
@@ -617,7 +622,7 @@ ret
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; tftoutcharf
-; This function prints de symbol corresponding to the ASCII code in the accu
+; This function prints the corresponding symbol for the ASCII code in the accu
 ; on the tft display.
 ;
 ; ASCII codes 20h-7fh are valid.
@@ -632,7 +637,7 @@ ret
 ; output:	charcter printed on the display in front color on background color
 ; used:	tftxh and tftxlow are incremented by 15, tfty is incremented by 31
 ;
-; Ik simple positioning is required, use tftoutchar
+; If simple positioning is required, use tftoutchar
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -645,14 +650,14 @@ push	01h
 push	02h
 push	dph
 push	dpl
-push	acc		;needed!!(back up ASCII code)
+push	acc	  	;needed!!(back up ASCII code)
 mov	a,#2ah		;set column address limits (x coordinates)
 lcall	tftwrcbyte
 mov	a,tftxh	;start address (high and low byte)
 lcall	tftwrdbyte
 mov	a,tftxl
 lcall	tftwrdbyte	;2 parameters 
-; We need to calculate the end of the window
+; We3 need to calculate the end of the window
 mov	a,tftxl	;we need to add 15 (window is 16 pixels wide, but 0 counts as 1)
 add	a,#15		;add\
 mov	tftxl,a	;store
