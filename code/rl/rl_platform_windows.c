@@ -902,7 +902,11 @@ P_LOAD_APP_CODE()
  
  str8 TempDLLFileName = Str8Fmt(Stringify(RL_PLATFORM_APP_NAME) "_temp%llu.dll", (u64)OS_GetWallClock());
  
+#if RL_PLATFORM_HOT_RELOAD_CODE
  char *TempDLLPath = PathFromExe(Arena, TempDLLFileName);
+#else
+ char *TempDLLPath = Code->LibraryPath;
+#endif
  
  WIN32_FILE_ATTRIBUTE_DATA Data;
  
@@ -928,7 +932,9 @@ P_LOAD_APP_CODE()
     }
    }
    
+#if RL_PLATFORM_HOT_RELOAD_CODE   
    Win32LogIf(!CopyFile(Code->LibraryPath, TempDLLPath, false));
+#endif
    
    Library = LoadLibraryA(TempDLLPath);
    if(Library)

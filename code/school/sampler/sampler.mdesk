@@ -49,49 +49,64 @@ ConfigTable:
 }
 
 //- Templates 
-
-@data
-AsmSample:
+@table(Code)
+AsmSampleCode:
 {
- "str8 AsmTemplateText = {(u8 *)";
- @strings @cstring_lit
+ {
   """$NOMOD51
+   
+   ;~ Defines
+   $include "aducgd1def.asm"
+   
+   ;~ Inits
+   .org 0x0000
+   
+   ;~ EntryPoint
+   mov sp, #0x7F
   
-  ;~ Defines
-  $include "aducgd1def.asm"
+  loop: 
   
-  ;~ Inits
-  .org 0x0000
-  
-  ;~ EntryPoint
-  mov sp, #0x7F
- 
- loop: 
- 
- ljmp loop
-  
-  ;~ Libraries
-  $include "aducgd1inc.asm"
-  
-  end
-  """;
-  "};";
+  ljmp loop
+   
+   ;~ Libraries
+   $include "aducgd1inc.asm"
+   
+   end
+   """;
+   "};";
+ }
 }
+
+@table(Code)
+CSampleCode:
+{
+ {
+  """
+#define _CRT_SECURE_NO_WARNINGS 1
+#include <stdio.h>
+  
+  int main(int ArgCount, char **Args)
+  {
+   
+   return 0;
+  }
+  
+  """;
+   "};";
+ }
+}
+
 
 @data
 CSample:
 {
- "str8 CTemplateText = {(u8 *)";
- @strings @cstring_lit
-  """#define _CRT_SECURE_NO_WARNINGS 1
-#include <stdio.h>
- 
- int main(int ArgCount, char **Args)
- {
-  
-  return 0;
- }
- 
- """;
-  "};";
+ @expand(CSampleCode) @strings @cstring_lit
+  `str8 CTemplateText = {$(Code)}`;
+}
+
+@data
+AsmSample:
+{
+ @expand(AsmSampleCode) @strings @cstring_lit
+  `str8 AsmTemplateText = {$(Code)}`;
 }

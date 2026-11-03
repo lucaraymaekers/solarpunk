@@ -37,10 +37,10 @@ paths =
  { .path = "code/cling/",  .recursive = true,  .relative = true, },
  
  //- Targets
- //{ .path = "code/muze/",          .recursive = true,  .relative = true, },
+ { .path = "code/muze/",          .recursive = true,  .relative = true, },
  //{ .path = "code/wordled/",       .recursive = true,  .relative = true, },
  //{ .path = "code/editor/",        .recursive = true,  .relative = true, },
- { .path = "code/compenhance/",   .recursive = true,  .relative = true, },
+ //{ .path = "code/compenhance/",   .recursive = true,  .relative = true, },
  //{ .path = "code/wsdcom/",        .recursive = true,  .relative = true, },
  //{ .path = "code/lsd/",           .recursive = true,  .relative = true, },
  //{ .path = "code/pp/",            .recursive = true,  .relative = true, },
@@ -185,7 +185,7 @@ commands =
 
 fkey_command =
 {
- .F1 = "rl_compile_sample",
+ .F1 = "build_muze",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",

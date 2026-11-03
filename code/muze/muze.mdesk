@@ -1,12 +1,12 @@
-@table(Name)
+@table(Name, DisplayName)
 PanelTypes:
 {
- { Empty,}
- { Sheet, }
- { Roll, }
- { Controls, }
- { Piece, }
- { Debug, }
+ { Empty,    "Empty"          }
+ { Sheet,    "Sheet"          }    
+ { Roll,     "Roll"           }
+ { Controls, "Sheet controls" }
+ { Piece,    "Piece"          }
+ { Debug,    "Debug"          }
 }
 
 @table
@@ -29,5 +29,5 @@ PanelKind:
 PanelTypeStrings: 
 {
  @expand(PanelTypes) @strings
-  `{$(Name)},`;
+  `{$(DisplayName)},`;
 }

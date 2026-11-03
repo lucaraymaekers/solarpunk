@@ -219,8 +219,8 @@ enum command_kind
  Command_SetLength,
  Command_ClearSelection,
  Command_DeleteSelection,
- //-
  
+ //- Lister
  Command_CloseLister,
  Command_OpenLister,
  
@@ -237,6 +237,7 @@ enum command_kind
  Command_PieceToggleMetronome,
  Command_PieceToggleBarWrapping,
  Command_PieceSetBPM,
+ Command_PieceSetInstrument,
  //-
 };
 typedef enum command_kind command_kind;
@@ -259,6 +260,7 @@ struct command
  panel *Panel;
  panel_kind PanelKind;
  voice *Voice;
+ piece *Piece;
  s32 PresetIdx;
  platform_midi_device *Device;
  lister_kind ListerKind;

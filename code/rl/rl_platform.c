@@ -247,7 +247,7 @@ BASE_ENTRY_POINT()
   // NOTE(luca): Total memory for platform and app.
   u64 PermanentMemoryOffset = TB(2);
   u64 ReadOnlyMemoryOffset = TB(3);
-#if !RL_PLATFORM_INTERNAL
+#if !RL_PLATFORM_INTERNAL || ASAN_ENABLED
   PermanentMemoryOffset = 0;
   ReadOnlyMemoryOffset = 0;
 #endif
@@ -346,9 +346,9 @@ BASE_ENTRY_POINT()
   ui_box *DebugUIBox = 0;
   {
    char *FontPath = 0;
-   FontPath = PathFromExe(FrameArena, S8("../data/icons.ttf"));
+   FontPath = PathFromExe(FrameArena, S8("icons.ttf"));
    InitFont(&IconsFont, FontPath);
-   FontPath = PathFromExe(FrameArena, S8("../data/font_regular.ttf"));
+   FontPath = PathFromExe(FrameArena, S8("font_regular.ttf"));
    InitFont(&TextFont, FontPath);
    
    gladLoaderLoadGL();
@@ -418,7 +418,7 @@ BASE_ENTRY_POINT()
      P_LoadAppCode(FrameArena, &Code, &AppMemory);
      CodeLoaded = true;
     }
-#if RL_PLATFORM_INTERNAL
+#if RL_PLATFORM_HOT_RELOAD_CODE
     CodeLoaded = false;
 #endif
     
@@ -850,6 +850,7 @@ BASE_ENTRY_POINT()
           ReplayBuffer.Size = Replay.RecordingSize;
           OS_WriteEntireFile(FileName, ReplayBuffer);
          }
+         Log("Replay saved to disk.\n");
         }
         
         DebugSpacer();

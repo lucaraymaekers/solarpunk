@@ -37,6 +37,9 @@
 #if !defined(RL_PLATFORM_INTERNAL)
 # define RL_PLATFORM_INTERNAL 0
 #endif
+#if !defined(RL_PLATFORM_HOT_RELOAD_CODE)
+# define RL_PLATFORM_HOT_RELOAD_CODE 0
+#endif
 // NOTE(luca): Toggles the compiliation of the debug GUI in the platform layer, this is separate from RL_PLATFORM_INTERNAL because sometimes we want to test the "release" version of our app with our platform debug tools. 
 #if !defined(RL_PLATFORM_DEBUG_UI)
 # define RL_PLATFORM_DEBUG_UI 0

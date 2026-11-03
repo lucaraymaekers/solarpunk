@@ -30,187 +30,251 @@ RectVSAttributeOffsets:
   `$(Offset),`;
 }
 
-@file("rect_vert.glsl") @data
-VSCode:
+@table(Code)
+VertexShaderPreCode:
 {
- ```
+ {
+  ```
 #version 330 core
- 
+  
 #define v2 vec2
 #define v3 vec3
 #define v4 vec4 
 #define f32 float
 #define b32 int
- 
- uniform v2 Viewport;
- 
- out v2 VS_Pos;
- out v4 VS_Dest;
- out v2 VS_TexCoord;
- out v2 VS_Center;
- out v2 VS_HalfSize;
- out v4 VS_Color;
- flat out v4 VS_Clip;
- flat out f32 VS_CornerRadius;
- flat out f32 VS_BorderThickness;
- flat out f32 VS_Softness;
- flat out f32 VS_HasTexture;
- ```,
- 
- @expand(RectVSAttributes)
-  ```layout (location = $(_Idx)) in $(Type) I_$(Name);
- ```,
- 
- ```
-  void main()
- {
-  v4 Colors[] = v4[](I_Color0, I_Color1, I_Color2, I_Color3);
-  v2 Vertices[] = v2[](v2(-1.0, +1.0), v2(+1.0, +1.0), v2(-1.0, -1.0), v2(+1.0, -1.0));
   
-  v2 PixelPos, HalfSize, Center, ClipPos;
-  {    
-   v2 Min = I_Dest.xy;
-   v2 Max = I_Dest.zw;
-   
-   v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;
-   PixelPos = mix(Min, Max, PosInQuad);
-   
-   ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;
-   ClipPos.y = -ClipPos.y;
-   
-   HalfSize = (Max - Min)/2.0;
-   Center = Min + HalfSize;
-  }
+  uniform v2 Viewport;
   
-  v2 Min = I_TexSrc.xy;
-  v2 Max = I_TexSrc.zw;
-  
-  v2 BL = v2(Min.x, Max.y);
-  v2 BR = v2(Max.x, Max.y);
-  v2 TL = v2(Min.x, Min.y);
-  v2 TR = v2(Max.x, Min.y);
-  v2 TexCoords[] = v2[](BL, BR, TL, TR);
-  
-  v2 TexCoord = TexCoords[gl_VertexID];
-  
-  VS_Center = Center;
-  VS_HalfSize = HalfSize;
-  VS_Pos = PixelPos - Center;
-  VS_Dest = I_Dest;
-  VS_TexCoord = TexCoord;
-  VS_Clip = I_Clip;
-  VS_Color = Colors[gl_VertexID];
-  VS_CornerRadius = I_CornerRadii[gl_VertexID];
-  VS_BorderThickness = I_BorderThickness;
-  VS_Softness = I_Softness;
-  VS_HasTexture = I_HasTexture;
-  
-  gl_Position = v4(ClipPos, 0.0, 1.0);
+  out v2 VS_Pos;
+  out v4 VS_Dest;
+  out v2 VS_TexCoord;
+  out v2 VS_Center;
+  out v2 VS_HalfSize;
+  out v4 VS_Color;
+  flat out v4 VS_Clip;
+  flat out f32 VS_CornerRadius;
+  flat out f32 VS_BorderThickness;
+  flat out f32 VS_Softness;
+  flat out f32 VS_HasTexture;
+  ```
  }
- ```
 }
 
-@file("rect_frag.glsl") @data
-FSCode:
+@table(Code)
+VertexShaderPostCode:
 {
- ```
+ {
+  ```
+   void main()
+  {
+   v4 Colors[] = v4[](I_Color0, I_Color1, I_Color2, I_Color3);
+   v2 Vertices[] = v2[](v2(-1.0, +1.0), v2(+1.0, +1.0), v2(-1.0, -1.0), v2(+1.0, -1.0));
+   
+   v2 PixelPos, HalfSize, Center, ClipPos;
+   {    
+    v2 Min = I_Dest.xy;
+    v2 Max = I_Dest.zw;
+    
+    v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;
+    PixelPos = mix(Min, Max, PosInQuad);
+    
+    ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;
+    ClipPos.y = -ClipPos.y;
+    
+    HalfSize = (Max - Min)/2.0;
+    Center = Min + HalfSize;
+   }
+   
+   v2 Min = I_TexSrc.xy;
+   v2 Max = I_TexSrc.zw;
+   
+   v2 BL = v2(Min.x, Max.y);
+   v2 BR = v2(Max.x, Max.y);
+   v2 TL = v2(Min.x, Min.y);
+   v2 TR = v2(Max.x, Min.y);
+   v2 TexCoords[] = v2[](BL, BR, TL, TR);
+   
+   v2 TexCoord = TexCoords[gl_VertexID];
+   
+   VS_Center = Center;
+   VS_HalfSize = HalfSize;
+   VS_Pos = PixelPos - Center;
+   VS_Dest = I_Dest;
+   VS_TexCoord = TexCoord;
+   VS_Clip = I_Clip;
+   VS_Color = Colors[gl_VertexID];
+   VS_CornerRadius = I_CornerRadii[gl_VertexID];
+   VS_BorderThickness = I_BorderThickness;
+   VS_Softness = I_Softness;
+   VS_HasTexture = I_HasTexture;
+   
+   gl_Position = v4(ClipPos, 0.0, 1.0);
+  }
+  ```
+ }
+}
+
+@table(Code)
+FragmentShaderCode:
+{
+ {
+  ```
 #version 330 core
- 
+  
 #define Pi32 3.1415926535897
 #define v2 vec2
 #define v3 vec3
 #define v4 vec4 
 #define f32 float
 #define b32 int
- 
- in v2 VS_Pos;
- in v4 VS_Dest;
- in v2 VS_TexCoord;
- in v2 VS_Center;
- in v2 VS_HalfSize;
- in v4 VS_Color;
- flat in v4 VS_Clip;
- flat in f32 VS_CornerRadius;
- flat in f32 VS_BorderThickness;
- flat in f32 VS_Softness;
- flat in f32 VS_HasTexture;
- 
- uniform sampler2D Texture;
- 
- out v4 FragColor;
- 
- v3 
-  RGBFromHSV(v3 Color)
- {
-  v4 K = v4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  v3 p = abs(fract(Color.xxx + K.xyz) * 6.0 - K.www);
-  return Color.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), Color.y);
- }
- 
- f32
-  BoxSDF(v2 Pos, v2 HalfDim, f32 CornerRadius)
- {
-  v2 q = abs(Pos) - (HalfDim - CornerRadius);
   
-  f32 Distance = min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - CornerRadius;
+  in v2 VS_Pos;
+  in v4 VS_Dest;
+  in v2 VS_TexCoord;
+  in v2 VS_Center;
+  in v2 VS_HalfSize;
+  in v4 VS_Color;
+  flat in v4 VS_Clip;
+  flat in f32 VS_CornerRadius;
+  flat in f32 VS_BorderThickness;
+  flat in f32 VS_Softness;
+  flat in f32 VS_HasTexture;
   
-  return Distance;
- }
- 
- void main()
- {
-  v4 Color = VS_Color;
+  uniform sampler2D Texture;
   
-  // Exclude pixels outside of the clip region.
-  if(true)
-  {  
-   v2 Min = VS_Clip.xy;
-   v2 Max = VS_Clip.zw;
-   v2 Pos = gl_FragCoord.xy;
+  out v4 FragColor;
+  
+  v3 
+   RGBFromHSV(v3 Color)
+  {
+   v4 K = v4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+   v3 p = abs(fract(Color.xxx + K.xyz) * 6.0 - K.www);
+   return Color.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), Color.y);
+  }
+  
+  f32
+   BoxSDF(v2 Pos, v2 HalfDim, f32 CornerRadius)
+  {
+   v2 q = abs(Pos) - (HalfDim - CornerRadius);
    
-   Pos.y = 900 - Pos.y;
+   f32 Distance = min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - CornerRadius;
    
-   if(!(Pos.x >= Min.x && Pos.x <= Max.x &&
-        Pos.y >= Min.y && Pos.y <= Max.y))
+   return Distance;
+  }
+  
+  void main()
+  {
+   v4 Color = VS_Color;
+   
+   // Exclude pixels outside of the clip region.
+   if(true)
+   {  
+    v2 Min = VS_Clip.xy;
+    v2 Max = VS_Clip.zw;
+    v2 Pos = gl_FragCoord.xy;
+    
+    Pos.y = 900 - Pos.y;
+    
+    if(!(Pos.x >= Min.x && Pos.x <= Max.x &&
+         Pos.y >= Min.y && Pos.y <= Max.y))
+    {
+     discard;
+    }
+    
+   }
+   
+   f32 tBorder = 1.0;
+   if(VS_BorderThickness > 0.0)
+   {
+    f32 sBorder = BoxSDF(VS_Pos,
+                         VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0) - VS_BorderThickness,
+                         max(VS_CornerRadius-VS_BorderThickness, 0.0));
+    tBorder = smoothstep(0.0, 2.0*VS_Softness, sBorder);
+   }
+   if(tBorder < 0.001f)
    {
     discard;
    }
    
-  }
-  
-  f32 tBorder = 1.0;
-  if(VS_BorderThickness > 0.0)
-  {
-   f32 sBorder = BoxSDF(VS_Pos,
-                        VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0) - VS_BorderThickness,
-                        max(VS_CornerRadius-VS_BorderThickness, 0.0));
-   tBorder = smoothstep(0.0, 2.0*VS_Softness, sBorder);
-  }
-  if(tBorder < 0.001f)
-  {
-   discard;
-  }
-  
-  f32 tCorner = 1.0;
-  if(VS_CornerRadius > 0.0 || VS_Softness > 0.75f)
-  {
-   f32 sCorner = BoxSDF(VS_Pos,
-                        VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0),
-                        VS_CornerRadius);
-   tCorner = 1.0-smoothstep(0.0, 2.0*VS_Softness, sCorner);
-  }
-  
-  if(VS_HasTexture > 0)
-  {
-   f32 Alpha = texture(Texture, VS_TexCoord).r;
+   f32 tCorner = 1.0;
+   if(VS_CornerRadius > 0.0 || VS_Softness > 0.75f)
+   {
+    f32 sCorner = BoxSDF(VS_Pos,
+                         VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0),
+                         VS_CornerRadius);
+    tCorner = 1.0-smoothstep(0.0, 2.0*VS_Softness, sCorner);
+   }
    
-   Color.a *= Alpha;
+   if(VS_HasTexture > 0)
+   {
+    f32 Alpha = texture(Texture, VS_TexCoord).r;
+    
+    Color.a *= Alpha;
+   }
+   
+   Color.a *= tBorder;
+   Color.a *= tCorner;
+   
+   FragColor = Color;
   }
-  
-  Color.a *= tBorder;
-  Color.a *= tCorner;
-  
-  FragColor = Color;
+  ```
  }
- ```
+}
+
+@file("rect_frag.glsl") @data
+FSCodeFile:
+{
+ @expand(FragmentShaderCode) `$(Code)`;
+}
+
+@data
+FSCodeString:
+{
+ `str8 FSCode = `;
+ @expand(FragmentShaderCode) @strings @cstring_lit
+  ```
+ {$(Code)};
+ ```;
+ `;`;
+};
+
+@file("rect_vert.glsl") @data
+VSCodeFile:
+{
+ @expand(VertexShaderPreCode) `$(Code)`;
+ 
+ @expand(RectVSAttributes)
+  ```layout (location = $(_Idx)) in $(Type) I_$(Name);
+ ```;
+ 
+ @expand(VertexShaderPostCode) `$(Code)`;
+}
+
+@data
+VSCodeString:
+{
+ `str8 VSCode = {(u8 *)`;
+  @expand(VertexShaderPreCode) @cstring_lit
+   `$(Code)`;
+  
+  @expand(RectVSAttributes)
+   ```
+   "layout (location = $(_Idx)) in $(Type) I_$(Name);\n"
+   ```;
+  
+  @expand(VertexShaderPostCode) @cstring_lit
+   `$(Code)`;
+  ```, sizeof(```;
+              @expand(VertexShaderPreCode) @cstring_lit
+              `$(Code)`;
+              
+              @expand(RectVSAttributes)
+              ```
+              "layout (location = $(_Idx)) in $(Type) I_$(Name);\n"
+              ```;
+              
+              @expand(VertexShaderPostCode) @cstring_lit
+              `$(Code)`;
+              
+              ```) - 1};```;
 }

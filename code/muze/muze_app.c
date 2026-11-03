@@ -136,6 +136,7 @@ ZeroPanel(panel *Panel)
 {
  MemoryZero(Panel);
  Panel->First = Panel->Last = Panel->Next = Panel->Prev = Panel->Parent = NilPanel;
+ Panel->Piece = NilPiece;
 }
 
 global_variable u64 PanelsAllocated;
@@ -1007,7 +1008,8 @@ PieceAlloc(app_state *App)
  }
  else
  {
-  ErrorLog("Max piece countreached.\n");
+  // TODO(luca): Popup?
+  ErrorLog("Max piece count reached.\n");
  }
  
  return Result;
@@ -1024,7 +1026,7 @@ PieceStopPlaying(piece *Piece)
 }
 
 #if 0
-#include "../data/muze/muze_pieces.c"
+# include "../data/muze/muze_pieces.c"
 #endif
 
 //~ UI 
@@ -2352,7 +2354,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  {
   //- Init TSF 
   {        
-   char *Path = PathFromExe(FrameArena, S8("../data/muze/sounds/sounds.sf2"));
+   char *Path = PathFromExe(FrameArena, S8("sounds.sf2"));
    str8 File = OS_ReadEntireFileIntoMemory(Path);
    GlobalTSF = tsf_load_memory(App->TSFArena, File.Data, (int)File.Size);
    if(GlobalTSF == 0)
@@ -2431,11 +2433,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
   //- Init Fonts
   {
    {
-    char *FontPath = PathFromExe(FrameArena, S8("../data/font_regular.ttf"));
+    char *FontPath = PathFromExe(FrameArena, S8("font_regular.ttf"));
     InitFont(&App->Font, FontPath);
    }
    {
-    char *FontPath = PathFromExe(FrameArena, S8("../data/icons.ttf"));
+    char *FontPath = PathFromExe(FrameArena, S8("icons.ttf"));
     InitFont(&App->IconsFont, FontPath);
    }
    
@@ -2455,10 +2457,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
     MemoryZero(Arena);
     Arena->Size = MB(1);
     
-#if MUZE_INTERNAL
     umm Offset = TB(2) + GB(64);
-#else
-    umm Offset = 0;
+#if !MUZE_INTERNAL || ASAN_ENABLED
+    Offset = 0;
 #endif
     
     Arena->Base = OS_AllocateAtOffset(Arena->Size, Offset);
@@ -2961,7 +2962,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
            UI_FillAll()
            UI_LayoutAxis(Axis2_Y)
           {
-           ui_box *Box = UI_AddBox(S8("Items"), UI_BoxFlag_Clip);
+           ui_box *Box = UI_AddBox(S8("Items"), UI_BoxFlag_Clip|UI_BoxFlag_Scroll);
            Box->Scroll.Y = App->ListerScroll;
            MinIdx = (s32)(Box->Scroll.Y/ItemHeight);
            Assert(MinIdx >= 0 && "Negative MinIdx will create Item -1");
@@ -2986,7 +2987,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                        .Disabled = Selected, 
                        .DisabledBackgroundColor = Color_Yellow, 
                        .Padding = ItemPadding,
-                       .ClipSize = true).Released)
+                       .ClipSize = false).Released)
              {
               switch(App->ListerKind)
               {
@@ -3185,7 +3186,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
             else if(Panel->Kind == PanelKind_Piece)
             {
              b32 Loop = true;
-             piece *Piece = (Panel->Piece ? Panel->Piece : PieceAlloc(App));
+             piece *Piece = (IsNilPiece(Panel->Piece) ? PieceAlloc(App) : Panel->Piece);
              Panel->Piece = Piece;
              
 #if MUZE_INTERNAL && 0
@@ -3230,7 +3231,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #endif
              
 #endif
-             
              ui_box *PieceBox;
              
              UI_FillAll()
@@ -3244,7 +3244,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                UI_FontKind(FontKind_Icon)
                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                {
-                str8 PieceFilePath = S8("../data/muze/lecon_11.muze_piece");
+                str8 PieceFilePath = S8("song.muze_piece");
                 
                 if(M_IconButton(UI_IconKind_File, S8("Open")))
                 {
@@ -3307,8 +3307,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
                }
 #endif
                
-               Piece->Metronome ^= 
-                M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta);
+               if(M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta))
+               {
+                PushCommand(App, Command_PieceToggleMetronome)->Piece = Piece;
+               }
                
                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                 if(M_Button(S8("Clear")))
@@ -4504,7 +4506,27 @@ UPDATE_AND_RENDER(UpdateAndRender)
     Command->Panel->Kind = Command->PanelKind;
     MemoryZero(&Command->Panel->Scroll);
    } break;
+   
+   //- Piece commands
+   case Command_PieceToggleMetronome:
+   {
+    Command->Piece->Metronome ^= 1;
+   } break;
+   
+   case Command_PieceSetInstrument:
+   {
+    piece *Piece = Command->Piece;
+    if(Command->PresetIdx != Piece->Preset)
+    {
+     tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+    }
+    
+    Piece->Preset = Command->PresetIdx;
+    tsf_channel_set_presetindex(GlobalTSF, Piece->Channel, Command->PresetIdx);
+   } break;
+   
   }
+  
  }
  
  f32 MaxRecordingLength = 3600.f;

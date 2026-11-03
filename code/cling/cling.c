@@ -1,6 +1,11 @@
 //-
 // Cling is a build script and metaprogram for this codebase..
 //-
+// TODO(luca): 
+// - Asan build:  copy dll and pdb on windows
+// - Clean build: Delete build directory
+// - Package:     Package application for distribution
+//-
 
 //~ Libaries
 #define BASE_FORCE_THREADS_COUNT 1
@@ -129,7 +134,7 @@ AppBuild(cng_build_options *BuildOptions,
 {
  str8 LibFileName = S8("../build/rl_libs.obj");
  
- if(!OS_FileExists(CSS8(LibFileName)))
+ if(!OS_FileExists(CSS8(LibFileName)) || BuildOptions->Slow)
  {
   Cng_Build(Name, BuildOptions, 
             S8ArrayLit(S8("../code/rl/rl_libs.h")),
@@ -445,14 +450,75 @@ BASE_ENTRY_POINT()
                      field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
                      MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
                      
-                     if(GenStrings)
+                     if(GenCStringLiteral)
                      {
-                      OutString = Str8Fmt("(u8 *)\"%S\", %llu", 
-                                          Field->string, Field->string.Size);
+                      u64 Extra = 0;
+                      str8 CString = {0};
+                      str8 InString = Field->string;
+                      S8OverPush(Arena, CString, KB(4), CString.Size)
+                      {
+                       CString.Size = 0;
+                       
+                       CString.Data[CString.Size] = '"';
+                       CString.Size += 1;
+                       Extra += 1;
+                       
+                       u8 Char = 0;
+                       for EachIndex(CharIdx, InString.Size)
+                       {
+                        if(Char == '\n')
+                        {
+                         CString.Data[CString.Size] = '"';
+                         CString.Size += 1;
+                         Extra += 1;
+                        }
+                        
+                        Char = InString.Data[CharIdx];
+                        
+                        if(0) {}
+                        else if(Char == '"' || Char == '\\')
+                        {
+                         CString.Data[CString.Size] = '\\';
+                         CString.Size += 1;
+                         Extra += 1;
+                        }
+                        else if(Char == '\n')
+                        {
+                         CString.Data[CString.Size] = '\\';
+                         CString.Size += 1;
+                         CString.Data[CString.Size] = 'n';
+                         CString.Size += 1;
+                         CString.Data[CString.Size] = '"';
+                         CString.Size += 1;
+                         Extra += 3; // one for the newline and one for the quote
+                         // One more for the newline that's coming
+                        }
+                        
+                        CString.Data[CString.Size] = Char;
+                        CString.Size += 1;
+                       }
+                       CString.Data[CString.Size] = '"';
+                       CString.Size += 1;
+                       Extra += 1;
+                      }
+                      
+                      OutString = CString;
+                      
+                      if(GenStrings)
+                      {
+                       OutString = Str8Fmt("(u8 *)%S, %llu", OutString, OutString.Size - Extra);
+                      }
+                      
                      }
                      else
                      {
                       OutString = Field->string;
+                      
+                      if(GenStrings)
+                      {
+                       OutString = Str8Fmt("(u8 *)\"%S\", %llu", OutString, OutString.Size);
+                      }
+                      
                      }
                      
                     }
@@ -492,65 +558,6 @@ BASE_ENTRY_POINT()
                 
                 RowCount += 1;
                }
-              }
-              else if(GenCStringLiteral)
-              {
-               u64 Extra = 0;
-               str8 String = {0};
-               S8OverPush(Arena, String, KB(4), String.Size)
-               {
-                String.Size = 0;
-                
-                String.Data[String.Size] = '"';
-                String.Size += 1;
-                Extra += 1;
-                
-                u8 Char = 0;
-                for EachIndex(Idx, Row->string.Size)
-                {
-                 if(Char == '\n')
-                 {
-                  String.Data[String.Size] = '"';
-                  String.Size += 1;
-                  Extra += 1;
-                 }
-                 
-                 Char = Row->string.Data[Idx];
-                 
-                 if(0) {}
-                 else if(Char == '"' || Char == '\\')
-                 {
-                  String.Data[String.Size] = '\\';
-                  String.Size += 1;
-                  Extra += 1;
-                 }
-                 else if(Char == '\n')
-                 {
-                  String.Data[String.Size] = '\\';
-                  String.Size += 1;
-                  String.Data[String.Size] = 'n';
-                  String.Size += 1;
-                  String.Data[String.Size] = '"';
-                  String.Size += 1;
-                  Extra += 3; // one for the newline and one for the quote
-                  // One more for the newline that's coming
-                 }
-                 
-                 String.Data[String.Size] = Char;
-                 String.Size += 1;
-                }
-                String.Data[String.Size] = '"';
-                String.Size += 1;
-                Extra += 1;
-                
-                S8ListPush(String);
-               }
-               
-               if(GenStrings)
-               {
-                S8ListPush(Str8Fmt(", %llu", String.Size - Extra));
-               }
-               
               }
               else
               {

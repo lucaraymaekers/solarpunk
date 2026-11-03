@@ -67,33 +67,38 @@ GL_ErrorStatus(gl_uint Handle, b32 IsShader)
 }
 
 internal gl_uint
-GL_CompileShaderFromSource(str8 FileNameAfterExe, u32 Type)
+GL_CompileShaderFromString(str8 File, u32 Type)
 {
- gl_uint Shader = (gl_uint)glCreateShader(Type);
+ gl_uint Shader = glCreateShader(Type);
  
- char *FileName = PathFromExe(GL_FrameArena, FileNameAfterExe);
- str8 Source = OS_ReadEntireFileIntoMemory(FileName);
- 
- if(Source.Size)
- {    
-  glShaderSource(Shader, 1, (const char **)&Source.Data, NULL);
-  glCompileShader(Shader);
-  GL_ErrorStatus(Shader, true);
- }
- 
- OS_FreeFileMemory(Source);
+ glShaderSource(Shader, 1, (const char **)&File.Data, 0);
+ glCompileShader(Shader);
+ GL_ErrorStatus(Shader, true);
  
  return Shader;
 }
 
 internal gl_uint
-GL_ProgramFromShaders(str8 VertPath, str8 FragPath)
+GL_CompileShaderFromFile(str8 FileNameAfterExe, u32 Type)
+{
+ gl_uint Shader = 0;
+ 
+ char *FilePath = PathFromExe(GL_FrameArena, FileNameAfterExe);
+ str8 File = OS_ReadEntireFileIntoMemory(FilePath);
+ 
+ if(File.Size)
+ {    
+  Shader = GL_CompileShaderFromString(File, Type);
+  OS_FreeFileMemory(File);
+ }
+ 
+ return Shader;
+}
+
+internal gl_uint
+GL_ProgramFromShaders(gl_int VertexShader, gl_int FragmentShader)
 {
  gl_uint Program = 0;
- 
- gl_uint VertexShader, FragmentShader;
- VertexShader = GL_CompileShaderFromSource(VertPath, GL_VERTEX_SHADER);
- FragmentShader = GL_CompileShaderFromSource(FragPath, GL_FRAGMENT_SHADER);
  
  Program = glCreateProgram();
  glAttachShader(Program, VertexShader);

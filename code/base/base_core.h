@@ -261,11 +261,11 @@ do { if(!(Expression)) DebugBreakMsg(Format, ##__VA_ARGS__); } while(0)
 
 #define NotImplemented() DebugBreakMsg("Not Implemented!\n")
 #define InvalidPath()    DebugBreakMsg("Invalid Path!\n")
-#define StaticAssert(C, ID) global_variable u8 Glue(ID, __LINE__)[(C)?1:-1]
+#define StaticAssert(C, ID) global_variable u8 Var(ID)[(C)?1:-1]
 
 //~ Loop macros
 
-#define DeferLoop(Begin, End) DeferLoop_(Begin, End, Var(_i_))
+#define DeferLoop(Begin, End) DeferLoop_(Begin, End, Glue(_i_, __COUNTER__))
 #define DeferLoop_(Begin, End, i) \
 for(int i = ((Begin), 0); !i; i += 1, (End))
 
