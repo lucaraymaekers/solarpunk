@@ -494,8 +494,11 @@ BASE_ENTRY_POINT()
                          // One more for the newline that's coming
                         }
                         
-                        CString.Data[CString.Size] = Char;
-                        CString.Size += 1;
+                        if(Char != '\r')
+                        {
+                         CString.Data[CString.Size] = Char;
+                         CString.Size += 1;
+                        }
                        }
                        CString.Data[CString.Size] = '"';
                        CString.Size += 1;
