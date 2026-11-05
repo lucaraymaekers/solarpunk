@@ -1643,8 +1643,9 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     // Update trail
     if(*dtForFrame > 0.f)
     {
-     Piece->PrevPlayPos.X += (MarkerPos.X - Piece->PrevPlayPos.X)*UI_State->AnimSpeed;
-     Piece->PrevPlayPos.Y += (MarkerPos.Y - Piece->PrevPlayPos.Y)*UI_State->AnimSpeed;
+     f32 Speed = .5f*UI_State->AnimSpeed;
+     Piece->PrevPlayPos.X += (MarkerPos.X - Piece->PrevPlayPos.X)*Speed;
+     Piece->PrevPlayPos.Y += (MarkerPos.Y - Piece->PrevPlayPos.Y)*Speed;
     }
    }
    
@@ -3729,7 +3730,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  f32 Speed = UI_State->AnimSpeedCoeff;
                  Speed = M_Slider(S8("SetAnimSpeed"), S8("Set animation speed"), 
                                   Str8Fmt("%3.0f", Speed),
-                                  Speed, 0.f, 120.f, 1.f, false).Value;
+                                  Speed, 1.f, 120.f, 1.f, false).Value;
                  UI_State->AnimSpeedCoeff = Speed;
                 }
                 
