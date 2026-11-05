@@ -96,18 +96,18 @@ GL_CompileShaderFromFile(str8 FileNameAfterExe, u32 Type)
 }
 
 internal gl_uint
-GL_ProgramFromShaders(gl_int VertexShader, gl_int FragmentShader)
+GL_ProgramFromShaders(gl_uint VertexShader, gl_uint FragmentShader)
 {
  gl_uint Program = 0;
  
  Program = glCreateProgram();
- glAttachShader(Program, VertexShader);
- glAttachShader(Program, FragmentShader);
+    glAttachShader(Program, VertexShader);
+    glAttachShader(Program, FragmentShader);
  glLinkProgram(Program);
  GL_ErrorStatus(Program, false);
  
- glDeleteShader(VertexShader);
- glDeleteShader(FragmentShader); 
+    glDeleteShader(VertexShader);
+    glDeleteShader(FragmentShader); 
  
  return Program;
 }

@@ -7,7 +7,7 @@ IF NOT EXIST ..\build mkdir ..\build
 cd ..\build
 call ..\code\build.bat -Muze -Slow
 
-REM --- Delete muze directory
+REM --- Create clean directory
 IF EXIST .\muze rmdir /s /q muze
 mkdir .\muze 
 cd .\muze

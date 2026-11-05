@@ -26,129 +26,129 @@ s32 RectVSAttributeOffsets[] = {
 
 
 str8 FSCode = 
- {(u8 *)"\n"
-"#version 330 core\n"
-"  \n"
-"#define Pi32 3.1415926535897\n"
-"#define v2 vec2\n"
-"#define v3 vec3\n"
-"#define v4 vec4 \n"
-"#define f32 float\n"
-"#define b32 int\n"
-"  \n"
-"  in v2 VS_Pos;\n"
-"  in v4 VS_Dest;\n"
-"  in v2 VS_TexCoord;\n"
-"  in v2 VS_Center;\n"
-"  in v2 VS_HalfSize;\n"
-"  in v4 VS_Color;\n"
-"  flat in v4 VS_Clip;\n"
-"  flat in f32 VS_CornerRadius;\n"
-"  flat in f32 VS_BorderThickness;\n"
-"  flat in f32 VS_Softness;\n"
-"  flat in f32 VS_HasTexture;\n"
-"  \n"
-"  uniform sampler2D Texture;\n"
-"  \n"
-"  out v4 FragColor;\n"
-"  \n"
-"  v3 \n"
-"   RGBFromHSV(v3 Color)\n"
-"  {\n"
-"   v4 K = v4(1.0, 2.0/3.0, 1.0/3.0, 3.0);\n"
-"   v3 p = abs(fract(Color.xxx + K.xyz) * 6.0 - K.www);\n"
-"   return Color.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), Color.y);\n"
-"  }\n"
-"  \n"
-"  f32\n"
-"   BoxSDF(v2 Pos, v2 HalfDim, f32 CornerRadius)\n"
-"  {\n"
-"   v2 q = abs(Pos) - (HalfDim - CornerRadius);\n"
-"   \n"
-"   f32 Distance = min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - CornerRadius;\n"
-"   \n"
-"   return Distance;\n"
-"  }\n"
-"  \n"
-"  void main()\n"
-"  {\n"
-"   v4 Color = VS_Color;\n"
-"   \n"
-"   // Exclude pixels outside of the clip region.\n"
-"   if(true)\n"
-"   {  \n"
-"    v2 Min = VS_Clip.xy;\n"
-"    v2 Max = VS_Clip.zw;\n"
-"    v2 Pos = gl_FragCoord.xy;\n"
-"    \n"
-"    Pos.y = 900 - Pos.y;\n"
-"    \n"
-"    if(!(Pos.x >= Min.x && Pos.x <= Max.x &&\n"
-"         Pos.y >= Min.y && Pos.y <= Max.y))\n"
-"    {\n"
-"     discard;\n"
-"    }\n"
-"    \n"
-"   }\n"
-"   \n"
-"   f32 tBorder = 1.0;\n"
-"   if(VS_BorderThickness > 0.0)\n"
-"   {\n"
-"    f32 sBorder = BoxSDF(VS_Pos,\n"
-"                         VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0) - VS_BorderThickness,\n"
-"                         max(VS_CornerRadius-VS_BorderThickness, 0.0));\n"
-"    tBorder = smoothstep(0.0, 2.0*VS_Softness, sBorder);\n"
-"   }\n"
-"   if(tBorder < 0.001f)\n"
-"   {\n"
-"    discard;\n"
-"   }\n"
-"   \n"
-"   f32 tCorner = 1.0;\n"
-"   if(VS_CornerRadius > 0.0 || VS_Softness > 0.75f)\n"
-"   {\n"
-"    f32 sCorner = BoxSDF(VS_Pos,\n"
-"                         VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0),\n"
-"                         VS_CornerRadius);\n"
-"    tCorner = 1.0-smoothstep(0.0, 2.0*VS_Softness, sCorner);\n"
-"   }\n"
-"   \n"
-"   if(VS_HasTexture > 0)\n"
-"   {\n"
-"    f32 Alpha = texture(Texture, VS_TexCoord).r;\n"
-"    \n"
-"    Color.a *= Alpha;\n"
-"   }\n"
-"   \n"
-"   Color.a *= tBorder;\n"
-"   Color.a *= tCorner;\n"
-"   \n"
-"   FragColor = Color;\n"
-"  }\n"
-"  ", 2204};
+ {(u8 *)"\n"
+"#version 330 core\n"
+"  \n"
+"#define Pi32 3.1415926535897\n"
+"#define v2 vec2\n"
+"#define v3 vec3\n"
+"#define v4 vec4 \n"
+"#define f32 float\n"
+"#define b32 int\n"
+"  \n"
+"  in v2 VS_Pos;\n"
+"  in v4 VS_Dest;\n"
+"  in v2 VS_TexCoord;\n"
+"  in v2 VS_Center;\n"
+"  in v2 VS_HalfSize;\n"
+"  in v4 VS_Color;\n"
+"  flat in v4 VS_Clip;\n"
+"  flat in f32 VS_CornerRadius;\n"
+"  flat in f32 VS_BorderThickness;\n"
+"  flat in f32 VS_Softness;\n"
+"  flat in f32 VS_HasTexture;\n"
+"  \n"
+"  uniform sampler2D Texture;\n"
+"  \n"
+"  out v4 FragColor;\n"
+"  \n"
+"  v3 \n"
+"   RGBFromHSV(v3 Color)\n"
+"  {\n"
+"   v4 K = v4(1.0, 2.0/3.0, 1.0/3.0, 3.0);\n"
+"   v3 p = abs(fract(Color.xxx + K.xyz) * 6.0 - K.www);\n"
+"   return Color.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), Color.y);\n"
+"  }\n"
+"  \n"
+"  f32\n"
+"   BoxSDF(v2 Pos, v2 HalfDim, f32 CornerRadius)\n"
+"  {\n"
+"   v2 q = abs(Pos) - (HalfDim - CornerRadius);\n"
+"   \n"
+"   f32 Distance = min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - CornerRadius;\n"
+"   \n"
+"   return Distance;\n"
+"  }\n"
+"  \n"
+"  void main()\n"
+"  {\n"
+"   v4 Color = VS_Color;\n"
+"   \n"
+"   // Exclude pixels outside of the clip region.\n"
+"   if(true)\n"
+"   {  \n"
+"    v2 Min = VS_Clip.xy;\n"
+"    v2 Max = VS_Clip.zw;\n"
+"    v2 Pos = gl_FragCoord.xy;\n"
+"    \n"
+"    Pos.y = 900 - Pos.y;\n"
+"    \n"
+"    if(!(Pos.x >= Min.x && Pos.x <= Max.x &&\n"
+"         Pos.y >= Min.y && Pos.y <= Max.y))\n"
+"    {\n"
+"     discard;\n"
+"    }\n"
+"    \n"
+"   }\n"
+"   \n"
+"   f32 tBorder = 1.0;\n"
+"   if(VS_BorderThickness > 0.0)\n"
+"   {\n"
+"    f32 sBorder = BoxSDF(VS_Pos,\n"
+"                         VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0) - VS_BorderThickness,\n"
+"                         max(VS_CornerRadius-VS_BorderThickness, 0.0));\n"
+"    tBorder = smoothstep(0.0, 2.0*VS_Softness, sBorder);\n"
+"   }\n"
+"   if(tBorder < 0.001f)\n"
+"   {\n"
+"    discard;\n"
+"   }\n"
+"   \n"
+"   f32 tCorner = 1.0;\n"
+"   if(VS_CornerRadius > 0.0 || VS_Softness > 0.75f)\n"
+"   {\n"
+"    f32 sCorner = BoxSDF(VS_Pos,\n"
+"                         VS_HalfSize - v2(VS_Softness*2.0, VS_Softness*2.0),\n"
+"                         VS_CornerRadius);\n"
+"    tCorner = 1.0-smoothstep(0.0, 2.0*VS_Softness, sCorner);\n"
+"   }\n"
+"   \n"
+"   if(VS_HasTexture > 0)\n"
+"   {\n"
+"    f32 Alpha = texture(Texture, VS_TexCoord).r;\n"
+"    \n"
+"    Color.a *= Alpha;\n"
+"   }\n"
+"   \n"
+"   Color.a *= tBorder;\n"
+"   Color.a *= tCorner;\n"
+"   \n"
+"   FragColor = Color;\n"
+"  }\n"
+"  ", 2105};
  ;
-str8 VSCode = {(u8 *)"\n"
-"#version 330 core\n"
-"  \n"
-"#define v2 vec2\n"
-"#define v3 vec3\n"
-"#define v4 vec4 \n"
-"#define f32 float\n"
-"#define b32 int\n"
-"  \n"
-"  uniform v2 Viewport;\n"
-"  \n"
-"  out v2 VS_Pos;\n"
-"  out v4 VS_Dest;\n"
-"  out v2 VS_TexCoord;\n"
-"  out v2 VS_Center;\n"
-"  out v2 VS_HalfSize;\n"
-"  out v4 VS_Color;\n"
-"  flat out v4 VS_Clip;\n"
-"  flat out f32 VS_CornerRadius;\n"
-"  flat out f32 VS_BorderThickness;\n"
-"  flat out f32 VS_Softness;\n"
-"  flat out f32 VS_HasTexture;\n"
+str8 VSCode = {(u8 *)"\n"
+"#version 330 core\n"
+"  \n"
+"#define v2 vec2\n"
+"#define v3 vec3\n"
+"#define v4 vec4 \n"
+"#define f32 float\n"
+"#define b32 int\n"
+"  \n"
+"  uniform v2 Viewport;\n"
+"  \n"
+"  out v2 VS_Pos;\n"
+"  out v4 VS_Dest;\n"
+"  out v2 VS_TexCoord;\n"
+"  out v2 VS_Center;\n"
+"  out v2 VS_HalfSize;\n"
+"  out v4 VS_Color;\n"
+"  flat out v4 VS_Clip;\n"
+"  flat out f32 VS_CornerRadius;\n"
+"  flat out f32 VS_BorderThickness;\n"
+"  flat out f32 VS_Softness;\n"
+"  flat out f32 VS_HasTexture;\n"
 "  "
    "layout (location = 0) in v4 I_Dest;\n"
    
@@ -171,74 +171,74 @@ str8 VSCode = {(u8 *)"\n"
    "layout (location = 9) in f32 I_Softness;\n"
    
    "layout (location = 10) in f32 I_HasTexture;\n"
-   "\n"
-"   void main()\n"
-"  {\n"
-"   v4 Colors[] = v4[](I_Color0, I_Color1, I_Color2, I_Color3);\n"
-"   v2 Vertices[] = v2[](v2(-1.0, +1.0), v2(+1.0, +1.0), v2(-1.0, -1.0), v2(+1.0, -1.0));\n"
-"   \n"
-"   v2 PixelPos, HalfSize, Center, ClipPos;\n"
-"   {    \n"
-"    v2 Min = I_Dest.xy;\n"
-"    v2 Max = I_Dest.zw;\n"
-"    \n"
-"    v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;\n"
-"    PixelPos = mix(Min, Max, PosInQuad);\n"
-"    \n"
-"    ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;\n"
-"    ClipPos.y = -ClipPos.y;\n"
-"    \n"
-"    HalfSize = (Max - Min)/2.0;\n"
-"    Center = Min + HalfSize;\n"
-"   }\n"
-"   \n"
-"   v2 Min = I_TexSrc.xy;\n"
-"   v2 Max = I_TexSrc.zw;\n"
-"   \n"
-"   v2 BL = v2(Min.x, Max.y);\n"
-"   v2 BR = v2(Max.x, Max.y);\n"
-"   v2 TL = v2(Min.x, Min.y);\n"
-"   v2 TR = v2(Max.x, Min.y);\n"
-"   v2 TexCoords[] = v2[](BL, BR, TL, TR);\n"
-"   \n"
-"   v2 TexCoord = TexCoords[gl_VertexID];\n"
-"   \n"
-"   VS_Center = Center;\n"
-"   VS_HalfSize = HalfSize;\n"
-"   VS_Pos = PixelPos - Center;\n"
-"   VS_Dest = I_Dest;\n"
-"   VS_TexCoord = TexCoord;\n"
-"   VS_Clip = I_Clip;\n"
-"   VS_Color = Colors[gl_VertexID];\n"
-"   VS_CornerRadius = I_CornerRadii[gl_VertexID];\n"
-"   VS_BorderThickness = I_BorderThickness;\n"
-"   VS_Softness = I_Softness;\n"
-"   VS_HasTexture = I_HasTexture;\n"
-"   \n"
-"   gl_Position = v4(ClipPos, 0.0, 1.0);\n"
-"  }\n"
-"  ", sizeof("\n"
-"#version 330 core\n"
-"  \n"
-"#define v2 vec2\n"
-"#define v3 vec3\n"
-"#define v4 vec4 \n"
-"#define f32 float\n"
-"#define b32 int\n"
-"  \n"
-"  uniform v2 Viewport;\n"
-"  \n"
-"  out v2 VS_Pos;\n"
-"  out v4 VS_Dest;\n"
-"  out v2 VS_TexCoord;\n"
-"  out v2 VS_Center;\n"
-"  out v2 VS_HalfSize;\n"
-"  out v4 VS_Color;\n"
-"  flat out v4 VS_Clip;\n"
-"  flat out f32 VS_CornerRadius;\n"
-"  flat out f32 VS_BorderThickness;\n"
-"  flat out f32 VS_Softness;\n"
-"  flat out f32 VS_HasTexture;\n"
+   "\n"
+"   void main()\n"
+"  {\n"
+"   v4 Colors[] = v4[](I_Color0, I_Color1, I_Color2, I_Color3);\n"
+"   v2 Vertices[] = v2[](v2(-1.0, +1.0), v2(+1.0, +1.0), v2(-1.0, -1.0), v2(+1.0, -1.0));\n"
+"   \n"
+"   v2 PixelPos, HalfSize, Center, ClipPos;\n"
+"   {    \n"
+"    v2 Min = I_Dest.xy;\n"
+"    v2 Max = I_Dest.zw;\n"
+"    \n"
+"    v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;\n"
+"    PixelPos = mix(Min, Max, PosInQuad);\n"
+"    \n"
+"    ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;\n"
+"    ClipPos.y = -ClipPos.y;\n"
+"    \n"
+"    HalfSize = (Max - Min)/2.0;\n"
+"    Center = Min + HalfSize;\n"
+"   }\n"
+"   \n"
+"   v2 Min = I_TexSrc.xy;\n"
+"   v2 Max = I_TexSrc.zw;\n"
+"   \n"
+"   v2 BL = v2(Min.x, Max.y);\n"
+"   v2 BR = v2(Max.x, Max.y);\n"
+"   v2 TL = v2(Min.x, Min.y);\n"
+"   v2 TR = v2(Max.x, Min.y);\n"
+"   v2 TexCoords[] = v2[](BL, BR, TL, TR);\n"
+"   \n"
+"   v2 TexCoord = TexCoords[gl_VertexID];\n"
+"   \n"
+"   VS_Center = Center;\n"
+"   VS_HalfSize = HalfSize;\n"
+"   VS_Pos = PixelPos - Center;\n"
+"   VS_Dest = I_Dest;\n"
+"   VS_TexCoord = TexCoord;\n"
+"   VS_Clip = I_Clip;\n"
+"   VS_Color = Colors[gl_VertexID];\n"
+"   VS_CornerRadius = I_CornerRadii[gl_VertexID];\n"
+"   VS_BorderThickness = I_BorderThickness;\n"
+"   VS_Softness = I_Softness;\n"
+"   VS_HasTexture = I_HasTexture;\n"
+"   \n"
+"   gl_Position = v4(ClipPos, 0.0, 1.0);\n"
+"  }\n"
+"  ", sizeof("\n"
+"#version 330 core\n"
+"  \n"
+"#define v2 vec2\n"
+"#define v3 vec3\n"
+"#define v4 vec4 \n"
+"#define f32 float\n"
+"#define b32 int\n"
+"  \n"
+"  uniform v2 Viewport;\n"
+"  \n"
+"  out v2 VS_Pos;\n"
+"  out v4 VS_Dest;\n"
+"  out v2 VS_TexCoord;\n"
+"  out v2 VS_Center;\n"
+"  out v2 VS_HalfSize;\n"
+"  out v4 VS_Color;\n"
+"  flat out v4 VS_Clip;\n"
+"  flat out f32 VS_CornerRadius;\n"
+"  flat out f32 VS_BorderThickness;\n"
+"  flat out f32 VS_Softness;\n"
+"  flat out f32 VS_HasTexture;\n"
 "  "
               "layout (location = 0) in v4 I_Dest;\n"
               
@@ -261,50 +261,50 @@ str8 VSCode = {(u8 *)"\n"
               "layout (location = 9) in f32 I_Softness;\n"
               
               "layout (location = 10) in f32 I_HasTexture;\n"
-              "\n"
-"   void main()\n"
-"  {\n"
-"   v4 Colors[] = v4[](I_Color0, I_Color1, I_Color2, I_Color3);\n"
-"   v2 Vertices[] = v2[](v2(-1.0, +1.0), v2(+1.0, +1.0), v2(-1.0, -1.0), v2(+1.0, -1.0));\n"
-"   \n"
-"   v2 PixelPos, HalfSize, Center, ClipPos;\n"
-"   {    \n"
-"    v2 Min = I_Dest.xy;\n"
-"    v2 Max = I_Dest.zw;\n"
-"    \n"
-"    v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;\n"
-"    PixelPos = mix(Min, Max, PosInQuad);\n"
-"    \n"
-"    ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;\n"
-"    ClipPos.y = -ClipPos.y;\n"
-"    \n"
-"    HalfSize = (Max - Min)/2.0;\n"
-"    Center = Min + HalfSize;\n"
-"   }\n"
-"   \n"
-"   v2 Min = I_TexSrc.xy;\n"
-"   v2 Max = I_TexSrc.zw;\n"
-"   \n"
-"   v2 BL = v2(Min.x, Max.y);\n"
-"   v2 BR = v2(Max.x, Max.y);\n"
-"   v2 TL = v2(Min.x, Min.y);\n"
-"   v2 TR = v2(Max.x, Min.y);\n"
-"   v2 TexCoords[] = v2[](BL, BR, TL, TR);\n"
-"   \n"
-"   v2 TexCoord = TexCoords[gl_VertexID];\n"
-"   \n"
-"   VS_Center = Center;\n"
-"   VS_HalfSize = HalfSize;\n"
-"   VS_Pos = PixelPos - Center;\n"
-"   VS_Dest = I_Dest;\n"
-"   VS_TexCoord = TexCoord;\n"
-"   VS_Clip = I_Clip;\n"
-"   VS_Color = Colors[gl_VertexID];\n"
-"   VS_CornerRadius = I_CornerRadii[gl_VertexID];\n"
-"   VS_BorderThickness = I_BorderThickness;\n"
-"   VS_Softness = I_Softness;\n"
-"   VS_HasTexture = I_HasTexture;\n"
-"   \n"
-"   gl_Position = v4(ClipPos, 0.0, 1.0);\n"
-"  }\n"
+              "\n"
+"   void main()\n"
+"  {\n"
+"   v4 Colors[] = v4[](I_Color0, I_Color1, I_Color2, I_Color3);\n"
+"   v2 Vertices[] = v2[](v2(-1.0, +1.0), v2(+1.0, +1.0), v2(-1.0, -1.0), v2(+1.0, -1.0));\n"
+"   \n"
+"   v2 PixelPos, HalfSize, Center, ClipPos;\n"
+"   {    \n"
+"    v2 Min = I_Dest.xy;\n"
+"    v2 Max = I_Dest.zw;\n"
+"    \n"
+"    v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;\n"
+"    PixelPos = mix(Min, Max, PosInQuad);\n"
+"    \n"
+"    ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;\n"
+"    ClipPos.y = -ClipPos.y;\n"
+"    \n"
+"    HalfSize = (Max - Min)/2.0;\n"
+"    Center = Min + HalfSize;\n"
+"   }\n"
+"   \n"
+"   v2 Min = I_TexSrc.xy;\n"
+"   v2 Max = I_TexSrc.zw;\n"
+"   \n"
+"   v2 BL = v2(Min.x, Max.y);\n"
+"   v2 BR = v2(Max.x, Max.y);\n"
+"   v2 TL = v2(Min.x, Min.y);\n"
+"   v2 TR = v2(Max.x, Min.y);\n"
+"   v2 TexCoords[] = v2[](BL, BR, TL, TR);\n"
+"   \n"
+"   v2 TexCoord = TexCoords[gl_VertexID];\n"
+"   \n"
+"   VS_Center = Center;\n"
+"   VS_HalfSize = HalfSize;\n"
+"   VS_Pos = PixelPos - Center;\n"
+"   VS_Dest = I_Dest;\n"
+"   VS_TexCoord = TexCoord;\n"
+"   VS_Clip = I_Clip;\n"
+"   VS_Color = Colors[gl_VertexID];\n"
+"   VS_CornerRadius = I_CornerRadii[gl_VertexID];\n"
+"   VS_BorderThickness = I_BorderThickness;\n"
+"   VS_Softness = I_Softness;\n"
+"   VS_HasTexture = I_HasTexture;\n"
+"   \n"
+"   gl_Position = v4(ClipPos, 0.0, 1.0);\n"
+"  }\n"
 "  ") - 1};

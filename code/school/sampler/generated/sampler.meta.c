@@ -27,34 +27,34 @@ str8 ConfigTable[] = {
 
 
 
-str8 CTemplateText = {(u8 *)"\n"
-"#define _CRT_SECURE_NO_WARNINGS 1\n"
-"#include <stdio.h>\n"
-"  \n"
-"  int main(int ArgCount, char **Args)\n"
-"  {\n"
-"   \n"
-"   return 0;\n"
-"  }\n"
-"  \n"
-"  ", 135}
-str8 AsmTemplateText = {(u8 *)"$NOMOD51\n"
-"   \n"
-"   ;~ Defines\n"
-"   $include \"aducgd1def.asm\"\n"
-"   \n"
-"   ;~ Inits\n"
-"   .org 0x0000\n"
-"   \n"
-"   ;~ EntryPoint\n"
-"   mov sp, #0x7F\n"
-"  \n"
-"  loop: \n"
-"  \n"
-"  ljmp loop\n"
-"   \n"
-"   ;~ Libraries\n"
-"   $include \"aducgd1inc.asm\"\n"
-"   \n"
-"   end\n"
-"   ", 234}
+str8 CTemplateText = {(u8 *)"\n"
+"#define _CRT_SECURE_NO_WARNINGS 1\n"
+"#include <stdio.h>\n"
+"  \n"
+"  int main(int ArgCount, char **Args)\n"
+"  {\n"
+"   \n"
+"   return 0;\n"
+"  }\n"
+"  \n"
+"  ", 125}
+str8 AsmTemplateText = {(u8 *)"$NOMOD51\n"
+"   \n"
+"   ;~ Defines\n"
+"   $include \"aducgd1def.asm\"\n"
+"   \n"
+"   ;~ Inits\n"
+"   .org 0x0000\n"
+"   \n"
+"   ;~ EntryPoint\n"
+"   mov sp, #0x7F\n"
+"  \n"
+"  loop: \n"
+"  \n"
+"  ljmp loop\n"
+"   \n"
+"   ;~ Libraries\n"
+"   $include \"aducgd1inc.asm\"\n"
+"   \n"
+"   end\n"
+"   ", 215}

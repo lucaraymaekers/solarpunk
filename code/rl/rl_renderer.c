@@ -247,11 +247,11 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
 #if RL_PLATFORM_HOT_RELOAD_SHADERS
   str8 VertPath = S8("../code/rl/generated/rect_vert.glsl");
   str8 FragPath = S8("../code/rl/generated/rect_frag.glsl");
-  gl_int VertexShader = GL_CompileShaderFromFile(VertPath, GL_VERTEX_SHADER);
-  gl_int FragmentShader = GL_CompileShaderFromFile(FragPath, GL_FRAGMENT_SHADER);
+  gl_uint VertexShader = GL_CompileShaderFromFile(VertPath, GL_VERTEX_SHADER);
+  gl_uint FragmentShader = GL_CompileShaderFromFile(FragPath, GL_FRAGMENT_SHADER);
 #else
-  gl_int VertexShader = GL_CompileShaderFromString(VSCode, GL_VERTEX_SHADER);
-  gl_int FragmentShader = GL_CompileShaderFromString(FSCode, GL_FRAGMENT_SHADER);
+  gl_uint VertexShader = GL_CompileShaderFromString(VSCode, GL_VERTEX_SHADER);
+  gl_uint FragmentShader = GL_CompileShaderFromString(FSCode, GL_FRAGMENT_SHADER);
 #endif
   
   RectShader = GL_ProgramFromShaders(VertexShader, FragmentShader);

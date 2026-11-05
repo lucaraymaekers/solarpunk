@@ -2727,8 +2727,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
     if(HotString.Size == 0) HotString = S8("null");
     
     ui_box *Box;
-    
-#if MUZE_INTERNAL && 1
+                
+                // TODO(luca): Investigate bug, why when reloading this causes problems.
+#if MUZE_INTERNAL && 0
     StringsScratchTemp(UI_State->FrameArenaBack)
     {
      DebugStringAdd(App, "(ui) Active: %S", ActiveString);
