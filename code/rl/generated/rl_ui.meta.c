@@ -13,6 +13,8 @@ UI_IconKind_Record,
  UI_IconKind_Save,
  UI_IconKind_File,
  UI_IconKind_Close,
+ UI_IconKind_Clock,
+ UI_IconKind_Loop,
  
 };
 typedef enum icon_kind icon_kind;
@@ -27,6 +29,8 @@ str8 UI_Icons[] = {
  {((u8 []){UI_IconKind_Save}), 1 },
  {((u8 []){UI_IconKind_File}), 1 },
  {((u8 []){UI_IconKind_Close}), 1 },
+ {((u8 []){UI_IconKind_Clock}), 1 },
+ {((u8 []){UI_IconKind_Loop}), 1 },
  
 };
 

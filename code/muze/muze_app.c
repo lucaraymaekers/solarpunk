@@ -995,7 +995,7 @@ PieceStopPlaying(piece *Piece)
 
 //~ UI 
 internal ui_box *
-Label(str8 String)
+M_Label(str8 String)
 {
  ui_box *Result = UI_AddBox(String, 
                             UI_BoxFlag_DrawDisplayString|
@@ -1007,7 +1007,7 @@ Label(str8 String)
 }
 
 internal ui_box *
-Labelf(char *Format, ...)
+M_Labelf(char *Format, ...)
 {
  ui_box *Result = UI_NilBox;
  str8 String = {0};
@@ -1016,7 +1016,7 @@ Labelf(char *Format, ...)
  va_start(Args, Format);
  String = Str8VFmt(Format, Args);
  
- Result = Label(String);
+ Result = M_Label(String);
  
  return Result;
 }
@@ -1538,6 +1538,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   PieceMarkerKind_PracticeStart,
   PieceMarkerKind_PracticeEnd,
   PieceMarkerKind_PracticePos,
+  PieceMarkerKind_PrevPracticePos,
   PieceMarkerKind_Count
  };
  
@@ -1547,6 +1548,10 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   {
    v4 Color = {0};
    f32 Start = 0.f;
+   
+   b32 Animate = false;
+   
+   v2 *FollowPos = 0;
    
    if(0) {}
    else if(Kind == PieceMarkerKind_Play)
@@ -1558,6 +1563,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    {
     Color = Color_Yellow;
     Start = Piece->PlayPos;
+    FollowPos = &Piece->PrevPlayPos;
    }
    else if(Kind == PieceMarkerKind_Record)
    {
@@ -1579,23 +1585,44 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     Color = Color_Yellow;
     Start = Piece->PracticePos;
    }
+   else if(Kind == PieceMarkerKind_PrevPracticePos)
+   {
+    Color = Color_Yellow;
+    Start = Piece->PracticePos;
+    FollowPos = &Piece->PrevPracticePos;
+   }
    else
    {
     InvalidPath();
    }
    
+   if(Piece->IsPracticing && Kind < PieceMarkerKind_PracticeStart) Color.W *= 0.5f;
+   
    f32 BeatsPerBar = Piece->TimeSigNum;
    
    v2 MarkerPos = Pos;
-   s32 BarIdx = (Start == 0.f ? 0 :
-                 (s32)CeilF32(Start/BeatsPerBar) - 1);
+   s32 BarIdx = 0;
+   f32 Remainder = 0.f;
    
-   s32 HeightIdx = BarIdx/BarsPerWidth;
-   
-   f32 Remainder = Start - BeatsPerBar*(f32)BarIdx;
+   // NOTE(luca): PracticePos must use same calculations as notes such that the marker is
+   // placed before the note.
+   // All other markers have the special case that they when they equal the bar length, they
+   // are placed on the end of the bar and not on the next bar's start.
+   if(Kind < PieceMarkerKind_PracticePos &&
+      Kind > PieceMarkerKind_PrevPracticePos)
+   {
+    BarIdx = (Start == 0.f ? 0 : (s32)CeilF32(Start/BeatsPerBar) - 1);
+    Remainder = Start - BeatsPerBar*(f32)BarIdx;
+   }
+   else
+   {
+    BarIdx = (s32)FloorF32(Start/Piece->TimeSigNum);
+    Remainder = ModF32(Start, Piece->TimeSigNum);
+   }
    
    if(Piece->BarWrapping)
    {
+    s32 HeightIdx = BarIdx/BarsPerWidth;
     BarIdx = (BarIdx%BarsPerWidth);
     MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
    }
@@ -1603,12 +1630,12 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
    MarkerPos.X = Pos.X + BarStart + Remainder*BeatWidth;
    
-   if(Kind == PieceMarkerKind_PrevPlay)
+   if(FollowPos)
    {
     // NOTE(luca): We draw first, then update the position.  This ensures that the first
     // trail will start from the end.
     
-    f32 Width = AbsF32(Piece->PrevPlayPos.X - MarkerPos.X); 
+    f32 Width = AbsF32(FollowPos->X - MarkerPos.X); 
     {
      // The whole width is a bit much
      Width = Min(Width, 50.f);
@@ -1618,8 +1645,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
     // Draw trail
     {
-     v2 TrailPos = Piece->PrevPlayPos;
-     if(Piece->PrevPlayPos.X > MarkerPos.X) TrailPos.X -= Width;
+     v2 TrailPos = *FollowPos;
+     if(FollowPos->X > MarkerPos.X) TrailPos.X -= Width;
      DrawFilledRect(TrailPos, V2(Width, StaffHeight), Color);
     }
     
@@ -1627,8 +1654,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     if(*dtForFrame > 0.f)
     {
      f32 Speed = .5f*UI_State->AnimSpeed;
-     Piece->PrevPlayPos.X += (MarkerPos.X - Piece->PrevPlayPos.X)*Speed;
-     Piece->PrevPlayPos.Y += (MarkerPos.Y - Piece->PrevPlayPos.Y)*Speed;
+     FollowPos->X += (MarkerPos.X - FollowPos->X)*Speed;
+     FollowPos->Y += (MarkerPos.Y - FollowPos->Y)*Speed;
     }
    }
    
@@ -1645,8 +1672,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   
   // Used to see when a new bar begins and we should add padding.
   f32 LengthSum = 0.f;
-  
-  s32 DebugColorCounter = 0;
   
   for EachIndex(Idx, Piece->NoteCount)
   {
@@ -1666,7 +1691,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    
    if(NoteIsPlaying) NoteColor = Color_Yellow;
    
-   if(Piece->IsPracticing) NoteColor.W = 0.5f;
+   if(Piece->IsPracticing) NoteColor.W *= 0.5f;
    
    if(Note->Kind == PieceNoteKind_Pitch)
    {
@@ -1703,17 +1728,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      }
      
      f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
-     
      f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
      NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
-     
-#if MUZE_INTERNAL && 0
-     {
-      v4 Colors[] = {Color_Blue, Color_Yellow};
-      DrawFilledRect(NotePos, V2(BeatWidth, 4.f), Colors[DebugColorCounter%2]);
-      DebugColorCounter += 1;
-     }
-#endif
      
     }
     
@@ -2250,7 +2266,7 @@ M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
 internal void
 M_ControlLabel(str8 Name)
 {
- UI_BackgroundColor(Color_Frost2) Label(Name);
+ UI_BackgroundColor(Color_Frost2) M_Label(Name);
 }
 
 //~ EntryPoint
@@ -3306,6 +3322,16 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   Piece->PracticePos = Piece->PracticeStart;
                  }
                  
+                 if(M_IconButton(UI_IconKind_Clock, S8("Metronome"), .TextColor = (Piece->Metronome ? Color_Magenta : Color_Black)))
+                 {
+                  PushCommand(App, Command_PieceToggleMetronome)->Piece = Piece;
+                 }
+                 
+                 if(M_IconButton(UI_IconKind_Loop, S8("Loop"), .TextColor = (Piece->IsLooping ? Color_Yellow : Color_Black)))
+                 {
+                  Piece->IsLooping ^= 1;
+                 }
+                 
                  
                 }
                 
@@ -3319,15 +3345,16 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 }
 #endif
                 
-                if(M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta))
-                {
-                 PushCommand(App, Command_PieceToggleMetronome)->Piece = Piece;
-                }
-                
                 if(M_SimpleToggleButton(S8("Practice"), Piece->IsPracticing, Color_Yellow))
                 {
                  PushCommand(App, Command_PieceTogglePracticing)->Piece = Piece;
                 }
+                
+                UI_SemanticWidth(UI_SizePx(200.f, 1))
+                 Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
+                                       Str8Fmt("%3.0f", Piece->BPM),
+                                       Piece->BPM, 0.f, 300.f, 1.f, false,
+                                       .Align = false).Value;
                 
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                  if(M_Button(S8("Clear")))
@@ -3338,12 +3365,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  Piece->RecordLength = 0.f;
                  Piece->PlayPos = 0.f;
                 }
-                
-                UI_SemanticWidth(UI_SizePx(200.f, 1))
-                 Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
-                                       Str8Fmt("%3.0f", Piece->BPM),
-                                       Piece->BPM, 0.f, 300.f, 1.f, false,
-                                       .Align = false).Value;
                 
                 UI_FillWidth()
                  UI_BackgroundColor(Color_ButtonBackground)
@@ -3704,17 +3725,22 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  // Piece Debug Info
                  {                 
                   piece *Piece = App->SelectedPanel->Piece;
-                  Label(Str8Fmt("Pos: %.2f "
-                                "PrevPos: (%.2f,%.2f)"
-                                "###PlayPos", 
-                                Piece->PlayPos, 
-                                Piece->PrevPlayPos.X, Piece->PrevPlayPos.Y));
+                  M_Labelf("Pos: %.2f "
+                           "PrevPos: (%.2f,%.2f)"
+                           "###PlayPos", 
+                           Piece->PlayPos, 
+                           V2Arg(Piece->PrevPlayPos));
+                  M_Labelf("PracticePos: %.2f "
+                           "PrevPracticePos: (%.2f,%.2f)"
+                           "###PracticePos", 
+                           Piece->PracticePos, 
+                           V2Arg(Piece->PrevPracticePos));
                   
-                  Label(Str8Fmt("Practice Start: %.2f "
-                                "Practice End: %.2f)"
-                                "###PracticePos", 
-                                Piece->PracticeStart, 
-                                Piece->PracticeEnd));
+                  M_Labelf("Practice Start: %.2f "
+                           "Practice End: %.2f)"
+                           "###PracticePos", 
+                           Piece->PracticeStart, 
+                           Piece->PracticeEnd);
                   
                   
                   
@@ -4586,11 +4612,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {               
      Piece->PlayPos += BPS*Input->dtForFrame;
      
-     b32 PieceEnded = (Piece->PlayPos > Piece->RecordLength);
+     f32 PieceEnd = (Piece->IsPracticing ? Piece->PracticeEnd : Piece->RecordLength);
+     b32 PieceEnded = (Piece->PlayPos > PieceEnd);
      if(PieceEnded)
      {
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
       Piece->PlayPos = 0.f;
+      
       if(!Piece->IsLooping) Piece->IsPlaying = false;
      }
     }
@@ -4641,20 +4669,29 @@ UPDATE_AND_RENDER(UpdateAndRender)
       {
        Log("Pitch diff: %d\n", Pitch - NoteToPlay->Pitch);
       }
-      
      }
      else if(Type == MIDIEventType_NoteOff ||
              Type == MIDIEventType_NoteOn && Data2 == 0)
      {
       u8 Pitch = Data1;
       u8 Velocity = Data2;
-      
      }
+    }
+    
+    if(!NoteWasPlayed && NoteToPlay->Kind == PieceNoteKind_Silence) 
+    {
+     NoteWasPlayed = true;
     }
     
     if(NoteWasPlayed)
     {
-     Piece->PracticePos += NoteToPlay->Length;
+     // NOTE(luca): Instead of adding up Length as we go which would cumulate precision error
+     // we start from the note start which makes it way less.
+     Piece->PracticePos = NoteToPlay->Start + NoteToPlay->Length;
+     if(Piece->PracticePos >= Piece->PracticeEnd) 
+     {
+      Piece->PracticePos = Piece->PracticeStart;
+     }
     }
    }
    

@@ -60,6 +60,8 @@ Icons:
  { Save         }
  { File         }
  { Close        }
+ { Clock        }
+ { Loop         }
 }
 
 @data_enum("icon_kind")

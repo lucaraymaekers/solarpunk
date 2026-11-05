@@ -242,7 +242,6 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
  if(!Render->ShadersCompiled)
  {
   gl_uint RectShader = Render->RectShader;
-  glDeleteProgram(RectShader);
   
 #if RL_PLATFORM_HOT_RELOAD_SHADERS
   str8 VertPath = S8("../code/rl/generated/rect_vert.glsl");
@@ -257,18 +256,21 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
   // NOTE(luca): Could be 0 if there are errors.
   if(VertexShader && FragmentShader)
   {
+   glDeleteProgram(RectShader);
+   
    RectShader = GL_ProgramFromShaders(VertexShader, FragmentShader);
    glUseProgram(RectShader);
+   
+   // Uniforms
+   {
+    gl_int UViewport = glGetUniformLocation(RectShader, "Viewport");
+    glUniform2f(UViewport, V2Arg(BufferDim));
+   }
+   
+   Render->RectShader = RectShader;
+   Render->ShadersCompiled = true;
   }
   
-  // Uniforms
-  {
-   gl_int UViewport = glGetUniformLocation(RectShader, "Viewport");
-   glUniform2f(UViewport, V2Arg(BufferDim));
-  }
-  
-  Render->RectShader = RectShader;
-  Render->ShadersCompiled = true;
  }
  
  // NOTE(luca): This cannot be shared between platform and app.  For now it is used for fonts

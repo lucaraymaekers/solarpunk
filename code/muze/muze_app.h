@@ -57,6 +57,7 @@ struct piece
  
  // UI
  v2 PrevPlayPos; // For animating
+ v2 PrevPracticePos; // For animating
  b32 BarWrapping;
  b32 PageWrapping;
  f32 BarPadding;
