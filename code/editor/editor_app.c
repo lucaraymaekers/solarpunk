@@ -1210,7 +1210,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
   // Nil read only structs 
   {        
-   arena *Arena = ArenaAlloc(.Size = MB(1), .Offset = TB(3));
+   arena *Arena = ArenaAlloc(.Size = MB(1), .Offset = TB(2) + GB(64));
    
    ui_box *Box = PushArray(Arena, ui_box, 1);
    *Box = (ui_box){Box, Box, Box, Box, Box, Box, Box};
@@ -1233,23 +1233,31 @@ UPDATE_AND_RENDER(UpdateAndRender)
    PanelAxis(Axis2_X) PanelGroup()
    {
     App->FirstPanel = PanelAdd(1.f);
-    
-    PanelAxis(Axis2_Y) PanelGroup()
-    {
-     PanelAdd(.4f);
-     PanelAdd(.6f);
-#if EDITOR_INTERNAL
-     PanelAxis(Axis2_X) PanelGroup()
-     {
-      PanelAdd(.5f);
-      App->DebugPanel = PanelAdd(.5f);
-      App->DebugPanel->CannotClose = true;
-     }
-#endif
-    }
    }
    
    App->SelectedPanel = PanelNextLeaf(App->FirstPanel, false);
+   
+   // Add a text panel
+   {   
+    panel *Panel = App->SelectedPanel;
+    
+    b32 IsFreePanel = (!IsNilPanel(Panel) && 
+                       !IsTextPanel(App, Panel) &&
+                       !Panel->CannotClose);
+    if(IsFreePanel)
+    {                        
+     panel_node *New = PushArrayZero(PanelArena, panel_node, 1);
+     
+     New->Text = PushArrayZero(App->TextArena, app_text, 1);
+     New->Text->Capacity = KB(64);
+     New->Text->Data = PushArray(App->TextArena, rune, New->Text->Capacity);
+     
+     New->Next = App->TextPanels;
+     App->TextPanels = New;
+     
+     New->Value = Panel;
+    }
+   }
    
    OS_ProfileAndPrint("Memory Init");
   }
@@ -1270,104 +1278,29 @@ UPDATE_AND_RENDER(UpdateAndRender)
   TextPanel->Text->PrevCursor = TextPanel->Text->Cursor;
  }
  
- for EachIndex(Idx, Input->Text.Count)
+ for EachTextButton(Key, Id, Input)
  {
-  app_key Key = Input->Text.Buffer[Idx];
-  
-  b32 Control = Key.Modifiers & PlatformKeyModifier_Control;
-  b32 Shift = Key.Modifiers & PlatformKeyModifier_Shift;
-  b32 Alt = Key.Modifiers & PlatformKeyModifier_Alt;
-  s32 ModifiersShiftIgnored = (Key.Modifiers & ~PlatformKeyModifier_Shift);
-  b32 None = (Key.Modifiers == PlatformKeyModifier_None);
-  
-  if(!Key.IsSymbol)
-  {
-   if(Control)
-   {
-    switch(Key.Codepoint)
-    {
-     case 'b': DebugBreak();  break;
-     
-     //- Panels 
-     case 'p':
-     {
-      if(!Shift)
-      {
-       App->SelectedPanel = SplitPanel(PanelArena, App->SelectedPanel, Axis2_X, false);
-      }
-      else
-      {
-       RemoveTextPanel(App, TextPanel);
-       
-       App->SelectedPanel = ClosePanel(App, App->SelectedPanel);
-      }
-     } break;
-     
-     case 'n':
-     {
-      panel *Panel = App->SelectedPanel;
-      
-      b32 IsFreePanel = (!IsNilPanel(Panel) && 
-                         !IsTextPanel(App, Panel) &&
-                         !Panel->CannotClose);
-      if(IsFreePanel)
-      {                        
-       panel_node *New = PushArrayZero(PanelArena, panel_node, 1);
-       
-       New->Text = PushArrayZero(App->TextArena, app_text, 1);
-       New->Text->Capacity = KB(64);
-       New->Text->Data = PushArray(App->TextArena, rune, New->Text->Capacity);
-       
-       New->Next = App->TextPanels;
-       App->TextPanels = New;
-       
-       New->Value = Panel;
-      }
-      
-     } break;
-     
-     case '-':
-     {
-      if(!Shift)
-      {                        
-       App->SelectedPanel = SplitPanel(PanelArena, App->SelectedPanel, Axis2_Y, false);
-      }
-     } break;
-     
-     case ',':
-     {
-      App->SelectedPanel = (IsNilPanel(App->SelectedPanel) ?
-                            PanelNextLeaf(App->FirstPanel, true) :
-                            (!Shift ?
-                             PanelNextLeaf(App->SelectedPanel, false) :
-                             PanelNextLeaf(App->SelectedPanel, true)));
-     } break;
-    }
-   }
-  }
-  else
-  {
-   switch(Key.Codepoint)
-   {
-    case PlatformKey_Escape: ShouldQuit = true; break;
-   }
-  }
+  b32 Control = Key->Modifiers & PlatformKeyModifier_Control;
+  b32 Shift = Key->Modifiers & PlatformKeyModifier_Shift;
+  b32 Alt = Key->Modifiers & PlatformKeyModifier_Alt;
+  s32 ModifiersShiftIgnored = (Key->Modifiers & ~PlatformKeyModifier_Shift);
+  b32 None = (Key->Modifiers == PlatformKeyModifier_None);
   
   //- Text Input
   if(TextPanel)
   {
    app_text *Text = TextPanel->Text;
    
-   if(!Key.IsSymbol)
+   if(!Key->IsSymbol)
    {
     if(ModifiersShiftIgnored == PlatformKeyModifier_None)
     {
      DeleteSelection(Text);
-     AppendChar(Text, Key.Codepoint);
+     AppendChar(Text, Key->Codepoint);
     }
     else
     {
-     switch(Key.Codepoint)
+     switch(Key->Codepoint)
      {
       case 'a':
       {
@@ -1425,7 +1358,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    }
    else
    {
-    switch(Key.Symbol)
+    switch(Key->Symbol)
     {
      default: break;
      

@@ -81,7 +81,6 @@ global_variable app_input *PanelInput = 0;
 global_variable panel *PanelDragging = 0;
 
 global_variable s32 PanelDebugIndentation = 0;
-
 global_variable axis2_stack_node *PanelAxisTop = 0; 
 
 //~ Misc
@@ -2728,8 +2727,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
     if(HotString.Size == 0) HotString = S8("null");
     
     ui_box *Box;
-                
-                // TODO(luca): Investigate bug, why when reloading this causes problems.
+    
+    // TODO(luca): Investigate bug, why when reloading this causes problems.
 #if MUZE_INTERNAL && 0
     StringsScratchTemp(UI_State->FrameArenaBack)
     {
@@ -4640,52 +4639,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
  }
  
  //- Rendering 
- 
-#if 0
- // Debug text rendering
- {
-  font_atlas *Atlas = &App->FontAtlas;
-  v2 Pos = V2(500.f, 500.f);
-  
-  font *Font = Atlas->IconsFont;
-  s32 Char = UI_IconKind_Cancel;
-  
-  s32 PackedCharIdx = GetPackedCharIdx(Font, char);
-  stbtt_packedchar PackedChar = Atlas->PackedChars[PackedCharIdx];
-  f32 CharWidth = CeilF32(PackedChar.xadvance);
-  
-  f32 CharHeight = (PackedChar.y1 - PackedChar.y0);
-  
-  f32 Descent = Font->Scale*(f32)Font->Descent;
-  f32 Baseline = GetBaseline(Font);
-  
-  // Background
-  {  
-   v4 Dest = RectFromSize(Pos, V2(CharWidth, CharHeight));
-   DrawRect(RectFromSize(Pos, V2(CharWidth, Font->HeightPx)), Color_Blue, 0.f, 0.f, 0.f);
-  }
-  
-  // Icon
-  DrawRectChar(Atlas, FontKind_Icon, 
-               Pos, Char, Color_Black);
-  
-  // Baseline
-  {
-   v2 NewPos = Pos;
-   NewPos.Y += FloorF32(Baseline);
-   v4 Dest = RectFromSize(NewPos, V2(CharWidth, 1.f));
-   DrawRect(Dest, V4(0.f, 0.f, 1.f, 1.f), 0.f, 0.f, 0.f);
-  }
-  
-  // Bounding box
-  {
-   v2 NewPos = Pos;
-   NewPos.Y += FloorF32(PackedChar.yoff + Baseline + Descent);
-   v4 Dest = RectFromSize(NewPos, V2(CharWidth, CharHeight));
-   DrawRect(Dest, Color_Green, 0.f, 1.f, 0.f);
-  }
- }
-#endif
  
  // Render rectangles
  if(!Input->SkipRendering)
