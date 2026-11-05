@@ -38,15 +38,19 @@ NO_WARNINGS_END
 #define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
 #define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
 #define IsNilNote(Note) CheckNil(Note, NilNote)
+#define IsNilVoice(Voice) CheckNil(Voice, NilVoice)
 #define IsNilPieceNote(Note) CheckNil(Note, NilPieceNote)
+
+#define Disabled() Log("Temporarily disabled.\n");
 
 //~ Globals
 global_variable tsf *GlobalTSF;
-global_variable tsf *NilTSF;
-global_variable panel *NilPanel;
 global_variable drag_data *DragData;
 global_variable ui_size GlobalItemPadding;
 
+global_variable tsf *NilTSF;
+global_variable panel *NilPanel;
+global_variable voice *NilVoice;
 global_variable rec_note *NilNote;
 global_variable piece_note *NilPieceNote;
 global_variable piece *NilPiece;
@@ -67,6 +71,7 @@ InitReadOnlyGlobals(arena *Arena)
  ArenaSetPos(Arena, 0);
  UI_NilBox = PushArray(Arena, ui_box, 1);
  NilPanel = PushArray(Arena, panel, 1);
+ NilVoice  = PushArray(Arena, voice, 1);
  NilNote = PushArray(Arena, rec_note, 1);
  NilPieceNote = PushArray(Arena, piece_note, 1);
  NilPiece = PushArray(Arena, piece, 1);
@@ -136,6 +141,7 @@ ZeroPanel(panel *Panel)
  MemoryZero(Panel);
  Panel->First = Panel->Last = Panel->Next = Panel->Prev = Panel->Parent = NilPanel;
  Panel->Piece = NilPiece;
+ Panel->Voice = NilVoice;
 }
 
 global_variable u64 PanelsAllocated;
@@ -217,37 +223,70 @@ IsLeafPanel(panel *Panel)
  return Result;
 }
 
+// NOTE(luca): Returns new panel.
 internal panel *
-SplitPanel(panel *To, axis2 Axis, b32 Backwards)
+SplitPanel(app_state *App, panel *To, axis2 Axis, b32 Backwards)
 {
+ // NOTE(luca): If no new panel created return To as selected.
  panel *Result = To;
- 
- panel *New = PanelAlloc();
- panel *Parent = To->Parent;
  
  if(!IsNilPanel(To))
  {
   // NOTE(luca): Must be a leaf node.
   Assert(IsLeafPanel(To));
   
+  panel *Parent = To->Parent;
+  
   if(IsNilPanel(Parent))
   {
-   MemoryCopyStruct(New, To);
-   ZeroPanel(To);
+   Parent = PanelAlloc();
    
+   Parent->Axis = Axis;
+   Parent->ParentPct = 1.f;
+   
+   Parent->First = To;
+   Parent->Last = To;
+   To->Parent = Parent;
+   
+   To->Axis = 1 - Axis;
    To->ParentPct = 1.f;
-   To->Axis = Axis;
    
-   To->First = New;
-   To->Last = New;
-   New->Parent = To;
-   
-   New->Axis = 1 - Axis;
-   New->ParentPct = 1.f;
-   
-   Result = SplitPanel(New, Axis, Backwards);
+   if(To == App->FirstPanel)
+   {
+    App->FirstPanel = Parent;
+   }
   }
-  else if(Axis == Parent->Axis)
+  
+  if(Axis != Parent->Axis)
+  {
+   // NOTE(luca): This branch is only taken when Parent has more than one child.  
+   
+   // Create new parent and move "To" to be the first child of this parent.
+   Parent = PanelAlloc();
+   Parent->Axis = Axis;
+   Parent->ParentPct = To->ParentPct;
+   
+   // Inherit links from To
+   Parent->Parent = To->Parent;
+   Parent->Prev = To->Prev;
+   Parent->Next = To->Next;
+   
+   // Update Links to To
+   if(!IsNilPanel(To->Next)) To->Next->Prev = Parent;
+   if(!IsNilPanel(To->Prev)) To->Prev->Next = Parent;
+   if(To == To->Parent->Last) To->Parent->Last = Parent;
+   if(To == To->Parent->First) To->Parent->First = Parent;
+   
+   // Make To new child for Parent
+   To->Next = NilPanel;
+   To->Prev = NilPanel;
+   To->Parent = Parent;
+   To->ParentPct = 1.f;
+   Parent->First = To;
+   Parent->Last = To;
+  }
+  
+  f32 NewParentPct = 1.f;
   {
    //The new child's ParentPct becomes 1/n where n is the children count
    //Other children's ParentPct *= (1-1/n) 
@@ -257,108 +296,33 @@ SplitPanel(panel *To, axis2 Axis, b32 Backwards)
     {
      ChildrenCount += 1;
     }
-    
     Assert(ChildrenCount > 0);
-    // The new child
+    
+    // Account for new child
     ChildrenCount += 1;
     
-    New->ParentPct = 1.f/(f32)ChildrenCount;;
-    
-    for EachChildPanel(Child, Parent)
-    {
-     Child->ParentPct *= (1.f - New->ParentPct);
-    }
+    NewParentPct = 1.f/(f32)ChildrenCount;;
    }
    
-   New->Parent = Parent;
-   
-   if(!Backwards)
+   // Update children
+   for EachChildPanel(Child, Parent)
    {
-    if(To == Parent->Last)
-    {
-     Parent->Last = New;
-    }
-   }
-   else
-   {
-    if(To == Parent->First)
-    {
-     Parent->First = New;
-    }
+    Child->ParentPct *= (1.f - NewParentPct);
    }
    
-   if(!Backwards)
-   {    
-    New->Next = To->Next;
-    
+   // Append after To
+   panel *New = PanelAlloc();
+   {   
+    New->ParentPct = NewParentPct;
+    New->Parent = Parent;
     if(!IsNilPanel(To->Next)) To->Next->Prev = New;
-    
-    To->Next = New;
+    else          Parent->Last = New;
+    New->Next = To->Next;
     New->Prev = To;
-   }
-   else
-   {
-    New->Next = To;
-    
-    if(!IsNilPanel(To->Prev)) To->Prev->Next = New;
-    
-    New->Prev = To->Prev;
-    To->Prev = New;
+    To->Next = New;
    }
    
    Result = New;
-  }
-  else
-  {
-   //- Create NewParent replacing Parent
-   panel *NewParent = New;
-   {
-    NewParent->Axis = Axis;
-    NewParent->ParentPct = To->ParentPct;
-    NewParent->Parent = Parent;
-   }
-   
-   //- Update To and Parent links
-   {
-    if(To == Parent->First)
-    {
-     Parent->First = NewParent;
-    }
-    
-    if(To == Parent->Last)
-    {
-     Parent->Last = NewParent;
-    }
-    
-    if(!IsNilPanel(To->Prev))
-    {
-     To->Prev->Next = NewParent;
-     NewParent->Prev = To->Prev;
-    }
-    
-    if(!IsNilPanel(To->Next))
-    {
-     To->Next->Prev = NewParent;
-     NewParent->Next = To->Next;
-    }
-    
-    To->Parent = NewParent;
-    NewParent->First = To;
-    NewParent->Last = To;
-    To->Next = To->Prev = NilPanel;
-   }
-   
-   //- Split To along the same axis 
-   {
-    To->ParentPct = 1.f;
-    Result = SplitPanel(To, Axis, Backwards); 
-   }
-   
-   //- Move kind from parent over to new leaf child 
-   {
-    Result->Kind = Result->Parent->Kind;
-    Result->Parent->Kind = PanelKind_Empty;
-   }
   }
  }
  
@@ -699,7 +663,7 @@ IsNotePlaying(rec_note *Note, voice *Voice)
 internal void
 StopAllPlayingNotes(app_memory *Memory, app_state *App, voice *Voice)
 {
- for EachNote(Note, Voice->FirstNote)
+ for EachRecNote(Note, Voice->FirstNote)
  {
   b32 NoteIsPlaying = IsNotePlaying(Note, Voice);
   if(NoteIsPlaying)
@@ -795,7 +759,7 @@ ProcessMIDINotes(app_memory *Memory, app_state *App, voice *Voice, app_midi_even
     {
      b32 NoteFound = false;
      // Set the duration of the last note with same pitch
-     for EachNoteBack(Note, Voice->LastNote)
+     for EachRecNoteBack(Note, Voice->LastNote)
      {
       if(Note->Kind == NoteKind_Note && 
          Note->Pitch == Pitch)
@@ -849,7 +813,7 @@ ProcessMIDINotes(app_memory *Memory, app_state *App, voice *Voice, app_midi_even
       
       // Find matching pedal start
       {
-       for EachNoteBack(Note, Voice->LastNote)
+       for EachRecNoteBack(Note, Voice->LastNote)
        {
         if(Note->Kind == NoteKind_Pedal)
         {
@@ -994,6 +958,7 @@ PieceAlloc(app_state *App)
    Result->NoteCount = 0;
    Result->Octave = 4;
    
+   Result->IsLooping = true;
    Result->BarWrapping = true;
    Result->BarPadding = 16.f;
    Result->BeatWidth = 64.f;
@@ -1112,12 +1077,12 @@ DebugStringAddArena(app_state *App, str8 Name, arena *Arena)
 }
 
 //~ Custom draw UI elements 
-internal note_node *
-FindSelForNote(note_node *Selection, rec_note *Note)
+internal rec_note_node *
+FindSelForNote(rec_note_node *Selection, rec_note *Note)
 {
- note_node *Result = 0;
+ rec_note_node *Result = 0;
  
- for EachNode(Node, note_node, Selection)
+ for EachNode(Node, rec_note_node, Selection)
  {
   if(Node->Value == Note)
   {
@@ -1180,7 +1145,7 @@ CustomDrawNoteInput(ui_box *Box)
 
 internal void
 AddNoteToSelection(custom_draw_note_input_result *NoteInput, v4 Dest,
-                   app_state *App, voice *Voice, note_node *Sel, rec_note *Note)
+                   app_state *App, voice *Voice, rec_note_node *Sel, rec_note *Note)
 {
  // Draw selection rectangle
  if(NoteInput->LeftDown || NoteInput->RightDown)
@@ -1190,13 +1155,13 @@ AddNoteToSelection(custom_draw_note_input_result *NoteInput, v4 Dest,
   {
    if(NoteInput->Adding && !Sel)
    {
-    note_node *Node;
+    rec_note_node *Node;
     
     // Allocate
     {
      if(!App->FirstFreeNode)
      {
-      Node = PushArray(App->Arena, note_node, 1);
+      Node = PushArray(App->Arena, rec_note_node, 1);
      }
      else
      {
@@ -1328,11 +1293,11 @@ UI_CUSTOM_DRAW(CustomDrawSheetMusic)
  // Input
  custom_draw_note_input_result NoteInput = CustomDrawNoteInput(Box);
  
- for EachNote(Note, Voice->FirstNote)
+ for EachRecNote(Note, Voice->FirstNote)
  {        
   if(Note->Kind == NoteKind_Note)
   {
-   note_node *Sel = FindSelForNote(Voice->NoteSel, Note);
+   rec_note_node *Sel = FindSelForNote(Voice->NoteSel, Note);
    b32 NoteIsPlaying = IsNotePlaying(Note, Voice);
    
    v4 NoteColor = (Sel ? Color_Blue : 
@@ -1503,6 +1468,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    v2 BarPos = StaffPos;
    
 #if 0 && MUZE_INTERNAL
+   // Visualize space taken up by padding etc. 
    {
     v2 P = BarPos;
     
@@ -1566,9 +1532,12 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  
  enum piece_marker_kind
  {
-  PieceMarkerKind_Record,
-  PieceMarkerKind_PrevPlay,
   PieceMarkerKind_Play,
+  PieceMarkerKind_PrevPlay,
+  PieceMarkerKind_Record,
+  PieceMarkerKind_PracticeStart,
+  PieceMarkerKind_PracticeEnd,
+  PieceMarkerKind_PracticePos,
   PieceMarkerKind_Count
  };
  
@@ -1594,6 +1563,21 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    {
     Color = Color_Red;
     Start = Piece->RecordLength;
+   }
+   else if(Kind == PieceMarkerKind_PracticeStart)
+   {
+    Color = Color_Blue;
+    Start = Piece->PracticeStart;
+   }
+   else if(Kind == PieceMarkerKind_PracticeEnd)
+   {
+    Color = Color_Orange;
+    Start = Piece->PracticeEnd;
+   }
+   else if(Kind == PieceMarkerKind_PracticePos)
+   {
+    Color = Color_Yellow;
+    Start = Piece->PracticePos;
    }
    else
    {
@@ -1681,6 +1665,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    }
    
    if(NoteIsPlaying) NoteColor = Color_Yellow;
+   
+   if(Piece->IsPracticing) NoteColor.W = 0.5f;
    
    if(Note->Kind == PieceNoteKind_Pitch)
    {
@@ -1910,7 +1896,7 @@ UI_CUSTOM_DRAW(CustomDrawPianoRoll)
     PlayMarkerX = RollX + RoundF32(ZoomedTimestamp); 
    }
    
-   for EachNote(Note, Voice->FirstNote)
+   for EachRecNote(Note, Voice->FirstNote)
    {
     b32 NoteIsRecording = (Note->Duration == 0.f);
     
@@ -1949,7 +1935,7 @@ UI_CUSTOM_DRAW(CustomDrawPianoRoll)
     u8 PitchClass = (Note->Pitch%Note_Count);
     b32 White = NoteIsWhite[PitchClass];
     
-    note_node *Sel = FindSelForNote(Voice->NoteSel, Note);
+    rec_note_node *Sel = FindSelForNote(Voice->NoteSel, Note);
     
     v4 NoteColor = (IsNotePlaying(Note, Voice) ? Color_Yellow :
                     (Sel ? Color_Blue : 
@@ -2467,24 +2453,18 @@ UPDATE_AND_RENDER(UpdateAndRender)
    
    // Initialize read only structs
    {
-    ui_box *Box = PushArray(Arena, ui_box, 1);
-    *Box = (ui_box){Box, Box, Box, Box, Box, Box, Box};
+    InitReadOnlyGlobals(Arena);
     
-    panel *Panel = PushArray(Arena, panel, 1);
-    *Panel = (panel){Panel, Panel, Panel, Panel, Panel};
-    
-    rec_note *RecNote = PushArray(Arena, rec_note, 1);
-    *RecNote = (rec_note){RecNote, RecNote};
-    
-    piece_note *PieceNote = PushArray(Arena, piece_note, 1);
-    
-    piece *Piece = PushArray(Arena, piece, 1);
-    *Piece = (piece){Piece};
+    *UI_NilBox = (ui_box){UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox};
+    *NilPanel = (panel){NilPanel, NilPanel, NilPanel, NilPanel, NilPanel};
+    *NilNote = (rec_note){NilNote, NilNote};
+    *NilPiece = (piece){NilPiece};
+    *NilVoice = (voice){NilNote, NilNote};
    }
    
    OS_MarkReadonly(Arena->Base, Arena->Size);
    
-   InitReadOnlyGlobals(Arena);
+   
   }
   OS_ProfileAndPrint("RO Init");
   
@@ -2616,16 +2596,26 @@ UPDATE_AND_RENDER(UpdateAndRender)
      
      case 'p': 
      {
-      if(!Alt)
+      if(!Shift)
       {
-       command *Command = PushCommand(App, Command_SplitPanel);
-       Command->Panel = App->SelectedPanel;
-       if(Shift) Command->Axis = Axis2_Y;
+       PushCommand(App, Command_SplitSelectedPanelX);
       }
       else
       {
        PushCommand(App, Command_ClosePanel)->Panel = App->SelectedPanel;
       }
+     } break;
+     
+     case 't': PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_PanelTypes; break;
+     
+     case '-':
+     {
+      PushCommand(App, Command_SplitSelectedPanelY);
+     } break;
+     
+     case ',':
+     {
+      PushCommand(App, Command_SelectNextPanel);
      } break;
      
      case 's': PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Instruments; break;
@@ -2652,7 +2642,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     switch(Key->Codepoint)
     {
-     case ' ': PushCommand(App, Command_ToggleRecording); break;
+     case ' ': 
+     {
+      if(App->SelectedPanel->Kind == PanelKind_Sheet)
+      {
+       PushCommand(App, Command_ToggleRecording); 
+      }
+     } break;
      default: 
      {
       Handled = false;
@@ -2665,6 +2661,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
   {
    switch(Key->Codepoint)
    {
+    case PlatformKey_Return:
+    {
+     if(App->ListerOpened)
+     {
+      App->ListerReturnPressed = true;
+     }
+    } break;
+    
     case PlatformKey_Escape:
     {
      PushCommand(App, Command_CloseLister);
@@ -2988,7 +2992,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
                        .Disabled = Selected, 
                        .DisabledBackgroundColor = Color_Yellow, 
                        .Padding = ItemPadding,
-                       .ClipSize = false).Released)
+                       .ClipSize = false).Released || 
+                App->ListerReturnPressed)
              {
               switch(App->ListerKind)
               {
@@ -3027,6 +3032,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
           }
          }
          
+         App->ListerReturnPressed = false;
          
          FilteredItemCount = Max(FilteredItemCount, 1);
          f32 TotalElementSize = (f32)(FilteredItemCount - 1)*ItemHeight;
@@ -3186,9 +3192,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
             if(0) {}
             else if(Panel->Kind == PanelKind_Piece)
             {
-             b32 Loop = true;
-             piece *Piece = (IsNilPiece(Panel->Piece) ? PieceAlloc(App) : Panel->Piece);
-             Panel->Piece = Piece;
+             if(IsNilPiece(Panel->Piece)) Panel->Piece = PieceAlloc(App);
+             piece *Piece = Panel->Piece;
              
 #if MUZE_INTERNAL && 0
              Piece->RecordLength = 0.f;
@@ -3233,260 +3238,197 @@ UPDATE_AND_RENDER(UpdateAndRender)
              
 #endif
              ui_box *PieceBox;
-             
-             UI_FillAll()
-              UI_Push()
-              UI_Column()
-             {         
-              UI_SemanticHeight(UI_SizePx(ItemHeight,  1.f))
-               UI_Row()
-               UI_SemanticWidth(UI_SizePx(150.f, 1))
-              {               
-               UI_FontKind(FontKind_Icon)
-                UI_SemanticWidth(UI_SizePx(30.f, 1.f))
-               {
-                str8 PieceFilePath = S8("song.muze_piece");
-                
-                if(M_IconButton(UI_IconKind_File, S8("Open")))
-                {
-                 M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
-                 Piece->IsRecording = false;
-                 PieceStopPlaying(Piece);
-                }
-                
-                if(M_IconButton(UI_IconKind_Save, S8("Save")))
-                {
-                 M_SerializePiece(FrameArena, false, PieceFilePath, Piece);
-                }
-                
-                if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
-                {
-                 PieceStopPlaying(Piece);
-                 
-                 if(Piece->IsRecording)
-                 {
-                  Piece->IsRecording = false;
-                 }
-                 else
-                 {
-                  Piece->IsRecording = true;
-                 }
-                }
-                
-                if(M_IconButton(UI_IconKind_Play, S8("Play"), .TextColor = (Piece->IsPlaying ? Color_Green : Color_ButtonText)))
-                {
-                 if(!Piece->IsPlaying)
-                 {
-                  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-                  Piece->IsPlaying = true;
-                  
-                  Piece->IsRecording = false;
-                 }
-                }
-                
-                if(M_IconButton(UI_IconKind_Pause, S8("Pause")))
-                {
-                 PieceStopPlaying(Piece);
-                }
-                
-                if(M_IconButton(UI_IconKind_Stop, S8("Stop")))
-                {
-                 PieceStopPlaying(Piece);
-                 Piece->PlayPos = 0.f;
-                }
-                
-                
-               }
-               
-#if MUZE_INTERNAL && 0 
-               UI_FontKind(FontKind_Text)
-                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                if(M_Button(S8("Set to end")))
-               {
-                Piece->PlayPos = Piece->RecordLength;
-                PieceStopPlaying(Piece);
-               }
-#endif
-               
-               if(M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta))
-               {
-                PushCommand(App, Command_PieceToggleMetronome)->Piece = Piece;
-               }
-               
-               UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                if(M_Button(S8("Clear")))
-               {
-                PieceStopPlaying(Piece);
-                Piece->IsRecording = false;
-                Piece->NoteCount = 0;
-                Piece->RecordLength = 0.f;
-                Piece->PlayPos = 0.f;
-               }
-               
-               UI_SemanticWidth(UI_SizePx(200.f, 1))
-                Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
-                                      Str8Fmt("%3.0f", Piece->BPM),
-                                      Piece->BPM, 0.f, 300.f, 1.f, false,
-                                      .Align = false).Value;
-               
-               UI_FillWidth()
-                UI_BackgroundColor(Color_ButtonBackground)
-                UI_AddBox(S8("TopSpacer"), 
-                          UI_BoxFlag_DrawBackground|
-                          UI_BoxFlag_DrawBorders);
-              }
-              UI_Row()
-              {
-               UI_TextColor(Color_Black)
-                UI_FillAll()
-                PieceBox = UI_AddBox(S8("Piece"), 
-                                     UI_BoxFlag_Scroll|
-                                     UI_BoxFlag_MouseClickable|
-                                     UI_BoxFlag_DrawBackground);
-               
-               f32 VerticalOverflow = 0.f;
-               // Find out if vertically overflowing and if it is, add a scrollbar
-               {
-                if(Piece->BarWrapping)
-                {
-                 f32 WholeBarWidth = Piece->BeatWidth*Piece->TimeSigNum + 2.f*Piece->BarPadding;
-                 s32 BarsPerWidth = (s32)((PieceBox->FixedSize.X - 2.f*Piece->BarPadding)/WholeBarWidth);
-                 BarsPerWidth = Max(1, BarsPerWidth);
-                 s32 BarCount = (s32)Max(1.f, CeilF32(Piece->RecordLength/Piece->TimeSigNum));
-                 
-#if 0            
-                 // TODO(luca): Maybe we want this API, waiting for 3rd case
-                 s32 WholeBarWidth = PieceWholeBarWidth(Piece);
-                 s32 BarCount = PieceBarCount(Piece);
-                 s32 BarsPerWidth = PieceBarsPerWidth(Piece, WholeBarWidth);
-                 f32 StaffHeight = PieceStaffHeight(Piece);
-                 
-                 s32 Rows = ((BarCount/BarsPerWidth + 1)*2);
-                 f32 Height = StaffHeight*Rows; 
-                 
-                 // Or something like this
-                 f32 Height = PieceHeight();
-                 // Or compute it in Piece
-                 f32 Height = PieceHeight();
-#endif
-                 
-                 s32 StaffLineCount = 5;
-                 f32 StaffLineWidth = Piece->StaffLineWidth;
-                 f32 StaffHeight = (f32)(StaffLineCount-1)*Piece->NoteSize + StaffLineWidth;
-                 
-                 f32 Height = PieceBox->FixedSize.Y;
-                 s32 Rows = BarCount/BarsPerWidth + 2;
-                 Rows *= 2;
-                 f32 HeightForRows = (f32)Rows*StaffHeight; 
-                 
-                 VerticalOverflow = HeightForRows - Height;
-                }
-                
-                if(VerticalOverflow > 0.f)
-                {               
-                 f32 Scroll = Panel->Scroll.Y; 
-                 Scroll = M_Scrollbar(Axis2_Y, VerticalOverflow, Scroll);
-                 PieceBox->Scroll.Y = Scroll;
-                 Panel->Scroll.Y = Scroll;
-                }
-               }
-              }
-              
-              piece_box_data *Data = PushArray(FrameArena, piece_box_data, 1);
-              Data->Piece = Piece;
-              Data->Box = PieceBox;
-              
-              PieceBox->CustomDrawData = Data;
-              PieceBox->CustomDraw = CustomDrawPiece;
-              f32 BPS = Piece->BPM/60.f;
-              
-              if(Piece->IsPlaying)
-              {
-               // Play notes
-               {
-                for EachIndex(Idx, Piece->NoteCount)
-                {
-                 piece_note *Note = Piece->Notes + Idx;
-                 
-                 if(Note->Kind == PieceNoteKind_Pitch)
-                 {
-                  if(Piece->Metronome)
-                  {
-                   f32 Duration = 0.2f; 
-                   f32 Start = FloorF32(Piece->PlayPos);
-                   f32 End = Start + Duration*BPS;
-                   b32 HasPlayed = PieceWasTimestampPlayed(Piece, Start);
-                   b32 HasStopped = PieceWasTimestampPlayed(Piece, End);
-                   
-                   s32 Pitch = Note_A + 6*12;
-                   
-                   if(HasPlayed)
-                   {
-                    tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
-                   }
-                   
-                   if(HasStopped)
-                   {
-                    tsf_channel_note_off(GlobalTSF, App->MetronomeChannel, Pitch);
-                   }
-                  }
-                  
-                  // Piece notes
-                  {                 
-                   f32 Start = Note->Start;
-                   f32 End = Start + Note->Length;
-                   
-                   b32 NoteIsPlaying = PieceWasTimestampPlayed(Piece, Start);
-                   b32 NoteHasEnded = PieceWasTimestampPlayed(Piece, End);
-                   
-                   s32 Pitch = Note->Pitch + 1*12;
-                   
-                   if(NoteIsPlaying)
-                   {
-                    tsf_channel_note_on(GlobalTSF, Piece->Channel, Pitch, .5f);
-                   }
-                   
-                   if(NoteHasEnded)
-                   {
-                    tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
-                   }
-                  }
-                 }
-                }
-               }
-               
-               // Increment playpos
+             // UI for piece panel
+             {             
+              UI_FillAll()
+               UI_Push()
+               UI_Column()
+              {         
+               UI_SemanticHeight(UI_SizePx(ItemHeight,  1.f))
+                UI_Row()
+                UI_SemanticWidth(UI_SizePx(150.f, 1))
                {               
-                Piece->PlayPos += BPS*Input->dtForFrame;
-                
-                b32 PieceEnded = (Piece->PlayPos > Piece->RecordLength);
-                if(PieceEnded)
+                UI_FontKind(FontKind_Icon)
+                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                 {
-                 tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+                 str8 PieceFilePath = S8("song.muze_piece");
+                 
+                 if(M_IconButton(UI_IconKind_File, S8("Open")))
+                 {
+                  M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
+                  Piece->IsRecording = false;
+                  PieceStopPlaying(Piece);
+                 }
+                 
+                 if(M_IconButton(UI_IconKind_Save, S8("Save")))
+                 {
+#if 0
+                  M_SerializePiece(FrameArena, false, PieceFilePath, Piece);
+#else
+                  Disabled();
+#endif
+                 }
+                 
+                 if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
+                 {
+                  PieceStopPlaying(Piece);
+                  
+                  if(Piece->IsRecording)
+                  {
+                   Piece->IsRecording = false;
+                  }
+                  else
+                  {
+                   Piece->IsRecording = true;
+                  }
+                 }
+                 
+                 if(M_IconButton(UI_IconKind_Play, S8("Play"), .TextColor = (Piece->IsPlaying ? Color_Green : Color_ButtonText)))
+                 {
+                  if(!Piece->IsPlaying)
+                  {
+                   tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+                   Piece->IsPlaying = true;
+                   
+                   Piece->IsRecording = false;
+                  }
+                 }
+                 
+                 if(M_IconButton(UI_IconKind_Pause, S8("Pause")))
+                 {
+                  PieceStopPlaying(Piece);
+                 }
+                 
+                 if(M_IconButton(UI_IconKind_Stop, S8("Stop")))
+                 {
+                  PieceStopPlaying(Piece);
+                  Piece->PlayPos = 0.f;
+                  Piece->PracticePos = Piece->PracticeStart;
+                 }
+                 
+                 
+                }
+                
+#if MUZE_INTERNAL && 0 
+                UI_FontKind(FontKind_Text)
+                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                 if(M_Button(S8("Set to end")))
+                {
+                 Piece->PlayPos = Piece->RecordLength;
+                 PieceStopPlaying(Piece);
+                }
+#endif
+                
+                if(M_SimpleToggleButton(S8("Metronome"), Piece->Metronome, Color_Magenta))
+                {
+                 PushCommand(App, Command_PieceToggleMetronome)->Piece = Piece;
+                }
+                
+                if(M_SimpleToggleButton(S8("Practice"), Piece->IsPracticing, Color_Yellow))
+                {
+                 PushCommand(App, Command_PieceTogglePracticing)->Piece = Piece;
+                }
+                
+                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                 if(M_Button(S8("Clear")))
+                {
+                 PieceStopPlaying(Piece);
+                 Piece->IsRecording = false;
+                 Piece->NoteCount = 0;
+                 Piece->RecordLength = 0.f;
                  Piece->PlayPos = 0.f;
-                 if(!Loop) Piece->IsPlaying = false;
+                }
+                
+                UI_SemanticWidth(UI_SizePx(200.f, 1))
+                 Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
+                                       Str8Fmt("%3.0f", Piece->BPM),
+                                       Piece->BPM, 0.f, 300.f, 1.f, false,
+                                       .Align = false).Value;
+                
+                UI_FillWidth()
+                 UI_BackgroundColor(Color_ButtonBackground)
+                 UI_AddBox(S8("TopSpacer"), 
+                           UI_BoxFlag_DrawBackground|
+                           UI_BoxFlag_DrawBorders);
+               }
+               UI_Row()
+               {
+                UI_TextColor(Color_Black)
+                 UI_FillAll()
+                 PieceBox = UI_AddBox(S8("Piece"), 
+                                      UI_BoxFlag_Scroll|
+                                      UI_BoxFlag_MouseClickable|
+                                      UI_BoxFlag_DrawBackground);
+                
+                f32 VerticalOverflow = 0.f;
+                // Find out if vertically overflowing and if it is, add a scrollbar
+                {
+                 if(Piece->BarWrapping)
+                 {
+                  f32 WholeBarWidth = Piece->BeatWidth*Piece->TimeSigNum + 2.f*Piece->BarPadding;
+                  s32 BarsPerWidth = (s32)((PieceBox->FixedSize.X - 2.f*Piece->BarPadding)/WholeBarWidth);
+                  BarsPerWidth = Max(1, BarsPerWidth);
+                  s32 BarCount = (s32)Max(1.f, CeilF32(Piece->RecordLength/Piece->TimeSigNum));
+                  
+#if 0            
+                  // TODO(luca): Maybe we want this API, waiting for 3rd case
+                  s32 WholeBarWidth = PieceWholeBarWidth(Piece);
+                  s32 BarCount = PieceBarCount(Piece);
+                  s32 BarsPerWidth = PieceBarsPerWidth(Piece, WholeBarWidth);
+                  f32 StaffHeight = PieceStaffHeight(Piece);
+                  
+                  s32 Rows = ((BarCount/BarsPerWidth + 1)*2);
+                  f32 Height = StaffHeight*Rows; 
+                  
+                  // Or something like this
+                  f32 Height = PieceHeight();
+                  // Or compute it in Piece
+                  f32 Height = PieceHeight();
+#endif
+                  
+                  s32 StaffLineCount = 5;
+                  f32 StaffLineWidth = Piece->StaffLineWidth;
+                  f32 StaffHeight = (f32)(StaffLineCount-1)*Piece->NoteSize + StaffLineWidth;
+                  
+                  f32 Height = PieceBox->FixedSize.Y;
+                  s32 Rows = BarCount/BarsPerWidth + 2;
+                  Rows *= 2;
+                  f32 HeightForRows = (f32)Rows*StaffHeight; 
+                  
+                  VerticalOverflow = HeightForRows - Height;
+                 }
+                 
+                 if(VerticalOverflow > 0.f)
+                 {               
+                  f32 Scroll = Panel->Scroll.Y; 
+                  Scroll = M_Scrollbar(Axis2_Y, VerticalOverflow, Scroll);
+                  PieceBox->Scroll.Y = Scroll;
+                  Panel->Scroll.Y = Scroll;
+                 }
                 }
                }
-              }
-              
-              if(Piece->IsRecording)
-              {
-               Piece->RecordLength += BPS*Input->dtForFrame;
-              }
-              
-              // Scrollbar
-              if(!Piece->BarWrapping)
-              {
-               f32 BarPadding = Piece->BarPadding;
-               f32 BarCount = Max(1.f, CeilF32(Piece->RecordLength/Piece->TimeSigNum));
-               f32 WholeBarWidth = Piece->BeatWidth*Piece->TimeSigNum + 2.f*BarPadding;
-               f32 Width = BarCount*WholeBarWidth + 2.f*BarPadding;
-               Width -= WholeBarWidth + 2.f*BarPadding;
                
-               f32 Scroll = M_Scrollbar(Axis2_X, Width, Panel->Scroll.X);
-               PieceBox->Scroll.X = Scroll;
-               Panel->Scroll.X = Scroll;
+               piece_box_data *Data = PushArray(FrameArena, piece_box_data, 1);
+               Data->Piece = Piece;
+               Data->Box = PieceBox;
+               
+               PieceBox->CustomDrawData = Data;
+               PieceBox->CustomDraw = CustomDrawPiece;
               }
+             }
+             
+             // Scrollbar
+             if(!Piece->BarWrapping)
+             {
+              f32 BarPadding = Piece->BarPadding;
+              f32 BarCount = Max(1.f, CeilF32(Piece->RecordLength/Piece->TimeSigNum));
+              f32 WholeBarWidth = Piece->BeatWidth*Piece->TimeSigNum + 2.f*BarPadding;
+              f32 Width = BarCount*WholeBarWidth + 2.f*BarPadding;
+              Width -= WholeBarWidth + 2.f*BarPadding;
+              
+              f32 Scroll = M_Scrollbar(Axis2_X, Width, Panel->Scroll.X);
+              PieceBox->Scroll.X = Scroll;
+              Panel->Scroll.X = Scroll;
              }
              
             }
@@ -3756,19 +3698,30 @@ UPDATE_AND_RENDER(UpdateAndRender)
                    Scale = RandomNext(&Series)%Note_Count;
                    IsMajor = (RandomNext(&Series)%1);
                   }
+                  
                  }
                  
-                 piece *Piece = (!IsNilPiece(App->FirstPiece) ? App->FirstPiece : NilPiece);
-                 UI_BackgroundColor(Color_ButtonBackground)
-                  UI_AddBox(S8("PlayPos"), 
-                            UI_BoxFlag_DrawBackground|
-                            UI_BoxFlag_DrawDisplayString|
-                            UI_BoxFlag_CenterTextHorizontally|
-                            UI_BoxFlag_CenterTextVertically)->DisplayString =
-                  Str8Fmt("Pos: %.2f "
-                          "PrevPos: (%.2f,%.2f)", 
-                          Piece->PlayPos, 
-                          Piece->PrevPlayPos.X, Piece->PrevPlayPos.Y);
+                 // Piece Debug Info
+                 {                 
+                  piece *Piece = App->SelectedPanel->Piece;
+                  Label(Str8Fmt("Pos: %.2f "
+                                "PrevPos: (%.2f,%.2f)"
+                                "###PlayPos", 
+                                Piece->PlayPos, 
+                                Piece->PrevPlayPos.X, Piece->PrevPlayPos.Y));
+                  
+                  Label(Str8Fmt("Practice Start: %.2f "
+                                "Practice End: %.2f)"
+                                "###PracticePos", 
+                                Piece->PracticeStart, 
+                                Piece->PracticeEnd));
+                  
+                  
+                  
+                 }
+                 
+                 
+                 
                 }
                 
                 
@@ -3789,6 +3742,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
             }
             else if(Panel->Kind == PanelKind_Sheet)
             {
+             if(IsNilVoice(Panel->Voice)) Panel->Voice = VoiceAdd(App);
              voice *Voice = Panel->Voice;
              
              UI_FillAll()
@@ -4230,7 +4184,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      
      if(Command->Kind == Command_PlayFromNote)
      {
-      note_node *Note = App->SelectedVoice->NoteSel;
+      rec_note_node *Note = App->SelectedVoice->NoteSel;
       if(Note)
       {
        Pos = Note->Value->Timestamp;
@@ -4252,7 +4206,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       f32 LastNoteEnd = (LastNote->Timestamp + LastNote->Duration); 
       //- Find the last note's end.
       {
-       for EachNote(Note, App->SelectedVoice->FirstNote)
+       for EachRecNote(Note, App->SelectedVoice->FirstNote)
        {
         if(Note->Kind == NoteKind_Note)
         {
@@ -4266,7 +4220,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       rec_note *FirstNote = App->SelectedVoice->FirstNote;
       //- Find the first note played.
       {
-       for EachNote(Note, FirstNote)
+       for EachRecNote(Note, FirstNote)
        {
         if(Note->Kind == NoteKind_Note)
         {
@@ -4293,7 +4247,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       
       //- Update notes .
       {
-       for EachNote(Note, App->SelectedVoice->FirstNote)
+       for EachRecNote(Note, App->SelectedVoice->FirstNote)
        {
         
         if(Note->Kind == NoteKind_Pedal)
@@ -4327,7 +4281,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {
      f32 BPS = App->BPM/60.f;
      
-     for EachNoteNode(Note, App->SelectedVoice->NoteSel)
+     for EachRecNoteNode(Note, App->SelectedVoice->NoteSel)
      {
       f32 NoteLength = Note->Duration*BPS;
       f32 DenomOfFraction = RoundF32(-Log2F32(NoteLength));
@@ -4342,7 +4296,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     case Command_Sync:
     {
      f32 BPS = App->BPM/60.f;
-     for EachNoteNode(Note, App->SelectedVoice->NoteSel)
+     for EachRecNoteNode(Note, App->SelectedVoice->NoteSel)
      {
       f32 NoteLength = Note->Duration*BPS;
       f32 DenomOfFraction = RoundF32(-Log2F32(NoteLength));
@@ -4365,7 +4319,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_GuessBPM:
     {
-     note_node *Node = App->SelectedVoice->NoteSel;
+     rec_note_node *Node = App->SelectedVoice->NoteSel;
      
      f32 AveragedDiff = 0.f;
      f32 Diff = 0.f;
@@ -4397,7 +4351,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      f32 SecondsPerBeat = 1.f/(App->BPM/60.f);
      f32 Duration = SecondsPerBeat * Length;
      
-     for EachNoteNode(Note, App->SelectedVoice->NoteSel)
+     for EachRecNoteNode(Note, App->SelectedVoice->NoteSel)
      {
       Note->Duration = Duration;
      }
@@ -4411,7 +4365,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_DeleteSelection: 
     {
-     for(note_node *Node = App->SelectedVoice->NoteSel;
+     for(rec_note_node *Node = App->SelectedVoice->NoteSel;
          Node;)
      {
       App->SelectedVoice->NoteCount -= 1;
@@ -4441,7 +4395,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
        }
       }
       
-      note_node *NextNode = Node->Next;
+      rec_note_node *NextNode = Node->Next;
       
       // Remove from selection
       {                                
@@ -4496,10 +4450,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
     App->SelectedPanel = ClosePanel(App, Command->Panel);
    } break;
    
-   case Command_SplitPanel:
+   case Command_SplitSelectedPanelY:
    {
-    App->SelectedPanel = SplitPanel(Command->Panel, Command->Axis, false);
-    App->SelectedPanel->Voice = App->SelectedVoice;
+    Command->Axis = Axis2_Y;
+   }
+   case Command_SplitSelectedPanelX:
+   {
+    panel *To = App->SelectedPanel;
+    
+    App->SelectedPanel = SplitPanel(App, To, Command->Axis, false);
+    App->SelectedPanel->Kind = To->Kind;
+   } break;
+   
+   case Command_SelectNextPanel:
+   {
+    App->SelectedPanel = PanelNextLeaf(App->SelectedPanel, false);
    } break;
    
    case Command_SetPanelType:
@@ -4513,6 +4478,27 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     Command->Piece->Metronome ^= 1;
    } break;
+   
+   case Command_PieceTogglePracticing:
+   {
+    piece *Piece = Command->Piece;
+    if(Piece->IsPracticing)
+    {
+     Piece->IsPracticing = false;
+    }
+    else
+    {
+     Piece->IsPracticing = true;
+     
+     // Conflicts
+     PieceStopPlaying(Piece);
+     Piece->IsRecording = false;
+     
+     Piece->PracticeStart = 0.f;
+     Piece->PracticeEnd = Min(4.f, Piece->RecordLength);
+     Piece->PracticePos = Piece->PracticeStart;
+    }
+   };
    
    case Command_PieceSetInstrument:
    {
@@ -4530,56 +4516,203 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
  }
  
- f32 MaxRecordingLength = 3600.f;
  
- for EachIndex(Idx, App->VoiceCount)
- {    
-  voice *Voice = App->Voices + Idx;
-  
-  if(Voice->IsPlaying)
+ //- Update pieces 
+ {
+  for(panel *Panel = App->FirstPanel;
+      !IsNilPanel(Panel);
+      Panel = PanelRecDepthFirstPreOrder(Panel).Next)
   {
-   // NOTE(luca): N^M ? But I won't ever have many voices, yes?  If I do, I can just cache the last played note and loop form there as an optimization.
-   for EachNote(Note, Voice->FirstNote)
+   piece *Piece = Panel->Piece;
+   
+   f32 BPS = Piece->BPM/60.f;
+   
+   if(Piece->IsPlaying)
    {
-    f32 NoteStart = Note->Timestamp;
-    f32 NoteEnd = NoteStart + Note->Duration;
-    
-    // TODO(luca): If a note is shorter than dtForFrame it could skip it.
-    
-    if(NoteStart <= Voice->PlayPos &&
-       NoteStart > (Voice->PlayPos - Input->dtForFrame))
+    // Play notes
     {
-     PlayNote(Memory, App, Voice, Note);
+     for EachIndex(Idx, Piece->NoteCount)
+     {
+      piece_note *Note = Piece->Notes + Idx;
+      
+      if(Note->Kind == PieceNoteKind_Pitch)
+      {
+       if(Piece->Metronome)
+       {
+        f32 Duration = 0.2f; 
+        f32 Start = FloorF32(Piece->PlayPos);
+        f32 End = Start + Duration*BPS;
+        b32 HasPlayed = PieceWasTimestampPlayed(Piece, Start);
+        b32 HasStopped = PieceWasTimestampPlayed(Piece, End);
+        
+        s32 Pitch = Note_A + 6*12;
+        
+        if(HasPlayed)
+        {
+         tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
+        }
+        
+        if(HasStopped)
+        {
+         tsf_channel_note_off(GlobalTSF, App->MetronomeChannel, Pitch);
+        }
+       }
+       
+       // Piece notes
+       {                 
+        f32 Start = Note->Start;
+        f32 End = Start + Note->Length;
+        
+        b32 NoteIsPlaying = PieceWasTimestampPlayed(Piece, Start);
+        b32 NoteHasEnded = PieceWasTimestampPlayed(Piece, End);
+        
+        s32 Pitch = Note->Pitch + 1*12;
+        
+        if(NoteIsPlaying)
+        {
+         tsf_channel_note_on(GlobalTSF, Piece->Channel, Pitch, .5f);
+        }
+        
+        if(NoteHasEnded)
+        {
+         tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
+        }
+       }
+      }
+     }
     }
     
-    if(NoteEnd <= Voice->PlayPos &&
-       NoteEnd > (Voice->PlayPos - Input->dtForFrame))
-    {
-     rec_note OffNote = *Note;
-     OffNote.Velocity = 0;
-     PlayNote(Memory, App, Voice, &OffNote);
+    // Increment playpos
+    {               
+     Piece->PlayPos += BPS*Input->dtForFrame;
+     
+     b32 PieceEnded = (Piece->PlayPos > Piece->RecordLength);
+     if(PieceEnded)
+     {
+      tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+      Piece->PlayPos = 0.f;
+      if(!Piece->IsLooping) Piece->IsPlaying = false;
+     }
     }
    }
    
-   Voice->PlayPos += Input->dtForFrame;
-   if(Voice->PlayPos >= Voice->RecordLength)
+   if(Piece->IsRecording)
    {
-    StopAllPlayingNotes(Memory, App, Voice);
-    
-    Voice->PlayPos = 0.f;
+    Piece->RecordLength += BPS*Input->dtForFrame;
    }
-  }
-  
-  if(Voice->IsRecording)
-  {
-   Voice->RecordLength = (GetWallTime() - Voice->RecordStart);
    
-   if(Voice->RecordLength >= MaxRecordingLength)
+   if(Piece->IsPracticing)
    {
-    StopRecording(Voice);
+    piece_note *NoteToPlay = NilPieceNote;
+    for EachIndex(Idx, Piece->NoteCount)
+    {
+     piece_note *Note = Piece->Notes + Idx;
+     if(Piece->PracticePos <= Note->Start)
+     {
+      NoteToPlay = Note;
+      break;
+     }
+    }
+    
+    b32 NoteWasPlayed = false;
+    
+    for EachIndex(Idx, Input->MIDI.EventCount)
+    {
+     app_midi_event *Event = Input->MIDI.Events + Idx;
+     
+     midi_message Message = {Event->Message};
+     u8 Status = Message.U8[0];
+     u8 Data1  = Message.U8[1];
+     u8 Data2 = Message.U8[2];
+     u8 Type = Status & 0xF0;
+     u8 Channel = Status & 0x0F;
+     
+     if(0) {}
+     else if(Type == MIDIEventType_NoteOn && Data2 > 0)
+     {
+      u8 Pitch = Data1;
+      u8 Velocity = Data2;
+      
+      if(Pitch == NoteToPlay->Pitch)
+      {
+       NoteWasPlayed = true;
+      }
+      else
+      {
+       Log("Pitch diff: %d\n", Pitch - NoteToPlay->Pitch);
+      }
+      
+     }
+     else if(Type == MIDIEventType_NoteOff ||
+             Type == MIDIEventType_NoteOn && Data2 == 0)
+     {
+      u8 Pitch = Data1;
+      u8 Velocity = Data2;
+      
+     }
+    }
+    
+    if(NoteWasPlayed)
+    {
+     Piece->PracticePos += NoteToPlay->Length;
+    }
+   }
+   
+  }
+ }
+ 
+ //- Update voices 
+ { 
+  f32 MaxRecordingLength = 3600.f;
+  
+  for EachIndex(Idx, App->VoiceCount)
+  {    
+   voice *Voice = App->Voices + Idx;
+   
+   if(Voice->IsPlaying)
+   {
+    // NOTE(luca): N^M ? But I won't ever have many voices, yes?  If I do, I can just cache the last played note and loop form there as an optimization.
+    for EachRecNote(Note, Voice->FirstNote)
+    {
+     f32 NoteStart = Note->Timestamp;
+     f32 NoteEnd = NoteStart + Note->Duration;
+     
+     // TODO(luca): If a note is shorter than dtForFrame it could skip it.
+     
+     if(NoteStart <= Voice->PlayPos &&
+        NoteStart > (Voice->PlayPos - Input->dtForFrame))
+     {
+      PlayNote(Memory, App, Voice, Note);
+     }
+     
+     if(NoteEnd <= Voice->PlayPos &&
+        NoteEnd > (Voice->PlayPos - Input->dtForFrame))
+     {
+      rec_note OffNote = *Note;
+      OffNote.Velocity = 0;
+      PlayNote(Memory, App, Voice, &OffNote);
+     }
+    }
+    
+    Voice->PlayPos += Input->dtForFrame;
+    if(Voice->PlayPos >= Voice->RecordLength)
+    {
+     StopAllPlayingNotes(Memory, App, Voice);
+     
+     Voice->PlayPos = 0.f;
+    }
+   }
+   
+   if(Voice->IsRecording)
+   {
+    Voice->RecordLength = (GetWallTime() - Voice->RecordStart);
+    
+    if(Voice->RecordLength >= MaxRecordingLength)
+    {
+     StopRecording(Voice);
+    }
    }
   }
-  
  }
  
  // MIDI Processing

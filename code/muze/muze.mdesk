@@ -9,13 +9,6 @@ PanelTypes:
  { Debug,    "Debug"          }
 }
 
-@table
-Keys:
-{
- { Note_C 0 }
- {          }
-}
-
 @data_enum("panel_kind")
 PanelKind:
 {

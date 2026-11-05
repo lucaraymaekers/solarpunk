@@ -254,8 +254,12 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
   gl_uint FragmentShader = GL_CompileShaderFromString(FSCode, GL_FRAGMENT_SHADER);
 #endif
   
-  RectShader = GL_ProgramFromShaders(VertexShader, FragmentShader);
-  glUseProgram(RectShader);
+  // NOTE(luca): Could be 0 if there are errors.
+  if(VertexShader && FragmentShader)
+  {
+   RectShader = GL_ProgramFromShaders(VertexShader, FragmentShader);
+   glUseProgram(RectShader);
+  }
   
   // Uniforms
   {

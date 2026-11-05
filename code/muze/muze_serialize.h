@@ -17,6 +17,7 @@ struct ms_serializer
 enum ms_version
 {
  MSV_Initial,
+ MSV_Practice,
  MSV_Count,
 };
 typedef enum ms_serializer_version ms_serializer_version;

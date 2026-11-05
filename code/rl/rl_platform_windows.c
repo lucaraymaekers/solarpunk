@@ -799,7 +799,7 @@ P_PROCESS_MESSAGES()
           Input->Text.Count -= 1;
           Handled = false;
           // Not implemented
-          Log("Unhandled codepoint: %s\n", Codepoint);
+          Log("Unhandled codepoint: %d\n", Codepoint);
          };
         }
        }
@@ -1001,12 +1001,10 @@ P_PLAY_SOUND()
   LastHere = OS_GetWallClock();
  }
  
-#if 1    
  if(Code->GetAudioSamples)
  {
   Code->GetAudioSamples(Sound, WriteCount);
  }
-#endif
  
  WA_UnlockBuffer(&GlobalAudioBuffer, WriteCount);
 }

@@ -301,6 +301,9 @@ Last = Node)
 Node->Prev = Last, \
 Last = Node)
 
+#define DLLInsertNil(Node, To, First, Last) \
+
+
 //~ Attributes
 #define internal static
 #define local_persist static

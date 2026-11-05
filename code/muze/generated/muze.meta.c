@@ -1,5 +1,4 @@
 
-
 enum panel_kind
 {
 PanelKind_Empty,

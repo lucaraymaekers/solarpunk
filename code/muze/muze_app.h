@@ -45,13 +45,18 @@ struct piece
  
  b32 IsRecording;
  b32 IsPlaying;
+ b32 IsPracticing;
  f32 RecordLength;
  f32 PlayPos;
- v2 PrevPlayPos;
+ f32 PracticeStart;
+ f32 PracticeEnd;
+ f32 PracticePos;
+ 
  b32 Metronome;
- s32 Octave;
+ b32 IsLooping;
  
  // UI
+ v2 PrevPlayPos; // For animating
  b32 BarWrapping;
  b32 PageWrapping;
  f32 BarPadding;
@@ -59,6 +64,8 @@ struct piece
  f32 NoteSize;
  f32 StaffLineWidth;
  f32 TailHeight;
+ 
+ s32 Octave; // Only for recording
 };
 
 typedef enum note_kind note_kind;
@@ -84,18 +91,18 @@ struct rec_note
 };
 raddbg_type_view(note, rows(Note, (s32)Pitch, no_char((note_pitch)(Pitch%Note_Count)), no_char(Velocity), omit($, Pitch, Velocity)));
 
-typedef struct note_node note_node;
-struct note_node
+typedef struct rec_note_node rec_note_node;
+struct rec_note_node
 {
  rec_note *Value;
- note_node *Next;
- note_node *Prev;
+ rec_note_node *Next;
+ rec_note_node *Prev;
 };
-#define EachNoteNode(Index, First) \
-(note_node *_node = (First); _node; _node = _node->Next) \
+#define EachRecNoteNode(Index, First) \
+(rec_note_node *_node = (First); _node; _node = _node->Next) \
 for (rec_note *Index = _node->Value, *_note = _node->Value; _note; _note = 0)
-#define EachNote(Index, First) (rec_note *Index = First; !IsNilNote(Index); Note = Note->Next)
-#define EachNoteBack(Index, Last) (rec_note *Index = Last; !IsNilNote(Index); Note = Note->Prev)
+#define EachRecNote(Index, First) (rec_note *Index = First; !IsNilNote(Index); Note = Note->Next)
+#define EachRecNoteBack(Index, Last) (rec_note *Index = Last; !IsNilNote(Index); Note = Note->Prev)
 
 typedef struct voice voice;
 struct voice
@@ -117,7 +124,7 @@ struct voice
  
  f32 NoteSetLength;
  
- note_node *NoteSel;
+ rec_note_node *NoteSel;
  
  int Channel;
  int PresetIdx;
@@ -151,14 +158,16 @@ struct panel
  v2 Scroll;
  piece *Piece;
 };
+#if 0
 raddbg_type_view(panel, 
                  rows($,
-                      (&First == NilPanel || &First == 0) ? "Nil" : "",
+                      (&First == NilPanel || &First == 0),
                       ParentPct,
                       Kind,
-                      (Axis == Axis2_X ? "X" : "Y"),
-                      list($, Next),
-                      First));
+                      Axis,
+                      omit(ParentPct, Kind, Axis)));
+#endif
+
 #define EachChildPanel(Child, Parent) \
 (panel *Child = Parent->First; !IsNilPanel(Child); Child = Child->Next)
 
@@ -225,7 +234,9 @@ enum command_kind
  Command_OpenLister,
  
  Command_ClosePanel,
- Command_SplitPanel,
+ Command_SplitSelectedPanelX,
+ Command_SplitSelectedPanelY,
+ Command_SelectNextPanel,
  Command_SetPanelType,
  
  //- Piece 
@@ -238,6 +249,7 @@ enum command_kind
  Command_PieceToggleBarWrapping,
  Command_PieceSetBPM,
  Command_PieceSetInstrument,
+ Command_PieceTogglePracticing,
  //-
 };
 typedef enum command_kind command_kind;
@@ -312,6 +324,7 @@ struct app_state
  ui_box *ListerBox;
  f32 ListerScroll;
  b32 ListerOpened;
+ b32 ListerReturnPressed;
  lister_kind ListerKind;
  
  u64 MaxTextSize;
@@ -343,7 +356,7 @@ struct app_state
  
  // Application memory
  arena *Arena;
- note_node *FirstFreeNode;
+ rec_note_node *FirstFreeNode;
  
  // NOTE(luca): PushBuffer
  umm MaxCommandCount;
