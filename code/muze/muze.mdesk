@@ -2,10 +2,10 @@
 PanelTypes:
 {
  { Empty,    "Empty"          }
+ { Piece,    "Piece"          }
+ { Controls, "Controls" }
  { Sheet,    "Sheet"          }    
  { Roll,     "Roll"           }
- { Controls, "Controls" }
- { Piece,    "Piece"          }
  { Debug,    "Debug"          }
 }
 

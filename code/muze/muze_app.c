@@ -939,7 +939,11 @@ PieceAlloc(app_state *App)
    
    // Allocate channel
    {   
+#if 1
+    Result->Preset = 0;
+#else
     Result->Preset = 73;
+#endif
     Result->Channel = App->NextChannelIdx;
     App->NextChannelIdx += 1;
     tsf_channel_set_presetindex(GlobalTSF, Result->Channel, Result->Preset);
@@ -1432,6 +1436,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  piece_box_data *Data = (piece_box_data *)CustomDrawData;
  ui_box *Box = Data->Box;
  piece *Piece = Data->Piece;
+ app_state *App = Data->App;
+ app_input *Input = UI_State->Input;
  
  f32 BarPadding = Piece->BarPadding;
  f32 BeatWidth = Piece->BeatWidth;
@@ -1549,9 +1555,10 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    v4 Color = {0};
    f32 Start = 0.f;
    
-   b32 Animate = false;
-   
    v2 *FollowPos = 0;
+   b32 AlignMarkerToBarEnd = false;
+   
+   f32 BarHeightIdx = 0;
    
    if(0) {}
    else if(Kind == PieceMarkerKind_Play)
@@ -1569,34 +1576,48 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    {
     Color = Color_Red;
     Start = Piece->RecordLength;
+    AlignMarkerToBarEnd = true;
+    BarHeightIdx = 1.f;
    }
    else if(Kind == PieceMarkerKind_PracticeStart)
    {
     Color = Color_Blue;
     Start = Piece->PracticeStart;
+    BarHeightIdx = 2.f;
    }
    else if(Kind == PieceMarkerKind_PracticeEnd)
    {
     Color = Color_Orange;
     Start = Piece->PracticeEnd;
+    BarHeightIdx = 3.f;
    }
    else if(Kind == PieceMarkerKind_PracticePos)
    {
-    Color = Color_Yellow;
+    Color = Color_Green;
     Start = Piece->PracticePos;
+    BarHeightIdx = 4.f;
    }
    else if(Kind == PieceMarkerKind_PrevPracticePos)
    {
-    Color = Color_Yellow;
+    Color = Color_Green;
     Start = Piece->PracticePos;
     FollowPos = &Piece->PrevPracticePos;
+    BarHeightIdx = 4.f;
    }
    else
    {
     InvalidPath();
    }
    
-   if(Piece->IsPracticing && Kind < PieceMarkerKind_PracticeStart) Color.W *= 0.5f;
+   // NOTE(luca): Grey out markers when practicing
+   if(Piece->IsPracticing && Kind < PieceMarkerKind_PracticeStart) 
+   {
+    Color.W *= 0.5f;
+   }
+   else if(!Piece->IsPracticing && Kind >= PieceMarkerKind_PracticeStart)
+   {
+    Color.W *= 0.5f;
+   }
    
    f32 BeatsPerBar = Piece->TimeSigNum;
    
@@ -1608,8 +1629,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    // placed before the note.
    // All other markers have the special case that they when they equal the bar length, they
    // are placed on the end of the bar and not on the next bar's start.
-   if(Kind < PieceMarkerKind_PracticePos &&
-      Kind > PieceMarkerKind_PrevPracticePos)
+   if(AlignMarkerToBarEnd)
    {
     BarIdx = (Start == 0.f ? 0 : (s32)CeilF32(Start/BeatsPerBar) - 1);
     Remainder = Start - BeatsPerBar*(f32)BarIdx;
@@ -1626,6 +1646,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     BarIdx = (BarIdx%BarsPerWidth);
     MarkerPos.Y += (f32)HeightIdx*2.f*StaffHeight;
    }
+   MarkerPos.Y += BarHeightIdx*NoteDim.Y;
    
    f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
    MarkerPos.X = Pos.X + BarStart + Remainder*BeatWidth;
@@ -1640,14 +1661,14 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      // The whole width is a bit much
      Width = Min(Width, 50.f);
      // This gets rid of the wobbly cursor when the width is near 0
-     if(Width <= 20.f) Width = 0.f;
+     if(Kind == PieceMarkerKind_PrevPlay && Width <= 20.f) Width = 0.f;
     }
     
     // Draw trail
     {
      v2 TrailPos = *FollowPos;
      if(FollowPos->X > MarkerPos.X) TrailPos.X -= Width;
-     DrawFilledRect(TrailPos, V2(Width, StaffHeight), Color);
+     DrawFilledRect(TrailPos, V2(Width, NoteDim.Y), Color);
     }
     
     // Update trail
@@ -1659,7 +1680,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     }
    }
    
-   DrawFilledRect(MarkerPos, V2(StaffLineWidth, StaffHeight), Color);
+   DrawFilledRect(MarkerPos, V2(StaffLineWidth, NoteDim.Y), Color);
   }
  }
  
@@ -1689,10 +1710,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
                      Piece->PlayPos < End);
    }
    
-   if(NoteIsPlaying) NoteColor = Color_Yellow;
-   
-   if(Piece->IsPracticing) NoteColor.W *= 0.5f;
-   
    if(Note->Kind == PieceNoteKind_Pitch)
    {
     s32 RelPitch = Note->Pitch%Note_Count;
@@ -1702,6 +1719,10 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     b32 IsDotted = false;
     b32 IsBarred = false;
     b32 IsSharp = !GetEl(NoteIsWhite, RelPitch);
+    b32 IsHovered = false;
+    b32 IsSelected = false;
+    v2 TailPos = {0};
+    b32 DebugDrawBoundingBox = false;
     
     // Calculate position
     {
@@ -1716,7 +1737,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      s32 StepCount = BaseNote_Count*(RelOctave - NoteOctave);
      StepCount -= MinStepCount + StepForPitch;
      
-     NotePos.Y = Pos.Y + StaffLineWidth/2.f + StepSize*(f32)StepCount;
+     NotePos.Y = Pos.Y + .5f*StaffLineWidth + StepSize*(f32)StepCount;
      
      s32 BarIdx = (s32)FloorF32(Note->Start/Piece->TimeSigNum);
      s32 HeightIdx = BarIdx/BarsPerWidth;
@@ -1731,7 +1752,56 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
      NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
      
+     TailPos = NotePos;
+     {
+      TailPos.X += NoteDim.X - 2.f;
+      TailPos.Y -= TailDim.Y - .5f*NoteDim.Y;
+     }
     }
+    
+    if(NoteIsPlaying) NoteColor = Color_Yellow;
+    
+    v4 HeadBounds = {0};
+    v4 TailBounds = {0};
+    // Is Hovered and compute bounds
+    {
+     v2 MousePos = V2V2S32(Input->Mouse.Pos);
+     HeadBounds = RectFromSize(NotePos, NoteDim);
+     IsHovered = IsInsideRectV2(MousePos, HeadBounds);
+     
+     if(HasStem)
+     {
+      f32 ExtraWidth = 3.f;
+      TailBounds = RectFromSize(TailPos, TailDim);
+      TailBounds.Min.X -= ExtraWidth;
+      TailBounds.Max.X += ExtraWidth;
+      IsHovered |= IsInsideRectV2(MousePos, TailBounds);
+     }
+    }
+    
+    // Selected
+    {
+     IsSelected = (Idx == Piece->SelectedNoteIdx);
+    }
+    
+    if(IsSelected)
+    {
+     NoteColor = Color_Orange;
+    }
+    
+    if(IsHovered)
+    {
+     NoteColor = Color_Blue;
+     
+     if(WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
+     {
+      command *Command = PushCommand(App, Command_PieceSelectNote);
+      Command->Piece = Piece;
+      Command->U64 = Idx;
+     }
+    }
+    
+    if(Piece->IsPracticing) NoteColor.W *= 0.5f;
     
     // Find out if is dotted
     {
@@ -1747,12 +1817,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
     if(HasStem)
     {
-     v2 TailPos = NotePos;
-     {
-      TailPos.X += NoteDim.X - 2.f;
-      TailPos.Y -= TailDim.Y - .5f*NoteDim.Y;
-     }
-     
      // Draw Flags
      {
       FlagCount = (s32)(-Log2F32(Note->Length));
@@ -1817,14 +1881,17 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      
      DrawRectChar(UI_State->Atlas, FontKind_Text, SharpPos, '#', NoteColor);
     }
-   }
-   
-   NotePos.X += BeatWidth*Note->Length;
-   LengthSum += Note->Length;
-   if(LengthSum >= Piece->TimeSigNum)
-   {
-    NotePos.X += 2.f*BarPadding;
-    LengthSum -= Piece->TimeSigNum;
+    
+    if(DebugDrawBoundingBox)
+    {
+     {
+      if(((Note->Pitch - !!IsSharp) & 1))
+       NotePos.Y += .5f;
+     }
+     DrawRect(HeadBounds, Color_Blue, 0.f, 1.f, 0.f);
+     DrawRect(TailBounds, Color_Blue, 0.f, 1.f, 0.f);
+    }
+    
    }
   }
  }
@@ -2748,29 +2815,32 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     ui_box *Box;
     
-    // TODO(luca): Investigate bug, why when reloading this causes problems.
-#if MUZE_INTERNAL && 0
-    StringsScratchTemp(UI_State->FrameArenaBack)
-    {
-     DebugStringAdd(App, "(ui) Active: %S", ActiveString);
-     DebugStringAdd(App, "(ui) Hot: %S", HotString);
-     DebugStringAdd(App, "(ui) Active->tHot = %.2f", Active->tHot);
-     DebugStringAdd(App, "(ui) Active->tActive = %.2f", Active->tActive);
-     DebugStringAdd(App, "(ui) Hot->tHot = %.2f", Hot->tHot);
-     DebugStringAdd(App, "(ui) Hot->tActive = %.2f", Hot->tActive);
-     
-     DebugStringAddArena(App, S8("Perm"), PermanentArena);
-     DebugStringAddArena(App, S8("Frame"), FrameArena);
-     DebugStringAddArena(App, S8("R/O"), App->ReadOnlyArena);
-     DebugStringAddArena(App, S8("Font"), App->FontAtlasArena);
-     DebugStringAddArena(App, S8("UI"), App->UIArena);
-     DebugStringAddArena(App, S8("Panel"), App->PanelArena);
-     DebugStringAddArena(App, S8("Muze"), App->Arena);
-     DebugStringAddArena(App, S8("Voice"), App->SelectedVoice->Arena);
-     DebugStringAddArena(App, S8("TSF"), App->TSFArena);
+#if MUZE_INTERNAL
+    if(!Memory->Reloaded)
+    {     
+     // NOTE(luca): When DLL is reloaded strings may have their location changed.  So, to not 
+     // dereference them we just skip the frame where reloaded.
+     StringsScratchTemp(UI_State->FrameArenaBack)
+     {
+      DebugStringAdd(App, "(ui) Active: %S", ActiveString);
+      DebugStringAdd(App, "(ui) Hot: %S", HotString);
+      DebugStringAdd(App, "(ui) Active->tHot = %.2f", Active->tHot);
+      DebugStringAdd(App, "(ui) Active->tActive = %.2f", Active->tActive);
+      DebugStringAdd(App, "(ui) Hot->tHot = %.2f", Hot->tHot);
+      DebugStringAdd(App, "(ui) Hot->tActive = %.2f", Hot->tActive);
+      
+      DebugStringAddArena(App, S8("Perm"), PermanentArena);
+      DebugStringAddArena(App, S8("Frame"), FrameArena);
+      DebugStringAddArena(App, S8("R/O"), App->ReadOnlyArena);
+      DebugStringAddArena(App, S8("Font"), App->FontAtlasArena);
+      DebugStringAddArena(App, S8("UI"), App->UIArena);
+      DebugStringAddArena(App, S8("Panel"), App->PanelArena);
+      DebugStringAddArena(App, S8("Muze"), App->Arena);
+      DebugStringAddArena(App, S8("Voice"), App->SelectedVoice->Arena);
+      DebugStringAddArena(App, S8("TSF"), App->TSFArena);
+     }
     }
 #endif
-    
    }
    
    OS_ProfileAndPrint("UI setup");
@@ -3018,7 +3088,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                case ListerKind_Instruments:
                {
                 command *Command = PushCommand(App, Command_SelectInstrument);
-                Command->PresetIdx = (s32)Item->Idx;
+                Command->S32 = (s32)Item->Idx;
                } break;
                
                case ListerKind_MIDIInput:
@@ -3259,6 +3329,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
               UI_FillAll()
                UI_Push()
                UI_Column()
+               UI_BackgroundColor(Color_ButtonBackground)
               {         
                UI_SemanticHeight(UI_SizePx(ItemHeight,  1.f))
                 UI_Row()
@@ -3318,11 +3389,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  if(M_IconButton(UI_IconKind_Stop, S8("Stop")))
                  {
                   PieceStopPlaying(Piece);
-                  Piece->PlayPos = 0.f;
+                  Piece->PlayPos = Piece->PracticeStart;
                   Piece->PracticePos = Piece->PracticeStart;
                  }
                  
-                 if(M_IconButton(UI_IconKind_Clock, S8("Metronome"), .TextColor = (Piece->Metronome ? Color_Magenta : Color_Black)))
+                 if(M_IconButton(UI_IconKind_Gauge, S8("Metronome"), .TextColor = (Piece->Metronome ? Color_Magenta : Color_Black)))
                  {
                   PushCommand(App, Command_PieceToggleMetronome)->Piece = Piece;
                  }
@@ -3335,21 +3406,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  
                 }
                 
-#if MUZE_INTERNAL && 0 
-                UI_FontKind(FontKind_Text)
-                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                 if(M_Button(S8("Set to end")))
-                {
-                 Piece->PlayPos = Piece->RecordLength;
-                 PieceStopPlaying(Piece);
-                }
-#endif
-                
-                if(M_SimpleToggleButton(S8("Practice"), Piece->IsPracticing, Color_Yellow))
-                {
-                 PushCommand(App, Command_PieceTogglePracticing)->Piece = Piece;
-                }
-                
+                UI_FillWidth()
+                 UI_AddBox(S8("TopSpacer"), 
+                           UI_BoxFlag_DrawBackground|
+                           UI_BoxFlag_DrawBorders);
                 UI_SemanticWidth(UI_SizePx(200.f, 1))
                  Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
                                        Str8Fmt("%3.0f", Piece->BPM),
@@ -3366,15 +3426,47 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  Piece->PlayPos = 0.f;
                 }
                 
+               }
+               
+               UI_SemanticHeight(UI_SizePx(ItemHeight,  1.f))
+                UI_Row()
+                UI_SemanticWidth(UI_SizePx(150.f, 1))
+               {
+                if(M_SimpleToggleButton(S8("Practice"), Piece->IsPracticing, Color_Yellow))
+                {
+                 PushCommand(App, Command_PieceTogglePracticing)->Piece = Piece;
+                }
+                
+                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                 if(M_Button(S8("Start")))
+                {
+                 f32 Start = Piece->Notes[Piece->SelectedNoteIdx].Start;
+                 if(Start < Piece->PracticeEnd)
+                 {
+                  Piece->PracticeStart = Start;
+                 }
+                }
+                
+                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                 if(M_Button(S8("End")))
+                {
+                 f32 Start = Piece->Notes[Piece->SelectedNoteIdx].Start;
+                 if(Start > Piece->PracticeStart)
+                 {
+                  Piece->PracticeEnd = Start;
+                 }
+                }
+                
                 UI_FillWidth()
-                 UI_BackgroundColor(Color_ButtonBackground)
                  UI_AddBox(S8("TopSpacer"), 
                            UI_BoxFlag_DrawBackground|
                            UI_BoxFlag_DrawBorders);
                }
+               
                UI_Row()
                {
-                UI_TextColor(Color_Black)
+                UI_BackgroundColor(Color_Night2)
+                 UI_TextColor(Color_Black)
                  UI_FillAll()
                  PieceBox = UI_AddBox(S8("Piece"), 
                                       UI_BoxFlag_Scroll|
@@ -3432,6 +3524,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                piece_box_data *Data = PushArray(FrameArena, piece_box_data, 1);
                Data->Piece = Piece;
                Data->Box = PieceBox;
+               Data->App = App;
                
                PieceBox->CustomDrawData = Data;
                PieceBox->CustomDraw = CustomDrawPiece;
@@ -3601,7 +3694,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   
                   if(SliderResult.Clicked)
                   {
-                   PushCommand(App, Command_SetLength)->Length = SliderResult.Value;
+                   PushCommand(App, Command_SetLength)->F32 = SliderResult.Value;
                   }
                  }
                  
@@ -4043,7 +4136,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     case Command_SetFontSize:
     {
-     App->HeightPx = Command->Size;
+     App->HeightPx = Command->F32;
     } break;
    } 
    
@@ -4065,12 +4158,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_SelectInstrument:
     {
-     if(Command->PresetIdx != App->SelectedVoice->PresetIdx)
+     if(Command->S32 != App->SelectedVoice->PresetIdx)
      {
       tsf_channel_note_off_all(GlobalTSF, App->SelectedVoice->Channel);
      }
      
-     App->SelectedVoice->PresetIdx = Command->PresetIdx;
+     App->SelectedVoice->PresetIdx = Command->S32;
      tsf_channel_set_presetindex(GlobalTSF, App->SelectedVoice->Channel, App->SelectedVoice->PresetIdx);
     } break;
     
@@ -4505,6 +4598,18 @@ UPDATE_AND_RENDER(UpdateAndRender)
     Command->Piece->Metronome ^= 1;
    } break;
    
+   case Command_PieceSetInstrument:
+   {
+    piece *Piece = Command->Piece;
+    if(Piece->Preset != Command->S32)
+    {
+     tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+    }
+    
+    Piece->Preset = Command->S32;
+    tsf_channel_set_presetindex(GlobalTSF, Piece->Channel, Piece->Preset);
+   } break;
+   
    case Command_PieceTogglePracticing:
    {
     piece *Piece = Command->Piece;
@@ -4520,22 +4625,19 @@ UPDATE_AND_RENDER(UpdateAndRender)
      PieceStopPlaying(Piece);
      Piece->IsRecording = false;
      
-     Piece->PracticeStart = 0.f;
-     Piece->PracticeEnd = Min(4.f, Piece->RecordLength);
+     if(Piece->PracticeEnd == Piece->PracticeStart)
+     {
+      Piece->PracticeEnd = Min(Piece->RecordLength, 
+                               Piece->PracticeStart + Piece->TimeSigNum);
+     }
+     
      Piece->PracticePos = Piece->PracticeStart;
     }
-   };
+   } break;
    
-   case Command_PieceSetInstrument:
+   case Command_PieceSelectNote:
    {
-    piece *Piece = Command->Piece;
-    if(Command->PresetIdx != Piece->Preset)
-    {
-     tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-    }
-    
-    Piece->Preset = Command->PresetIdx;
-    tsf_channel_set_presetindex(GlobalTSF, Piece->Channel, Command->PresetIdx);
+    Command->Piece->SelectedNoteIdx = Command->U64;
    } break;
    
   }
@@ -4618,6 +4720,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      {
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
       Piece->PlayPos = 0.f;
+      if(Piece->IsPracticing) Piece->PlayPos = Piece->PracticeStart;
       
       if(!Piece->IsLooping) Piece->IsPlaying = false;
      }

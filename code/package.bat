@@ -3,14 +3,24 @@ setlocal
 
 cd %~dp0
 
+:: Unpack arguments
+for %%a in (%*) do set "%%~a=1"
+
+set suffix=debug
+set mode=
+if "%release%"=="1" set suffix=release
+if "%release%"=="1" set mode=-Release
+
+set dir=muze_%suffix%
+
 IF NOT EXIST ..\build mkdir ..\build
 cd ..\build
-call ..\code\build.bat -Muze -Slow
+call ..\code\build.bat -Muze -Slow %mode%
 
-REM --- Create clean directory
-IF EXIST .\muze rmdir /s /q muze
-mkdir .\muze 
-cd .\muze
+:: Create clean directory
+IF EXIST .\muze rmdir /s /q %dir%
+mkdir %dir%
+cd %dir%
 
 copy /Y ..\..\build\muze.exe
 copy /Y ..\..\build\muze_app.dll
@@ -19,5 +29,6 @@ copy /Y ..\..\data\icons.ttf
 copy /Y ..\..\data\muze\sounds\sounds.sf2
 copy /Y ..\..\data\muze\song.muze_piece
 
-del *.zip
-7z a muze.zip *
+cd ..
+del %dir%.zip
+7z a %dir%.zip %dir%\*

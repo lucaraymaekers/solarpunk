@@ -1,4 +1,5 @@
 # Now
+- Visualize silences
 
 - Use piece view for both input and representation
   -> just convert on the fly
@@ -36,6 +37,9 @@ Piece:
 - Visualizer for which note is getting played and is about to get played.
 
 # Next
+UI:
+- Page wrapping
+
 Improving your playing:
 - When practicing a piece as a whole or a segment, record what was played.
   Then if you want you can time travel into your recording, and see a log of mistakes.

@@ -42,6 +42,7 @@ struct piece
  
  u64 NoteCount;
  piece_note Notes[KB(1)];
+ u64 SelectedNoteIdx;
  
  b32 IsRecording;
  b32 IsPlaying;
@@ -59,7 +60,6 @@ struct piece
  v2 PrevPlayPos; // For animating
  v2 PrevPracticePos; // For animating
  b32 BarWrapping;
- b32 PageWrapping;
  f32 BarPadding;
  f32 BeatWidth;
  f32 NoteSize;
@@ -251,6 +251,7 @@ enum command_kind
  Command_PieceSetBPM,
  Command_PieceSetInstrument,
  Command_PieceTogglePracticing,
+ Command_PieceSelectNote,
  //-
 };
 typedef enum command_kind command_kind;
@@ -274,12 +275,13 @@ struct command
  panel_kind PanelKind;
  voice *Voice;
  piece *Piece;
- s32 PresetIdx;
  platform_midi_device *Device;
  lister_kind ListerKind;
- f32 Length;
  axis2 Axis;
- f32 Size; 
+ 
+ s32 S32;
+ f32 F32; 
+ u64 U64;
  
  // TODO(luca): For undo and redo
  ms_serializer Serializer;
@@ -386,6 +388,7 @@ struct piece_box_data
 {
  ui_box *Box;
  piece *Piece;
+ app_state *App;
 };
 
 typedef struct muze_box_data muze_box_data;

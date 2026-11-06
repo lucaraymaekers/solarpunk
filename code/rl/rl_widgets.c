@@ -164,7 +164,11 @@ Button_(ui_button_params Params)
  
  UI_PaddingAround(Params.Padding)
  {
-  s32 TextFlags = UI_BoxFlag_Clip|UI_BoxFlag_DrawDisplayString|UI_BoxFlag_CenterTextVertically;
+  s32 TextFlags = (UI_BoxFlag_DrawDisplayString|
+                   UI_BoxFlag_CenterTextVertically);
+  
+  if(Params.ClipSize) TextFlags |= UI_BoxFlag_Clip;
+  
   
   if(Params.CenterText)
   {
