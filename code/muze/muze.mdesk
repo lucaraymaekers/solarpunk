@@ -1,12 +1,84 @@
+
+@table(Name, NeedsParam, Description)
+CommandsTable:
+{
+ { None,                       false, "Null Command", }
+ 
+ { SetFontSize,                true,  "App: Set font size", }
+ 
+ { SelectInputDevice,          true,  "App: Select MIDI input device", }
+ { SelectOutputDevice,         true,  "App: Select MIDI output device", }
+ { SelectInstrument,           true,  "App: Select Synth output instrument", }
+ { ToggleMIDIInput,            false, "App: Toggle MIDI input", }
+ { ToggleMIDIOutput,           false, "App: Toggle MIDI output", }
+ { ToggleVirtualKeyboardInput, false, "App: Toggle Virtual Keyboard input", }
+ { ToggleSynthOutput,          false, "App: Toggle Synth output", }
+ 
+ //- Panels 
+ { ClosePanel,          false, "Panel: Close", }
+ { SplitSelectedPanelX, false, "Panel: Split on X axis", }
+ { SplitSelectedPanelY, false, "Panel: Split on Y axis", }
+ { SelectNextPanel,     false, "Panel: Select next", }
+ { SetPanelType,        true,  "Panel: Set type", }
+ 
+ //- Piece 
+ { PieceToggleRecording,   false, "Piece: Toggle recording", }
+ { PieceTogglePlaying,     false, "Piece: Toggle playing", }
+ { PieceTogglePracticing,  false, "Piece: Toggle practicing", }
+ { PieceStop,              false, "Piece: Stop", }
+ { PieceClear,             false, "Piece: Clear", }
+ { PieceToggleMetronome,   false, "Piece: Toggle metronome", }
+ { PieceToggleBarWrapping, false, "Piece: Toggle bar wrapping", }
+ { PieceSetBPM,            true,  "Piece: Set BPM", }
+ { PieceSelectNote,        true,  "Piece: Select note", }
+ { PieceSelectInstrument,  false, "Piece: Select instrument", }
+ 
+ //- Lister
+ { CloseLister,         false, "Lister: Close", }
+ { OpenLister,          true,  "Lister: Open", }
+ 
+}
+
+@data_enum("command_kind")
+CommandKind:
+{
+ @expand(CommandsTable)
+  ```Command_$(Name),
+ ```;
+ `Command_Count`;
+}
+
+@data_table("str8")
+CommandsNames:
+{
+ @expand(CommandsTable) @strings
+  ```{$(Description)},
+ ```;
+}
+
+@data_table("command_kind")
+CommandsWithoutParam:
+{
+ @expand(CommandsTable)
+  ```Command_$(Name),
+ ```;
+}
+
+@data_table("b32")
+CommandHasParam:
+{
+ @expand(CommandsTable)
+  ```$(NeedsParam),
+ ```;
+}
+
 @table(Name, DisplayName)
 PanelTypes:
 {
- { Empty,    "Empty"          }
- { Piece,    "Piece"          }
+ { Empty,    "Empty"    }
+ { Piece,    "Piece"    }
  { Controls, "Controls" }
- { Sheet,    "Sheet"          }    
- { Roll,     "Roll"           }
- { Debug,    "Debug"          }
+ { Debug,    "Debug"    }
 }
 
 @data_enum("panel_kind")

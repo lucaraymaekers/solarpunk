@@ -155,7 +155,6 @@ struct panel
  v4 Region;
  
  panel_kind Kind;
- voice *Voice;
  v2 Scroll;
  piece *Piece;
 };
@@ -188,74 +187,7 @@ struct drag_data
  f32 NextStartPct;
 };
 
-//~ State 
-enum command_kind
-{
- Command_None,
- 
- Command_SetFontSize,
- 
- Command_SelectInputDevice,
- Command_SelectOutputDevice,
- Command_SelectInstrument,
- Command_ToggleMIDIInput,
- Command_ToggleMIDIOutput,
- Command_ToggleVirtualKeyboardInput,
- Command_ToggleSynthOutput,
- 
- //- Voice 
- Command_AddVoice,
- Command_DeleteVoice,
- Command_SetPanelVoice,
- Command_PlayAllVoices,
- Command_StopAllVoices,
- 
- Command_Enqueue,
- Command_Dequeue,
- 
- Command_ToggleRecording,
- Command_TogglePlaying,
- Command_ToggleAutoScroll,
- 
- Command_Trim,
- Command_Stop,
- Command_Reset,
- Command_PlayFromStart,
- Command_PlayFromNote,
- 
- Command_Round,
- Command_Sync,
- Command_GuessBPM,
- Command_SetLength,
- Command_ClearSelection,
- Command_DeleteSelection,
- 
- //- Lister
- Command_CloseLister,
- Command_OpenLister,
- 
- Command_ClosePanel,
- Command_SplitSelectedPanelX,
- Command_SplitSelectedPanelY,
- Command_SelectNextPanel,
- Command_SetPanelType,
- 
- //- Piece 
- Command_PieceRecord,
- Comamnd_PiecePlay,
- Command_PiecePause,
- Command_PieceStop,
- Command_PieceClear,
- Command_PieceToggleMetronome,
- Command_PieceToggleBarWrapping,
- Command_PieceSetBPM,
- Command_PieceSetInstrument,
- Command_PieceTogglePracticing,
- Command_PieceSelectNote,
- //-
-};
-typedef enum command_kind command_kind;
-
+//~ State
 enum lister_kind
 {
  ListerKind_Instruments,
@@ -263,6 +195,8 @@ enum lister_kind
  ListerKind_MIDIOutput,
  ListerKind_DebugInfo,
  ListerKind_PanelTypes,
+ ListerKind_Commands,
+ ListerKind_Count,
 };
 typedef enum lister_kind lister_kind;
 
@@ -342,20 +276,12 @@ struct app_state
  b32 InputMIDIEnabled;
  b32 InputVirtualKeyboardEnabled;
  
- s64 MaxVoiceCount;
- s64 VoiceCount;
- voice *Voices;
- voice *SelectedVoice;
- 
  arena *PieceArena;
  piece *FirstPiece;
  piece *LastPiece;
  u64 PieceCount;
  u64 MaxPieceCount;
  piece *NextFreePiece;
- 
- s32 TimeSig;
- f32 BPM;
  
  // Application memory
  arena *Arena;

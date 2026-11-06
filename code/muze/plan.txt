@@ -1,9 +1,21 @@
 # Now
 - Visualize silences
+- Dichter und Bauer
+- Visualize note played when practicing
+- Multi-Portées
+- Transpose everything
+- ClosePanel bug
+
+- Command lister
 
 - Use piece view for both input and representation
   -> just convert on the fly
      -> if we want to replay we can just convert back.
+
+Metronome improvements
+- When recording wait for two ticks before recording
+- When playing wait for two ticks before playing
+- When practicing loop metronome
 
 X Serialization
   - Implement Undo for commands.
@@ -17,6 +29,8 @@ X Serialization
 x Timeline marker for playing position in piece
 
 Bugs:
+- muze: 
+  - ClosePanel refreshes layout.
 - bug: when doing sliders and toggles at different sizes they end up looking wrong.
 - bug: When resizing mouse pointer can glitch between resizing and pointer
 - bug: win32: MIDI devices are not getting selected correctly
