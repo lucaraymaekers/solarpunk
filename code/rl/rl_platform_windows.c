@@ -254,6 +254,16 @@ PLATFORM_MIDI_GET_DEVICES(P_MIDIGetDevices)
  Result.Devices = PushArrayZero(FrameArena, platform_midi_device, MaxDevicesCount);
  MIDIDevices = PushArrayZero(FrameArena, win32_platform_midi_device, MaxDevicesCount);
  
+ // Add nil device
+ { 
+  platform_midi_device *NilDevice = Result.Devices + Result.Count;
+  NilDevice->Id = Result.Count;
+  NilDevice->Name = S8("Null");
+  NilDevice->IsInput = true;
+  NilDevice->IsOutput = true;
+  Result.Count += 1;
+ }
+ 
  u32 OutDevicesCount = midiOutGetNumDevs();
  for EachIndex(Idx, OutDevicesCount)
  {    
@@ -728,8 +738,6 @@ P_PROCESS_MESSAGES()
        {
         if((uint)VKCode == Symbols[Idx]) ProcessKeyPress(&Input->MIDI.Buttons[Idx], IsDown);
        }
-       
-       
       }
      }
      
@@ -815,6 +823,16 @@ P_PROCESS_MESSAGES()
         else if(VKCode == VK_SHIFT) Key->Symbol = PlatformKey_Shift;
         else if(VKCode == VK_DELETE) Key->Symbol = PlatformKey_Delete;
         else if(VKCode == VK_MENU) Key->Symbol = PlatformKey_Alt;
+        else if(VKCode == VK_INSERT) Key->Symbol = PlatformKey_Insert;
+        else if(VKCode == VK_HOME) Key->Symbol = PlatformKey_Home;     
+        else if(VKCode == VK_PRIOR) Key->Symbol = PlatformKey_PageUp;    
+        else if(VKCode == VK_DELETE) Key->Symbol = PlatformKey_Delete;   
+        else if(VKCode == VK_END) Key->Symbol = PlatformKey_End;      
+        else if(VKCode == VK_NEXT) Key->Symbol = PlatformKey_PageDown;     
+        else if(VK_F1 <= VKCode && VKCode <= VK_F12)
+        {
+         Key->Symbol = PlatformKey_F1 + (VKCode - VK_F1);
+        }
         else if(VKCode == VK_OEM_MINUS)
         {
          Key->IsSymbol = false;

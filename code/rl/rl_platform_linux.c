@@ -365,6 +365,14 @@ P_INIT()
    {        
     MIDIDevices = PushArrayZero(Arena, linux_midi_device, MaxMIDIDevicesCount); 
     
+    {
+     linux_midi_device *NilDevice = MIDIDevices + MIDIDevicesCount;
+     NilDevice->CanRead = true;
+     NilDevice->CanWrite = true;
+     NilDevice->Name = S8("Null");
+     MIDIDevicesCount += 1;
+    }
+    
     snd_seq_client_info_set_client(MIDIClientInfo, -1);
     while(snd_seq_query_next_client(MIDISeq, MIDIClientInfo) >= 0)
     {
