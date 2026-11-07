@@ -58,10 +58,11 @@ global_variable piece *NilPiece;
 global_variable f32 *dtForFrame;
 
 //~ Helpers
-internal f32
-GetWallTime(void)
+internal inline b32
+EqualsWithEpsilon(f32 A, f32 B, f32 Epsilon)
 {
- f32 Result = (f32)OS_GetWallClock();
+ b32 Result = (A < (B + Epsilon) && 
+               A > (B - Epsilon));
  return Result;
 }
 
@@ -443,7 +444,7 @@ ClosePanel(app_state *App, panel *Panel)
    if(Collapse == Parent->First && 
       Collapse == Parent->Last)
    {
-    Assert(EqualsWithEpsilon(Collapse->ParentPct, 1.f, 0.001f));
+    Collapse->ParentPct = 1.f;
     
     Parent->First = NilPanel;
     Parent->Last = NilPanel;
@@ -527,7 +528,7 @@ PieceNoteAddCode(piece *Piece,
   // NOTE(luca): Sometimes we will add fractions which are not powers of 2, this is to
   // correct the inaccuracies
   f32 DecimalPart = ModF32(Piece->RecordLength, 1.f);
-  if(EqualsWithEpsilon(DecimalPart, 1.f, .001f))
+  if(EqualsWithEpsilon(DecimalPart, 1.f, .0001f))
   {
    Piece->RecordLength += 1.f - DecimalPart;
   }
@@ -1216,7 +1217,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      v2 MousePos = V2V2S32(Input->Mouse.Pos);
      HeadBounds = RectFromSize(NotePos, NoteDim);
      
-     b32 InputIsOurs = (UI_IsHot(Box) && UI_IsActive(UI_NilBox) || 
+     b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
                         UI_IsActive(Box));
      
      if(InputIsOurs)
@@ -2032,11 +2033,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
     case PlatformKey_Escape:
     {
      PushCommand(App, Command_CloseLister);
-     
-     default: 
-     {
-      Handled = false;
-     } break;
+    } break;
+    
+    default: 
+    {
+     Handled = false;
     } break;
    }
   }
@@ -2416,7 +2417,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  {
                   if(FilteredIdx == Item->Idx)
                   {
-                   PushCommand(App, CommandIdx);
+                   PushCommand(App, (command_kind)CommandIdx);
                   }
                   FilteredIdx += 1;
                  }
@@ -3336,7 +3337,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     case Command_SplitSelectedPanelY:
     {
      Command->Axis = Axis2_Y;
-    }
+    } FallThrough();
     case Command_SplitSelectedPanelX:
     {
      panel *To = App->SelectedPanel;
@@ -3628,8 +3629,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
        Log("Pitch diff: %d\n", Pitch - NoteToPlay->Pitch);
       }
      }
-     else if(Type == MIDIEventType_NoteOff ||
-             Type == MIDIEventType_NoteOn && Data2 == 0)
+     else if((Type == MIDIEventType_NoteOff) ||
+             (Type == MIDIEventType_NoteOn && Data2 == 0))
      {
       u8 Pitch = Data1;
       u8 Velocity = Data2;

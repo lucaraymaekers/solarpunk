@@ -3,7 +3,7 @@ global_variable s32 UI_DebugIndentation = 0;
 
 //~ Misc
 internal inline b32
-EqualsWithEpsilon(f32 A, f32 B, f32 Epsilon)
+_EqualsWithEpsilon(f32 A, f32 B, f32 Epsilon)
 {
  b32 Result = (A < (B + Epsilon) && 
                A > (B - Epsilon));

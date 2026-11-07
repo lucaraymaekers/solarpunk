@@ -2,8 +2,7 @@
 #include "rl/rl_midi.h"
 
 //- ALSA 
-#define ALSA_RECOVER_SILENT false
-
+#define ALSA_RECOVER_SILENT !RL_PLATFORM_INTERNAL
 #include <alsa/asoundlib.h>
 
 //- OpenGL 
@@ -301,8 +300,8 @@ PLATFORM_MIDI_SEND(P_MIDISend)
  snd_seq_event_t Event;
  snd_seq_ev_clear(&Event);
  snd_seq_ev_set_direct(&Event);
- snd_seq_ev_set_source(&Event, MIDIOutPort);
- snd_seq_ev_set_dest(&Event, Dev->Client, Dev->Port);
+ snd_seq_ev_set_source(&Event, (unsigned char)MIDIOutPort);
+ snd_seq_ev_set_dest(&Event, (unsigned char)Dev->Client, (unsigned char)Dev->Port);
  
  // TODO(luca): Allow for U32 message.
  midi_message Msg = {Message};

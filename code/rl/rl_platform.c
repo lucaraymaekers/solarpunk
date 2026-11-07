@@ -493,7 +493,7 @@ BASE_ENTRY_POINT()
         DebugBreak();
        }
        else Handled = false;
-      }
+      } break;
       
       case 'p':
       {

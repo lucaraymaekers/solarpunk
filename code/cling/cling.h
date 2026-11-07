@@ -254,7 +254,7 @@ Cng_Build__(str8 BuildName,
     Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH " "
                          "-D_GNU_SOURCE=1"));
     // Common warning flags
-    Cng_S8ArrayAppend(S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow " 
+    Cng_S8ArrayAppend(S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow -Wimplicit-fallthrough " 
                          "-Wno-double-promotion "
                          "-Wno-unused-but-set-variable "
                          "-Wno-write-strings "
@@ -285,6 +285,9 @@ Cng_Build__(str8 BuildName,
     if(GCC)
     {
      Cng_S8ArrayAppend(S8("-Wno-type-limits "
+                          "-Wno-override-init "
+                          "-Wno-missing-braces "
+                          "-Wno-override-init-side-effects "
                           "-Wno-cast-function-type "
                           "-Wno-missing-field-initializers "
                           "-Wno-int-to-pointer-cast "

@@ -335,6 +335,15 @@ Last = Node)
 # define PrintfFunc(FormatIdx, FirstArgIdx) __attribute__((format(printf, FormatIdx, FirstArgIdx)))
 #endif
 
+
+#if 0
+#elif COMPILER_MSVC
+# define FallThrough()
+#elif COMPILER_CLANG || COMPILER_GNU
+# define FallThrough() __attribute__((fallthrough));
+#endif
+
+
 #if COMPILER_MSVC
 # define force_inline __forceinline
 #elif COMPILER_CLANG || COMPILER_GNU
