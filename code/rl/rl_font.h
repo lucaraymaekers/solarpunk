@@ -5,7 +5,9 @@
 enum font_kind
 {
  FontKind_Text,
- FontKind_Icon
+ FontKind_Icons,
+ FontKind_Music,
+ FontKind_Count
 };
 typedef enum font_kind font_kind;
 
@@ -29,22 +31,11 @@ struct font
 typedef struct font_atlas font_atlas;
 struct font_atlas
 {
+ arena *Arena;
+ 
  s32 Width;
  s32 Height;
  u8 *Data;
- 
- union
- {
-  font *Fonts[2];
-  struct 
-  {  
-   font *TextFont;
-   font *IconsFont;
-  };
- };
- 
- f32 PixelScaleWidth;
- f32 PixelScaleHeight;
  
  stbtt_packedchar *PackedChars;
  stbtt_aligned_quad *AlignedQuads;

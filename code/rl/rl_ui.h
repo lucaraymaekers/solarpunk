@@ -171,6 +171,7 @@ struct ui_state
  app_input *Input;
  ui_box *InputConsumerBox;
  font_atlas *Atlas;
+ font *Fonts[FontKind_Count];
  u64 FrameIdx;
  arena *StyleArena;
  

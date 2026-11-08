@@ -226,10 +226,10 @@ struct app_state
 {
  //- UI 
  arena *UIArena;
- font Font;
+ font TextFont;
  font IconsFont;
+ font MusicFont;
  font_atlas FontAtlas;
- arena *FontAtlasArena; 
  f32 PreviousHeightPx;
  f32 HeightPx;
  

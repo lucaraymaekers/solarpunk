@@ -1,83 +1,63 @@
 //~ Functions
 internal void
-RenderBuildAtlas(arena *Arena, 
-                 font_atlas *Atlas, 
-                 font *TextFont, 
-                 font *IconsFont,
-                 f32 HeightPx)
+RenderBuildAtlas(font_atlas *Atlas, u64 FontCount, font **Fonts, f32 HeightPx)
 { 
+ arena *Arena = Atlas->Arena;
+ s32 CodepointCount = 0;
  
- if(TextFont->Initialized)
+ for EachIndex(Idx, FontCount)
  {
-  Atlas->TextFont = TextFont;
-  // TODO(luca): Unhardcode with asset pipeline.
-  TextFont->FirstCodepoint = ' ';
-  // NOTE(luca): 2 bytes =>small alphabets.
-  TextFont->CodepointCount = (((s32)KB(2) - 1) - TextFont->FirstCodepoint);
-  TextFont->FirstPackedCharIdx = 0;
+  font *Font = Fonts[Idx];
   
-  if(IconsFont->Initialized)
-  {
-   Atlas->IconsFont = IconsFont;
-   IconsFont->FirstCodepoint = 0x31;
-   IconsFont->CodepointCount = 15;
-   IconsFont->FirstPackedCharIdx = TextFont->CodepointCount;
-   IconsFont->Scale = stbtt_ScaleForPixelHeight(&IconsFont->Info, HeightPx);
+  if(Font->Initialized)
+  {  
+   // TODO(luca): Unhardcode with asset pipeline.
+   Font->FirstCodepoint = ' ';
+   Font->FirstPackedCharIdx = CodepointCount;
+   Font->Scale = stbtt_ScaleForPixelHeight(&Font->Info, HeightPx);
+   Font->HeightPx = HeightPx;
+   
+   CodepointCount += Font->CodepointCount;
   }
+ }
+ 
+ Atlas->Width = 1024;
+ Atlas->Height = 1024;
+ u64 Size = (u64)(Atlas->Width*Atlas->Height);
+ 
+ ArenaSetPos(Arena, 0);
+ Atlas->Data = PushArrayZero(Arena, u8, Size);
+ Atlas->PackedChars = PushArray(Arena, stbtt_packedchar, (u64)CodepointCount);
+ Atlas->AlignedQuads = PushArray(Arena, stbtt_aligned_quad, (u64)CodepointCount);
+ 
+ stbtt_pack_context Ctx = {0};
+ {
+  stbtt_PackBegin(&Ctx, 
+                  Atlas->Data,
+                  Atlas->Width, Atlas->Height,
+                  0, 1, 0);
   
-  Atlas->Width = 1024;
-  Atlas->Height = 1024;
-  u64 Size = (u64)(Atlas->Width*Atlas->Height);
-  
-  ArenaSetPos(Arena, 0);
-  Atlas->Data = PushArrayZero(Arena, u8, Size);
-  s32 CodepointCount = (TextFont->CodepointCount + IconsFont->CodepointCount);
-  Atlas->PackedChars = PushArray(Arena, stbtt_packedchar, (u64)CodepointCount);
-  Atlas->AlignedQuads = PushArray(Arena, stbtt_aligned_quad, (u64)CodepointCount);
-  
-  TextFont->HeightPx = HeightPx;
-  TextFont->Scale = stbtt_ScaleForPixelHeight(&TextFont->Info, HeightPx);
-  
-  stbtt_pack_context Ctx;
-  {
-   stbtt_PackBegin(&Ctx, 
-                   Atlas->Data,
-                   Atlas->Width, Atlas->Height,
-                   0, 1, 0);
-   
-   stbtt_PackFontRange(&Ctx, TextFont->Info.data, 0, TextFont->HeightPx, 
-                       TextFont->FirstCodepoint, TextFont->CodepointCount, 
-                       Atlas->PackedChars);
-   
-   if(IconsFont->Initialized)
-   {
-#if 0
-    // NOTE(luca): We need to scale this so that it matches our font.
-    f32 TextEmHeight = (f32)(TextFont->Ascent - TextFont->Descent);
-    f32 IconsEmHeight = (f32)(IconsFont->Ascent - IconsFont->Descent);
-    IconsFont->HeightPx = HeightPx*(IconsEmHeight/TextEmHeight);
-#endif
-    IconsFont->HeightPx = HeightPx;
-    
-    stbtt_PackFontRange(&Ctx, IconsFont->Info.data, 0, IconsFont->HeightPx, 
-                        IconsFont->FirstCodepoint, IconsFont->CodepointCount, 
-                        Atlas->PackedChars + TextFont->CodepointCount);
-    
-    // TODO(luca): Remove this hack
-    IconsFont->FirstCodepoint = UI_IconKind_Record;
+  for EachIndex(Idx, FontCount)
+  {  
+   font *Font = Fonts[Idx];
+   if(Font->Initialized)
+   {    
+    stbtt_PackFontRange(&Ctx, Font->Info.data, 0, Font->HeightPx, 
+                        Font->FirstCodepoint, Font->CodepointCount, 
+                        Atlas->PackedChars);
    }
-   
-   stbtt_PackEnd(&Ctx);
   }
   
-  for EachIndex(Idx, CodepointCount)
-  {
-   float UnusedX, UnusedY;
-   stbtt_GetPackedQuad(Atlas->PackedChars, Atlas->Width, Atlas->Height, 
-                       Idx,
-                       &UnusedX, &UnusedY,
-                       &Atlas->AlignedQuads[Idx], 0);
-  }
+  stbtt_PackEnd(&Ctx);
+ }
+ 
+ for EachIndex(Idx, CodepointCount)
+ {
+  float UnusedX, UnusedY;
+  stbtt_GetPackedQuad(Atlas->PackedChars, Atlas->Width, Atlas->Height, 
+                      Idx,
+                      &UnusedX, &UnusedY,
+                      &Atlas->AlignedQuads[Idx], 0);
  }
 }
 
@@ -124,7 +104,7 @@ DrawFilledRect(v2 Pos, v2 Size, v4 Color)
 }
 
 internal rect_instance *
-DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 Color)
+DrawRectChar(font_atlas *Atlas, font *Font, v2 Pos, rune Codepoint, v4 Color)
 {
  rect_instance *Result = 0;
  v4 Dest = {0};
@@ -132,7 +112,6 @@ DrawRectChar(font_atlas *Atlas, font_kind FontKind, v2 Pos, rune Codepoint, v4 C
  // NOTE(luca): Evereything happens in pixel coordinates in here.
  // TODO(luca): Proper glyph cache.
  
- font *Font = Atlas->Fonts[FontKind]; 
  s32 PackedCharIdx = GetPackedCharIdx(Font, Codepoint);
  
  {

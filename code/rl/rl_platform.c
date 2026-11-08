@@ -346,9 +346,9 @@ BASE_ENTRY_POINT()
   ui_box *DebugUIBox = 0;
   {
    char *FontPath = 0;
-   FontPath = PathFromExe(FrameArena, S8("icons.ttf"));
+   FontPath = PathFromExe(FrameArena, S8("font_icons.ttf"));
    InitFont(&IconsFont, FontPath);
-   FontPath = PathFromExe(FrameArena, S8("font_regular.ttf"));
+   FontPath = PathFromExe(FrameArena, S8("font_text_regular.ttf"));
    InitFont(&TextFont, FontPath);
    
    gladLoaderLoadGL();
@@ -361,9 +361,12 @@ BASE_ENTRY_POINT()
 #endif
    
    RenderInit(&DebugRender);
-   arena *FontAtlasArena = PushArena(PermanentArena, MB(150), false);
+   DebugRenderAtlas.Arena = PushArena(PermanentArena, MB(150), false);
    // TODO(luca): Building this atlas is slow and tanks our startup time.  So we should speed it up by using a glyph cache.
-   RenderBuildAtlas(FontAtlasArena, &DebugRenderAtlas, &TextFont, &IconsFont, DebugHeightPx);
+   
+   
+   font *Fonts[] = {&TextFont, &IconsFont};
+   RenderBuildAtlas(&DebugRenderAtlas, ArrayCount(Fonts), Fonts, DebugHeightPx);
    
    arena *ROArena = ArenaAlloc(.Offset = ReadOnlyMemoryOffset);
    
@@ -372,6 +375,9 @@ BASE_ENTRY_POINT()
     arena *UIArena = PushArena(PermanentArena, MB(64), false);
     UI_State = PushArray(UIArena, ui_state, 1);
     UI_InitState(UIArena);
+    
+    UI_State->Fonts[FontKind_Text] = &TextFont;
+    UI_State->Fonts[FontKind_Icons] = &IconsFont;
     
     ui_box *Box = PushArray(ROArena, ui_box, 1);
     *Box = (ui_box){Box, Box, Box, Box, Box, Box, Box};

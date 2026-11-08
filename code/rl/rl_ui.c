@@ -581,9 +581,10 @@ UI_CalculateStandaloneSizes(ui_box *Box, axis2 Axis)
   } break;
   case UI_SizeKind_TextContent:
   {
+   font *Font = UI_State->Fonts[Box->FontKind];
+   
    if(Axis == Axis2_X)
    {
-    font *Font = UI_State->Atlas->Fonts[Box->FontKind];
     // NOTE(luca): GPU likes exact pixel coordinates
     if(UI_IsDebugBox(Box))
     {
@@ -596,7 +597,7 @@ UI_CalculateStandaloneSizes(ui_box *Box, axis2 Axis)
    }
    else
    {
-    Box->FixedSize.e[Axis] = (UI_State->Atlas->Fonts[Box->FontKind]->HeightPx + 
+    Box->FixedSize.e[Axis] = (Font->HeightPx + 
                               2.f*Box->SemanticSize[Axis].Value);
    }
   } break;
@@ -903,7 +904,7 @@ UI_DrawBoxes(ui_box *Box)
    
    v2 Cur = TextPos;
    
-   font *Font = Atlas->Fonts[Box->FontKind];
+   font *Font = UI_State->Fonts[Box->FontKind];
    
    if(UI_IsDebugBox(Box))
    {
@@ -947,7 +948,7 @@ UI_DrawBoxes(ui_box *Box)
     
     if(ShouldDraw)
     {
-     DrawRectChar(Atlas, Box->FontKind, Cur, Char, Box->TextColor);
+     DrawRectChar(Atlas, Font, Cur, Char, Box->TextColor);
      Cur.X += CharWidth;
     }
    }

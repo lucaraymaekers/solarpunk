@@ -1336,7 +1336,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      SharpPos.X -= NoteSize;
      SharpPos.Y -= 5.f;
      
-     DrawRectChar(UI_State->Atlas, FontKind_Text, SharpPos, '#', NoteColor);
+     DrawRectChar(UI_State->Atlas, UI_State->Fonts[FontKind_Text], SharpPos, '#', NoteColor);
     }
     
     if(DebugDrawBoundingBox)
@@ -1371,17 +1371,18 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
  Cur.X += HorizontalPadding;
  Cur.Y += RoundF32(.5f*(Box->FixedSize.Y - Box->HeightPx));
  
- f32 EllipsisWidth = Atlas->PackedChars[' ' - Atlas->TextFont->FirstCodepoint].xadvance;
+ font *Font = UI_State->Fonts[FontKind_Text];
+ s32 PackedCharIdx = GetPackedCharIdx(Font, ' ');
+ f32 EllipsisWidth = Atlas->PackedChars[PackedCharIdx].xadvance;
  
  f32 CurMaxX = (Box->FixedPos.X + Box->FixedSize.X - 
                 (HorizontalPadding + EllipsisWidth));
- font *Font = Atlas->TextFont;
  b32 Overflowed = false;
  for EachIndex(Idx, Text.Size)
  {
   rune Char = Text.Data[Idx]; 
   
-  s32 PackedCharIdx = GetPackedCharIdx(Font, Char);
+  PackedCharIdx = GetPackedCharIdx(Font, Char);
   f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
   
   DrawRectChar(Atlas, FontKind_Text, Cur, Char, Box->TextColor);
@@ -1674,7 +1675,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   {        
    App = PushArray(PermanentArena, app_state, 1);
    
-   App->FontAtlasArena = PushArena(PermanentArena, MB(100), false);
+   App->FontAtlas.Arena = PushArena(PermanentArena, MB(100), false);
    App->UIArena = PushArena(PermanentArena, MB(64), false);
    App->Arena = PushArena(PermanentArena, MB(64), false);
    App->TSFArena = PushArena(PermanentArena, MB(500), false);
@@ -1768,12 +1769,20 @@ UPDATE_AND_RENDER(UpdateAndRender)
   //- Init Fonts
   {
    {
-    char *FontPath = PathFromExe(FrameArena, S8("font_regular.ttf"));
-    InitFont(&App->Font, FontPath);
+    char *FontPath = PathFromExe(FrameArena, S8("font_text_regular.ttf"));
+    InitFont(&App->TextFont, FontPath);
+    // NOTE(luca): 2 bytes =>small alphabets.
+    App->TextFont.CodepointCount = (((s32)KB(2) - 1));
    }
    {
-    char *FontPath = PathFromExe(FrameArena, S8("icons.ttf"));
+    char *FontPath = PathFromExe(FrameArena, S8("font_icons.ttf"));
     InitFont(&App->IconsFont, FontPath);
+    App->IconsFont.CodepointCount = 15;
+   }
+   {
+    char *FontPath = PathFromExe(FrameArena, S8("font_music.otf"));
+    InitFont(&App->MusicFont, FontPath);
+    App->MusicFont.CodepointCount = (((s32)KB(2) - 1));
    }
    
    App->HeightPx = DefaultHeightPx;
@@ -1822,6 +1831,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
   // Init UI 
   {
    UI_InitState(App->UIArena);
+   UI_State->Fonts[FontKind_Text] = &App->TextFont;
+   UI_State->Fonts[FontKind_Icons] = &App->IconsFont;
+   UI_State->Fonts[FontKind_Music] = &App->MusicFont;
    App->ListerBox = UI_BoxAlloc(UI_State->Arena);
    App->TopBox = UI_BoxAlloc(UI_State->Arena);
   }
@@ -2060,8 +2072,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
   App->PreviousHeightPx = App->HeightPx;
   
-  RenderBuildAtlas(App->FontAtlasArena, &App->FontAtlas, &App->Font, &App->IconsFont, 
-                   App->HeightPx);
+  font *Fonts[] = {&App->TextFont, &App->IconsFont, &App->MusicFont};
+  
+  RenderBuildAtlas(&App->FontAtlas, ArrayCount(Fonts), Fonts, App->HeightPx);
  }
  
  RenderBeginFrame(FrameArena, 0, 0, Buffer->Dim.X, Buffer->Dim.Y);
@@ -2110,7 +2123,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       DebugStringAddArena(App, S8("Perm"), PermanentArena);
       DebugStringAddArena(App, S8("Frame"), FrameArena);
       DebugStringAddArena(App, S8("R/O"), App->ReadOnlyArena);
-      DebugStringAddArena(App, S8("Font"), App->FontAtlasArena);
+      DebugStringAddArena(App, S8("Font"), App->FontAtlas.Arena);
       DebugStringAddArena(App, S8("UI"), App->UIArena);
       DebugStringAddArena(App, S8("Panel"), App->PanelArena);
       DebugStringAddArena(App, S8("Muze"), App->Arena);
@@ -2553,7 +2566,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
              // Settings button 
              {
               UI_SemanticWidth(UI_SizePx(30.f, 1.f))
-               UI_FontKind(FontKind_Icon)
+               UI_FontKind(FontKind_Icons)
                if(M_IconButton(UI_IconKind_Cog, S8("Settings"), .BackgroundColor = Color_Frost3))
               {
                PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Commands;
@@ -2564,7 +2577,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
              {
               ui_box *Close;
               UI_SemanticWidth(UI_SizePx(30.f, 1.f))
-               UI_FontKind(FontKind_Icon)
+               UI_FontKind(FontKind_Icons)
                Close = UI_AddBox(S8("Close"), (UI_BoxFlag_DrawBackground|
                                                UI_BoxFlag_DrawBorders|
                                                UI_BoxFlag_MouseClickable|
@@ -2658,7 +2671,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_Row()
                 UI_SemanticWidth(UI_SizePx(150.f, 1))
                {               
-                UI_FontKind(FontKind_Icon)
+                UI_FontKind(FontKind_Icons)
                  UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                 {
                  str8 PieceFilePath = S8("song.muze_piece");
