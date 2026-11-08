@@ -1015,7 +1015,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     f32 NoteLength = Note->Length;
     if(NoteLength == 0.f)
     {
-     Assert(Piece->RecordLength);
+     Assert(Piece->IsRecording);
      NoteIsRecording = true;
      NoteLength = (Piece->RecordLength - Note->Start);
     }

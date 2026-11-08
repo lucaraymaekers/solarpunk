@@ -33,7 +33,10 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
    // Bummer, we have to crop.
    Log("Error: Since piece has max note amount, last note cropped.\n");
   }
-  MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(piece_note)*(Piece->NoteCount - 1));
+  if(Piece->NoteCount)
+  {   
+   MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(piece_note)*(Piece->NoteCount - 1));
+  }
   Piece->Notes[0] = Nil(piece_note);
   
   for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
