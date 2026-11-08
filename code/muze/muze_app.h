@@ -9,7 +9,7 @@
 typedef enum piece_note_kind piece_note_kind;
 enum piece_note_kind
 {
- PieceNoteKind_Silence,
+ PieceNoteKind_Rest,
  PieceNoteKind_Pitch,
 };
 

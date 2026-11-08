@@ -1162,6 +1162,27 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
                      Piece->PlayPos < End);
    }
    
+   if(0) {}
+   else if(Note->Kind == PieceNoteKind_Rest)
+   {
+    // Calculate position
+    {    
+     s32 BarIdx = (s32)FloorF32(Note->Start/Piece->TimeSigNum);
+     s32 HeightIdx = BarIdx/BarsPerWidth;
+     
+     if(Piece->BarWrapping)
+     {
+      BarIdx = (BarIdx%BarsPerWidth);
+      NotePos.Y += (f32)HeightIdx*2.f*StaffHeight;
+     }
+     
+     f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
+     f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
+     NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
+    }
+    
+    DrawRectChar(UI_State->Atlas, UI_State->Fonts[FontKind_Music], NotePos, 0xE4E5, NoteColor);
+   }
    if(Note->Kind == PieceNoteKind_Pitch)
    {
     s32 RelPitch = Note->Pitch%Note_Count;
@@ -1335,9 +1356,20 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     {
      v2 SharpPos = NotePos;
      SharpPos.X -= NoteSize;
-     SharpPos.Y -= 5.f;
+     SharpPos.Y -= 4.f;
      
-     DrawRectChar(UI_State->Atlas, UI_State->Fonts[FontKind_Text], SharpPos, '#', NoteColor);
+     font *Font = UI_State->Fonts[FontKind_Text];
+     font_atlas *Atlas = UI_State->Atlas;
+     s32 Codepoint = '#';
+     
+#if 0
+     Font = UI_State->Fonts[FontKind_Music];
+     SharpPos.Y -= Font->HeightPx/4.f;
+     SharpPos.X += 3.f;
+     Codepoint = 0xE262;
+#endif
+     
+     DrawRectChar(Atlas, Font, SharpPos, Codepoint, NoteColor);
     }
     
     if(DebugDrawBoundingBox)
@@ -3640,7 +3672,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      }
     }
     
-    if(!NoteWasPlayed && NoteToPlay->Kind == PieceNoteKind_Silence) 
+    if(!NoteWasPlayed && NoteToPlay->Kind == PieceNoteKind_Rest) 
     {
      NoteWasPlayed = true;
     }

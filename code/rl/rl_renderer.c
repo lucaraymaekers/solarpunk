@@ -12,10 +12,13 @@ RenderBuildAtlas(font_atlas *Atlas, u64 FontCount, font **Fonts, f32 HeightPx)
   if(Font->Initialized)
   {  
    // TODO(luca): Unhardcode with asset pipeline.
-   Font->FirstCodepoint = ' ';
    Font->FirstPackedCharIdx = CodepointCount;
-   Font->Scale = stbtt_ScaleForPixelHeight(&Font->Info, HeightPx);
    Font->HeightPx = HeightPx;
+   if(Idx == FontKind_Music)
+   {
+    Font->HeightPx *= 2;
+   }
+   Font->Scale = stbtt_ScaleForPixelHeight(&Font->Info, Font->HeightPx);
    
    CodepointCount += Font->CodepointCount;
   }

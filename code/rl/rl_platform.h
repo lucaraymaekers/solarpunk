@@ -330,6 +330,7 @@ InitFontFromKind(font *Font, font_kind Kind)
  char *Path = PathFromExe(FontPaths[Kind]);
  InitFont(Font, Path);
  Font->CodepointCount = FontCodepointCounts[Kind];
+ Font->FirstCodepoint = FontFirstCodepoints[Kind];
 }
 
 internal void 
