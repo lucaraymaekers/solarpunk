@@ -293,7 +293,7 @@ internal void P_UpdateImage(P_context Context, app_offscreen_buffer *Buffer)
 #define P_PROCESS_MESSAGES() \
 internal void P_ProcessMessages(P_context Context, app_input *Input, app_offscreen_buffer *Buffer, b32 *Running)
 #define P_LOAD_APP_CODE() \
-internal void P_LoadAppCode(arena *Arena, app_code *Code, app_memory *Memory)
+internal void P_LoadAppCode(app_code *Code, app_memory *Memory)
 
 #define P_CLEANUP() \
 internal void P_Cleanup(P_context Context)
@@ -318,29 +318,18 @@ WasPressed(app_button_state State)
 }
 
 internal char *
-PathFromExe(arena *Arena, str8 Path)
+PathFromExe(str8 Path)
 {
- char *Result = 0;
- 
- u64 Size = ExeDirPath.Size + Path.Size + 1;
- 
- Result = PushArray(Arena, char, Size);
- 
- u64 At = 0;
- for EachIndex(Idx, ExeDirPath.Size)
- {
-  Result[At] = (char)ExeDirPath.Data[Idx];
-  At += 1;
- }
- for EachIndex(Idx, Path.Size)
- {
-  Result[At] = (char)Path.Data[Idx];
-  At += 1;
- }
- 
- Result[Size - 1] = 0;
- 
+ char *Result = CSS8(S8Cat(ExeDirPath, Path));
  return Result;
+}
+
+internal void
+InitFontFromKind(font *Font, font_kind Kind)
+{
+ char *Path = PathFromExe(FontPaths[Kind]);
+ InitFont(Font, Path);
+ Font->CodepointCount = FontCodepointCounts[Kind];
 }
 
 internal void 

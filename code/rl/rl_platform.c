@@ -13,22 +13,22 @@
 
 #include "rl/generated/rl_tables.meta.c"
 #include "rl/generated/rl_render.meta.c"
-#include "rl/rl_platform.h"
-#if OS_LINUX
-# include "rl/rl_platform_linux.c"
-#elif OS_WINDOWS
-# include "rl/rl_platform_windows.c"
-#endif
-
-//- For rendering debug UI 
+#include "rl/generated/rl_font.meta.c"
 #include "rl/generated/rl_ui.meta.c"
-#include "rl/rl_gl.h"
 #include "rl/rl_font.h"
+#include "rl/rl_platform.h"
+#include "rl/rl_gl.h"
 #include "rl/rl_renderer.h"
 #include "rl/rl_ui.h"
 #include "rl/rl_renderer.c"
 #include "rl/rl_ui.c"
 #include "rl/rl_widgets.c"
+
+#if OS_LINUX
+# include "rl/rl_platform_linux.c"
+#elif OS_WINDOWS
+# include "rl/rl_platform_windows.c"
+#endif
 
 //~ Recording 
 typedef struct platform_replay platform_replay;
@@ -330,7 +330,8 @@ BASE_ENTRY_POINT()
 #endif
   
   str8 LibraryPath = Str8Fmt(Stringify(RL_PLATFORM_APP_NAME) ".%s", (CurrentOSLinux ? "so" : "dll"));
-  Code.LibraryPath = PathFromExe(PermanentArena, LibraryPath);
+  StringsScratchTemp(PermanentArena)
+   Code.LibraryPath = PathFromExe(LibraryPath);
   
   //- Debug UI 
   b32 ShowDebugUI = false;
@@ -345,47 +346,44 @@ BASE_ENTRY_POINT()
   font IconsFont = {0};
   ui_box *DebugUIBox = 0;
   {
-   char *FontPath = 0;
-   FontPath = PathFromExe(FrameArena, S8("font_icons.ttf"));
-   InitFont(&IconsFont, FontPath);
-   FontPath = PathFromExe(FrameArena, S8("font_text_regular.ttf"));
-   InitFont(&TextFont, FontPath);
-   
-   gladLoaderLoadGL();
-   
-#if 1   
-   GLint Major, Minor;
-   glGetIntegerv(GL_MAJOR_VERSION, &Major);
-   glGetIntegerv(GL_MINOR_VERSION, &Minor);
-   Log("Loaded OpenGL %d.%d\n", Major, Minor);
-#endif
-   
-   RenderInit(&DebugRender);
-   DebugRenderAtlas.Arena = PushArena(PermanentArena, MB(150), false);
-   // TODO(luca): Building this atlas is slow and tanks our startup time.  So we should speed it up by using a glyph cache.
-   
-   
-   font *Fonts[] = {&TextFont, &IconsFont};
-   RenderBuildAtlas(&DebugRenderAtlas, ArrayCount(Fonts), Fonts, DebugHeightPx);
-   
-   arena *ROArena = ArenaAlloc(.Offset = ReadOnlyMemoryOffset);
-   
-   // Init UI state
-   {
-    arena *UIArena = PushArena(PermanentArena, MB(64), false);
-    UI_State = PushArray(UIArena, ui_state, 1);
-    UI_InitState(UIArena);
-    
-    UI_State->Fonts[FontKind_Text] = &TextFont;
-    UI_State->Fonts[FontKind_Icons] = &IconsFont;
-    
-    ui_box *Box = PushArray(ROArena, ui_box, 1);
-    *Box = (ui_box){Box, Box, Box, Box, Box, Box, Box};
-    UI_NilBox = Box;
-   }
-   
-   OS_MarkReadonly(ROArena->Base, ROArena->Size);
+   InitFontFromKind(&TextFont, FontKind_Text);
+   InitFontFromKind(&IconsFont, FontKind_Icons);
   }
+  
+  gladLoaderLoadGL();
+  
+#if 1   
+  GLint Major, Minor;
+  glGetIntegerv(GL_MAJOR_VERSION, &Major);
+  glGetIntegerv(GL_MINOR_VERSION, &Minor);
+  Log("Loaded OpenGL %d.%d\n", Major, Minor);
+#endif
+  
+  RenderInit(&DebugRender);
+  DebugRenderAtlas.Arena = PushArena(PermanentArena, MB(150), false);
+  // TODO(luca): Building this atlas is slow and tanks our startup time.  So we should speed it up by using a glyph cache.
+  
+  
+  font *Fonts[] = {&TextFont, &IconsFont};
+  RenderBuildAtlas(&DebugRenderAtlas, ArrayCount(Fonts), Fonts, DebugHeightPx);
+  
+  arena *ROArena = ArenaAlloc(.Offset = ReadOnlyMemoryOffset);
+  
+  // Init UI state
+  {
+   arena *UIArena = PushArena(PermanentArena, MB(64), false);
+   UI_State = PushArray(UIArena, ui_state, 1);
+   UI_InitState(UIArena);
+   
+   UI_State->Fonts[FontKind_Text] = &TextFont;
+   UI_State->Fonts[FontKind_Icons] = &IconsFont;
+   
+   ui_box *Box = PushArray(ROArena, ui_box, 1);
+   *Box = (ui_box){Box, Box, Box, Box, Box, Box, Box};
+   UI_NilBox = Box;
+  }
+  
+  OS_MarkReadonly(ROArena->Base, ROArena->Size);
   
   OS_ProfileAndPrint("Debug UI setup");
 #endif
@@ -399,7 +397,7 @@ BASE_ENTRY_POINT()
   u64 ReplayMaxRecordingFramesCount = (u64)GameUpdateHz * 60 * 10;
   u64 ReplayMaxBufferSize = AppMemory.MemorySize + (ReplayMaxRecordingFramesCount*sizeof(app_input));
   Replay.Buffer = PushArray(PermanentArena, u8, ReplayMaxBufferSize);
-  u64 MaxReplaySlots = 5;
+  u64 MaxReplaySlots = 4;
   u64 ReplaySlot = 0;
   
   OS_ProfileAndPrint("Misc");
@@ -421,7 +419,7 @@ BASE_ENTRY_POINT()
     
     if(!CodeLoaded)
     {
-     P_LoadAppCode(FrameArena, &Code, &AppMemory);
+     P_LoadAppCode(&Code, &AppMemory);
      CodeLoaded = true;
     }
 #if RL_PLATFORM_HOT_RELOAD_CODE
@@ -650,7 +648,8 @@ BASE_ENTRY_POINT()
         List = UI_AddBox(S8("List"), 
                          UI_BoxFlag_Clip|
                          UI_BoxFlag_DrawBackground|
-                         UI_BoxFlag_DrawBorders);
+                         UI_BoxFlag_DrawBorders|
+                         UI_BoxFlag_MouseClickable);
        
        UI_Push()
         UI_FillWidth()
@@ -828,7 +827,7 @@ BASE_ENTRY_POINT()
         
         if(DisabledButton(S8("Load from disk"), false))
         {
-         char *FileName = PathFromExe(FrameArena, Str8Fmt("replay_%lu.edr", ReplaySlot));
+         char *FileName = PathFromExe(Str8Fmt("replay_%lu.edr", ReplaySlot));
          
          str8 ReplayBuffer = OS_ReadEntireFileIntoMemory(FileName);
          
@@ -850,13 +849,37 @@ BASE_ENTRY_POINT()
         {
          if(Replay.RecordingSize)
          {
-          char *FileName = PathFromExe(FrameArena, Str8Fmt("replay_%lu.edr", ReplaySlot));
+          char *FileName = PathFromExe(Str8Fmt("replay_%lu.edr", ReplaySlot));
           str8 ReplayBuffer = {0};
           ReplayBuffer.Data = Replay.Buffer;
           ReplayBuffer.Size = Replay.RecordingSize;
           OS_WriteEntireFile(FileName, ReplayBuffer);
          }
          Log("Replay saved to disk.\n");
+        }
+        
+        // ReplaySlot
+        {                            
+         UI_BackgroundColor(Color_Disabled)
+          UI_AddBox(S8("ReplaySlot"), 
+                    UI_BoxFlag_Clip|
+                    UI_BoxFlag_DrawBorders|
+                    UI_BoxFlag_DrawBackground);
+         UI_PaddingAround(ItemPadding)
+         {
+          ui_box *Box;
+          UI_SemanticWidth(UI_SizeText(1.f, 1.f))
+           Box = UI_AddBox(S8("Slot"), 
+                           UI_BoxFlag_DrawDisplayString|
+                           UI_BoxFlag_CenterTextVertically|
+                           UI_BoxFlag_CenterTextHorizontally);
+          
+          Box->DisplayString = Str8Fmt("ReplaySlot: %2d/%-2d", ReplaySlot, MaxReplaySlots);
+          
+          UI_BackgroundColor(Color_Orange)
+           UI_BorderColor(Color_Black)
+           ReplaySlot = (u64)UI_Slider((f32)ReplaySlot, 0.f, (f32)MaxReplaySlots, 1.f, 0, true);
+         }
         }
         
         DebugSpacer();

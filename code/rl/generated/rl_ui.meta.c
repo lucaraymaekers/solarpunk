@@ -20,17 +20,17 @@ UI_IconKind_Record,
 typedef enum icon_kind icon_kind;
 
 str8 UI_Icons[] = {
-{((u8 []){UI_IconKind_Record}), 1 },
- {((u8 []){UI_IconKind_Pause}), 1 },
- {((u8 []){UI_IconKind_Stop}), 1 },
- {((u8 []){UI_IconKind_Play}), 1 },
- {((u8 []){UI_IconKind_Gauge}), 1 },
- {((u8 []){UI_IconKind_Cog}), 1 },
- {((u8 []){UI_IconKind_Save}), 1 },
- {((u8 []){UI_IconKind_File}), 1 },
- {((u8 []){UI_IconKind_Close}), 1 },
- {((u8 []){UI_IconKind_Clock}), 1 },
- {((u8 []){UI_IconKind_Loop}), 1 },
+{((u8 []){UI_IconKind_Record + ' '}), 1 },
+ {((u8 []){UI_IconKind_Pause + ' '}), 1 },
+ {((u8 []){UI_IconKind_Stop + ' '}), 1 },
+ {((u8 []){UI_IconKind_Play + ' '}), 1 },
+ {((u8 []){UI_IconKind_Gauge + ' '}), 1 },
+ {((u8 []){UI_IconKind_Cog + ' '}), 1 },
+ {((u8 []){UI_IconKind_Save + ' '}), 1 },
+ {((u8 []){UI_IconKind_File + ' '}), 1 },
+ {((u8 []){UI_IconKind_Close + ' '}), 1 },
+ {((u8 []){UI_IconKind_Clock + ' '}), 1 },
+ {((u8 []){UI_IconKind_Loop + ' '}), 1 },
  
 };
 

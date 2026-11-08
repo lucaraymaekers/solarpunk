@@ -11,9 +11,10 @@ NO_WARNINGS_END
 #include "rl/generated/rl_tables.meta.c"
 #include "rl/generated/rl_ui.meta.c"
 #include "rl/generated/rl_render.meta.c"
-#include "rl/rl_platform.h"
+#include "rl/generated/rl_font.meta.c"
 #include "rl/rl_libs.h"
 #include "rl/rl_font.h"
+#include "rl/rl_platform.h"
 #include "rl/rl_random.h"
 #include "rl/rl_gl.h"
 #include "rl/rl_renderer.h"
@@ -1719,7 +1720,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  {
   //- Init TSF 
   {        
-   char *Path = PathFromExe(FrameArena, S8("sounds.sf2"));
+   char *Path = PathFromExe(S8("sounds.sf2"));
    str8 File = OS_ReadEntireFileIntoMemory(Path);
    GlobalTSF = tsf_load_memory(App->TSFArena, File.Data, (int)File.Size);
    if(GlobalTSF == 0)
@@ -1769,20 +1770,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
   //- Init Fonts
   {
    {
-    char *FontPath = PathFromExe(FrameArena, S8("font_text_regular.ttf"));
-    InitFont(&App->TextFont, FontPath);
-    // NOTE(luca): 2 bytes =>small alphabets.
-    App->TextFont.CodepointCount = (((s32)KB(2) - 1));
-   }
-   {
-    char *FontPath = PathFromExe(FrameArena, S8("font_icons.ttf"));
-    InitFont(&App->IconsFont, FontPath);
-    App->IconsFont.CodepointCount = 15;
-   }
-   {
-    char *FontPath = PathFromExe(FrameArena, S8("font_music.otf"));
-    InitFont(&App->MusicFont, FontPath);
-    App->MusicFont.CodepointCount = (((s32)KB(2) - 1));
+    InitFontFromKind(&App->TextFont, FontKind_Text);
+    InitFontFromKind(&App->IconsFont, FontKind_Icons);
+    InitFontFromKind(&App->MusicFont, FontKind_Music);
    }
    
    App->HeightPx = DefaultHeightPx;

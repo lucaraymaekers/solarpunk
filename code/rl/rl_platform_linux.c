@@ -1465,14 +1465,8 @@ P_LOAD_APP_CODE()
   
   if(KeepOldDLLsAllocated)
   {
-   str8 TempDLLFileName;
-   char *TempDLLPath;
-   
-   StringsScratchTemp(Arena)
-   {
-    TempDLLFileName = Str8Fmt("editor_app_temp_%lu.so", (u64)OS_GetWallClock());
-    TempDLLPath = PathFromExe(Arena, TempDLLFileName);
-   }
+   str8 TempDLLFileName = Str8Fmt("editor_app_temp_%lu.so", (u64)OS_GetWallClock());
+   char *TempDLLPath = PathFromExe(TempDLLFileName);
    
    int File = open(Code->LibraryPath, O_RDONLY, 0600);
    if(File != -1)

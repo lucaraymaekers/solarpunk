@@ -76,7 +76,7 @@ IconKindEnum:
 UI_Icons:
 {
  @expand(Icons)
-  ```{((u8 []){UI_IconKind_$(Name)}), 1 },
+  ```{((u8 []){UI_IconKind_$(Name) + ' '}), 1 },
  ```;
 }
 

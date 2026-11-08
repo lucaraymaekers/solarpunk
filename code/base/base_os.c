@@ -164,14 +164,16 @@ CmdLineHasEntryAndAddHelp(cmd_line *CmdLine, str8_array *Help, str8 Flag, str8 D
  return Result;
 }
 
-str8 OS_PathFromExe(cmd_line *CmdLine, str8 Path)
+
+internal str8 
+OS_PathFromExe(cmd_line *CmdLine, str8 Path)
 {
-    str8 Result = {0};
-    
-    str8 ExeDirPath = S8CutFromChar(CmdLine->ExePath, OS_SlashChar, false);
-    Result = S8Cat(ExeDirPath, Path);
-    
-    return Result;
+ str8 Result = {0};
+ 
+ str8 ExeDirPath = S8CutFromChar(CmdLine->ExePath, OS_SlashChar, false);
+ Result = S8Cat(ExeDirPath, Path);
+ 
+ return Result;
 }
 
 #if OS_LINUX || OS_ANDROID
@@ -229,6 +231,6 @@ OS_PrintFormat(char *Format, ...)
 internal b32
 OS_Is(os_kind Kind)
 {
-    b32 Result = (OS_Kind == Kind);
-    return Result;
+ b32 Result = (OS_Kind == Kind);
+ return Result;
 }

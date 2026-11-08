@@ -30,6 +30,7 @@ RenderBuildAtlas(font_atlas *Atlas, u64 FontCount, font **Fonts, f32 HeightPx)
  Atlas->PackedChars = PushArray(Arena, stbtt_packedchar, (u64)CodepointCount);
  Atlas->AlignedQuads = PushArray(Arena, stbtt_aligned_quad, (u64)CodepointCount);
  
+ s32 PackedCharStartIdx = 0;
  stbtt_pack_context Ctx = {0};
  {
   stbtt_PackBegin(&Ctx, 
@@ -44,7 +45,8 @@ RenderBuildAtlas(font_atlas *Atlas, u64 FontCount, font **Fonts, f32 HeightPx)
    {    
     stbtt_PackFontRange(&Ctx, Font->Info.data, 0, Font->HeightPx, 
                         Font->FirstCodepoint, Font->CodepointCount, 
-                        Atlas->PackedChars);
+                        Atlas->PackedChars + Font->FirstPackedCharIdx);
+    
    }
   }
   

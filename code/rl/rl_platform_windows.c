@@ -915,13 +915,12 @@ P_LOAD_APP_CODE()
  HMODULE Library = (HMODULE)Code->LibraryHandle;
  
  // TODO(luca): Wait on this lock file to be created before loading the dll.
- char *LockFileName = PathFromExe(Arena, S8("lock.tmp"));
- SetStringsScratch(Arena);
+ char *LockFileName = PathFromExe(S8("lock.tmp"));
  
  str8 TempDLLFileName = Str8Fmt(Stringify(RL_PLATFORM_APP_NAME) "_temp%llu.dll", (u64)OS_GetWallClock());
  
 #if RL_PLATFORM_HOT_RELOAD_CODE
- char *TempDLLPath = PathFromExe(Arena, TempDLLFileName);
+ char *TempDLLPath = PathFromExe(TempDLLFileName);
 #else
  char *TempDLLPath = Code->LibraryPath;
 #endif
@@ -988,6 +987,7 @@ P_LOAD_APP_CODE()
   Code->UpdateAndRender = UpdateAndRenderStub;
   Code->GetAudioSamples = GetAudioSamplesStub;
  }
+ 
 }
 
 P_PLAY_SOUND()

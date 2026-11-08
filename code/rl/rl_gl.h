@@ -83,8 +83,12 @@ GL_CompileShaderFromFile(str8 FileNameAfterExe, u32 Type)
 {
  gl_uint Shader = 0;
  
- char *FilePath = PathFromExe(GL_FrameArena, FileNameAfterExe);
- str8 File = OS_ReadEntireFileIntoMemory(FilePath);
+ str8 File = {0};
+ StringsScratchTemp(GL_FrameArena)
+ {
+  char *FilePath = PathFromExe(FileNameAfterExe);
+  File = OS_ReadEntireFileIntoMemory(FilePath);
+ }
  
  if(File.Size)
  {    
@@ -101,13 +105,13 @@ GL_ProgramFromShaders(gl_uint VertexShader, gl_uint FragmentShader)
  gl_uint Program = 0;
  
  Program = glCreateProgram();
-    glAttachShader(Program, VertexShader);
-    glAttachShader(Program, FragmentShader);
+ glAttachShader(Program, VertexShader);
+ glAttachShader(Program, FragmentShader);
  glLinkProgram(Program);
  GL_ErrorStatus(Program, false);
  
-    glDeleteShader(VertexShader);
-    glDeleteShader(FragmentShader); 
+ glDeleteShader(VertexShader);
+ glDeleteShader(FragmentShader); 
  
  return Program;
 }

@@ -2,15 +2,6 @@
 #define RL_FONT_H
 // TODO(luca): UTF8 handling 
 
-enum font_kind
-{
- FontKind_Text,
- FontKind_Icons,
- FontKind_Music,
- FontKind_Count
-};
-typedef enum font_kind font_kind;
-
 typedef struct font font;
 struct font
 {

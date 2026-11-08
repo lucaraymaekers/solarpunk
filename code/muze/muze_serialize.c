@@ -35,7 +35,7 @@ M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
  ms_serializer Serializer = {0};
  Serializer.IsReading = Read;
  
- char *FilePath = PathFromExe(FrameArena, Path);
+ char *FilePath = PathFromExe(Path);
  
  if(Serializer.IsReading)
  {

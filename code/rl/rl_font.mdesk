@@ -1,0 +1,30 @@
+@table(Kind, Path, CodepointCount)
+FontsTable:
+{
+ { Text,  "font_text_regular.ttf", 2048 }
+ { Icons, "font_icons.ttf",        15   }
+ { Music, "font_music.otf",        2048 }
+}
+
+@data_enum("font_kind")
+{
+ @expand(FontsTable)
+  ```FontKind_$(Kind),
+ ```;
+ `FontKind_Count`;
+}
+
+@data_table("s32")
+FontCodepointCounts:
+{
+ @expand(FontsTable)
+  `$(CodepointCount),`;
+}
+
+@data_table("str8")
+FontPaths:
+{
+ @expand(FontsTable) @strings
+  ```{$(Path)},
+ ```;
+}

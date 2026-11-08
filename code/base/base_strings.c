@@ -71,9 +71,9 @@ IsAlpha(u8 Char)
 internal b32
 IsAlphaNum(u8 Char)
 {
-    b32 Result = ((Char >= 'A' && Char <= 'Z') || (Char >= 'a' && Char <= 'z') ||
-                  (Char >= '0' && Char <= '9'));
-    return Result;
+ b32 Result = ((Char >= 'A' && Char <= 'Z') || (Char >= 'a' && Char <= 'z') ||
+               (Char >= '0' && Char <= '9'));
+ return Result;
 }
 
 internal b32
@@ -119,10 +119,10 @@ S8Match(str8 A, str8 B, s8_match_flag Flags)
  b32 Match = false;
  
  b32 Requirements = false;
-    
-    b32 BIsPrefix = (Flags & S8MatchFlag_Prefix);
-    
-    Requirements |= ( BIsPrefix && (B.Size <= A.Size));
+ 
+ b32 BIsPrefix = (Flags & S8MatchFlag_Prefix);
+ 
+ Requirements |= ( BIsPrefix && (B.Size <= A.Size));
  Requirements |= (!BIsPrefix && (B.Size == A.Size));
  
  u64 MinSize = Min(A.Size, B.Size);
@@ -131,17 +131,17 @@ S8Match(str8 A, str8 B, s8_match_flag Flags)
  {
   Match = true;
   for EachIndex(Idx, MinSize)
-        {
-            u8 CharA = A.Data[Idx];
-            u8 CharB = B.Data[Idx];
-            
-            if(Flags & S8MatchFlag_CaseInsensitive)
-            {
-                CharA = ToLowercase(CharA);
-                CharB = ToLowercase(CharB);
-            }
-            
-            if((CharA != CharB))
+  {
+   u8 CharA = A.Data[Idx];
+   u8 CharB = B.Data[Idx];
+   
+   if(Flags & S8MatchFlag_CaseInsensitive)
+   {
+    CharA = ToLowercase(CharA);
+    CharB = ToLowercase(CharB);
+   }
+   
+   if((CharA != CharB))
    {
     Match = false;
     break;
@@ -171,7 +171,10 @@ S8Cat(str8 Prefix, str8 Suffix)
 {
  arena *Arena = StringsScratch;
  
- str8 Result = PushS8(Arena, Prefix.Size + Suffix.Size);
+ // NOTE(luca): Always null-terminate
+ str8 Result = PushS8(Arena, Prefix.Size + Suffix.Size + 1);
+ Result.Size -= 1;
+ Result.Data[Result.Size] = 0;
  
  u64 At = 0;
  for EachIndex(Idx, Prefix.Size)
