@@ -31,6 +31,20 @@ SetStringsScratch_(arena *Arena, const char *Name, const char *FileName, s32 Lin
 #endif
 }
 
+arena *
+StringsScratchTempBegin(arena *Arena)
+{
+ arena *Result = StringsScratch;
+ SetStringsScratch(Arena);
+ return Result;
+}
+
+internal void
+StringsScratchTempEnd(arena *Arena)
+{
+ SetStringsScratch(Arena);
+}
+
 internal b32 
 IsPrintable(u8 Char)
 {

@@ -1,32 +1,33 @@
 # Now
-- Visualize silences
-- Dichter und Bauer
 - Visualize note played when practicing
-- Multi-Portées
-- Transpose everything
+- Multi-Staff / Toggling staffs / 1 Staff = 1 Voice
+  - Have multiple voices in one staff.
+- Dichter und Bauer
+- Transpose everything (But not visually)
 - ClosePanel bug
 
 - Command lister
 
-- Use piece view for both input and representation
-  -> just convert on the fly
-     -> if we want to replay we can just convert back.
-
-Metronome improvements
+Metronome improvements:
 - When recording wait for two ticks before recording
 - When playing wait for two ticks before playing
 - When practicing loop metronome
+- When metronome is enabled just tick.  (Standalone metronome)
+- Subdivisions
+- Emphasis on first beat
+- When pressing play, wait for metronome to tick a whole bar and then play.
 
 X Serialization
   - Implement Undo for commands.
-  - Serialize state along commands.
+    - Serialize state along commands.
 - Reimplement Autoscroll
-- Create a new custom theme 
 - Do icons everywhere
 - Implement key sharps and steps accordingly
   - We will want to force a sharp in the future
 - Merge bpm in both sheet & piece
-x Timeline marker for playing position in piece
+
+UX: 
+- Better colors 
 
 Bugs:
 - muze: 
@@ -222,8 +223,10 @@ x bug: When adjusting BPM in piece it can time travel.
 x bug: Double line not drawn
 x Metronome
 x SelectPanel() function that sets selectedvoice etc.
-
 x bug: ui: Releasing outside the box still clicks (wrong logic in UI_BeginLayout)
 x bug: ui: When moving panels it animates the buttons (introducec IsAnimating ui state)
 x bug: ui: The lister sometimes has an "empty" element and selected. (division by 0)
 x bug: ui: Text with 0 horizontal padding will be clipped, fix this.
+x Use piece view also for recording
+x Visualize rests
+x Timeline marker for playing position in piece

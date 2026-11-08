@@ -1,42 +1,40 @@
 
-@table(Name, NeedsParam, Description)
+@table(Name, NeedsParam, Tag, Description, Key Control, Shift, Alt)
 CommandsTable:
 {
- { None,                       false, "Null Command", }
- 
- { SetFontSize,                true,  "App: Set font size", }
- 
- { SelectInputDevice,          true,  "App: Select MIDI input device", }
- { SelectOutputDevice,         true,  "App: Select MIDI output device", }
- { SelectInstrument,           true,  "App: Select Synth output instrument", }
- { ToggleMIDIInput,            false, "App: Toggle MIDI input", }
- { ToggleMIDIOutput,           false, "App: Toggle MIDI output", }
- { ToggleVirtualKeyboardInput, false, "App: Toggle Virtual Keyboard input", }
- { ToggleSynthOutput,          false, "App: Toggle Synth output", }
- 
+ { None,                       false, "",       "Null Command",                   None  0 0 0 }
+ //- App
+ { SetFontSize,                true,  "App",    "Set font size",                  None  0 0 0 }
+ { SelectInputDevice,          true,  "App",    "Select MIDI input device",       None  0 0 0 }
+ { SelectOutputDevice,         true,  "App",    "Select MIDI output device",      None  0 0 0 }
+ { SelectInstrument,           true,  "App",    "Select Synth output instrument", None  0 0 0 }
+ { ToggleMIDIInput,            false, "App",    "Toggle MIDI input",              None  0 0 0 }
+ { ToggleMIDIOutput,           false, "App",    "Toggle MIDI output",             None  0 0 0 }
+ { ToggleVirtualKeyboardInput, false, "App",    "Toggle Virtual Keyboard input",  None  0 0 0 }
+ { ToggleSynthOutput,          false, "App",    "Toggle Synth output",            None  0 0 0 } 
  //- Panels 
- { ClosePanel,          false, "Panel: Close", }
- { SplitSelectedPanelX, false, "Panel: Split on X axis", }
- { SplitSelectedPanelY, false, "Panel: Split on Y axis", }
- { SelectNextPanel,     false, "Panel: Select next", }
- { SetPanelType,        true,  "Panel: Set type", }
- 
+ { ClosePanel,                 false, "Panel",  "Close",                          P     1 1 0 }  
+ { SplitSelectedPanelX,        false, "Panel",  "Split on X axis",                P     1 0 0 }
+ { SplitSelectedPanelY,        false, "Panel",  "Split on Y axis",                Minus 1 0 0 }
+ { SelectNextPanel,            false, "Panel",  "Select next",                    Comma 1 0 0 }
+ { SetPanelType,               true,  "Panel",  "Set type",                       T     1 0 0 }
  //- Piece 
- { PieceToggleRecording,   false, "Piece: Toggle recording", }
- { PieceTogglePlaying,     false, "Piece: Toggle playing", }
- { PieceTogglePracticing,  false, "Piece: Toggle practicing", }
- { PieceStop,              false, "Piece: Stop", }
- { PieceClear,             false, "Piece: Clear", }
- { PieceToggleMetronome,   false, "Piece: Toggle metronome", }
- { PieceToggleBarWrapping, false, "Piece: Toggle bar wrapping", }
- { PieceSetBPM,            true,  "Piece: Set BPM", }
- { PieceSelectNote,        true,  "Piece: Select note", }
- { PieceSelectInstrument,  false, "Piece: Select instrument", }
- 
+ { PieceToggleRecording,       false, "Piece",  "Toggle recording",               Space 0 0 0 }
+ { PieceTogglePlaying,         false, "Piece",  "Toggle playing",                 None  0 0 0 }
+ { PieceStartPlaying,          false, "Piece",  "Start playing",                  None  0 0 0 }
+ { PieceStopPlaying,           false, "Piece",  "Stop playing",                   None  0 0 0 }
+ { PieceTogglePracticing,      false, "Piece",  "Toggle practicing",              None  0 0 0 }
+ { PieceStop,                  false, "Piece",  "Stop",                          . None  0 0 0 }
+ { PieceClear,                 false, "Piece",  "Clear",                          None  0 0 0 }
+ { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0 }
+ { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0 }
+ { PieceSetBPM,                true,  "Piece",  "Set BPM",                        None  0 0 0 }
+ { PieceSelectNote,            true,  "Piece",  "Select note",                    None  0 0 0 }
+ { PieceDeselectNote,          false, "Piece",  "Deselect note",                  None  0 0 0 }
+ { PieceSelectInstrument,      false, "Piece",  "Select instrument",              S     1 0 0 }
  //- Lister
- { CloseLister,         false, "Lister: Close", }
- { OpenLister,          true,  "Lister: Open", }
- 
+ { CloseLister,                false, "Lister", "Close",                          None  0 0 0 }
+ { OpenLister,                 true,  "Lister", "Open",                           None  0 0 0 } 
 }
 
 @data_enum("command_kind")
@@ -49,10 +47,18 @@ CommandKind:
 }
 
 @data_table("str8")
-CommandsNames:
+CommandsDescriptions:
 {
  @expand(CommandsTable) @strings
   ```{$(Description)},
+ ```;
+}
+
+@data_table("str8")
+CommandsTags:
+{
+ @expand(CommandsTable) @strings
+  ```{$(Tag)},
  ```;
 }
 

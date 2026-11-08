@@ -42,7 +42,7 @@ NO_WARNINGS_END
 #define IsNilVoice(Voice) CheckNil(Voice, NilVoice)
 #define IsNilPieceNote(Note) CheckNil(Note, NilPieceNote)
 
-#define Disabled() Log("Temporarily disabled.\n");
+#define Disabled() if(true) { Log("Temporarily disabled.\n"); } else
 
 //~ Globals
 global_variable tsf *GlobalTSF;
@@ -51,8 +51,6 @@ global_variable ui_size GlobalItemPadding;
 
 global_variable tsf *NilTSF;
 global_variable panel *NilPanel;
-global_variable voice *NilVoice;
-global_variable rec_note *NilNote;
 global_variable piece_note *NilPieceNote;
 global_variable piece *NilPiece;
 
@@ -73,8 +71,6 @@ InitReadOnlyGlobals(arena *Arena)
  ArenaSetPos(Arena, 0);
  UI_NilBox = PushArray(Arena, ui_box, 1);
  NilPanel = PushArray(Arena, panel, 1);
- NilVoice  = PushArray(Arena, voice, 1);
- NilNote = PushArray(Arena, rec_note, 1);
  NilPieceNote = PushArray(Arena, piece_note, 1);
  NilPiece = PushArray(Arena, piece, 1);
 }
@@ -494,7 +490,7 @@ PanelRecDepthFirstPreOrder(panel *Panel)
  return Rec;
 }
 
-//~ Muze - MIDI
+//~ Muze - Commands
 global_variable command NilCommand = {0};
 
 internal command *
@@ -551,18 +547,24 @@ PieceNoteAddCode(piece *Piece,
 }
 
 internal b32
-PieceWasTimestampPlayed(piece *Piece, f32 Timestamp)
+PiecePosPassedTimestamp(piece *Piece, f32 Pos, f32 Timestamp)
 {
  b32 Result = false;
  
  f32 BPS = Piece->BPM/60.f;
  
- f32 Now = Piece->PlayPos;
- f32 Before = Piece->PlayPos - BPS*(*dtForFrame);
+ f32 Now = Pos;
+ f32 Before = Pos - BPS*(*dtForFrame);
  
- Result = (Timestamp > Before && 
-           Timestamp <= Now);
+ Result = (Before < Timestamp && Timestamp <= Now);
  
+ return Result;
+}
+
+internal b32
+PieceWasTimestampPlayed(piece *Piece, f32 Timestamp)
+{
+ b32 Result = PiecePosPassedTimestamp(Piece, Piece->PlayPos, Timestamp);
  return Result;
 }
 
@@ -605,7 +607,9 @@ PieceAlloc(app_state *App)
    Result->Key = Note_C;
    Result->Major = true;
    
-   Result->NoteCount = 0;
+   // First note is nil
+   Result->NoteCount = 1;
+   Result->PracticeNoteCount = 1;
    Result->Octave = 4;
    
    Result->IsLooping = true;
@@ -727,143 +731,6 @@ DebugStringAddArena(app_state *App, str8 Name, arena *Arena)
 }
 
 //~ Custom draw UI elements 
-internal rec_note_node *
-FindSelForNote(rec_note_node *Selection, rec_note *Note)
-{
- rec_note_node *Result = 0;
- 
- for EachNode(Node, rec_note_node, Selection)
- {
-  if(Node->Value == Note)
-  {
-   Result = Node;
-   break;
-  }
- }
- 
- return Result;
-}
-
-
-typedef struct custom_draw_note_input_result custom_draw_note_input_result;
-struct custom_draw_note_input_result
-{
- b32 LeftDown;
- b32 RightDown;
- v2 MouseP;
- v2 MouseStartP;
- b32 Adding;
- v4 SelDest;
-};
-
-internal custom_draw_note_input_result
-CustomDrawNoteInput(ui_box *Box)
-{
- custom_draw_note_input_result Result = {0};
- 
- app_input *Input = UI_State->Input;
- 
- if(UI_State->InputConsumerBox == Box)
- {
-  Result.LeftDown = Input->Mouse.Buttons[PlatformMouseButton_Left].EndedDown;
-  Result.RightDown = Input->Mouse.Buttons[PlatformMouseButton_Right].EndedDown;
-  UI_ConsumeInput(Input, Box);
- }
- 
- Result.Adding = (Result.LeftDown && !Result.RightDown);
- Result.MouseP = MousePosFromInput(Input);
- Result.MouseStartP = V2V2S32(Input->Mouse.Start);
- 
- v4 SelDest;
- // Get selection rectangle
- {        
-  SelDest = (v4){.Min = Result.MouseP, .Max = Result.MouseStartP};
-  if(SelDest.Min.X > SelDest.Max.X) Swap(SelDest.Min.X, SelDest.Max.X);
-  if(SelDest.Min.Y > SelDest.Max.Y) Swap(SelDest.Min.Y, SelDest.Max.Y);
-  SelDest = RectIntersect(Box->Rec, SelDest);
- }
- Result.SelDest = SelDest;
- 
- if(Result.LeftDown || Result.RightDown)
- {
-  DrawRect(SelDest, V4(V3Arg(Result.Adding ? Color_Blue : Color_Snow2), .3f), 1.f, 0.f, 0.f);
-  DrawRect(SelDest, V4(V3Arg(Result.Adding ? Color_Orange : Color_Black), 1.f), 1.f, 1.f, 0.f);
- }
- 
- return Result;
-}
-
-internal void
-AddNoteToSelection(custom_draw_note_input_result *NoteInput, v4 Dest,
-                   app_state *App, voice *Voice, rec_note_node *Sel, rec_note *Note)
-{
- // Draw selection rectangle
- if(NoteInput->LeftDown || NoteInput->RightDown)
- {
-  // NOTE(luca): @Command
-  if(RectOverlap(Dest, NoteInput->SelDest))
-  {
-   if(NoteInput->Adding && !Sel)
-   {
-    rec_note_node *Node;
-    
-    // Allocate
-    {
-     if(!App->FirstFreeNode)
-     {
-      Node = PushArray(App->Arena, rec_note_node, 1);
-     }
-     else
-     {
-      Node = App->FirstFreeNode;
-      App->FirstFreeNode = Node->Next;
-     }
-     MemoryZero(Node);
-    }
-    
-    // Add to selection
-    {                            
-     Node->Value = Note;
-     
-     if(Voice->NoteSel) 
-     {
-      Voice->NoteSel->Prev = Node;
-     }
-     Node->Next = Voice->NoteSel;
-     
-     Voice->NoteSel = Node;
-    }
-   }
-   else if(!NoteInput->Adding && Sel)
-   {
-    // Remove from selection
-    {
-     if(Sel->Prev)
-     {
-      Sel->Prev->Next = Sel->Next;
-     }
-     
-     if(Sel->Next)
-     {
-      Sel->Next->Prev = Sel->Prev;
-     }
-     
-     if(Sel == Voice->NoteSel)
-     {
-      Voice->NoteSel = (Sel->Next ? Sel->Next : Sel->Prev);
-     }
-    }
-    
-    // Add to free list
-    {
-     Sel->Next = App->FirstFreeNode;
-     App->FirstFreeNode = Sel;
-    }
-   }
-  }
- }
-}
-
 UI_CUSTOM_DRAW(CustomDrawPiece)
 {
  piece_box_data *Data = (piece_box_data *)CustomDrawData;
@@ -1130,43 +997,46 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  
  // Draw notes
  {
-  v2 NotePos = Pos;
-  NotePos.X += BarPadding;
+  piece_note *NoteArrays[] = {Piece->Notes, Piece->PracticeNotes};
+  u64 NoteCounts[] = {Piece->NoteCount, Piece->PracticeNoteCount};
   
-  f32 BPS = Piece->BPM/60.f;
-  
-  // Used to see when a new bar begins and we should add padding.
-  f32 LengthSum = 0.f;
-  
-  for EachIndex(Idx, Piece->NoteCount)
+  for EachElement(ArrayIdx, NoteArrays)
   {
-   piece_note *Note = Piece->Notes + Idx;
-   b32 NoteIsRecording = false;
-   f32 NoteLength = Note->Length;
-   if(NoteLength == 0.f)
-   {
-    Assert(Piece->IsRecording);
-    NoteIsRecording = true;
-    NoteLength = (Piece->RecordLength - Note->Start);
-   }
+   piece_note *Notes = NoteArrays[ArrayIdx];
+   u64 NoteCount = NoteCounts[ArrayIdx];
    
-   v4 NoteColor = StaffColor;
-   
-   b32 NoteIsPlaying = false;
-   if(Piece->IsPlaying)
+   for(u64 Idx = 1; Idx < NoteCount; Idx += 1)
    {
-    f32 Start = Note->Start;
-    f32 End = Start + NoteLength;
+    piece_note *Note = Notes + Idx;
     
-    NoteIsPlaying = (Piece->PlayPos >= Start &&
-                     Piece->PlayPos < End);
-   }
-   
-   if(0) {}
-   else if(Note->Kind == PieceNoteKind_Rest)
-   {
+    v2 NotePos = Pos;
+    
+    b32 NoteIsRecording = false;
+    f32 NoteLength = Note->Length;
+    if(NoteLength == 0.f)
+    {
+     Assert(Piece->RecordLength);
+     NoteIsRecording = true;
+     NoteLength = (Piece->RecordLength - Note->Start);
+    }
+    
+    v4 NoteColor = StaffColor;
+    
+    b32 NoteIsPlaying = false;
+    if(Piece->IsPlaying)
+    {
+     f32 Start = Note->Start;
+     f32 End = Start + NoteLength;
+     
+     NoteIsPlaying = (Piece->PlayPos >= Start &&
+                      Piece->PlayPos < End);
+    }
+    
     // Calculate position
     {    
+     NotePos.X += BarPadding;
+     NotePos.Y = Pos.Y + .5f*StaffLineWidth;
+     
      s32 BarIdx = (s32)FloorF32(Note->Start/Piece->TimeSigNum);
      s32 HeightIdx = BarIdx/BarsPerWidth;
      
@@ -1181,207 +1051,209 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
     }
     
-    DrawRectChar(UI_State->Atlas, UI_State->Fonts[FontKind_Music], NotePos, 0xE4E5, NoteColor);
-   }
-   if(Note->Kind == PieceNoteKind_Pitch)
-   {
-    s32 RelPitch = Note->Pitch%Note_Count;
-    b32 FillHead = (NoteLength < 2.f);;
-    s32 FlagCount = 0;
-    b32 HasStem = (NoteLength < 4.f);
-    b32 IsDotted = false;
-    b32 IsBarred = false;
-    b32 IsSharp = !GetEl(NoteIsWhite, RelPitch);
-    b32 IsHovered = false;
-    b32 IsSelected = false;
-    v2 TailPos = {0};
-    b32 DebugDrawBoundingBox = false;
-    
-    // Calculate position
+    if(0) {}
+    else if(Note->Kind == PieceNoteKind_Rest)
     {
-     s32 RelOctave = 6;
-     // Get Y From pitch
-     // Sets the notes at the octave's C
-     s32 MinStepCount = 5;
-     f32 StepSize = NoteSize/2.f;
+     // Each increment is halving the value.
+     s32 WholeRest = 0xE4E3;
      
-     s32 NoteOctave = Note->Pitch/Note_Count;
-     s32 StepForPitch = GetEl(NoteStepFromPitch, RelPitch);
-     s32 StepCount = BaseNote_Count*(RelOctave - NoteOctave);
-     StepCount -= MinStepCount + StepForPitch;
+     f32 WholeRestLength = 4.f;
      
-     NotePos.Y = Pos.Y + .5f*StaffLineWidth + StepSize*(f32)StepCount;
+     f32 Size = -Log2F32(NoteLength/WholeRestLength);
      
-     s32 BarIdx = (s32)FloorF32(Note->Start/Piece->TimeSigNum);
-     s32 HeightIdx = BarIdx/BarsPerWidth;
+     s32 Increment = (s32)RoundF32(Size);
+     s32 Codepoint = WholeRest + Increment;
      
-     if(Piece->BarWrapping)
-     {
-      BarIdx = (BarIdx%BarsPerWidth);
-      NotePos.Y += (f32)HeightIdx*2.f*StaffHeight;
-     }
-     
-     f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
-     f32 Remainder = ModF32(Note->Start, Piece->TimeSigNum);
-     NotePos.X = Pos.X + BarStart + Remainder*BeatWidth;
-     
-     TailPos = NotePos;
-     {
-      TailPos.X += NoteDim.X - 2.f;
-      TailPos.Y -= TailDim.Y - .5f*NoteDim.Y;
-     }
+     font *Font = UI_State->Fonts[FontKind_Music];
+     DrawRectChar(UI_State->Atlas, Font, NotePos, Codepoint, NoteColor);
     }
-    
-    v4 HeadBounds = {0};
-    v4 TailBounds = {0};
-    // Is Hovered and compute bounds
+    else if(Note->Kind == PieceNoteKind_Pitch)
     {
-     v2 MousePos = V2V2S32(Input->Mouse.Pos);
-     HeadBounds = RectFromSize(NotePos, NoteDim);
+     s32 RelPitch = Note->Pitch%Note_Count;
+     b32 FillHead = (NoteLength < 2.f);;
+     s32 FlagCount = 0;
+     b32 HasStem = (NoteLength < 4.f);
+     b32 IsDotted = false;
+     b32 IsBarred = false;
+     b32 IsSharp = !GetEl(NoteIsWhite, RelPitch);
+     b32 IsHovered = false;
+     b32 IsSelected = false;
+     v2 TailPos = {0};
+     b32 DebugDrawBoundingBox = false;
      
-     b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
-                        UI_IsActive(Box));
-     
-     if(InputIsOurs)
-     {     
-      IsHovered = IsInsideRectV2(MousePos, HeadBounds);
+     // Calculate position
+     {
+      s32 RelOctave = 6;
+      // Get Y From pitch
+      // Sets the notes at the octave's C
+      s32 MinStepCount = 5;
+      f32 StepSize = NoteSize/2.f;
       
-      if(HasStem)
+      s32 NoteOctave = Note->Pitch/Note_Count;
+      s32 StepForPitch = GetEl(NoteStepFromPitch, RelPitch);
+      s32 StepCount = BaseNote_Count*(RelOctave - NoteOctave);
+      StepCount -= MinStepCount + StepForPitch;
+      
+      NotePos.Y += StepSize*(f32)StepCount;
+      
+      TailPos = NotePos;
       {
-       f32 ExtraWidth = 3.f;
-       TailBounds = RectFromSize(TailPos, TailDim);
-       TailBounds.Min.X -= ExtraWidth;
-       TailBounds.Max.X += ExtraWidth;
-       IsHovered |= IsInsideRectV2(MousePos, TailBounds);
+       TailPos.X += NoteDim.X - 2.f;
+       TailPos.Y -= TailDim.Y - .5f*NoteDim.Y;
       }
      }
-    }
-    
-    if(NoteIsPlaying || NoteIsRecording) NoteColor = Color_Yellow;
-    
-    // Selected
-    {
-     IsSelected = (Idx == Piece->SelectedNoteIdx);
-    }
-    
-    
-    if(IsSelected)
-    {
-     NoteColor = Color_Orange;
-    }
-    
-    if(IsHovered)
-    {
-     NoteColor = Color_Blue;
      
-     if(WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
+     v4 HeadBounds = {0};
+     v4 TailBounds = {0};
+     // Is Hovered and compute bounds
      {
-      PushCommand(App, Command_PieceSelectNote)->U64 = Idx;
-     }
-    }
-    
-    if(Piece->IsPracticing) NoteColor.W *= 0.5f;
-    
-    // Find out if is dotted
-    {
-     f32 Exp = -Log2F32(NoteLength);
-     f32 Remainder = ModF32(Exp, 1.f);
-     IsDotted = !(EqualsWithEpsilon(Remainder, 0.f, 0.0001f));
-    }
-    
-    // Find out if is barred
-    {
-     IsBarred = (Note->Pitch == Note_C);
-    }
-    
-    if(HasStem)
-    {
-     // Draw Flags
-     {
-      FlagCount = (s32)(-Log2F32(NoteLength));
-      v2 FlagPos = TailPos;
+      v2 MousePos = V2V2S32(Input->Mouse.Pos);
+      HeadBounds = RectFromSize(NotePos, NoteDim);
       
-      for EachCount(FlagCount)
-      {
-       v4 Dest = RectFromSize(FlagPos, V2(8.f, TailDim.X*2.f));
-       DrawRect(Dest, NoteColor, 0.f, 0.f, 0.f);
+      b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
+                         UI_IsActive(Box));
+      
+      if(InputIsOurs)
+      {     
+       IsHovered = IsInsideRectV2(MousePos, HeadBounds);
        
-       FlagPos.Y += 5.f;
+       if(HasStem)
+       {
+        f32 ExtraWidth = 3.f;
+        TailBounds = RectFromSize(TailPos, TailDim);
+        TailBounds.Min.X -= ExtraWidth;
+        TailBounds.Max.X += ExtraWidth;
+        IsHovered |= IsInsideRectV2(MousePos, TailBounds);
+       }
       }
      }
      
-     // Draw Stem
-     {  
-      v4 Dest = RectFromSize(TailPos, TailDim);
-      DrawRect(Dest, NoteColor, 0.f, 2.f, .5f);
-     }
-    }
-    
-    // Draw Head
-    {
-     v4 Dest = RectFromSize(NotePos, NoteDim);
-     f32 BorderThickness = (FillHead ? 0.f : 2.f);
-     DrawRect(Dest, NoteColor, NoteDim.X/2.f, BorderThickness, .5f);
-    }
-    
-    // Draw dot
-    if(IsDotted)
-    {
-     f32 dSize = 5.f;
+     if(NoteIsPlaying || NoteIsRecording) NoteColor = Color_Yellow;
      
-     v2 DotDim = V2SubF32(NoteDim, dSize);
-     v2 DotPos = NotePos;
-     DotPos.X += NoteDim.X + 2.f;
-     DotPos.Y = NotePos.Y + dSize/2.f;
-     v4 Dest = RectFromSize(DotPos, DotDim);
-     f32 BorderThickness = (FillHead ? 0.f : 2.f);
-     DrawRect(Dest, NoteColor, DotDim.X/2.f, BorderThickness, .5f);
-    }
-    
-    // Draw barred
-    if(IsBarred)
-    {
-     // TODO(luca): Should draw bars above / below until reaching back to the staff. 
-     f32 Portrusion = 1.f;
-     v2 HeadBarDim = V2(NoteDim.X + Portrusion*2.f, 2.f);
-     v2 HeadBarPos = NotePos;
-     HeadBarPos.X -= Portrusion;
-     HeadBarPos.Y += .5f*(NoteDim.Y - HeadBarDim.Y);
-     v4 Dest = RectFromSize(HeadBarPos, HeadBarDim);
-     DrawRect(Dest, StaffColor, 0.f, 0.f, 0.f);
-    }
-    
-    // Draw sharp
-    if(IsSharp)
-    {
-     v2 SharpPos = NotePos;
-     SharpPos.X -= NoteSize;
-     SharpPos.Y -= 4.f;
-     
-     font *Font = UI_State->Fonts[FontKind_Text];
-     font_atlas *Atlas = UI_State->Atlas;
-     s32 Codepoint = '#';
-     
-#if 0
-     Font = UI_State->Fonts[FontKind_Music];
-     SharpPos.Y -= Font->HeightPx/4.f;
-     SharpPos.X += 3.f;
-     Codepoint = 0xE262;
-#endif
-     
-     DrawRectChar(Atlas, Font, SharpPos, Codepoint, NoteColor);
-    }
-    
-    if(DebugDrawBoundingBox)
-    {
+     if(IsHovered)
      {
-      if(((Note->Pitch - !!IsSharp) & 1))
-       NotePos.Y += .5f;
+      NoteColor = Color_Blue;
+      
+      if(WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
+      {
+       PushCommand(App, Command_PieceSelectNote)->U64 = Idx;
+      }
      }
-     DrawRect(HeadBounds, Color_Blue, 0.f, 1.f, 0.f);
-     DrawRect(TailBounds, Color_Blue, 0.f, 1.f, 0.f);
+     
+     // Selected
+     {
+      IsSelected = (Idx == Piece->SelectedNoteIdx);
+     }
+     
+     if(IsSelected)
+     {
+      NoteColor = Color_Orange;
+     }
+     
+     if(Piece->IsPracticing && ArrayIdx != 1) NoteColor.W *= 0.5f;
+     
+     // Find out if is dotted
+     {
+      f32 Exp = -Log2F32(NoteLength);
+      f32 Remainder = ModF32(Exp, 1.f);
+      IsDotted = !(EqualsWithEpsilon(Remainder, 0.f, 0.0001f));
+      IsDotted = IsDotted && (ArrayIdx != 1);
+     }
+     
+     // Find out if is barred
+     {
+      IsBarred = (Note->Pitch == Note_C);
+     }
+     
+     if(HasStem)
+     {
+      // Draw Flags
+      {
+       FlagCount = (s32)(-Log2F32(NoteLength));
+       v2 FlagPos = TailPos;
+       
+       for EachCount(FlagCount)
+       {
+        v4 Dest = RectFromSize(FlagPos, V2(8.f, TailDim.X*2.f));
+        DrawRect(Dest, NoteColor, 0.f, 0.f, 0.f);
+        
+        FlagPos.Y += 5.f;
+       }
+      }
+      
+      // Draw Stem
+      {  
+       v4 Dest = RectFromSize(TailPos, TailDim);
+       DrawRect(Dest, NoteColor, 0.f, 2.f, .5f);
+      }
+     }
+     
+     // Draw Head
+     {
+      v4 Dest = RectFromSize(NotePos, NoteDim);
+      f32 BorderThickness = (FillHead ? 0.f : 2.f);
+      DrawRect(Dest, NoteColor, NoteDim.X/2.f, BorderThickness, .5f);
+     }
+     
+     // Draw dot
+     if(IsDotted)
+     {
+      f32 dSize = 5.f;
+      
+      v2 DotDim = V2SubF32(NoteDim, dSize);
+      v2 DotPos = NotePos;
+      DotPos.X += NoteDim.X + 2.f;
+      DotPos.Y = NotePos.Y + dSize/2.f;
+      v4 Dest = RectFromSize(DotPos, DotDim);
+      f32 BorderThickness = (FillHead ? 0.f : 2.f);
+      DrawRect(Dest, NoteColor, DotDim.X/2.f, BorderThickness, .5f);
+     }
+     
+     // Draw barred
+     if(IsBarred)
+     {
+      // TODO(luca): Should draw bars above / below until reaching back to the staff. 
+      f32 Portrusion = 1.f;
+      v2 HeadBarDim = V2(NoteDim.X + Portrusion*2.f, 2.f);
+      v2 HeadBarPos = NotePos;
+      HeadBarPos.X -= Portrusion;
+      HeadBarPos.Y += .5f*(NoteDim.Y - HeadBarDim.Y);
+      v4 Dest = RectFromSize(HeadBarPos, HeadBarDim);
+      DrawRect(Dest, StaffColor, 0.f, 0.f, 0.f);
+     }
+     
+     // Draw sharp
+     if(IsSharp)
+     {
+      v2 SharpPos = NotePos;
+      SharpPos.X -= NoteSize;
+      SharpPos.Y -= 4.f;
+      
+      font *Font = UI_State->Fonts[FontKind_Text];
+      font_atlas *Atlas = UI_State->Atlas;
+      s32 Codepoint = '#';
+      
+#if 0
+      Font = UI_State->Fonts[FontKind_Music];
+      SharpPos.Y -= Font->HeightPx/4.f;
+      SharpPos.X += 3.f;
+      Codepoint = 0xE262;
+#endif
+      
+      DrawRectChar(Atlas, Font, SharpPos, Codepoint, NoteColor);
+     }
+     
+     if(DebugDrawBoundingBox)
+     {
+      {
+       if(((Note->Pitch - !!IsSharp) & 1))
+        NotePos.Y += .5f;
+      }
+      DrawRect(HeadBounds, Color_Blue, 0.f, 1.f, 0.f);
+      DrawRect(TailBounds, Color_Blue, 0.f, 1.f, 0.f);
+     }
+     
     }
-    
    }
   }
  }
@@ -1418,7 +1290,7 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
   PackedCharIdx = GetPackedCharIdx(Font, Char);
   f32 CharWidth = (Atlas->PackedChars[PackedCharIdx].xadvance);
   
-  DrawRectChar(Atlas, FontKind_Text, Cur, Char, Box->TextColor);
+  DrawRectChar(Atlas, Font, Cur, Char, Box->TextColor);
   Cur.X += CharWidth;
   
   if(Cur.X > CurMaxX)
@@ -1837,9 +1709,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     *UI_NilBox = (ui_box){UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox, UI_NilBox};
     *NilPanel = (panel){NilPanel, NilPanel, NilPanel, NilPanel, NilPanel};
-    *NilNote = (rec_note){NilNote, NilNote};
     *NilPiece = (piece){NilPiece};
-    *NilVoice = (voice){NilNote, NilNote};
    }
    
    OS_MarkReadonly(Arena->Base, Arena->Size);
@@ -1876,8 +1746,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
      App->FirstPanel = PanelAdd(1.f);
      PanelChildren()
      {
-      PanelAdd(.5f);
-      PanelAdd(.5f);
+      PanelAdd(.6f);
+      PanelAdd(.4f);
       PanelChildren()
       {
        PanelAdd(.5f);
@@ -2066,7 +1936,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case PlatformKey_Escape:
     {
-     PushCommand(App, Command_CloseLister);
+     if(App->ListerOpened)
+     {
+      PushCommand(App, Command_CloseLister);
+     }
+     else
+     {
+      PushCommand(App, Command_PieceDeselectNote);
+     }
     } break;
     
     default: 
@@ -2245,7 +2122,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      {
       if(!CommandHasParam[Idx])
       {
-       NameList[NameListSize] = CommandsNames[Idx];
+       NameList[NameListSize] = Str8Fmt("%S: %S", CommandsTags[Idx], CommandsDescriptions[Idx]);
        NameListSize += 1; 
       }
      }
@@ -2642,42 +2519,41 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #if MUZE_INTERNAL
 #elif 0
              Piece->RecordLength = 0.f;
-             Piece->NoteCount = 0;
-             
+             Piece->NoteCount = 1;
 #if 0
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 7.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 8.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 7.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 8.f);
 #elif 0
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
 #elif 0
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
 #elif 0
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAdd(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
+             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
 #endif
              
 #endif
@@ -2707,11 +2583,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
                  {
-#if 0
                   M_SerializePiece(FrameArena, false, PieceFilePath, Piece);
-#else
-                  Disabled();
-#endif
                  }
                  
                  if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
@@ -2721,18 +2593,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  
                  if(M_IconButton(UI_IconKind_Play, S8("Play"), .TextColor = (Piece->IsPlaying ? Color_Green : Color_ButtonText)))
                  {
-                  if(!Piece->IsPlaying)
-                  {
-                   tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-                   Piece->IsPlaying = true;
-                   
-                   Piece->IsRecording = false;
-                  }
+                  PushCommand(App, Command_PieceStartPlaying);
                  }
                  
                  if(M_IconButton(UI_IconKind_Pause, S8("Pause")))
                  {
-                  PieceStopPlaying(Piece);
+                  PushCommand(App, Command_PieceStopPlaying);
                  }
                  
                  if(M_IconButton(UI_IconKind_Stop, S8("Stop")))
@@ -2768,7 +2634,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 {
                  PieceStopPlaying(Piece);
                  Piece->IsRecording = false;
-                 Piece->NoteCount = 0;
+                 Piece->NoteCount = 1;
+                 Piece->PracticeNoteCount = 0;
                  Piece->RecordLength = 0.f;
                  Piece->PlayPos = 0.f;
                  Piece->PracticePos = 0.f;
@@ -2801,7 +2668,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                    Piece->PracticePos = Piece->PracticeStart;
                   }
                   
-                  if(Start > Piece->PlayPos)
+                  if(Start > Piece->PlayPos || Piece->PlayPos > Piece->PracticeEnd)
                   {
                    Piece->PlayPos = Piece->PracticeStart;
                   }
@@ -3406,7 +3273,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       // NOTE(luca): Now that recording has stopped MIDI events with NoteOff will be ignored
       // So we manually set their length.
       
-      for EachIndex(NoteIdx, Piece->NoteCount)
+      for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
       {
        piece_note *Note = Piece->Notes + NoteIdx;
        if(Note->Length == 0.f) Note->Length = (Piece->RecordLength - Note->Start);
@@ -3420,6 +3287,24 @@ UPDATE_AND_RENDER(UpdateAndRender)
       Piece->IsPracticing = false;
       Piece->IsRecording = true;
      }
+    } break;
+    
+    case Command_PieceStartPlaying:
+    {
+     piece *Piece = Command->Piece;
+     if(!Piece->IsPlaying)
+     {
+      tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+      Piece->IsPlaying = true;
+      
+      Piece->IsRecording = false;
+      Piece->MetronomeTime = Piece->PlayPos;
+     }
+    } break;
+    
+    case Command_PieceStopPlaying:
+    {
+     PieceStopPlaying(Command->Piece);
     } break;
     
     case Command_PieceStop:
@@ -3436,17 +3321,28 @@ UPDATE_AND_RENDER(UpdateAndRender)
       Piece->PlayPos = 0.f;
      }
      
+     Piece->PracticeNoteCount = 1;
      Piece->PracticePos = Piece->PracticeStart;
     } break;
     
     case Command_PieceToggleMetronome:
     {
-     Command->Piece->Metronome ^= 1;
+     piece *Piece = Command->Piece;
+     if(Piece->Metronome)
+     {
+      Piece->MetronomeTime = (Piece->IsPlaying ? Piece->PlayPos : 0.f);
+      Piece->Metronome = false;
+     }
+     else
+     {
+      Piece->Metronome = true;
+     }
     } break;
     
     case Command_PieceTogglePracticing:
     {
      piece *Piece = Command->Piece;
+     Piece->PracticeNoteCount = 1;
      if(Piece->IsPracticing)
      {
       Piece->IsPracticing = false;
@@ -3475,6 +3371,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
      Command->Piece->SelectedNoteIdx = Command->U64;
     } break;
     
+    case Command_PieceDeselectNote:
+    {
+     Command->Piece->SelectedNoteIdx = 0;
+    } break;
+    
     
     case Command_PieceSelectInstrument:
     {
@@ -3497,37 +3398,39 @@ UPDATE_AND_RENDER(UpdateAndRender)
    
    f32 BPS = Piece->BPM/60.f;
    
+   if(Piece->Metronome)
+   {
+    f32 Duration = 0.2f; 
+    f32 Start = FloorF32(Piece->MetronomeTime);
+    f32 End = Start + Duration*BPS;
+    b32 HasPlayed = PiecePosPassedTimestamp(Piece, Piece->MetronomeTime, Start);
+    b32 HasStopped = PiecePosPassedTimestamp(Piece, Piece->MetronomeTime, End);
+    
+    s32 Pitch = Note_A + 6*12;
+    
+    if(HasPlayed)
+    {
+     tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
+    }
+    
+    if(HasStopped)
+    {
+     tsf_channel_note_off(GlobalTSF, App->MetronomeChannel, Pitch);
+    }
+    
+    Piece->MetronomeTime += BPS*Input->dtForFrame;
+   }
+   
    if(Piece->IsPlaying)
    {
     // Play notes
     {
-     for EachIndex(Idx, Piece->NoteCount)
+     for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
      {
       piece_note *Note = Piece->Notes + Idx;
       
       if(Note->Kind == PieceNoteKind_Pitch)
       {
-       if(Piece->Metronome)
-       {
-        f32 Duration = 0.2f; 
-        f32 Start = FloorF32(Piece->PlayPos);
-        f32 End = Start + Duration*BPS;
-        b32 HasPlayed = PieceWasTimestampPlayed(Piece, Start);
-        b32 HasStopped = PieceWasTimestampPlayed(Piece, End);
-        
-        s32 Pitch = Note_A + 6*12;
-        
-        if(HasPlayed)
-        {
-         tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
-        }
-        
-        if(HasStopped)
-        {
-         tsf_channel_note_off(GlobalTSF, App->MetronomeChannel, Pitch);
-        }
-       }
-       
        // Piece notes
        {                 
         f32 Start = Note->Start;
@@ -3562,7 +3465,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
      {
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
       Piece->PlayPos = 0.f;
-      if(Piece->IsPracticing) Piece->PlayPos = Piece->PracticeStart;
+      if(Piece->IsPracticing) 
+      {
+       Piece->PlayPos = Piece->PracticeStart;
+      }
+      
+      Piece->MetronomeTime = 0.f;
       
       if(!Piece->IsLooping) Piece->IsPlaying = false;
      }
@@ -3573,6 +3481,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     Assert(!Piece->IsPracticing);
     Piece->IsPracticing = false; // Bug if needed
+    
     
     for EachIndex(Idx, Input->MIDI.EventCount)
     {
@@ -3587,7 +3496,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
      if(0) {}
      else if(Type == MIDIEventType_NoteOn && Data2 > 0)
      {
-      
       if(Piece->NoteCount < ArrayCount(Piece->Notes))
       { 
        piece_note *Note = Piece->Notes + Piece->NoteCount;
@@ -3600,12 +3508,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
        
        Piece->NoteCount += 1;
       }
-      
      }
      else if(Type == MIDIEventType_NoteOff ||
              (Type == MIDIEventType_NoteOn && Data2 == 0))
      {
-      for EachIndex(NoteIdx, Piece->NoteCount)
+      // Find first note with same pitch and set its length.
+      for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
       {
        piece_note *Note = Piece->Notes + NoteIdx;
        u8 Pitch = Data1;
@@ -3618,26 +3526,27 @@ UPDATE_AND_RENDER(UpdateAndRender)
        }
       }
      }
-     
     }
     
     Piece->RecordLength += BPS*Input->dtForFrame;
    }
    
    if(Piece->IsPracticing)
-   {
+   {    
+    
+    b32 NoteWasPlayed = false;
     piece_note *NoteToPlay = NilPieceNote;
-    for EachIndex(Idx, Piece->NoteCount)
+    
+    for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
     {
      piece_note *Note = Piece->Notes + Idx;
+     
      if(Piece->PracticePos <= Note->Start)
      {
       NoteToPlay = Note;
       break;
      }
     }
-    
-    b32 NoteWasPlayed = false;
     
     for EachIndex(Idx, Input->MIDI.EventCount)
     {
@@ -3652,44 +3561,82 @@ UPDATE_AND_RENDER(UpdateAndRender)
      if(0) {}
      else if(Type == MIDIEventType_NoteOn && Data2 > 0)
      {
-      u8 Pitch = Data1;
-      u8 Velocity = Data2;
-      
-      if(Pitch == NoteToPlay->Pitch)
-      {
-       NoteWasPlayed = true;
-      }
-      else
-      {
-       Log("Pitch diff: %d\n", Pitch - NoteToPlay->Pitch);
+      if(Piece->PracticeNoteCount < ArrayCount(Piece->PracticeNotes))
+      { 
+       piece_note *Note = Piece->PracticeNotes + Piece->PracticeNoteCount;
+       u8 Pitch = Data1;
+       
+       Note->Kind = PieceNoteKind_Pitch;
+       Note->Pitch = Pitch;
+       Note->Length = 0.f;
+       Note->Start = Piece->PracticePos;
+       
+       Piece->PracticeNoteCount += 1;
       }
      }
-     else if((Type == MIDIEventType_NoteOff) ||
+     else if(Type == MIDIEventType_NoteOff ||
              (Type == MIDIEventType_NoteOn && Data2 == 0))
      {
-      u8 Pitch = Data1;
-      u8 Velocity = Data2;
+      // Find first note with same pitch and set its length.
+      for(u64 NoteIdx = 1; NoteIdx < Piece->PracticeNoteCount; NoteIdx += 1)
+      {
+       piece_note *Note = Piece->PracticeNotes + NoteIdx;
+       u8 Pitch = Data1;
+       
+       // NOTE(luca): Find matching note, and set its length we now know.
+       if(Note->Length == 0.f &&
+          Note->Pitch == Pitch)
+       {
+        // TODO(luca): Delete this note? Or stop incrementing it duration
+        // TODO(luca): Maybe we should round/snap its length.  Maybe not, since this gives us
+        // the error. -> too short/too long
+       }
+      }
      }
     }
     
-    if(!NoteWasPlayed && NoteToPlay->Kind == PieceNoteKind_Rest) 
+    // Skip rests ?
+    if(NoteToPlay->Kind == PieceNoteKind_Rest) 
     {
      NoteWasPlayed = true;
+    }
+    
+    b32 IsOneNotePressed = false;
+    for(u64 Idx = 1; Idx < Piece->PracticeNoteCount; Idx += 1)
+    {
+     piece_note *Note = Piece->PracticeNotes + Idx;
+     
+     if(Note->Start == Piece->PracticePos &&
+        Note->Pitch == NoteToPlay->Pitch && 
+        Note->Length >= NoteToPlay->Length)
+     {
+      NoteWasPlayed = true;
+     }
+     
+     if(Note->Start == Piece->PracticePos)
+     {
+      Note->Length += BPS*Input->dtForFrame;
+     }
     }
     
     if(NoteWasPlayed)
     {
      // NOTE(luca): Instead of adding up Length as we go which would cumulate precision error
-     // we start from the note start which makes it way less.
+     // we start from the note start which makes reduces error.
      Piece->PracticePos = NoteToPlay->Start + NoteToPlay->Length;
      if(Piece->PracticePos >= Piece->PracticeEnd) 
      {
       Piece->PracticePos = Piece->PracticeStart;
+      Piece->PracticeNoteCount = 1;
      }
     }
+    
    }
    
   }
+  
+  
+  
  }
  
  //- Rendering 

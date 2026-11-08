@@ -293,7 +293,7 @@ internal void P_UpdateImage(P_context Context, app_offscreen_buffer *Buffer)
 #define P_PROCESS_MESSAGES() \
 internal void P_ProcessMessages(P_context Context, app_input *Input, app_offscreen_buffer *Buffer, b32 *Running)
 #define P_LOAD_APP_CODE() \
-internal void P_LoadAppCode(app_code *Code, app_memory *Memory)
+internal void P_LoadAppCode(P_context Context, app_code *Code, app_memory *Memory)
 
 #define P_CLEANUP() \
 internal void P_Cleanup(P_context Context)

@@ -103,11 +103,10 @@ S8ArrayAppendMultiple_(Array, ArrayCount(Strings), Strings); \
 DeferLoop((Result = PushS8(Arena, MaxSize)), ArenaFree(Arena, MaxSize - EndSize))
 
 #define StringsScratchTemp(Arena) \
-StringsScratchTemp_(Arena, Var(Counter), Var(Temp))
-#define StringsScratchTemp_(Arena, Counter, Temp) \
-for(arena *Temp, *Counter = 0; !Counter; Counter = (arena *)1)  \
-for(Temp = StringsScratch, SetStringsScratch(Arena); \
-Arena == StringsScratch; \
-SetStringsScratch(Temp))
+_StringsScratchTemp(Arena, Var(Counter), Var(Temp))
+#define _StringsScratchTemp(Arena, Counter, Temp) \
+for(arena *Counter = 0, *Temp = StringsScratchTempBegin(Arena); \
+Counter == 0; \
+Counter += 1, StringsScratchTempEnd(Temp))
 
 #endif //BASE_STRINGS_H

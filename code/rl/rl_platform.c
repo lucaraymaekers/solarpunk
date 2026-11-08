@@ -419,9 +419,10 @@ BASE_ENTRY_POINT()
     
     if(!CodeLoaded)
     {
-     P_LoadAppCode(&Code, &AppMemory);
+     P_LoadAppCode(PlatformContext, &Code, &AppMemory);
      CodeLoaded = true;
     }
+    
 #if RL_PLATFORM_HOT_RELOAD_CODE
     CodeLoaded = false;
 #endif

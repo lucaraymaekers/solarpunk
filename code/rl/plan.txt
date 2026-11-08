@@ -42,6 +42,7 @@ Misc:
   - to have key binds. (WasPressed(Control, 'c')
 - sleep threads when idle
 - custom borders and titlebar
+- When code is reloaded have the golden glow on window.
 
 - Build as one executable without dll or shader code as text.
 

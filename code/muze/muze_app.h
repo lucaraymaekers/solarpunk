@@ -9,6 +9,7 @@
 typedef enum piece_note_kind piece_note_kind;
 enum piece_note_kind
 {
+ PieceNoteKind_None,
  PieceNoteKind_Rest,
  PieceNoteKind_Pitch,
 };
@@ -44,6 +45,10 @@ struct piece
  piece_note Notes[KB(1)];
  u64 SelectedNoteIdx;
  
+ u64 PracticeNoteCount;
+ piece_note PracticeNotes[KB(1)];
+ f32 MetronomeTime;
+ 
  b32 IsRecording;
  b32 IsPlaying;
  b32 IsPracticing;
@@ -67,74 +72,6 @@ struct piece
  f32 TailHeight;
  
  s32 Octave; // Only for recording
-};
-
-typedef enum note_kind note_kind;
-enum note_kind
-{
- NoteKind_Note,
- NoteKind_Pedal
-};
-
-typedef struct rec_note rec_note;
-struct rec_note
-{
- rec_note *Next;
- rec_note *Prev;
- 
- u8 Pitch;
- u8 Velocity;
- u8 Controller;
- f32 Timestamp;
- f32 Duration;
- 
- note_kind Kind;
-};
-raddbg_type_view(note, rows(Note, (s32)Pitch, no_char((note_pitch)(Pitch%Note_Count)), no_char(Velocity), omit($, Pitch, Velocity)));
-
-typedef struct rec_note_node rec_note_node;
-struct rec_note_node
-{
- rec_note *Value;
- rec_note_node *Next;
- rec_note_node *Prev;
-};
-#define EachRecNoteNode(Index, First) \
-(rec_note_node *_node = (First); _node; _node = _node->Next) \
-for (rec_note *Index = _node->Value, *_note = _node->Value; _note; _note = 0)
-#define EachRecNote(Index, First) (rec_note *Index = First; !IsNilNote(Index); Note = Note->Next)
-#define EachRecNoteBack(Index, Last) (rec_note *Index = Last; !IsNilNote(Index); Note = Note->Prev)
-
-typedef struct voice voice;
-struct voice
-{
- rec_note *FirstNote;
- rec_note *LastNote;
- s64 NoteCount;
- 
- b32 IsRecording;
- b32 IsPlaying;
- b32 AutoScroll;
- 
- f32 RecordStart;
- f32 RecordLength;
- f32 PlayPos;
- 
- u8 MaxPitch;
- u8 MinPitch;
- 
- f32 NoteSetLength;
- 
- rec_note_node *NoteSel;
- 
- int Channel;
- int PresetIdx;
- f32 Volume;
- f32 MIDISoftness;
- 
- f32 SheetScrollX;
- 
- arena *Arena;
 };
 
 //- Panels
@@ -207,7 +144,6 @@ struct command
  
  panel *Panel;
  panel_kind PanelKind;
- voice *Voice;
  piece *Piece;
  platform_midi_device *Device;
  lister_kind ListerKind;
@@ -285,7 +221,6 @@ struct app_state
  
  // Application memory
  arena *Arena;
- rec_note_node *FirstFreeNode;
  
  // NOTE(luca): PushBuffer
  umm MaxCommandCount;
@@ -315,14 +250,6 @@ struct piece_box_data
  ui_box *Box;
  piece *Piece;
  app_state *App;
-};
-
-typedef struct muze_box_data muze_box_data;
-struct muze_box_data
-{
- ui_box *Box;
- app_state *App;
- voice *Voice;
 };
 
 typedef struct custom_draw__single_line_text_input_params custom_draw__single_line_text_input_params;

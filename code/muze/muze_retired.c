@@ -1,3 +1,81 @@
+global_variable voice *NilVoice;
+global_variable rec_note *NilNote;
+
+typedef struct muze_box_data muze_box_data;
+struct muze_box_data
+{
+ ui_box *Box;
+ app_state *App;
+ voice *Voice;
+};
+
+typedef enum note_kind note_kind;
+enum note_kind
+{
+ NoteKind_Note,
+ NoteKind_Pedal
+};
+
+typedef struct rec_note rec_note;
+struct rec_note
+{
+ rec_note *Next;
+ rec_note *Prev;
+ 
+ u8 Pitch;
+ u8 Velocity;
+ u8 Controller;
+ f32 Timestamp;
+ f32 Duration;
+ 
+ note_kind Kind;
+};
+raddbg_type_view(note, rows(Note, (s32)Pitch, no_char((note_pitch)(Pitch%Note_Count)), no_char(Velocity), omit($, Pitch, Velocity)));
+
+typedef struct rec_note_node rec_note_node;
+struct rec_note_node
+{
+ rec_note *Value;
+ rec_note_node *Next;
+ rec_note_node *Prev;
+};
+#define EachRecNoteNode(Index, First) \
+(rec_note_node *_node = (First); _node; _node = _node->Next) \
+for (rec_note *Index = _node->Value, *_note = _node->Value; _note; _note = 0)
+#define EachRecNote(Index, First) (rec_note *Index = First; !IsNilNote(Index); Note = Note->Next)
+#define EachRecNoteBack(Index, Last) (rec_note *Index = Last; !IsNilNote(Index); Note = Note->Prev)
+
+typedef struct voice voice;
+struct voice
+{
+ rec_note *FirstNote;
+ rec_note *LastNote;
+ s64 NoteCount;
+ 
+ b32 IsRecording;
+ b32 IsPlaying;
+ b32 AutoScroll;
+ 
+ f32 RecordStart;
+ f32 RecordLength;
+ f32 PlayPos;
+ 
+ u8 MaxPitch;
+ u8 MinPitch;
+ 
+ f32 NoteSetLength;
+ 
+ rec_note_node *NoteSel;
+ 
+ int Channel;
+ int PresetIdx;
+ f32 Volume;
+ f32 MIDISoftness;
+ 
+ f32 SheetScrollX;
+ 
+ arena *Arena;
+};
 
 //~ Muze - Voices 
 internal void
@@ -718,6 +796,142 @@ UI_CUSTOM_DRAW(CustomDrawPianoRoll)
   }
  }
 }
+internal rec_note_node *
+FindSelForNote(rec_note_node *Selection, rec_note *Note)
+{
+ rec_note_node *Result = 0;
+ 
+ for EachNode(Node, rec_note_node, Selection)
+ {
+  if(Node->Value == Note)
+  {
+   Result = Node;
+   break;
+  }
+ }
+ 
+ return Result;
+}
+
+
+typedef struct custom_draw_note_input_result custom_draw_note_input_result;
+struct custom_draw_note_input_result
+{
+ b32 LeftDown;
+ b32 RightDown;
+ v2 MouseP;
+ v2 MouseStartP;
+ b32 Adding;
+ v4 SelDest;
+};
+
+internal custom_draw_note_input_result
+CustomDrawNoteInput(ui_box *Box)
+{
+ custom_draw_note_input_result Result = {0};
+ 
+ app_input *Input = UI_State->Input;
+ 
+ if(UI_State->InputConsumerBox == Box)
+ {
+  Result.LeftDown = Input->Mouse.Buttons[PlatformMouseButton_Left].EndedDown;
+  Result.RightDown = Input->Mouse.Buttons[PlatformMouseButton_Right].EndedDown;
+  UI_ConsumeInput(Input, Box);
+ }
+ 
+ Result.Adding = (Result.LeftDown && !Result.RightDown);
+ Result.MouseP = MousePosFromInput(Input);
+ Result.MouseStartP = V2V2S32(Input->Mouse.Start);
+ 
+ v4 SelDest;
+ // Get selection rectangle
+ {        
+  SelDest = (v4){.Min = Result.MouseP, .Max = Result.MouseStartP};
+  if(SelDest.Min.X > SelDest.Max.X) Swap(SelDest.Min.X, SelDest.Max.X);
+  if(SelDest.Min.Y > SelDest.Max.Y) Swap(SelDest.Min.Y, SelDest.Max.Y);
+  SelDest = RectIntersect(Box->Rec, SelDest);
+ }
+ Result.SelDest = SelDest;
+ 
+ if(Result.LeftDown || Result.RightDown)
+ {
+  DrawRect(SelDest, V4(V3Arg(Result.Adding ? Color_Blue : Color_Snow2), .3f), 1.f, 0.f, 0.f);
+  DrawRect(SelDest, V4(V3Arg(Result.Adding ? Color_Orange : Color_Black), 1.f), 1.f, 1.f, 0.f);
+ }
+ 
+ return Result;
+}
+
+internal void
+AddNoteToSelection(custom_draw_note_input_result *NoteInput, v4 Dest,
+                   app_state *App, voice *Voice, rec_note_node *Sel, rec_note *Note)
+{
+ // Draw selection rectangle
+ if(NoteInput->LeftDown || NoteInput->RightDown)
+ {
+  // NOTE(luca): @Command
+  if(RectOverlap(Dest, NoteInput->SelDest))
+  {
+   if(NoteInput->Adding && !Sel)
+   {
+    rec_note_node *Node;
+    
+    // Allocate
+    {
+     if(!App->FirstFreeNode)
+     {
+      Node = PushArray(App->Arena, rec_note_node, 1);
+     }
+     else
+     {
+      Node = App->FirstFreeNode;
+      App->FirstFreeNode = Node->Next;
+     }
+     MemoryZero(Node);
+    }
+    
+    // Add to selection
+    {                            
+     Node->Value = Note;
+     
+     if(Voice->NoteSel) 
+     {
+      Voice->NoteSel->Prev = Node;
+     }
+     Node->Next = Voice->NoteSel;
+     
+     Voice->NoteSel = Node;
+    }
+   }
+   else if(!NoteInput->Adding && Sel)
+   {
+    // Remove from selection
+    {
+     if(Sel->Prev)
+     {
+      Sel->Prev->Next = Sel->Next;
+     }
+     
+     if(Sel->Next)
+     {
+      Sel->Next->Prev = Sel->Prev;
+     }
+     
+     if(Sel == Voice->NoteSel)
+     {
+      Voice->NoteSel = (Sel->Next ? Sel->Next : Sel->Prev);
+     }
+    }
+    
+    // Add to free list
+    {
+     Sel->Next = App->FirstFreeNode;
+     App->FirstFreeNode = Sel;
+    }
+   }
+  }
+ }
+}
 
 internal void
 VoiceUIs()
@@ -1432,6 +1646,4 @@ VoiceUIs()
    ProcessMIDINotes(Memory, App, App->SelectedVoice, Input->MIDI.Events, Input->MIDI.EventCount);
   }
  }
- 
- 
 }

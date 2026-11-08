@@ -26,6 +26,22 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   MS_Struct(Serializer, Piece->Notes, sizeof(piece_note)*Piece->NoteCount);
  }
  
+ if(Serializer->Version < MSV_Practice)
+ {
+  if(Piece->NoteCount == ArrayCount(Piece->Notes))
+  {
+   // Bummer, we have to crop.
+   Log("Error: Since piece has max note amount, last note cropped.\n");
+  }
+  MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(piece_note)*(Piece->NoteCount - 1));
+  Piece->Notes[0] = Nil(piece_note);
+  
+  for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
+  {
+   Piece->Notes[Idx].Kind += 1;
+  }
+ }
+ 
  MS_Add(MSV_Initial, &Piece->BarWrapping);
 }
 

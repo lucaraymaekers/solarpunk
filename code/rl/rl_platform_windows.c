@@ -908,6 +908,8 @@ P_PROCESS_MESSAGES()
 
 P_LOAD_APP_CODE()
 {
+ win32_context *Win32 = (win32_context *)Context; 
+ 
  // NOTE(luca): If we don't do this, when reloading literals and constants can have wrong adresses, namely strings.  This causes crashes when creating persistent data with those boxes, namely ui_box'es. 
  // TODO(luca): Make an issue on github on how this makes raddbg hang and you have to forcefully terminate the process, to get your app to close.
  b32 KeepOldDLLsAllocated = false;
@@ -971,6 +973,20 @@ P_LOAD_APP_CODE()
      Code->Loaded = false;
      ErrorLog("Could not find UpdateAndRender or GetAudioSamples.\n");
     }
+    
+    // Flash the window
+    {    
+     FLASHWINFO Info = {0};
+     
+     Info.cbSize = sizeof(FLASHWINFO);
+     Info.hwnd = Win32->Window;
+     Info.dwFlags = FLASHW_ALL| FLASHW_TIMERNOFG;
+     Info.uCount = 0;
+     Info.dwTimeout = 0;
+     
+     FlashWindowEx(&Info);
+    }
+    
     Memory->Reloaded = true;
    }
    else
