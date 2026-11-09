@@ -29,6 +29,7 @@ CommandsTable:
  { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0 }
  { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0 }
  { PieceToggleStrictTiming,    false, "Piece",  "Toggle strict timing practice",  None  0 0 0 }
+ { PieceToggleLooping,         false, "Piece",  "Toggle looping",                 None  0 0 0 }
  { PieceSetBPM,                true,  "Piece",  "Set BPM",                        None  0 0 0 }
  { PieceSelectNote,            true,  "Piece",  "Select note",                    None  0 0 0 }
  { PieceDeselectNote,          false, "Piece",  "Deselect note",                  None  0 0 0 }

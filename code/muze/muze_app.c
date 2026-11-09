@@ -78,6 +78,21 @@ InitReadOnlyGlobals(arena *Arena)
  NilPiece = PushArray(Arena, piece, 1);
 }
 
+internal void
+TSFPlayNote(app_state *App, s32 Channel, s32 Key, f32 Velocity)
+{
+ if(App->OutputSynthEnabled)
+ {
+  tsf_channel_note_on(GlobalTSF, Channel, Key, Velocity);
+ }
+}
+
+internal void
+TSFPlayNoteU8(app_state *App, s32 Channel, s32 Key, u8 Velocity)
+{
+ TSFPlayNote(App, Channel, Key, ((f32)Velocity/256.f));
+}
+
 //~ Panels
 global_variable arena *PanelArena = 0;
 global_variable b32 PanelAppendToParent = false;
@@ -1153,6 +1168,8 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      {
       NoteColor = Color_Orange;
      }
+     
+     if(ArrayIdx == 1) NoteColor = Color_Yellow;
      
      if(Piece->IsPracticing && ArrayIdx != 1) NoteColor.W *= 0.5f;
      
@@ -2278,13 +2295,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
             
             UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
             {
-             if(Button(.String = ItemString,
-                       .Text = Item->Name, 
-                       .Disabled = Selected, 
-                       .DisabledBackgroundColor = Color_Yellow, 
-                       .Padding = ItemPadding,
-                       .ClipSize = false).Released || 
-                App->ListerReturnPressed)
+             b32 ItemSelected = (Button(.String = ItemString,
+                                        .Text = Item->Name, 
+                                        .Disabled = Selected, 
+                                        .DisabledBackgroundColor = Color_Yellow, 
+                                        .Padding = ItemPadding,
+                                        .ClipSize = false).Released || 
+                                 (App->ListerReturnPressed && Idx == MinIdx));
+             if(ItemSelected)
              {
               switch(App->ListerKind)
               {
@@ -2572,10 +2590,28 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  
                  if(M_IconButton(UI_IconKind_Loop, S8("Loop"), .TextColor = (Piece->IsLooping ? Color_Yellow : Color_Black)))
                  {
-                  Piece->IsLooping ^= 1;
+                  PushCommand(App, Command_PieceToggleLooping);
                  }
-                 
-                 
+                }
+                
+                // Synth
+                {                
+                 UI_SemanticWidth(UI_SizePx(120.f, 1.f))
+                 {
+                  ui_button_result Click = Button(.Text = S8("Synth"), 
+                                                  .Padding = GlobalItemPadding, 
+                                                  .HasToggle = true,
+                                                  .ToggleToggled = App->OutputSynthEnabled, 
+                                                  .ToggleToggledColor = Color_Yellow);
+                  if(Click.Pressed)
+                  {
+                   PushCommand(App, Command_PieceSelectInstrument);
+                  }
+                  if(Click.Toggled)
+                  {
+                   PushCommand(App, Command_ToggleSynthOutput);
+                  }
+                 }
                 }
                 
                 UI_FillWidth()
@@ -2837,7 +2873,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                
                // Scrollbar
                {
-                f32 ItemCount = (f32)32;
+                f32 ItemCount = (f32)1;
                 f32 TotalElementSize = ItemCount*ItemHeight;
                 TotalElementSize -= ItemHeight;
                 
@@ -3191,6 +3227,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
     } break;
     case Command_ToggleSynthOutput:
     {
+     if(App->OutputSynthEnabled)
+     {
+      tsf_note_off_all(GlobalTSF);
+     }
      App->OutputSynthEnabled ^= 1;
     } break;
    }
@@ -3259,10 +3299,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
        if(Note->Length == 0.f) Note->Length = (Piece->RecordLength - Note->Start);
       }
       
-      
      }
      else
      {
+      tsf_channel_note_off(GlobalTSF, Piece->Channel, Piece->Key);
       PieceStopPlaying(Piece);
       Piece->IsPracticing = false;
       Piece->IsRecording = true;
@@ -3331,6 +3371,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
      {
       Piece->IsPracticing = true;
       
+      tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+      
       // Conflicts
       PieceStopPlaying(Piece);
       Piece->IsRecording = false;
@@ -3344,6 +3386,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
       
       Piece->PracticePos = Piece->PracticeStart;
      }
+    } break;
+    
+    case Command_PieceToggleLooping:
+    {
+     Piece->IsLooping ^= 1;
     } break;
     
     case Command_PieceSelectNote:
@@ -3402,7 +3449,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     if(HasPlayed)
     {
-     tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, .05f);
+     tsf_channel_note_on(GlobalTSF, App->MetronomeChannel, Pitch, 1.f);
     }
     
     if(HasStopped)
@@ -3431,16 +3478,17 @@ UPDATE_AND_RENDER(UpdateAndRender)
         b32 NoteIsPlaying = PieceWasTimestampPlayed(Piece, Start);
         b32 NoteHasEnded = PieceWasTimestampPlayed(Piece, End);
         
-        s32 Pitch = Note->Pitch + 1*12;
-        
-        if(NoteIsPlaying)
-        {
-         tsf_channel_note_on(GlobalTSF, Piece->Channel, Pitch, .5f);
-        }
-        
-        if(NoteHasEnded)
-        {
-         tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
+        if(App->OutputSynthEnabled)
+        {        
+         if(NoteIsPlaying)
+         {
+          TSFPlayNote(App, Piece->Channel, Note->Pitch, .2f); 
+         }
+         
+         if(NoteHasEnded)
+         {
+          tsf_channel_note_off(GlobalTSF, Piece->Channel, Note->Pitch);
+         }
         }
        }
       }
@@ -3474,7 +3522,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
     Assert(!Piece->IsPracticing);
     Piece->IsPracticing = false; // Bug if needed
     
-    
     for EachIndex(Idx, Input->MIDI.EventCount)
     {
      app_midi_event *Event = Input->MIDI.Events + Idx;
@@ -3492,11 +3539,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
       { 
        piece_note *Note = Piece->Notes + Piece->NoteCount;
        u8 Pitch = Data1;
+       u8 Velocity = Data2;
        
        Note->Kind = PieceNoteKind_Pitch;
        Note->Pitch = Pitch;
        Note->Length = 0.f;
        Note->Start = Piece->RecordLength;
+       
+       TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Velocity);
        
        Piece->NoteCount += 1;
       }
@@ -3509,6 +3559,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
       {
        piece_note *Note = Piece->Notes + NoteIdx;
        u8 Pitch = Data1;
+       
+       tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
        
        // NOTE(luca): Find matching note, and set its length we now know.
        if(Note->Length == 0.f &&
@@ -3564,6 +3616,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
       { 
        piece_note *Note = Piece->PracticeNotes + Piece->PracticeNoteCount;
        u8 Pitch = Data1;
+       u8 Velocity = Data2;
+       
+       TSFPlayNoteU8(App, Piece->Channel, Pitch,  Velocity);
        
        Note->Kind = PieceNoteKind_Pitch;
        Note->Pitch = Pitch;
@@ -3584,6 +3639,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
              (Type == MIDIEventType_NoteOn && Data2 == 0))
      {
       u8 Pitch = Data1;
+      
+      tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
       
       // Find first note with same pitch and set its length.
       for(u64 NoteIdx = 1; NoteIdx < Piece->PracticeNoteCount; NoteIdx += 1)
