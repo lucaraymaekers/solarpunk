@@ -24,13 +24,16 @@ CommandsTable:
  { PieceStartPlaying,          false, "Piece",  "Start playing",                  None  0 0 0 }
  { PieceStopPlaying,           false, "Piece",  "Stop playing",                   None  0 0 0 }
  { PieceTogglePracticing,      false, "Piece",  "Toggle practicing",              None  0 0 0 }
- { PieceStop,                  false, "Piece",  "Stop",                          . None  0 0 0 }
+ { PieceStop,                  false, "Piece",  "Stop",                          .None  0 0 0 }
  { PieceClear,                 false, "Piece",  "Clear",                          None  0 0 0 }
  { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0 }
  { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0 }
+ { PieceToggleStrictTiming,    false, "Piece",  "Toggle strict timing practice",  None  0 0 0 }
  { PieceSetBPM,                true,  "Piece",  "Set BPM",                        None  0 0 0 }
  { PieceSelectNote,            true,  "Piece",  "Select note",                    None  0 0 0 }
  { PieceDeselectNote,          false, "Piece",  "Deselect note",                  None  0 0 0 }
+ { PieceDeleteNote,            false, "Piece",  "Delete note",                    None  0 0 0 }
+ { PieceSetNoteLength,         false, "Piece",  "Set note length",                None  0 0 0 }
  { PieceSelectInstrument,      false, "Piece",  "Select instrument",              S     1 0 0 }
  //- Lister
  { CloseLister,                false, "Lister", "Close",                          None  0 0 0 }

@@ -11,6 +11,16 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
 }
 
 internal void
+MS_PieceNote(ms_serializer *Serializer, piece_note *Note)
+{
+ MS_Add(MSV_Initial, &Note->Kind);
+ MS_Add(MSV_Initial, &Note->Start);
+ MS_Add(MSV_Initial, &Note->Length);
+ MS_Add(MSV_Initial, &Note->Pitch);
+ MS_Add(MSV_PieceNoteHidden, &Note->Hidden);
+}
+
+internal void
 MS_Piece(ms_serializer *Serializer, piece *Piece)
 {
  MS_Add(MSV_Initial, &Piece->BPM);
@@ -23,25 +33,35 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  
  if(Serializer->Version >= MSV_Initial)
  {
-  MS_Struct(Serializer, Piece->Notes, sizeof(piece_note)*Piece->NoteCount);
+  for EachIndex(Idx, Piece->NoteCount)
+  {
+   MS_PieceNote(Serializer, (Piece->Notes + Idx)); 
+  }
  }
  
- if(Serializer->Version < MSV_Practice)
+ if(Serializer->Version < MSV_PieceNoteKindAddAndZerothNote)
  {
   if(Piece->NoteCount == ArrayCount(Piece->Notes))
   {
    // Bummer, we have to crop.
    Log("Error: Since piece has max note amount, last note cropped.\n");
   }
-  if(Piece->NoteCount)
-  {   
-   MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(piece_note)*(Piece->NoteCount - 1));
-  }
-  Piece->Notes[0] = Nil(piece_note);
   
-  for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
+  // Move notes and make nil note
   {
-   Piece->Notes[Idx].Kind += 1;
+   if(Piece->NoteCount)
+   {   
+    MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(piece_note)*(Piece->NoteCount - 1));
+   }
+   Piece->Notes[0] = Nil(piece_note);
+  }
+  
+  // Increase for PieceNoteKind_None
+  {  
+   for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
+   {
+    Piece->Notes[Idx].Kind += 1;
+   }
   }
  }
  

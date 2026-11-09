@@ -1018,9 +1018,10 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     f32 NoteLength = Note->Length;
     if(NoteLength == 0.f)
     {
-     Assert(Piece->IsRecording);
      NoteIsRecording = true;
-     NoteLength = (Piece->RecordLength - Note->Start);
+     NoteLength = (Piece->IsRecording ? 
+                   Piece->RecordLength - Note->Start : 
+                   Piece->PracticePos - Note->Start);
     }
     
     v4 NoteColor = StaffColor;
@@ -1070,7 +1071,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      font *Font = UI_State->Fonts[FontKind_Music];
      DrawRectChar(UI_State->Atlas, Font, NotePos, Codepoint, NoteColor);
     }
-    else if(Note->Kind == PieceNoteKind_Pitch)
+    else if(Note->Kind == PieceNoteKind_Pitch && !Note->Hidden)
     {
      s32 RelPitch = Note->Pitch%Note_Count;
      b32 FillHead = (NoteLength < 2.f);;
@@ -1753,23 +1754,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
       PanelAdd(.4f);
       PanelChildren()
       {
-       PanelAdd(.5f);
-       PanelAdd(.5f);
+       PanelAdd(.5f)->Kind = PanelKind_Controls;
+       PanelAdd(.5f)->Kind = PanelKind_Debug;
       }
      }
     }
     
-    for(panel *Panel = App->FirstPanel;
-        !IsNilPanel(Panel);
-        Panel = PanelRecDepthFirstPreOrder(Panel).Next)
-    {
-     if(IsLeafPanel(Panel))
-     {
-      Panel->Kind = PanelKind_Piece;
-     }
-    }
-    
     App->SelectedPanel = PanelNextLeaf(App->FirstPanel, false);
+    App->SelectedPanel->Kind = PanelKind_Piece;
     
    }
   }
@@ -2519,47 +2511,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
              if(IsNilPiece(Panel->Piece)) Panel->Piece = PieceAlloc(App);
              piece *Piece = Panel->Piece;
              
-#if MUZE_INTERNAL
-#elif 0
-             Piece->RecordLength = 0.f;
-             Piece->NoteCount = 1;
-#if 0
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 7.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 8.f);
-#elif 0
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f);
-#elif 0
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/16.f);
-#elif 0
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-             PieceNoteAddCode(Piece, PieceNoteKind_Pitch, Note_C, 1.f/1.f);
-#endif
+             str8 PieceFilePath = S8("song.muze_piece");
              
-#endif
+             if(!Memory->Initialized)
+             {             
+              M_SerializePiece(FrameArena, true, PieceFilePath, Piece); 
+             }
+             
              ui_box *PieceBox;
              // UI for piece panel
              {             
@@ -2575,8 +2533,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_FontKind(FontKind_Icons)
                  UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                 {
-                 str8 PieceFilePath = S8("song.muze_piece");
-                 
                  if(M_IconButton(UI_IconKind_File, S8("Open")))
                  {
                   M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
@@ -2678,6 +2634,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  }
                 }
                 
+                UI_FontKind(FontKind_Icons)
+                 UI_SemanticWidth(UI_SizePx(30.f, 1.f))
+                 if(M_IconButton(UI_IconKind_Clock, S8("StrictTiming"), .TextColor = (Piece->PracticeStrictTiming ? Color_Yellow : Color_Black)))
+                {
+                 PushCommand(App, Command_PieceToggleStrictTiming);
+                }
+                
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                  if(M_Button(S8("End")))
                 {
@@ -2695,6 +2658,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   {
                    Piece->PlayPos = Piece->PracticeEnd;
                   }
+                 }
+                }
+                
+                UI_SemanticWidth(UI_SizePx(300.f, 1.f))
+                 
+                {                 
+                 m_slider_result Slider = M_Slider(S8("SetNoteLength"), S8("Length"), 
+                                                   Str8Fmt(" %2.0f/8", Piece->SetNoteLength), 
+                                                   Piece->SetNoteLength, 
+                                                   1.f, 32.f, 1.f, true,
+                                                   .Align = false); 
+                 Piece->SetNoteLength = Slider.Value;
+                 if(Slider.Clicked)
+                 {
+                  PushCommand(App, Command_PieceSetNoteLength);
                  }
                 }
                 
@@ -3154,6 +3132,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
   if(IsNilPanel(Command->Panel)) Command->Panel =  App->SelectedPanel;
   if(IsNilPiece(Command->Piece)) Command->Piece =  App->SelectedPanel->Piece;
   
+  piece *Piece = Command->Piece;
+  panel *Panel = Command->Panel;
+  
   switch(Command->Kind)
   {
    default: InvalidPath(); break;
@@ -3185,8 +3166,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
      if(0) {}
      else if(Kind == PanelKind_Piece)
      {
-      piece *Piece = App->SelectedPanel->Piece;
-      
       if(Piece->Preset != Command->S32)
       {
        tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
@@ -3267,8 +3246,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {   
     case Command_PieceToggleRecording:
     {
-     piece *Piece = Command->Piece;
-     
      if(Piece->IsRecording)
      {
       Piece->IsRecording = false;
@@ -3294,7 +3271,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceStartPlaying:
     {
-     piece *Piece = Command->Piece;
      if(!Piece->IsPlaying)
      {
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
@@ -3312,8 +3288,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceStop:
     {
-     piece *Piece = Command->Piece;
-     
      PieceStopPlaying(Piece);
      if(Piece->IsPracticing)
      {
@@ -3330,7 +3304,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceToggleMetronome:
     {
-     piece *Piece = Command->Piece;
      if(Piece->Metronome)
      {
       Piece->MetronomeTime = (Piece->IsPlaying ? Piece->PlayPos : 0.f);
@@ -3342,9 +3315,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
      }
     } break;
     
+    case Command_PieceToggleStrictTiming:
+    {
+     Command->Piece->PracticeStrictTiming ^= 1;
+    } break;
+    
     case Command_PieceTogglePracticing:
     {
-     piece *Piece = Command->Piece;
      Piece->PracticeNoteCount = 1;
      if(Piece->IsPracticing)
      {
@@ -3371,7 +3348,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceSelectNote:
     {
-     Command->Piece->SelectedNoteIdx = Command->U64;
+     Piece->SelectedNoteIdx = Command->U64;
+     Piece->SetNoteLength = Piece->Notes[Piece->SelectedNoteIdx].Length*8.f;
     } break;
     
     case Command_PieceDeselectNote:
@@ -3379,6 +3357,17 @@ UPDATE_AND_RENDER(UpdateAndRender)
      Command->Piece->SelectedNoteIdx = 0;
     } break;
     
+    case Command_PieceDeleteNote:
+    {
+     MemoryCopy(Piece->Notes + Piece->SelectedNoteIdx, 
+                Piece->Notes + Piece->SelectedNoteIdx + 1,
+                Piece->NoteCount - Piece->SelectedNoteIdx + 1);
+    } break;
+    
+    case Command_PieceSetNoteLength:
+    {
+     Piece->Notes[Piece->SelectedNoteIdx].Length = Piece->SetNoteLength/8.f;
+    } break;
     
     case Command_PieceSelectInstrument:
     {
@@ -3561,6 +3550,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
      u8 Type = Status & 0xF0;
      u8 Channel = Status & 0x0F;
      
+#if 0
+     if(Type == 128)
+     {
+      DebugBreak();
+     }
+#endif
+     
      if(0) {}
      else if(Type == MIDIEventType_NoteOn && Data2 > 0)
      {
@@ -3572,7 +3568,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
        Note->Kind = PieceNoteKind_Pitch;
        Note->Pitch = Pitch;
        Note->Length = 0.f;
+#if 0
        Note->Start = Piece->PracticePos;
+#else
+       // NOTE(luca): This should make it so that even if note is played a bit early it is
+       // still ok if held
+       Note->Start = NoteToPlay->Start;
+#endif
+       Note->Hidden = false;
        
        Piece->PracticeNoteCount += 1;
       }
@@ -3580,19 +3583,17 @@ UPDATE_AND_RENDER(UpdateAndRender)
      else if(Type == MIDIEventType_NoteOff ||
              (Type == MIDIEventType_NoteOn && Data2 == 0))
      {
+      u8 Pitch = Data1;
+      
       // Find first note with same pitch and set its length.
       for(u64 NoteIdx = 1; NoteIdx < Piece->PracticeNoteCount; NoteIdx += 1)
       {
        piece_note *Note = Piece->PracticeNotes + NoteIdx;
-       u8 Pitch = Data1;
        
-       // NOTE(luca): Find matching note, and set its length we now know.
-       if(Note->Length == 0.f &&
-          Note->Pitch == Pitch)
+       if(Note->Pitch == Pitch)
        {
-        // TODO(luca): Delete this note? Or stop incrementing it duration
-        // TODO(luca): Maybe we should round/snap its length.  Maybe not, since this gives us
-        // the error. -> too short/too long
+        Note->Hidden = true;
+        Note->Length = (Piece->PracticePos - Note->Start);
        }
       }
      }
@@ -3604,21 +3605,24 @@ UPDATE_AND_RENDER(UpdateAndRender)
      NoteWasPlayed = true;
     }
     
-    b32 IsOneNotePressed = false;
-    for(u64 Idx = 1; Idx < Piece->PracticeNoteCount; Idx += 1)
-    {
-     piece_note *Note = Piece->PracticeNotes + Idx;
-     
-     if(Note->Start == Piece->PracticePos &&
-        Note->Pitch == NoteToPlay->Pitch && 
-        Note->Length >= NoteToPlay->Length)
+    // Update practice notes
+    {    
+     b32 IsOneNotePressed = false;
+     for(u64 Idx = 1; Idx < Piece->PracticeNoteCount; Idx += 1)
      {
-      NoteWasPlayed = true;
-     }
-     
-     if(Note->Start == Piece->PracticePos)
-     {
-      Note->Length += BPS*Input->dtForFrame;
+      piece_note *Note = Piece->PracticeNotes + Idx;
+      
+      if(!Note->Hidden && 
+         Note->Start >= Piece->PracticePos && 
+         Note->Pitch == NoteToPlay->Pitch)
+      {
+       NoteWasPlayed = true;
+      }
+      
+      if(!Note->Hidden)
+      {
+       Note->Length += BPS*Input->dtForFrame;
+      }
      }
     }
     
@@ -3626,19 +3630,43 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {
      // NOTE(luca): Instead of adding up Length as we go which would cumulate precision error
      // we start from the note start which makes reduces error.
-     Piece->PracticePos = NoteToPlay->Start + NoteToPlay->Length;
-     if(Piece->PracticePos >= Piece->PracticeEnd) 
+     
+     if(!Piece->PracticeStrictTiming)
      {
-      Piece->PracticePos = Piece->PracticeStart;
-      Piece->PracticeNoteCount = 1;
+      Piece->PracticePos = NoteToPlay->Start + NoteToPlay->Length;
+     }
+     else
+     {
+      Piece->PracticePos += BPS*Input->dtForFrame;
+     }
+     
+    }
+    else if(NoteToPlay->Start > Piece->PracticePos)
+    {
+     if(Piece->PracticeStrictTiming)
+     {
+      Piece->PracticePos += BPS*Input->dtForFrame;
+      Piece->PracticePos = Min(Piece->PracticePos, NoteToPlay->Start); 
+     }
+     else
+     {
+      Piece->PracticePos = NoteToPlay->Start;
      }
     }
     
+    // Loop 
+    if(Piece->PracticePos >= Piece->PracticeEnd) 
+    {
+     Piece->PracticePos = Piece->PracticeStart;
+     Piece->PracticeNoteCount = 1;
+    }
    }
    
+   if(!IsNilPiece(Piece))
+   {
+    Piece->Notes[0] = Nil(piece_note);
+   }
   }
-  
-  
   
  }
  

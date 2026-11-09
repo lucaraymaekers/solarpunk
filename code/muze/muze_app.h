@@ -20,8 +20,8 @@ struct piece_note
  piece_note_kind Kind;
  f32 Start;
  f32 Length;
- 
  s32 Pitch;
+ b32 Hidden;
 };
 
 typedef struct piece piece; 
@@ -45,19 +45,21 @@ struct piece
  piece_note Notes[KB(1)];
  u64 SelectedNoteIdx;
  
- u64 PracticeNoteCount;
- piece_note PracticeNotes[KB(1)];
- f32 MetronomeTime;
- 
  b32 IsRecording;
- b32 IsPlaying;
- b32 IsPracticing;
  f32 RecordLength;
+ 
+ b32 IsPlaying;
  f32 PlayPos;
+ 
+ b32 IsPracticing;
  f32 PracticeStart;
  f32 PracticeEnd;
  f32 PracticePos;
+ b32 PracticeStrictTiming;
+ u64 PracticeNoteCount;
+ piece_note PracticeNotes[KB(1)];
  
+ f32 MetronomeTime;
  b32 Metronome;
  b32 IsLooping;
  
@@ -70,6 +72,7 @@ struct piece
  f32 NoteSize;
  f32 StaffLineWidth;
  f32 TailHeight;
+ f32 SetNoteLength;
  
  s32 Octave; // Only for recording
 };
