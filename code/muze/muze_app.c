@@ -1,3 +1,6 @@
+//-
+// Muze
+//-
 #define BASE_EXTERNAL_LIBS 1
 #define BASE_NO_ENTRYPOINT 1
 #include "base/base.h"

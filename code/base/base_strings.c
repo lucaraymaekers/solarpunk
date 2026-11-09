@@ -1,8 +1,7 @@
 //~ Libaries
 #include <stdio.h>
 
-#if !BASE_EXTERNAL_LIBS || RL_LIBS_IMPLEMENTATION
-// NOTE(luca): RL_LIBS_IMPLEMENTATION is set when everything is to be compiled statically.
+#if RL_LIBS_IMPLEMENTATION && !BASE_EXTERNAL_LIBS
 # define STB_SPRINTF_STATIC
 # define STB_SPRINTF_IMPLEMENTATION
 #endif 
@@ -294,7 +293,7 @@ Str8Fmt(const char *Format, ...)
 }
 
 //~ Hashing 
-#if !BASE_EXTERNAL_LIBS
+#if RL_LIBS_IMPLEMENTATION && !BASE_EXTERNAL_LIBS 
 # if !defined(XXH_IMPLEMENTATION)
 # define XXH_INLINE_ALL
 # define XXH_STATIC_LINKING_ONLY

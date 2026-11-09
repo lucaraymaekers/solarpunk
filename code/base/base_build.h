@@ -29,6 +29,10 @@
 # define BASE_NO_ENTRYPOINT 0
 #endif 
 
+#if !BASE_EXTERNAL_LIBS && !defined(RL_LIBS_IMPLEMENTATION)
+# define RL_LIBS_IMPLEMENTATION 1
+#endif
+
 //- RL 
 #if !defined(RL_PLATFORM_COLEMAK)
 # define RL_PLATFORM_COLEMAK 0

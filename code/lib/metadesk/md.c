@@ -706,15 +706,6 @@ MD_GetScratchDefault(MD_Arena **conflicts, MD_u64 count)
 //////////////////////// MD Library Implementation /////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-#if MD_DEFAULT_SPRINTF
-# if defined(STB_SPRINTF_IMPLEMENTATION)
-#  undef STB_SPRINTF_IMPLEMENTATION
-# endif
-// NOTE(luca): Removed because included elesewhere
-//#define STB_SPRINTF_DECORATE(name) md_stbsp_##name
-#include "lib/stb_sprintf.h"
-#endif
-
 //~ Nil Node Definition
 
 static MD_Node _md_nil_node =

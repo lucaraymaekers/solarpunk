@@ -252,7 +252,8 @@ Cng_Build__(str8 BuildName,
     
     // Common compiler flags
     Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH " "
-                         "-D_GNU_SOURCE=1"));
+                         "-D_GNU_SOURCE=1 "
+                         "-fno-omit-frame-pointer"));
     // Common warning flags
     Cng_S8ArrayAppend(S8("-Wall -Wextra -Wconversion -Wswitch -Wshadow -Wimplicit-fallthrough " 
                          "-Wno-double-promotion "

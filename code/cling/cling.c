@@ -126,7 +126,6 @@ ConfigMatch(MD_String8 Name, MD_String8 Match, MD_String8 Value)
 }
 
 //~ Build helpers
-
 internal void
 AppBuild(cng_build_options *BuildOptions, 
          str8 Name, str8 AppSource, str8 AppName, str8 ExeName,
@@ -134,7 +133,9 @@ AppBuild(cng_build_options *BuildOptions,
 {
  str8 LibFileName = S8("../build/rl_libs.obj");
  
- if(!OS_FileExists(CSS8(LibFileName)) || BuildOptions->Slow)
+ b32 Slow = BuildOptions->Slow;
+ 
+ if(!OS_FileExists(CSS8(LibFileName)) && !Slow)
  {
   Cng_Build(Name, BuildOptions, 
             S8ArrayLit(S8("../code/rl/rl_libs.h")),
@@ -144,12 +145,14 @@ AppBuild(cng_build_options *BuildOptions,
  }
  
  str8 AppDLLName = Str8Fmt("%S%S", AppName, (OS_Is(OSKind_Linux) ? S8(".so") : S8("")));
+ str8 DefineLibs = (BuildOptions->Slow ? 
+                    S8("-DRL_LIBS_IMPLEMENTATION=1") : 
+                    S8("-DRL_LIBS_IMPLEMENTATION=0"));
  
  Cng_Build(Name, BuildOptions, 
-           S8ArrayLit(AppSource, LibFileName),
+           S8ArrayLit(AppSource, (Slow ? Nil(str8) : LibFileName)),
            .Type = CngBuildType_DLL,
-           .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
-                                            ExtraFlags),
+           .ExtraCompilerFlags = S8ArrayLit(DefineLibs, ExtraFlags),
            .OutputName = AppDLLName);
  
  str8 Defines = Str8Fmt("-DRL_PLATFORM_APP_NAME=%S "
@@ -161,10 +164,8 @@ AppBuild(cng_build_options *BuildOptions,
  
  Cng_Build(Name, BuildOptions, 
            S8ArrayLit(S8("../code/rl/rl_platform.c"),
-                      LibFileName),
-           .ExtraCompilerFlags = S8ArrayLit(S8("-DRL_LIBS_IMPLEMENTATION=0"),
-                                            Defines,
-                                            ExtraFlags),
+                      (Slow ? Nil(str8) : LibFileName)),
+           .ExtraCompilerFlags = S8ArrayLit(DefineLibs, Defines, ExtraFlags),
            .ExtraLinkerFlags   = S8ArrayLit(LinkerFlags),
            .OutputName = ExeName,);
  
