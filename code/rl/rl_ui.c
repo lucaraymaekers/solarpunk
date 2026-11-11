@@ -522,7 +522,7 @@ UI_InitState(arena *Arena)
  UI_State->Arena = Arena;
  UI_State->BoxTableSize = 4096;
  UI_State->BoxTable = PushArray(UI_State->Arena, ui_box, UI_State->BoxTableSize);
- UI_State->StyleArena = PushArena(UI_State->Arena, KB(64), false);
+ UI_State->StyleArena = PushArena(UI_State->Arena, MB(1), false);
  UI_State->FrameArenaFront = PushArena(UI_State->Arena, MB(16), false);
  UI_State->FrameArenaBack = PushArena(UI_State->Arena, MB(16), false);
  //UI_State->FrameArenaStrings = PushArena(UI_State->Arena, KB(64), false);

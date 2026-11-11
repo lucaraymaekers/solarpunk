@@ -60,6 +60,7 @@ enum platform_key
  PlatformKey_Shift,
  PlatformKey_Control,
  PlatformKey_Alt,
+ PlatformKey_Super,
  
  PlatformKey_Count,
 };

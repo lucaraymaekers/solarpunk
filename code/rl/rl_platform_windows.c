@@ -829,6 +829,8 @@ P_PROCESS_MESSAGES()
         else if(VKCode == VK_DELETE) Key->Symbol = PlatformKey_Delete;   
         else if(VKCode == VK_END) Key->Symbol = PlatformKey_End;      
         else if(VKCode == VK_NEXT) Key->Symbol = PlatformKey_PageDown;     
+        else if(VKCode == VK_LWIN) Key->Symbol = PlatformKey_Super;     
+        else if(VKCode == VK_RWIN) Key->Symbol = PlatformKey_Super;     
         else if(VK_F1 <= VKCode && VKCode <= VK_F12)
         {
          Key->Symbol = PlatformKey_F1 + (VKCode - VK_F1);

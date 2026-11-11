@@ -19,6 +19,7 @@ enum ms_version
  MSV_Initial,
  MSV_PieceNoteKindAddAndZerothNote,
  MSV_PieceNoteHidden,
+ MSV_PieceMultiStaff,
  MSV_Count,
 };
 typedef enum ms_serializer_version ms_serializer_version;

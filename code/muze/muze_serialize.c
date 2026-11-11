@@ -18,6 +18,7 @@ MS_PieceNote(ms_serializer *Serializer, piece_note *Note)
  MS_Add(MSV_Initial, &Note->Length);
  MS_Add(MSV_Initial, &Note->Pitch);
  MS_Add(MSV_PieceNoteHidden, &Note->Hidden);
+ MS_Add(MSV_PieceMultiStaff, &Note->StaffIdx);
 }
 
 internal void
@@ -26,8 +27,23 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  MS_Add(MSV_Initial, &Piece->BPM);
  MS_Add(MSV_Initial, &Piece->TimeSigNum);
  MS_Add(MSV_Initial, &Piece->TimeSigDen);
- MS_Add(MSV_Initial, &Piece->Key);
- MS_Add(MSV_Initial, &Piece->Major);
+ 
+ if(Serializer->Version < MSV_PieceMultiStaff)
+ {
+  Piece->StaffCount = 1;
+  MS_Ser(Serializer, &Piece->Staffs[0].Key); 
+  MS_Ser(Serializer, &Piece->Staffs[0].Minor); 
+  Piece->Staffs[0].Minor ^= 1; // Used to be "Major"
+ }
+ else
+ {
+  MS_Ser(Serializer, &Piece->StaffCount);
+  for EachIndex(Idx, Piece->StaffCount)
+  {
+   MS_Ser(Serializer, (Piece->Staffs + Idx));
+  }
+ }
+ 
  MS_Add(MSV_Initial, &Piece->RecordLength);
  MS_Add(MSV_Initial, &Piece->NoteCount);
  
@@ -65,7 +81,12 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   }
  }
  
- MS_Add(MSV_Initial, &Piece->BarWrapping);
+ MS_Add(MSV_Initial, &Piece->BarWrappingDisabled);
+ 
+ if(Serializer->Version < MSV_PieceMultiStaff)
+ {
+  Piece->BarWrappingDisabled ^= 1;
+ }
 }
 
 internal void

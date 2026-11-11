@@ -22,6 +22,15 @@ struct piece_note
  f32 Length;
  s32 Pitch;
  b32 Hidden;
+ s32 StaffIdx;
+};
+
+typedef struct staff staff;
+struct staff
+{
+ note_pitch Key;
+ b32 Minor;
+ s32 Octave;
 };
 
 typedef struct piece piece; 
@@ -38,8 +47,9 @@ struct piece
  f32 BPM;
  f32 TimeSigNum;
  f32 TimeSigDen;
- note_pitch Key;
- b32 Major;
+ 
+ s32 StaffCount;
+ staff Staffs[128];
  
  u64 NoteCount;
  piece_note Notes[KB(1)];
@@ -61,12 +71,12 @@ struct piece
  
  f32 MetronomeTime;
  b32 Metronome;
- b32 IsLooping;
+ b32 LoopingDisabled;
  
  // UI
  v2 PrevPlayPos; // For animating
  v2 PrevPracticePos; // For animating
- b32 BarWrapping;
+ b32 BarWrappingDisabled;
  f32 BarPadding;
  f32 BeatWidth;
  f32 NoteSize;
@@ -91,7 +101,6 @@ struct panel
  
  axis2 Axis;
  f32 ParentPct;
- 
  v4 Region;
  
  panel_kind Kind;
@@ -211,8 +220,8 @@ struct app_state
  platform_midi_device Out;
  
  b32 OutputMIDIEnabled;
- b32 OutputSynthEnabled;
- b32 InputMIDIEnabled;
+ b32 OutputSynthDisabled;
+ b32 InputMIDIDisabled;
  b32 InputVirtualKeyboardEnabled;
  
  arena *PieceArena;

@@ -32,6 +32,7 @@ Command_None,
  Command_PieceDeleteNote,
  Command_PieceSetNoteLength,
  Command_PieceSelectInstrument,
+ Command_PieceAddStaff,
  Command_CloseLister,
  Command_OpenLister,
  Command_Count
@@ -70,6 +71,7 @@ str8 CommandsDescriptions[] = {
  {(u8 *)"Delete note", 11},
  {(u8 *)"Set note length", 15},
  {(u8 *)"Select instrument", 17},
+ {(u8 *)"Add staff octave below", 22},
  {(u8 *)"Close", 5},
  {(u8 *)"Open", 4},
  
@@ -90,6 +92,7 @@ str8 CommandsTags[] = {
  {(u8 *)"Panel", 5},
  {(u8 *)"Panel", 5},
  {(u8 *)"Panel", 5},
+ {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
@@ -144,6 +147,7 @@ Command_None,
  Command_PieceDeleteNote,
  Command_PieceSetNoteLength,
  Command_PieceSelectInstrument,
+ Command_PieceAddStaff,
  Command_CloseLister,
  Command_OpenLister,
  
@@ -182,6 +186,7 @@ false,
  false,
  false,
  false,
+ false,
  true,
  
 };
@@ -193,11 +198,12 @@ PanelKind_Empty,
  PanelKind_Piece,
  PanelKind_Controls,
  PanelKind_Debug,
+ PanelKind_Piano,
  PanelKind_Count
 };
 typedef enum panel_kind panel_kind;
 
 str8 PanelTypeStrings[] = {
-{(u8 *)"Empty", 5},{(u8 *)"Piece", 5},{(u8 *)"Controls", 8},{(u8 *)"Debug", 5},
+{(u8 *)"Empty", 5},{(u8 *)"Piece", 5},{(u8 *)"Controls", 8},{(u8 *)"Debug", 5},{(u8 *)"Piano", 5},
 };
 

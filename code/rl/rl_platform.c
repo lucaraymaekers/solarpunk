@@ -785,6 +785,12 @@ BASE_ENTRY_POINT()
         
         DebugSpacer();
         
+        if(DisabledButton(S8("Reload"), RecordingHasNoSteps))
+        {
+         Replay.StepIdx = 0;
+         Replay.IsSkipping = true;
+        }
+        
         UI_Row()
          UI_SemanticWidth(UI_SizeParent(.5f, 1.f))
         {                            

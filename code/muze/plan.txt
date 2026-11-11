@@ -1,10 +1,35 @@
-# Now
-- Visualize note played when practicing
+
+access scopes 
+asynchronous filling cache
+asynchronous eviction
+-> Hold onto this data 
+
+cancel eviction paths
+
+10/11/2026
+3:44:00 Network Immediate-Mode
+
+Muze:
+
+Visual
+1. Guess on which staff the note should go
+2. AddStaff
+3. Display multiple staffs 
+
+Piano custom draw for debuggin
+
+
+
+# No
+x Visualize note played when practicing
 - Multi-Staff / Toggling staffs / 1 Staff = 1 Voice
   - Have multiple voices in one staff.
 - Dichter und Bauer
-- Transpose everything (But not visually)
+- Transpose everything (But not visually) *E.g., key up by 1 + all pitches up by 1
 - ClosePanel bug
+
+- Hidden property removed from PieceNotes and only PracticeNotes.?
+  - Smaller size
 
 - Command lister
 

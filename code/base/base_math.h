@@ -60,6 +60,8 @@ union v4
 
 #define ColorU32(Name) {U32ToV4Arg(ColorU32_##Name)}
 
+#define V4FromU32(Value) (v4){U32ToV4Arg(Value)}
+
 #define U32ToV4Arg(Value) \
 ((f32)(((Value) >> 8*2) & 0xFF)/255.0f), \
 ((f32)(((Value) >> 8*1) & 0xFF)/255.0f), \
