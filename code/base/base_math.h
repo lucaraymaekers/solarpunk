@@ -4,6 +4,7 @@
 #define BASE_MATH_H
 
 #define S32Mod(a, m) (((a) % (m) + (m)) % (m))
+#define IntDivUp(A, B) (A + B - 1)/B
 
 //~ Types
 typedef struct range_s64 range_s64;

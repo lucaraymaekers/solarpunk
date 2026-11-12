@@ -37,6 +37,7 @@ CommandsTable:
  { PieceSetNoteLength,         false, "Piece",  "Set note length",                None  0 0 0 }
  { PieceSelectInstrument,      false, "Piece",  "Select instrument",              S     1 0 0 }
  { PieceAddStaff,              false, "Piece",  "Add staff octave below",         None  0 0 0 }
+ { PieceTrimAtFirstNote,       false, "Piece",  "Trim piece start at first note", None  0 0 0 }
  //- Lister
  { CloseLister,                false, "Lister", "Close",                          None  0 0 0 }
  { OpenLister,                 true,  "Lister", "Open",                           None  0 0 0 } 

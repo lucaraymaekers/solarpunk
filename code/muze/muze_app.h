@@ -25,12 +25,22 @@ struct piece_note
  s32 StaffIdx;
 };
 
+typedef enum cleff_kind cleff_kind;
+enum cleff_kind
+{
+ CleffKind_Treble,
+ CleffKind_Bass,
+ CleffKind_Alto,
+ CleffKind_Tenor,
+};
+
 typedef struct staff staff;
 struct staff
 {
  note_pitch Key;
  b32 Minor;
  s32 Octave;
+ cleff_kind CleffKind;
 };
 
 typedef struct piece piece; 
@@ -83,8 +93,6 @@ struct piece
  f32 StaffLineWidth;
  f32 TailHeight;
  f32 SetNoteLength;
- 
- s32 Octave; // Only for recording
 };
 
 //- Panels

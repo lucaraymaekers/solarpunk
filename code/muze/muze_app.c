@@ -439,6 +439,7 @@ ClosePanel(app_state *App, panel *Panel)
  }
  else if(IsLeafPanel(Collapse))
  {
+  
   // Remove the panel from the tree.
   {        
    if(!IsNilPanel(Panel->Next)) Panel->Next->Prev = Panel->Prev;
@@ -574,7 +575,7 @@ PieceNoteAddCode(piece *Piece,
   }
   
   Note->Kind = Kind;
-  Note->Pitch = Pitch + Note_Count*Piece->Octave;
+  Note->Pitch = Pitch + Note_Count*Piece->Staffs[0].Octave;
   Note->Length = Length;
   Note->Start = Piece->RecordLength;
   
@@ -642,11 +643,11 @@ PieceAlloc(app_state *App)
    Result->TimeSigNum = 2;
    Result->TimeSigDen = 4;
    Result->StaffCount = 1;
+   Result->Staffs[0].Octave = 5;
    
    // First note is nil
    Result->NoteCount = 1;
    Result->PracticeNoteCount = 1;
-   Result->Octave = 4;
    
    Result->BarPadding = 16.f;
    Result->BeatWidth = 64.f;
@@ -834,8 +835,9 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
   BarIdx = (BarIdx%BarsPerWidth);
   //Pos.Y += (f32)HeightIdx*2.f*StaffHeight;
   
-  Pos.Y += (f32)HeightIdx*Piece->StaffCount*2.f*StaffHeight;
+  f32 SizeToNextBar = (Piece->StaffCount*2.f*StaffHeight + StaffHeight);
   
+  Pos.Y += (f32)HeightIdx*SizeToNextBar;
  }
  
  f32 BarStart = 2.f*BarPadding + (f32)BarIdx*WholeBarWidth;
@@ -928,7 +930,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
       if(!Piece->BarWrappingDisabled)
       {
        BarPos.X = StaffPos.X;
-       BarPos.Y += (f32)Piece->StaffCount*2.f*StaffHeight;
+       BarPos.Y += (f32)Piece->StaffCount*2.f*StaffHeight + StaffHeight;
       }
      }
      
@@ -957,53 +959,53 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    f32 Start = 0.f;
    v2 *FollowPos = 0;
    b32 AlignMarkerToBarEnd = false;
-   f32 BarHeightIdx = 0;
+   f32 MarkerHeightIdx = 0;
    
    if(0) {}
    else if(Kind == PieceMarkerKind_Play)
    {
     Color = Color_Green;
     Start = Piece->PlayPos;
-    BarHeightIdx = 0.f;
+    MarkerHeightIdx = 0.f;
    }
    else if(Kind == PieceMarkerKind_PrevPlay)
    {
     Color = Color_Yellow;
     Start = Piece->PlayPos;
     FollowPos = &Piece->PrevPlayPos;
-    BarHeightIdx = 0.f;
+    MarkerHeightIdx = 0.f;
    }
    else if(Kind == PieceMarkerKind_Record)
    {
     Color = Color_Red;
     Start = Piece->RecordLength;
     AlignMarkerToBarEnd = true;
-    BarHeightIdx = 1.f;
+    MarkerHeightIdx = 1.f;
    }
    else if(Kind == PieceMarkerKind_PracticeStart)
    {
     Color = Color_Blue;
     Start = Piece->PracticeStart;
-    BarHeightIdx = 2.f;
+    MarkerHeightIdx = 2.f;
    }
    else if(Kind == PieceMarkerKind_PracticeEnd)
    {
     Color = Color_Orange;
     Start = Piece->PracticeEnd;
-    BarHeightIdx = 3.f;
+    MarkerHeightIdx = 3.f;
    }
    else if(Kind == PieceMarkerKind_PracticePos)
    {
     Color = Color_Green;
     Start = Piece->PracticePos;
-    BarHeightIdx = 4.f;
+    MarkerHeightIdx = 4.f;
    }
    else if(Kind == PieceMarkerKind_PrevPracticePos)
    {
     Color = Color_Green;
     Start = Piece->PracticePos;
     FollowPos = &Piece->PrevPracticePos;
-    BarHeightIdx = 4.f;
+    MarkerHeightIdx = 4.f;
    }
    else
    {
@@ -1021,7 +1023,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    }
    
    v2 MarkerPos = PiecePosFromTime(Piece, Start, Pos, AlignMarkerToBarEnd, BarsPerWidth, StaffHeight);
-   MarkerPos.Y += BarHeightIdx*NoteDim.Y;
+   MarkerPos.Y += MarkerHeightIdx*NoteDim.Y;
    
    if(FollowPos)
    {
@@ -1113,6 +1115,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
     NotePos = PiecePosFromTime(Piece, Note->Start, Pos, false, BarsPerWidth, StaffHeight);
     NotePos.Y += .5f*StaffLineWidth;
+    NotePos.Y += ((f32)Note->StaffIdx*2.f*StaffHeight);
     
     if(0) {}
     else if(Note->Kind == PieceNoteKind_Rest)
@@ -1146,10 +1149,10 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      
      // Calculate position
      {
-      s32 RelOctave = 6;
+      s32 RelOctave = Piece->Staffs[Note->StaffIdx].Octave;
       // Get Y From pitch
       // Sets the notes at the octave's C
-      s32 MinStepCount = 5;
+      s32 MinStepCount = -(BaseNote_Count + 2);
       f32 StepSize = NoteSize/2.f;
       
       s32 NoteOctave = Note->Pitch/Note_Count;
@@ -2598,10 +2601,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
              
              str8 PieceFilePath = S8("song.muze_piece");
              
+#if 0 && MUZE_INTERNAL     
              if(!Memory->Initialized)
              {             
               M_SerializePiece(FrameArena, true, PieceFilePath, Piece); 
              }
+#endif
              
              ui_box *PieceBox;
              // UI for piece panel
@@ -2803,40 +2808,18 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   f32 WholeBarWidth = Piece->BeatWidth*Piece->TimeSigNum + 2.f*Piece->BarPadding;
                   s32 BarsPerWidth = (s32)((PieceBox->FixedSize.X - 2.f*Piece->BarPadding)/WholeBarWidth);
                   BarsPerWidth = Max(1, BarsPerWidth);
-                  s32 BarCount = (s32)Max(1.f, CeilF32(Piece->RecordLength/Piece->TimeSigNum));
-                  
-#if 0            
-                  // TODO(luca): Maybe we want this API, waiting for 3rd case
-                  s32 WholeBarWidth = PieceWholeBarWidth(Piece);
-                  s32 BarCount = PieceBarCount(Piece);
-                  s32 BarsPerWidth = PieceBarsPerWidth(Piece, WholeBarWidth);
-                  f32 StaffHeight = PieceStaffHeight(Piece);
-                  
-                  s32 Rows = ((BarCount/BarsPerWidth + 1)*2);
-                  f32 Height = StaffHeight*Rows; 
-                  
-                  // Or something like this
-                  f32 Height = PieceHeight();
-                  // Or compute it in Piece
-                  f32 Height = PieceHeight();
-#endif
-                  
                   s32 StaffLineCount = 5;
                   f32 StaffLineWidth = Piece->StaffLineWidth;
                   f32 StaffHeight = (f32)(StaffLineCount-1)*Piece->NoteSize + StaffLineWidth;
                   
-#define IntDivUp(A, B) (A + B - 1)/B
-                  
+                  v2 Pos = PiecePosFromTime(Piece, Piece->RecordLength, PieceBox->FixedPos, true,
+                                            BarsPerWidth, StaffHeight);
+                  f32 PieceHeight = ((Pos.Y - PieceBox->FixedPos.Y) +
+                                     (f32)Piece->StaffCount*StaffHeight + 
+                                     StaffHeight);
                   f32 Height = PieceBox->FixedSize.Y;
-                  s32 Rows = IntDivUp(BarCount, BarsPerWidth);
-                  Rows *= Piece->StaffCount;
                   
-                  f32 FullHeightForStaff = 2.f*StaffHeight;
-                  
-                  f32 HeightForRows = (f32)Rows*FullHeightForStaff; 
-                  HeightForRows += 0.f*FullHeightForStaff; // 1 for top and 1 for below
-                  
-                  VerticalOverflow = HeightForRows - Height;
+                  VerticalOverflow = PieceHeight - Height;
                  }
                  
                  if(VerticalOverflow > 0.f)
@@ -3490,9 +3473,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceDeleteNote:
     {
-     MemoryCopy(Piece->Notes + Piece->SelectedNoteIdx, 
-                Piece->Notes + Piece->SelectedNoteIdx + 1,
-                Piece->NoteCount - Piece->SelectedNoteIdx + 1);
+     if(Piece->NoteCount)
+     {
+      MemoryCopy(Piece->Notes + Piece->SelectedNoteIdx, 
+                 Piece->Notes + Piece->SelectedNoteIdx + 1,
+                 (Piece->NoteCount - (Piece->SelectedNoteIdx + 1))*sizeof(piece_note));
+      Piece->NoteCount -= 1;
+     }
     } break;
     
     case Command_PieceSetNoteLength:
@@ -3505,10 +3492,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
      PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Instruments;
     } break;
     
-    
     case Command_PieceAddStaff:
     {
+     staff *PreviousStaff = Piece->Staffs + (Piece->StaffCount - 1);
+     staff *Staff = Piece->Staffs + Piece->StaffCount;
+     
+     *Staff = *PreviousStaff;
+     // Two octaves below
+     Staff->Octave -= 1;
+     
      Piece->StaffCount += 1;
+    } break;
+    
+    case Command_PieceTrimAtFirstNote:
+    {
+     
     } break;
    }
    
@@ -3635,6 +3633,21 @@ UPDATE_AND_RENDER(UpdateAndRender)
        Note->Pitch = Pitch;
        Note->Length = 0.f;
        Note->Start = Piece->RecordLength;
+       
+       s32 PitchDiff = S32Max;
+       for EachIndex(StaffIdx, Piece->StaffCount)
+       {        
+        s32 Octave = Piece->Staffs[StaffIdx].Octave;
+        
+        s32 Diff = (Note->Pitch - (Octave*12));
+        if(Diff < 0) Diff *= -1;
+        
+        if(Diff < PitchDiff)
+        {
+         Note->StaffIdx = StaffIdx;
+         PitchDiff = Diff;
+        }
+       }
        
        TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Velocity);
        

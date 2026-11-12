@@ -20,6 +20,7 @@ enum ms_version
  MSV_PieceNoteKindAddAndZerothNote,
  MSV_PieceNoteHidden,
  MSV_PieceMultiStaff,
+ MSV_StaffCleffKind,
  MSV_Count,
 };
 typedef enum ms_serializer_version ms_serializer_version;

@@ -11,6 +11,15 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
 }
 
 internal void
+MS_Staff(ms_serializer *Serializer, staff *Staff)
+{
+ MS_Add(MSV_PieceMultiStaff, &Staff->Key);
+ MS_Add(MSV_PieceMultiStaff, &Staff->Minor);
+ MS_Add(MSV_PieceMultiStaff, &Staff->Octave);
+ MS_Add(MSV_StaffCleffKind, &Staff->CleffKind);
+}
+
+internal void
 MS_PieceNote(ms_serializer *Serializer, piece_note *Note)
 {
  MS_Add(MSV_Initial, &Note->Kind);
@@ -34,13 +43,14 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   MS_Ser(Serializer, &Piece->Staffs[0].Key); 
   MS_Ser(Serializer, &Piece->Staffs[0].Minor); 
   Piece->Staffs[0].Minor ^= 1; // Used to be "Major"
+  Piece->Staffs[0].Octave = 5;
  }
  else
  {
   MS_Ser(Serializer, &Piece->StaffCount);
   for EachIndex(Idx, Piece->StaffCount)
   {
-   MS_Ser(Serializer, (Piece->Staffs + Idx));
+   MS_Staff(Serializer, (Piece->Staffs + Idx));
   }
  }
  
