@@ -12,6 +12,8 @@
 #endif
 #include <time.h>
 #include "rl/generated/rl_tables.meta.c"
+#include "rl/generated/rl_font.meta.c"
+#include "rl/rl_font.h"
 #include "rl/rl_platform.h"
 #include "rl/rl_libs.h"
 
@@ -116,7 +118,7 @@ DrawRectangle(app_offscreen_buffer *Buffer,
  }
  
  u32 ColorValue = 
-    ((u32)(0xFF << 3*8)) | 
+ ((u32)(0xFF << 3*8)) | 
  (RoundReal32ToUInt32(Color.X * 255.0f) << 2*8) | 
  (RoundReal32ToUInt32(Color.Y * 255.0f) << 1*8) |
  (RoundReal32ToUInt32(Color.Z * 255.0f) << 0*8);
@@ -353,7 +355,6 @@ CurlCBWriteToArena(void *Buffer, umm Size, umm DataSize, void *UserPointer)
 
 struct get_todays_wordle_curl_params
 {
- b32 *Done;
  arena *Arena;
  rune *Word;
 };
@@ -371,9 +372,9 @@ struct platform_work_queue_entry
 
 PLATFORM_WORK_QUEUE_CALLBACK(GetTodaysWordleCurl)
 {
- arena *Arena = ((get_todays_wordle_curl_params *)Data)->Arena;
- b32 *Done = ((get_todays_wordle_curl_params *)Data)->Done;
- rune *Word = ((get_todays_wordle_curl_params *)Data)->Word;
+ get_todays_wordle_curl_params *Params = (get_todays_wordle_curl_params *)Data;
+ arena *Arena = Params->Arena;
+ rune *Word = Params->Word;
  
  char URL[] = "https://www.nytimes.com/svc/wordle/v2";
  
@@ -403,10 +404,10 @@ PLATFORM_WORK_QUEUE_CALLBACK(GetTodaysWordleCurl)
 #if 0        
   curl_easy_setopt(CurlHandle, CURLOPT_HEADERFUNCTION, CurlCBLog);
 #endif
-        umm MatchAt = 0;
-        b32 IsMatch = false;
-        char *Str = (char *)((u8 *)Arena->Base + StartPos);
-        
+  umm MatchAt = 0;
+  b32 IsMatch = false;
+  char *Str = (char *)((u8 *)Arena->Base + StartPos);
+  
   if(CURLE_OK == (curl_easy_setopt(CurlHandle, CURLOPT_VERBOSE, 0L)) &&
      CURLE_OK == (curl_easy_setopt(CurlHandle, CURLOPT_URL, URLBuffer)) &&
      CURLE_OK == (curl_easy_setopt(CurlHandle, CURLOPT_WRITEFUNCTION, CurlCBWriteToArena)) &&
@@ -434,9 +435,9 @@ PLATFORM_WORK_QUEUE_CALLBACK(GetTodaysWordleCurl)
       break;
      }
     }
-            }
-            
-            curl_easy_cleanup(CurlHandle);
+   }
+   
+   curl_easy_cleanup(CurlHandle);
   }
   else
   {
@@ -457,8 +458,6 @@ PLATFORM_WORK_QUEUE_CALLBACK(GetTodaysWordleCurl)
  }
  
 #endif
- 
- *Done = true;
 }
 
 //- Input 
@@ -528,10 +527,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #endif
   
   FrameArena = PushArena(&GameState->Arena, MB(64), false);
+  SetStringsScratch(FrameArena);
   
-  InitFont(&GameState->RegularFont, PathFromExe(&GameState->Arena, S8("../data/font_regular.ttf")));
-  InitFont(&GameState->ItalicFont, PathFromExe(&GameState->Arena, S8("../data/font_italic.ttf")));
-  InitFont(&GameState->BoldFont, PathFromExe(&GameState->Arena, S8("../data/font_bold.ttf")));
+  InitFont(&GameState->RegularFont, PathFromExe(S8("../data/font_text_regular.ttf")));
+  InitFont(&GameState->ItalicFont, PathFromExe(S8("../data/font_text_italic.ttf")));
+  InitFont(&GameState->BoldFont, PathFromExe(S8("../data/font_text_bold.ttf")));
   Memory->Initialized = true;
  }
  
@@ -554,7 +554,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     if(!Key->IsSymbol)
     {
      if(0) {}
-                    else if(Key->Codepoint == 'u' && Key->Modifiers & PlatformKeyModifier_Control)
+     else if(Key->Codepoint == 'u' && Key->Modifiers & PlatformKeyModifier_Control)
      {
       *InputCount = 0;
      }
@@ -564,11 +564,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
       {
        *InputCount -= 1;
       }
-                    }
-                    else if('1' <= Key->Codepoint && Key->Codepoint <= '3')
-                    {
-                        GameState->SelectedColor = (u32)(Key->Codepoint - '1');
-                    }
+     }
+     else if('1' <= Key->Codepoint && Key->Codepoint <= '3')
+     {
+      GameState->SelectedColor = (u32)(Key->Codepoint - '1');
+     }
      else
      {
       if((Key->Codepoint >= 'A' &&
@@ -638,7 +638,15 @@ UPDATE_AND_RENDER(UpdateAndRender)
   {
    GameState->WordleWordIsValid = false;
    
-   //GetTodaysWordleCurl();
+   {
+    get_todays_wordle_curl_params Params = {};
+    
+    Params.Arena = &GameState->Arena;
+    Params.Word = GameState->WordleWord;
+    GetTodaysWordleCurl(NilP(platform_work_queue), &Params);
+    GameState->WordleWordIsValid = true;
+   }
+   
   }
  }
  
@@ -784,7 +792,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    //-Matche the pattern
    rune *Word = GameState->WordleWord;
    
-   str8 WordsFile = OS_ReadEntireFileIntoMemory(PathFromExe(FrameArena, S8("../data/wordled/words.txt")));
+   str8 WordsFile = OS_ReadEntireFileIntoMemory(PathFromExe(S8("../data/wordled/words.txt")));
    
    u64 WordsCount = WordsFile.Size / WORDLE_LENGTH;
    if(WordsFile.Data)
