@@ -1,3 +1,11 @@
+//-
+// Linux platform layer
+//-
+
+//~ Macros
+#define RL_PLATFORM_LINUX_DO_RESIZING 1
+
+//~ Libraries
 #include "base/base.h"
 #include "rl/rl_midi.h"
 
@@ -619,7 +627,9 @@ P_INIT()
     {            
      XRet = XStoreName(DisplayHandle, WindowHandle, WindowName);
      
+#if !RL_PLATFORM_LINUX_DO_RESIZING
      LinuxSetSizeHint(DisplayHandle, WindowHandle, Buffer->Dim.X, Buffer->Dim.Y, Buffer->Dim.X, Buffer->Dim.Y);
+#endif
      
      b32 DisableWindowDecorations = false;
      // Disable window decorations
@@ -802,93 +812,92 @@ P_PROCESS_MESSAGES()
 {
  linux_context *Linux = (linux_context *)Context;
  
- if(Linux)
- {
-  // Handle Cursor
-  if(Linux->Cursor != Input->PlatformCursor)
-  {        
-   Linux->Cursor = Input->PlatformCursor;
-   XUndefineCursor(Linux->DisplayHandle, Linux->WindowHandle);
-   switch(Input->PlatformCursor)
-   {
-    default:
-    case PlatformCursorShape_Arrow:
-    {
-     // NOTE(luca): Default, so nothing to do.
-    } break;
-    case PlatformCursorShape_None:
-    {
-     // NOTE(luca): Create transparent cursor.
-     XColor black = {0};
-     char NoData[8] = {0};
-     
-     Pixmap BitmapNoData = XCreateBitmapFromData(Linux->DisplayHandle, Linux->WindowHandle, NoData, 8, 8);
-     Cursor InvisibleCursor = XCreatePixmapCursor(Linux->DisplayHandle, BitmapNoData, BitmapNoData, 
-                                                  &black, &black, 0, 0);
-     XDefineCursor(Linux->DisplayHandle, Linux->WindowHandle, InvisibleCursor);
-     XFreeCursor(Linux->DisplayHandle, InvisibleCursor);
-     XFreePixmap(Linux->DisplayHandle, BitmapNoData);
-    } break;
-    case PlatformCursorShape_ResizeHorizontal:
-    {
-     Cursor vresize = XCreateFontCursor(Linux->DisplayHandle, XC_sb_h_double_arrow);
-     XDefineCursor(Linux->DisplayHandle, Linux->WindowHandle, vresize);
-    } break;
-    case PlatformCursorShape_ResizeVertical:
-    {
-     Cursor vresize = XCreateFontCursor(Linux->DisplayHandle, XC_sb_v_double_arrow);
-     XDefineCursor(Linux->DisplayHandle, Linux->WindowHandle, vresize);
-    } break;
-   }
-  }
-  
-  // Sound
+ 
+ // Handle Cursor
+ if(Linux->Cursor != Input->PlatformCursor)
+ {        
+  Linux->Cursor = Input->PlatformCursor;
+  XUndefineCursor(Linux->DisplayHandle, Linux->WindowHandle);
+  switch(Input->PlatformCursor)
   {
-   Input->MIDI.Events = PushArray(FrameArena, app_midi_event, KB(1));
-   
-   snd_seq_event_t *SeqEvent;
-   
-   while(snd_seq_event_input(MIDISeq, &SeqEvent) >= 0)
+   default:
+   case PlatformCursorShape_Arrow:
    {
-    // TODO(luca): Something more robuset that can detect new inputs and that doesn't force 
-    // us to select the device before being able to receive input from it.
-    b32 Handled = false;
+    // NOTE(luca): Default, so nothing to do.
+   } break;
+   case PlatformCursorShape_None:
+   {
+    // NOTE(luca): Create transparent cursor.
+    XColor black = {0};
+    char NoData[8] = {0};
     
-    midi_message Message = {0};
+    Pixmap BitmapNoData = XCreateBitmapFromData(Linux->DisplayHandle, Linux->WindowHandle, NoData, 8, 8);
+    Cursor InvisibleCursor = XCreatePixmapCursor(Linux->DisplayHandle, BitmapNoData, BitmapNoData, 
+                                                 &black, &black, 0, 0);
+    XDefineCursor(Linux->DisplayHandle, Linux->WindowHandle, InvisibleCursor);
+    XFreeCursor(Linux->DisplayHandle, InvisibleCursor);
+    XFreePixmap(Linux->DisplayHandle, BitmapNoData);
+   } break;
+   case PlatformCursorShape_ResizeHorizontal:
+   {
+    Cursor vresize = XCreateFontCursor(Linux->DisplayHandle, XC_sb_h_double_arrow);
+    XDefineCursor(Linux->DisplayHandle, Linux->WindowHandle, vresize);
+   } break;
+   case PlatformCursorShape_ResizeVertical:
+   {
+    Cursor vresize = XCreateFontCursor(Linux->DisplayHandle, XC_sb_v_double_arrow);
+    XDefineCursor(Linux->DisplayHandle, Linux->WindowHandle, vresize);
+   } break;
+  }
+ }
+ 
+ // Sound
+ {
+  snd_seq_event_t *SeqEvent;
+  
+  while(snd_seq_event_input(MIDISeq, &SeqEvent) >= 0)
+  {
+   // TODO(luca): Something more robuset that can detect new inputs and that doesn't force 
+   // us to select the device before being able to receive input from it.
+   b32 Handled = false;
+   
+   midi_message Message = {0};
+   {
+    snd_seq_event_data_t *Data = &SeqEvent->data;
+    switch(SeqEvent->type)
     {
-     snd_seq_event_data_t *Data = &SeqEvent->data;
-     switch(SeqEvent->type)
+     default: break;
+     
+     case SND_SEQ_EVENT_NOTEON:
      {
-      default: break;
-      
-      case SND_SEQ_EVENT_NOTEON:
-      {
-       Message.U8[0] = 0x90 | Data->note.channel;
-       Message.U8[1] = Data->note.note;
-       Message.U8[2] = Data->note.velocity;
-       Handled = true;
-      } break;
-      
-      case SND_SEQ_EVENT_NOTEOFF:
-      {
-       Message.U8[0] = 0x80 | Data->note.channel;
-       Message.U8[1] = Data->note.note;
-       Message.U8[2] = Data->note.velocity;
-       Handled = true;
-      } break;
-      
-      case SND_SEQ_EVENT_CONTROLLER:
-      {
-       Message.U8[0] = 0xB0 | Data->control.channel;
-       Message.U8[1] = (u8)Data->control.param;
-       Message.U8[2] = (u8)Data->control.value;
-       Handled = true;
-      } break;
-     }
+      Message.U8[0] = 0x90 | Data->note.channel;
+      Message.U8[1] = Data->note.note;
+      Message.U8[2] = Data->note.velocity;
+      Handled = true;
+     } break;
+     
+     case SND_SEQ_EVENT_NOTEOFF:
+     {
+      Message.U8[0] = 0x80 | Data->note.channel;
+      Message.U8[1] = Data->note.note;
+      Message.U8[2] = Data->note.velocity;
+      Handled = true;
+     } break;
+     
+     case SND_SEQ_EVENT_CONTROLLER:
+     {
+      Message.U8[0] = 0xB0 | Data->control.channel;
+      Message.U8[1] = (u8)Data->control.param;
+      Message.U8[2] = (u8)Data->control.value;
+      Handled = true;
+     } break;
     }
-    
-    if(Handled)
-    {
+   }
+   
+   if(Handled)
+   {
+    if(Input->MIDI.EventCount < ArrayCount(Input->MIDI.Events))
+    {                        
      app_midi_event *Event = Input->MIDI.Events + Input->MIDI.EventCount;
      Input->MIDI.EventCount += 1;
      
@@ -897,516 +906,517 @@ P_PROCESS_MESSAGES()
     }
    }
   }
-  
-  // Clipboard
-  Atom PropertyAtom = XInternAtom(Linux->DisplayHandle, "X11_CLIPBOARD_DATA", False);
-  Atom UTF8Atom = XInternAtom(Linux->DisplayHandle, "UTF8_STRING", False);
-  Atom StringAtom = XInternAtom(Linux->DisplayHandle, "STRING", False);
-  Atom TargetsAtom  = XInternAtom(Linux->DisplayHandle, "TARGETS", False);
-  Atom ClipboardAtom = XInternAtom(Linux->DisplayHandle, "CLIPBOARD", False);
+ }
+ 
+ // Clipboard
+ Atom PropertyAtom = XInternAtom(Linux->DisplayHandle, "X11_CLIPBOARD_DATA", False);
+ Atom UTF8Atom = XInternAtom(Linux->DisplayHandle, "UTF8_STRING", False);
+ Atom StringAtom = XInternAtom(Linux->DisplayHandle, "STRING", False);
+ Atom TargetsAtom  = XInternAtom(Linux->DisplayHandle, "TARGETS", False);
+ Atom ClipboardAtom = XInternAtom(Linux->DisplayHandle, "CLIPBOARD", False);
+ {
+  if(Input->PlatformSetClipboard)
   {
-   if(Input->PlatformSetClipboard)
-   {
-    Assert(Linux->Clipboard.Size < Linux->MaxClipboardSize);
-    
-    XSetSelectionOwner(Linux->DisplayHandle, ClipboardAtom, Linux->WindowHandle, CurrentTime);
-    
-    Linux->WeOwnClipboard = true;
-    Input->PlatformSetClipboard = false;
-   }
+   Assert(Linux->Clipboard.Size < Linux->MaxClipboardSize);
    
-   if(!Linux->WeOwnClipboard)
-   {
-    // TODO(luca): Poll on notify instead.
-    // NOTE(luca): Request CLIPBOARD as STRING target. 
-    XConvertSelection(Linux->DisplayHandle,
-                      ClipboardAtom,
-                      UTF8Atom,
-                      PropertyAtom,
-                      Linux->WindowHandle,
-                      CurrentTime);
-    
-   }
+   XSetSelectionOwner(Linux->DisplayHandle, ClipboardAtom, Linux->WindowHandle, CurrentTime);
+   
+   Linux->WeOwnClipboard = true;
+   Input->PlatformSetClipboard = false;
   }
   
-  XEvent WindowEvent = {0};
-  while(XPending(Linux->DisplayHandle) > 0)
+  if(!Linux->WeOwnClipboard)
   {
-   XNextEvent(Linux->DisplayHandle, &WindowEvent);
-   b32 FilteredEvent = XFilterEvent(&WindowEvent, 0);
-   if(FilteredEvent)
-   {
-    // TODO(luca): Log the event for debugging?
-    // NOTE(luca): I really don't know what I should expect here.
-   }
+   // TODO(luca): Poll on notify instead.
+   // NOTE(luca): Request CLIPBOARD as STRING target. 
+   XConvertSelection(Linux->DisplayHandle,
+                     ClipboardAtom,
+                     UTF8Atom,
+                     PropertyAtom,
+                     Linux->WindowHandle,
+                     CurrentTime);
    
-   switch(WindowEvent.type)
+  }
+ }
+ 
+ XEvent WindowEvent = {0};
+ while(XPending(Linux->DisplayHandle) > 0)
+ {
+  XNextEvent(Linux->DisplayHandle, &WindowEvent);
+  b32 FilteredEvent = XFilterEvent(&WindowEvent, 0);
+  if(FilteredEvent)
+  {
+   // TODO(luca): Log the event for debugging?
+   // NOTE(luca): I really don't know what I should expect here.
+  }
+  
+  switch(WindowEvent.type)
+  {
+   case SelectionClear:
    {
-    case SelectionClear:
-    {
-     Linux->WeOwnClipboard = false;
-     Log("Lost clipboard selection\n");
-    } break;
+    Linux->WeOwnClipboard = false;
+    Log("Lost clipboard selection\n");
+   } break;
+   
+   case SelectionRequest:
+   {
+    XSelectionRequestEvent *Event = (XSelectionRequestEvent *)&WindowEvent;
     
-    case SelectionRequest:
-    {
-     XSelectionRequestEvent *Event = (XSelectionRequestEvent *)&WindowEvent;
-     
-     Atom AtomToSend = Event->property;
-     
-     if(0) {}
-     else if(Event->target == StringAtom)
-     {
-      XChangeProperty(Linux->DisplayHandle, Event->requestor, Event->property, StringAtom, 8,
-                      PropModeReplace, (u8 *)Linux->Clipboard.Data, (int)Linux->Clipboard.Size);
-     }
-     else if(Event->target == UTF8Atom && Event->property != None)
-     {
-      XChangeProperty(Linux->DisplayHandle, Event->requestor, Event->property, UTF8Atom, 8,
-                      PropModeReplace, (u8 *)Linux->Clipboard.Data, (int)Linux->Clipboard.Size);
-     }
-     else
-     {
-      // NOTE(luca): Unsupported format, or requestor has not filled in 'property'
-      char *AtomName = XGetAtomName(Linux->DisplayHandle, Event->target);
-      Log("Unsupported request of type: '%s'\n", AtomName);
-      if(AtomName) XFree(AtomName);
-      
-      AtomToSend = None;
-     }
-     
-     // Send the clipboard event
-     {                    
-      XSelectionEvent Response = {0};
-      Response.type = SelectionNotify;
-      Response.requestor = Event->requestor;
-      Response.selection = Event->selection;
-      Response.target = Event->target;
-      Response.property = AtomToSend;
-      Response.time = Event->time;
-      
-      XSendEvent(Linux->DisplayHandle, Event->requestor, True, NoEventMask, (XEvent *)&Response);
-     }
-     
-    } break;
+    Atom AtomToSend = Event->property;
     
-    case SelectionNotify:
+    if(0) {}
+    else if(Event->target == StringAtom)
     {
-     XSelectionEvent *Event = (XSelectionEvent *)&WindowEvent;
-     if(!Linux->WeOwnClipboard && Input->PlatformWindowIsFocused)
-     {                    
-      if(Event->property != None)
+     XChangeProperty(Linux->DisplayHandle, Event->requestor, Event->property, StringAtom, 8,
+                     PropModeReplace, (u8 *)Linux->Clipboard.Data, (int)Linux->Clipboard.Size);
+    }
+    else if(Event->target == UTF8Atom && Event->property != None)
+    {
+     XChangeProperty(Linux->DisplayHandle, Event->requestor, Event->property, UTF8Atom, 8,
+                     PropModeReplace, (u8 *)Linux->Clipboard.Data, (int)Linux->Clipboard.Size);
+    }
+    else
+    {
+     // NOTE(luca): Unsupported format, or requestor has not filled in 'property'
+     char *AtomName = XGetAtomName(Linux->DisplayHandle, Event->target);
+     Log("Unsupported request of type: '%s'\n", AtomName);
+     if(AtomName) XFree(AtomName);
+     
+     AtomToSend = None;
+    }
+    
+    // Send the clipboard event
+    {                    
+     XSelectionEvent Response = {0};
+     Response.type = SelectionNotify;
+     Response.requestor = Event->requestor;
+     Response.selection = Event->selection;
+     Response.target = Event->target;
+     Response.property = AtomToSend;
+     Response.time = Event->time;
+     
+     XSendEvent(Linux->DisplayHandle, Event->requestor, True, NoEventMask, (XEvent *)&Response);
+    }
+    
+   } break;
+   
+   case SelectionNotify:
+   {
+    XSelectionEvent *Event = (XSelectionEvent *)&WindowEvent;
+    if(!Linux->WeOwnClipboard && Input->PlatformWindowIsFocused)
+    {                    
+     if(Event->property != None)
+     {
+      Atom AtomRet, Incr, Type;
+      int Format;
+      unsigned long Size, ItemsCount;
+      unsigned char *Data = 0;
+      int Ret;
+      
+      Ret = XGetWindowProperty(Linux->DisplayHandle, Linux->WindowHandle, 
+                               PropertyAtom, 0, 0, False, AnyPropertyType,
+                               &Type, &Format, &ItemsCount, &Size, &Data);
+      XFree(Data);
+      
+      Incr = XInternAtom(Linux->DisplayHandle, "INCR", False);
+      if(Type != Incr)
       {
-       Atom AtomRet, Incr, Type;
-       int Format;
-       unsigned long Size, ItemsCount;
-       unsigned char *Data = 0;
-       int Ret;
-       
-       Ret = XGetWindowProperty(Linux->DisplayHandle, Linux->WindowHandle, 
-                                PropertyAtom, 0, 0, False, AnyPropertyType,
-                                &Type, &Format, &ItemsCount, &Size, &Data);
-       XFree(Data);
-       
-       Incr = XInternAtom(Linux->DisplayHandle, "INCR", False);
-       if(Type != Incr)
-       {
-        if(Size > 0)
-        {                                
-         Ret = XGetWindowProperty(Linux->DisplayHandle, Linux->WindowHandle,
-                                  PropertyAtom, 0, (long)Size, False, AnyPropertyType,
-                                  &AtomRet, &Format, &ItemsCount, &Size, &Data);
-         
-         Size = ((unsigned long)Format/8)*ItemsCount;
-         
-         if(Size > Linux->MaxClipboardSize)
-         {
-          ErrorLog("Clipboard content exceeded max capacity.\n");
-          Size = Linux->MaxClipboardSize;
-         }
-         
-         MemoryCopy(Linux->Clipboard.Data, Data, Size);
-         Linux->Clipboard.Size = Size;
-         XFree(Data);
-         
-         // NOTE(luca): Own the selection so that we don't have to copy it again.
-         XSetSelectionOwner(Linux->DisplayHandle, ClipboardAtom, Linux->WindowHandle, CurrentTime);
-         Linux->WeOwnClipboard = true;
-         
+       if(Size > 0)
+       {                                
+        Ret = XGetWindowProperty(Linux->DisplayHandle, Linux->WindowHandle,
+                                 PropertyAtom, 0, (long)Size, False, AnyPropertyType,
+                                 &AtomRet, &Format, &ItemsCount, &Size, &Data);
+        
+        Size = ((unsigned long)Format/8)*ItemsCount;
+        
+        if(Size > Linux->MaxClipboardSize)
+        {
+         ErrorLog("Clipboard content exceeded max capacity.\n");
+         Size = Linux->MaxClipboardSize;
         }
-       }
-       else
-       {
-        NotImplemented();
+        
+        MemoryCopy(Linux->Clipboard.Data, Data, Size);
+        Linux->Clipboard.Size = Size;
+        XFree(Data);
+        
+        // NOTE(luca): Own the selection so that we don't have to copy it again.
+        XSetSelectionOwner(Linux->DisplayHandle, ClipboardAtom, Linux->WindowHandle, CurrentTime);
+        Linux->WeOwnClipboard = true;
+        
        }
       }
       else
       {
-       Window Owner = XGetSelectionOwner(Linux->DisplayHandle, ClipboardAtom);
-       if(Owner != None)
+       NotImplemented();
+      }
+     }
+     else
+     {
+      Window Owner = XGetSelectionOwner(Linux->DisplayHandle, ClipboardAtom);
+      if(Owner != None)
+      {
+       ErrorLog("X11 clipboard conversion failed.\n");
+      }
+     }
+     
+     // NOTE(luca): Signals the owner that the data has been read.
+     XDeleteProperty(Linux->DisplayHandle, Linux->WindowHandle, PropertyAtom);
+    }
+   } break;
+   
+   case KeyPress:
+   case KeyRelease:
+   {
+    KeySym Symbol = XLookupKeysym(&WindowEvent.xkey, 0);
+    b32 IsDown = (WindowEvent.type == KeyPress);
+    
+    b32 Alt = (WindowEvent.xkey.state & Mod1Mask);
+    b32 Shift  = (WindowEvent.xkey.state & ShiftMask);
+    b32 Control = (WindowEvent.xkey.state & ControlMask);
+    
+    //- How text input works 
+    // The needs:
+    //  1. Preserve game buttons, so that we can switch between a "game mode" or 
+    //     "text input mode".
+    //  2. Text input using the input method of the user which should allow for utf8 characters.
+    //  3. Hotkey support.  Eg. quickly navigating text.
+    // 3 will be supported by 2 for code reuse.
+    //
+    // We are going to send a buffer text button presses to the game layer, this solves these
+    // issues:
+    // - Pressing the same key multiple times in one frame.
+    // - Having modifiers be specific to each key press.
+    // - Not having to create a button record for each possible character in the structure.
+    // - Key events come in one at a time in the event loop, thus we need to have a buffer for
+    //   multiple keys pressed on a single frame.
+    //
+    // We store a count along the buffer and in the buffer we store the utf8 codepoint and its
+    // modifiers.
+    // The app code is responsible for traversing this buffer and applying the logic. 
+    
+    // The problem of input methods and hotkeys: 
+    // Basically the problem is that if we allow the input method and combos that could be 
+    // filtered by the input method it won't seem consistent to the user.
+    // So we don't allow key bound to the input method to have an effect and we only pass key
+    // inputs that have not been filtered.
+    //
+    // In the platform layer we handle the special case were the input methods creates non-
+    // printable characters and we decompose those key inputs since non-printable characters
+    // have no use anymore.
+    
+    // Extra:
+    // - I refuse to check which keys bind to what modifiers. It's not important.
+    
+    // - Handy resources: 
+    //   - https://www.coderstool.com/unicode-text-converter
+    //   - man Compose(5).
+    //   - https://en.wikipedia.org/wiki/Control_key#History
+    
+    // Text input
+    {                    
+     // TODO(luca): Refresh mappings.
+     // NOTE(luca): Only KeyPress events  see man page of Xutf8LookupString().  And skip filtered events for text input, but keep them for controller.
+     if(IsDown && !FilteredEvent)
+     {
+      // TODO(luca): Choose a better error value.
+      rune Codepoint = L'\b';
+      u8 LookupBuffer[4] = {0};
+      Status LookupStatus = {0};
+      
+      // Skip 0 to use as nil value
+      app_key_idx Id = Input->Text.Count + 1;
+      app_key *Key = Input->Text.Buffer + Id;
+      Input->Text.Count += 1;
+      b32 Handled = true;
+      
+      if(Shift)   Key->Modifiers |= PlatformKeyModifier_Shift;
+      if(Control) Key->Modifiers |= PlatformKeyModifier_Control;
+      if(Alt)     Key->Modifiers |= PlatformKeyModifier_Alt;
+      
+      s32 BytesLookedUp = Xutf8LookupString(Linux->InputContext, &WindowEvent.xkey, 
+                                            (char *)&LookupBuffer, ArrayCount(LookupBuffer), 
+                                            0, &LookupStatus);
+      Assert(LookupStatus != XBufferOverflow);
+      Assert(BytesLookedUp <= 4);
+      
+      b32 KeyHasLookup = ((LookupStatus != XLookupNone) && 
+                          (LookupStatus != XLookupKeySym));
+      
+      if(KeyHasLookup)
+      {
+       if(BytesLookedUp)
        {
-        ErrorLog("X11 clipboard conversion failed.\n");
+        Codepoint = ConvertUTF8StringToRune(LookupBuffer);
+        
+        b32 IsControlChar = (Control && BytesLookedUp == 1 && 
+                             (Codepoint < ' ' || Codepoint > '~'));
+        IsControlChar = (IsControlChar || Codepoint == 127); // Delete
+        if(IsControlChar)
+        {
+         Key->IsSymbol = true;
+         if(Codepoint != 8 &&
+            Codepoint != 127)
+         {
+          Key->IsSymbol = false;
+          Codepoint = (rune)((u8)(Symbol - XK_a) + 'a');
+         }
+        }
+        
+        // NOTE(luca): Input methods might produce non printable characters (< ' '). 
+        if(!Key->IsSymbol && (Codepoint >= ' ' || Codepoint < 0))
+        {                            
+         Key->Codepoint = Codepoint;
+         
+#if 0
+         Log("%d bytes '%c' %d (%c|%c|%c)\n", 
+             BytesLookedUp, 
+             (((char)Codepoint) >= ' ' ? (char)Codepoint : '\0'), Codepoint,
+             ((Shift)   ? 'S' : ' '),
+             ((Control) ? 'C' : ' '),
+             ((Alt)     ? 'A' : ' '));
+#endif
+         
+        }
+        else
+        {
+         // NOTE(luca): Fallthrough in next if statement
+         Key->IsSymbol = true;
+        }
+       }
+       else
+       {
+        InvalidPath();
        }
       }
       
-      // NOTE(luca): Signals the owner that the data has been read.
-      XDeleteProperty(Linux->DisplayHandle, Linux->WindowHandle, PropertyAtom);
+      if(!KeyHasLookup || Key->IsSymbol)
+      {
+       Key->IsSymbol = true;
+       
+       if(0) {}
+       else if(Symbol == XK_Up     || Symbol == XK_KP_Up)     
+        Key->Symbol = PlatformKey_Up;
+       else if(Symbol == XK_Left   || Symbol == XK_KP_Left)   
+        Key->Symbol = PlatformKey_Left;
+       else if(Symbol == XK_Right  || Symbol == XK_KP_Right)  
+        Key->Symbol = PlatformKey_Right;
+       else if(Symbol == XK_Down   || Symbol == XK_KP_Down)   
+        Key->Symbol = PlatformKey_Down;
+       else if(Symbol == XK_Delete || Symbol == XK_KP_Delete) 
+        Key->Symbol = PlatformKey_Delete;
+       else if(Symbol == XK_Home   || Symbol == XK_KP_Home)   
+        Key->Symbol = PlatformKey_Home;
+       else if(Symbol == XK_End    || Symbol == XK_KP_End)     
+        Key->Symbol = PlatformKey_End;
+       else if(Symbol == XK_Prior  || Symbol == XK_KP_Prior)  
+        Key->Symbol = PlatformKey_PageUp;
+       else if(Symbol == XK_Next   || Symbol == XK_KP_Next)   
+        Key->Symbol = PlatformKey_PageDown;
+       else if(Symbol == XK_Insert || Symbol == XK_KP_Insert)
+        Key->Symbol = PlatformKey_Insert;
+       else if(Symbol == XK_Shift_L || Symbol == XK_Shift_R)
+        Key->Symbol = PlatformKey_Shift;
+       else if(Symbol == XK_Control_L || Symbol == XK_Control_R)
+        Key->Symbol = PlatformKey_Control;
+       else if(Symbol == XK_Alt_L || Symbol == XK_Alt_R)
+        Key->Symbol = PlatformKey_Alt;
+       else if(Symbol == XK_Return || Symbol == XK_KP_Enter)
+        Key->Symbol = PlatformKey_Return;
+       
+       else if(Symbol == XK_Escape)    Key->Symbol = PlatformKey_Escape;
+       else if(Symbol == XK_Tab)       Key->Symbol = PlatformKey_Tab;
+       else if(Symbol == XK_BackSpace) Key->Symbol = PlatformKey_BackSpace;
+       
+       else if(Symbol >= XK_F1 && Symbol <= XK_F12) 
+       {
+        Key->Symbol = (platform_key)(PlatformKey_F1 + (Symbol - XK_F1));
+       }
+       
+       // NOTE(luca): Ignored
+       else if(Symbol == XK_KP_Begin || 
+               Symbol == XK_Super_L ||
+               Symbol == XK_Super_R || 
+               Symbol == XK_Num_Lock ||
+               Symbol == XK_Caps_Lock ||
+               Symbol == XK_ISO_Level3_Shift) 
+       {
+        Input->Text.Count -= 1;
+        Handled = false;
+       }
+       
+       else
+       {
+        Input->Text.Count -= 1;
+        DebugBreakMsg("Unhandled special key(%lu): %s (Consider adding it to the if statement above\n)", Symbol, LinuxReturnStringForSymbol(Symbol));
+        Handled = false;
+       }
+      }
+      
+      if(Handled)
+      {
+       DLLIDAppend(Input->Text.Buffer, Id, Input->Text.First, Input->Text.Last);
+      }
      }
-    } break;
+    }
     
-    case KeyPress:
-    case KeyRelease:
+    // Debug keys
+    
+    if(IsDown)
     {
-     KeySym Symbol = XLookupKeysym(&WindowEvent.xkey, 0);
-     b32 IsDown = (WindowEvent.type == KeyPress);
-     
-     b32 Alt = (WindowEvent.xkey.state & Mod1Mask);
-     b32 Shift  = (WindowEvent.xkey.state & ShiftMask);
-     b32 Control = (WindowEvent.xkey.state & ControlMask);
-     
-     //- How text input works 
-     // The needs:
-     //  1. Preserve game buttons, so that we can switch between a "game mode" or 
-     //     "text input mode".
-     //  2. Text input using the input method of the user which should allow for utf8 characters.
-     //  3. Hotkey support.  Eg. quickly navigating text.
-     // 3 will be supported by 2 for code reuse.
-     //
-     // We are going to send a buffer text button presses to the game layer, this solves these
-     // issues:
-     // - Pressing the same key multiple times in one frame.
-     // - Having modifiers be specific to each key press.
-     // - Not having to create a button record for each possible character in the structure.
-     // - Key events come in one at a time in the event loop, thus we need to have a buffer for
-     //   multiple keys pressed on a single frame.
-     //
-     // We store a count along the buffer and in the buffer we store the utf8 codepoint and its
-     // modifiers.
-     // The app code is responsible for traversing this buffer and applying the logic. 
-     
-     // The problem of input methods and hotkeys: 
-     // Basically the problem is that if we allow the input method and combos that could be 
-     // filtered by the input method it won't seem consistent to the user.
-     // So we don't allow key bound to the input method to have an effect and we only pass key
-     // inputs that have not been filtered.
-     //
-     // In the platform layer we handle the special case were the input methods creates non-
-     // printable characters and we decompose those key inputs since non-printable characters
-     // have no use anymore.
-     
-     // Extra:
-     // - I refuse to check which keys bind to what modifiers. It's not important.
-     
-     // - Handy resources: 
-     //   - https://www.coderstool.com/unicode-text-converter
-     //   - man Compose(5).
-     //   - https://en.wikipedia.org/wiki/Control_key#History
-     
-     // Text input
-     {                    
-      // TODO(luca): Refresh mappings.
-      // NOTE(luca): Only KeyPress events  see man page of Xutf8LookupString().  And skip filtered events for text input, but keep them for controller.
-      if(IsDown && !FilteredEvent)
-      {
-       // TODO(luca): Choose a better error value.
-       rune Codepoint = L'\b';
-       u8 LookupBuffer[4] = {0};
-       Status LookupStatus = {0};
-       
-       // Skip 0 to use as nil value
-       app_key_idx Id = Input->Text.Count + 1;
-       app_key *Key = Input->Text.Buffer + Id;
-       Input->Text.Count += 1;
-       b32 Handled = true;
-       
-       if(Shift)   Key->Modifiers |= PlatformKeyModifier_Shift;
-       if(Control) Key->Modifiers |= PlatformKeyModifier_Control;
-       if(Alt)     Key->Modifiers |= PlatformKeyModifier_Alt;
-       
-       s32 BytesLookedUp = Xutf8LookupString(Linux->InputContext, &WindowEvent.xkey, 
-                                             (char *)&LookupBuffer, ArrayCount(LookupBuffer), 
-                                             0, &LookupStatus);
-       Assert(LookupStatus != XBufferOverflow);
-       Assert(BytesLookedUp <= 4);
-       
-       b32 KeyHasLookup = ((LookupStatus != XLookupNone) && 
-                           (LookupStatus != XLookupKeySym));
-       
-       if(KeyHasLookup)
-       {
-        if(BytesLookedUp)
-        {
-         Codepoint = ConvertUTF8StringToRune(LookupBuffer);
-         
-         b32 IsControlChar = (Control && BytesLookedUp == 1 && 
-                              (Codepoint < ' ' || Codepoint > '~'));
-         IsControlChar = (IsControlChar || Codepoint == 127); // Delete
-         if(IsControlChar)
-         {
-          Key->IsSymbol = true;
-          if(Codepoint != 8 &&
-             Codepoint != 127)
-          {
-           Key->IsSymbol = false;
-           Codepoint = (rune)((u8)(Symbol - XK_a) + 'a');
-          }
-         }
-         
-         // NOTE(luca): Input methods might produce non printable characters (< ' '). 
-         if(!Key->IsSymbol && (Codepoint >= ' ' || Codepoint < 0))
-         {                            
-          Key->Codepoint = Codepoint;
-          
-#if 0
-          Log("%d bytes '%c' %d (%c|%c|%c)\n", 
-              BytesLookedUp, 
-              (((char)Codepoint) >= ' ' ? (char)Codepoint : '\0'), Codepoint,
-              ((Shift)   ? 'S' : ' '),
-              ((Control) ? 'C' : ' '),
-              ((Alt)     ? 'A' : ' '));
-#endif
-          
-         }
-         else
-         {
-          // NOTE(luca): Fallthrough in next if statement
-          Key->IsSymbol = true;
-         }
-        }
-        else
-        {
-         InvalidPath();
-        }
-       }
-       
-       if(!KeyHasLookup || Key->IsSymbol)
-       {
-        Key->IsSymbol = true;
-        
-        if(0) {}
-        else if(Symbol == XK_Up     || Symbol == XK_KP_Up)     
-         Key->Symbol = PlatformKey_Up;
-        else if(Symbol == XK_Left   || Symbol == XK_KP_Left)   
-         Key->Symbol = PlatformKey_Left;
-        else if(Symbol == XK_Right  || Symbol == XK_KP_Right)  
-         Key->Symbol = PlatformKey_Right;
-        else if(Symbol == XK_Down   || Symbol == XK_KP_Down)   
-         Key->Symbol = PlatformKey_Down;
-        else if(Symbol == XK_Delete || Symbol == XK_KP_Delete) 
-         Key->Symbol = PlatformKey_Delete;
-        else if(Symbol == XK_Home   || Symbol == XK_KP_Home)   
-         Key->Symbol = PlatformKey_Home;
-        else if(Symbol == XK_End    || Symbol == XK_KP_End)     
-         Key->Symbol = PlatformKey_End;
-        else if(Symbol == XK_Prior  || Symbol == XK_KP_Prior)  
-         Key->Symbol = PlatformKey_PageUp;
-        else if(Symbol == XK_Next   || Symbol == XK_KP_Next)   
-         Key->Symbol = PlatformKey_PageDown;
-        else if(Symbol == XK_Insert || Symbol == XK_KP_Insert)
-         Key->Symbol = PlatformKey_Insert;
-        else if(Symbol == XK_Shift_L || Symbol == XK_Shift_R)
-         Key->Symbol = PlatformKey_Shift;
-        else if(Symbol == XK_Control_L || Symbol == XK_Control_R)
-         Key->Symbol = PlatformKey_Control;
-        else if(Symbol == XK_Alt_L || Symbol == XK_Alt_R)
-         Key->Symbol = PlatformKey_Alt;
-        else if(Symbol == XK_Return || Symbol == XK_KP_Enter)
-         Key->Symbol = PlatformKey_Return;
-        
-        else if(Symbol == XK_Escape)    Key->Symbol = PlatformKey_Escape;
-        else if(Symbol == XK_Tab)       Key->Symbol = PlatformKey_Tab;
-        else if(Symbol == XK_BackSpace) Key->Symbol = PlatformKey_BackSpace;
-        
-        else if(Symbol >= XK_F1 && Symbol <= XK_F12) 
-        {
-         Key->Symbol = (platform_key)(PlatformKey_F1 + (Symbol - XK_F1));
-        }
-        
-        // NOTE(luca): Ignored
-        else if(Symbol == XK_KP_Begin || 
-                Symbol == XK_Super_L ||
-                Symbol == XK_Super_R || 
-                Symbol == XK_Num_Lock ||
-                Symbol == XK_Caps_Lock ||
-                Symbol == XK_ISO_Level3_Shift) 
-        {
-         Input->Text.Count -= 1;
-         Handled = false;
-        }
-        
-        else
-        {
-         Input->Text.Count -= 1;
-         DebugBreakMsg("Unhandled special key(%lu): %s (Consider adding it to the if statement above\n)", Symbol, LinuxReturnStringForSymbol(Symbol));
-         Handled = false;
-        }
-       }
-       
-       if(Handled)
-       {
-        DLLIDAppend(Input->Text.Buffer, Id, Input->Text.First, Input->Text.Last);
-       }
-      }
-     }
-     
-     // Debug keys
-     
-     if(IsDown)
-     {
-      if(0) {}
-      else if(Alt && (Symbol == XK_F2))
-      {
-       DebugBreak();
-      }
-      else if(Alt && (Symbol == XK_F3))
-      {
-       Trap();
-      }
-      else if(Alt && (Symbol == XK_F4))
-      {
-       *Running = false;
-      }
-     }
-     
-     // Game input
      if(0) {}
-     else if(Symbol == XK_Left)  ProcessKeyPress(&Input->ActionLeft, IsDown);
-     else if(Symbol == XK_Right) ProcessKeyPress(&Input->ActionRight, IsDown);
-     else if(Symbol == XK_Up)    ProcessKeyPress(&Input->ActionUp, IsDown);
-     else if(Symbol == XK_Down)  ProcessKeyPress(&Input->ActionDown, IsDown);
-     else if(Symbol == XK_a) ProcessKeyPress(&Input->MoveLeft, IsDown);
-     else if(Symbol == XK_s) ProcessKeyPress(&Input->MoveRight, IsDown);
-     else if(Symbol == XK_w) ProcessKeyPress(&Input->MoveUp, IsDown);
-     else if(Symbol == XK_r) ProcessKeyPress(&Input->MoveDown, IsDown);
-     
+     else if(Alt && (Symbol == XK_F2))
+     {
+      DebugBreak();
+     }
+     else if(Alt && (Symbol == XK_F3))
+     {
+      Trap();
+     }
+     else if(Alt && (Symbol == XK_F4))
+     {
+      *Running = false;
+     }
+    }
+    
+    // Game input
+    if(0) {}
+    else if(Symbol == XK_Left)  ProcessKeyPress(&Input->ActionLeft, IsDown);
+    else if(Symbol == XK_Right) ProcessKeyPress(&Input->ActionRight, IsDown);
+    else if(Symbol == XK_Up)    ProcessKeyPress(&Input->ActionUp, IsDown);
+    else if(Symbol == XK_Down)  ProcessKeyPress(&Input->ActionDown, IsDown);
+    else if(Symbol == XK_a) ProcessKeyPress(&Input->MoveLeft, IsDown);
+    else if(Symbol == XK_s) ProcessKeyPress(&Input->MoveRight, IsDown);
+    else if(Symbol == XK_w) ProcessKeyPress(&Input->MoveUp, IsDown);
+    else if(Symbol == XK_r) ProcessKeyPress(&Input->MoveDown, IsDown);
+    
 #if defined(RL_PLATFORM_COLEMAK)
-     uint Symbols[] = {LinuxColemakMIDIKeySymbolsDef};
+    uint Symbols[] = {LinuxColemakMIDIKeySymbolsDef};
 #else
-     uint Symbols[] = {LinuxQwertyMIDIKeySymbolsDef};
+    uint Symbols[] = {LinuxQwertyMIDIKeySymbolsDef};
 #endif
-     for EachElement(Idx, Symbols)
-     {
-      if(Symbol == Symbols[Idx]) ProcessKeyPress(&Input->MIDI.Buttons[Idx], IsDown);
-     }
-    } break;
-    
-    case ButtonPress:
-    case ButtonRelease:
+    for EachElement(Idx, Symbols)
     {
-     b32 IsDown = (WindowEvent.type == ButtonPress);
-     u32 ButtonValue = WindowEvent.xbutton.button;
-     
-     b32 Alt = (WindowEvent.xbutton.state & Mod1Mask);
-     b32 Shift  = (WindowEvent.xbutton.state & ShiftMask);
-     b32 Control = (WindowEvent.xbutton.state & ControlMask);
-     
-     platform_mouse_button_type ButtonType = {0};
-     if(0) {}
-     else if(ButtonValue == Button1) ButtonType = PlatformMouseButton_Left;
-     else if(ButtonValue == Button2) ButtonType = PlatformMouseButton_Middle;
-     else if(ButtonValue == Button3) ButtonType = PlatformMouseButton_Right;
-     else if(ButtonValue == Button4) ButtonType = PlatformMouseButton_ScrollUp;
-     else if(ButtonValue == Button5) ButtonType = PlatformMouseButton_ScrollDown;
-     
-     app_button_state *Button = &Input->Mouse.Buttons[ButtonType];
-     
-     ProcessKeyPress(Button, IsDown);
-     
-     if(Shift)   Button->Modifiers |= PlatformKeyModifier_Shift;
-     if(Control) Button->Modifiers |= PlatformKeyModifier_Control;
-     if(Alt)     Button->Modifiers |= PlatformKeyModifier_Alt;
-    } break;
+     if(Symbol == Symbols[Idx]) ProcessKeyPress(&Input->MIDI.Buttons[Idx], IsDown);
+    }
+   } break;
+   
+   case ButtonPress:
+   case ButtonRelease:
+   {
+    b32 IsDown = (WindowEvent.type == ButtonPress);
+    u32 ButtonValue = WindowEvent.xbutton.button;
     
-    case MotionNotify:
-    {
-     // TODO(luca): There can be multiple MotionNotify events per frame.  We should handle this if we want higher precision mouse movement.  E.g., drawing lines.
-     XMotionEvent *Event = (XMotionEvent *)&WindowEvent;
-     
-     Input->Mouse.Pos.X = Event->x;
-     Input->Mouse.Pos.Y = Event->y;
-    } break;
+    b32 Alt = (WindowEvent.xbutton.state & Mod1Mask);
+    b32 Shift  = (WindowEvent.xbutton.state & ShiftMask);
+    b32 Control = (WindowEvent.xbutton.state & ControlMask);
     
-    case ConfigureNotify:
-    {
-     XConfigureEvent *Event = (XConfigureEvent *)&WindowEvent;
-     // @resize TODO(luca): Implement smooth resizing.
-#if 0
-     Buffer->Width = Event->width;
-     Buffer->Height = Event->height;
-     Buffer->Pitch = Buffer->BytesPerPixel*Buffer->Width;
+    platform_mouse_button_type ButtonType = {0};
+    if(0) {}
+    else if(ButtonValue == Button1) ButtonType = PlatformMouseButton_Left;
+    else if(ButtonValue == Button2) ButtonType = PlatformMouseButton_Middle;
+    else if(ButtonValue == Button3) ButtonType = PlatformMouseButton_Right;
+    else if(ButtonValue == Button4) ButtonType = PlatformMouseButton_ScrollUp;
+    else if(ButtonValue == Button5) ButtonType = PlatformMouseButton_ScrollDown;
+    
+    app_button_state *Button = &Input->Mouse.Buttons[ButtonType];
+    
+    ProcessKeyPress(Button, IsDown);
+    
+    if(Shift)   Button->Modifiers |= PlatformKeyModifier_Shift;
+    if(Control) Button->Modifiers |= PlatformKeyModifier_Control;
+    if(Alt)     Button->Modifiers |= PlatformKeyModifier_Alt;
+   } break;
+   
+   case MotionNotify:
+   {
+    // TODO(luca): There can be multiple MotionNotify events per frame.  We should handle this if we want higher precision mouse movement.  E.g., drawing lines.
+    XMotionEvent *Event = (XMotionEvent *)&WindowEvent;
+    
+    Input->Mouse.Pos.X = Event->x;
+    Input->Mouse.Pos.Y = Event->y;
+   } break;
+   
+   case ConfigureNotify:
+   {
+    XConfigureEvent *Event = (XConfigureEvent *)&WindowEvent;
+    // @resize TODO(luca): Implement smooth resizing.
+#if RL_PLATFORM_LINUX_DO_RESIZING
+    Buffer->Dim.X = Event->width;
+    Buffer->Dim.Y = Event->height;
+    Buffer->Pitch = Buffer->BytesPerPixel*Buffer->Dim.X;
 #endif
-     
-    } break;
     
-    case DestroyNotify:
+   } break;
+   
+   case DestroyNotify:
+   {
+    XDestroyWindowEvent *Event = (XDestroyWindowEvent *)&WindowEvent;
+    if(Event->window == Linux->WindowHandle)
     {
-     XDestroyWindowEvent *Event = (XDestroyWindowEvent *)&WindowEvent;
-     if(Event->window == Linux->WindowHandle)
-     {
-      *Running = false;
-     }
-    } break;
+     *Running = false;
+    }
+   } break;
+   
+   case ClientMessage:
+   {
+    XClientMessageEvent *Event = (XClientMessageEvent *)&WindowEvent;
+    if((Atom)Event->data.l[0] == Linux->WM_DELETE_WINDOW)
+    {
+     XDestroyWindow(Linux->DisplayHandle, Linux->WindowHandle);
+     *Running = false;
+    }
+   } break;
+   
+   // TODO(luca): Collapse with Enter- and LeaveNotify
+   // TODO(luca): Check if window is focused at startup as well.
+   case FocusIn:
+   case FocusOut:
+   {
+    XFocusChangeEvent *Event = (XFocusChangeEvent *)&WindowEvent;
+    b32 IsFocused = (Event->type == FocusIn); 
     
-    case ClientMessage:
-    {
-     XClientMessageEvent *Event = (XClientMessageEvent *)&WindowEvent;
-     if((Atom)Event->data.l[0] == Linux->WM_DELETE_WINDOW)
-     {
-      XDestroyWindow(Linux->DisplayHandle, Linux->WindowHandle);
-      *Running = false;
-     }
-    } break;
+    s32 Mode = Event->mode;
     
-    // TODO(luca): Collapse with Enter- and LeaveNotify
-    // TODO(luca): Check if window is focused at startup as well.
-    case FocusIn:
-    case FocusOut:
+    if(Mode == NotifyWhileGrabbed ||
+       Mode == NotifyNormal)
     {
-     XFocusChangeEvent *Event = (XFocusChangeEvent *)&WindowEvent;
-     b32 IsFocused = (Event->type == FocusIn); 
+     Input->PlatformWindowIsFocused = IsFocused;
      
-     s32 Mode = Event->mode;
-     
-     if(Mode == NotifyWhileGrabbed ||
-        Mode == NotifyNormal)
-     {
-      Input->PlatformWindowIsFocused = IsFocused;
-      
 #if 0                        
-      // TODO(luca): If cursor is inside window
-      LinuxShowCursor(Linux, IsFocused);
+     // TODO(luca): If cursor is inside window
+     LinuxShowCursor(Linux, IsFocused);
 #endif
-      
-     }
      
-    } break;
+    }
     
-    case EnterNotify:
-    case LeaveNotify:
+   } break;
+   
+   case EnterNotify:
+   case LeaveNotify:
+   {
+    XCrossingEvent *Event = (XCrossingEvent *)&WindowEvent;
+    b32 Entered = (Event->type == EnterNotify);
+    
+    if(!Entered)
     {
-     XCrossingEvent *Event = (XCrossingEvent *)&WindowEvent;
-     b32 Entered = (Event->type == EnterNotify);
-     
-     if(!Entered)
-     {
-      Input->Mouse.Pos.X = -1;
-      Input->Mouse.Pos.Y = -1;
-     }
-     
-#if 0                    
-     if(Input->WindowIsFocused)
-     {
-      LinuxShowCursor(Linux, Entered);
-     }
-#endif
-     
-    } break;
+     Input->Mouse.Pos.X = -1;
+     Input->Mouse.Pos.Y = -1;
+    }
     
-   }
+#if 0                    
+    if(Input->WindowIsFocused)
+    {
+     LinuxShowCursor(Linux, Entered);
+    }
+#endif
+    
+   } break;
+   
   }
-  
-  Input->PlatformClipboard = Linux->Clipboard;
  }
+ 
+ Input->PlatformClipboard = Linux->Clipboard;
+ 
 }
 
 P_UPDATE_IMAGE()

@@ -820,8 +820,8 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
  // are placed on the end of the bar and not on the next bar's start.
  if(AlignToEnd)
  {
-  BarIdx = (Start == 0.f ? 0 : (s32)CeilF32(Start/BeatsPerBar) - 1);
-  Remainder = Start - BeatsPerBar*(f32)BarIdx;
+        BarIdx = (Start == 0.f ? 0 : (s32)CeilF32(Start/(f32)BeatsPerBar) - 1);
+        Remainder = Start - (f32)BeatsPerBar*(f32)BarIdx;
  }
  else
  {
@@ -835,7 +835,7 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
   BarIdx = (BarIdx%BarsPerWidth);
   //Pos.Y += (f32)HeightIdx*2.f*StaffHeight;
   
-  f32 SizeToNextBar = (Piece->StaffCount*2.f*StaffHeight + StaffHeight);
+        f32 SizeToNextBar = ((f32)Piece->StaffCount*2.f*StaffHeight + StaffHeight);
   
   Pos.Y += (f32)HeightIdx*SizeToNextBar;
  }
@@ -2846,7 +2846,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   v2 Pos = PiecePosFromTime(Piece, Piece->RecordLength, PieceBox->FixedPos, true,
                                             BarsPerWidth, StaffHeight);
                   f32 PieceHeight = ((Pos.Y - PieceBox->FixedPos.Y) +
-                                     (f32)Piece->StaffCount*StaffHeight + 
+                                     (f32)Piece->StaffCount*StaffHeight*2.f + 
                                      StaffHeight);
                   f32 Height = PieceBox->FixedSize.Y;
                   

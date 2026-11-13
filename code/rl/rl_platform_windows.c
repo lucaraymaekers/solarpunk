@@ -913,6 +913,7 @@ P_PROCESS_MESSAGES()
 #if RL_PLATFORM_WIN32_DO_RESIZING
   Buffer->Dim.X = GlobalBufferWidth;
   Buffer->Dim.Y = GlobalBufferHeight;
+  Buffer->Pitch = Buffer->BytesPerPixel*Buffer->Dim.X;
 #endif
   
   // Mouse
