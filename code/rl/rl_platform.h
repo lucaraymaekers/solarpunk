@@ -77,12 +77,12 @@ typedef enum platform_key_modifier platform_key_modifier;
 
 #define PlatformKeyModifier_Any (PlatformKeyModifier_Control|PlatformKeyModifier_Shift|PlatformKeyModifier_Alt)
 
-typedef u64 app_key_id;
+typedef u64 app_key_idx;
 typedef struct app_key app_key;
 struct app_key
 {
- app_key_id Next;
- app_key_id Prev;
+ app_key_idx Next;
+ app_key_idx Prev;
  
  union
  {
@@ -162,16 +162,16 @@ struct app_input
  struct
  {
   // NOTE(luca): This makes it easily serializable.
-  app_key Buffer[64];
+  app_key Buffer[32];
   u64 Count;
   
-  app_key_id First;
-  app_key_id Last;
+  app_key_idx First;
+  app_key_idx Last;
  } Text;
  
  struct
  {
-  app_midi_event *Events;
+  app_midi_event Events[32];
   u64 EventCount;
   
   union
@@ -352,7 +352,7 @@ MousePosFromInput(app_input *Input)
 }
 
 internal void
-RemoveTextButton(app_input *Input, app_key_id Id)
+RemoveTextButton(app_input *Input, app_key_idx Id)
 {
  app_key *Key = Input->Text.Buffer + Id;
  
@@ -365,7 +365,7 @@ RemoveTextButton(app_input *Input, app_key_id Id)
 #define EachTextButton(Key, Id, Input) \
 EachTextButton_(Key, Id, Input, Var(Counter))
 #define EachTextButton_(Key, Id, Input, Counter) \
-(app_key_id Id = Input->Text.First; \
+(app_key_idx Id = Input->Text.First; \
 Id != 0; \
 ) for(app_key *Key = Input->Text.Buffer + Id, *Counter = 0; \
 !Counter; \

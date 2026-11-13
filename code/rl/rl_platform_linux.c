@@ -1114,7 +1114,7 @@ P_PROCESS_MESSAGES()
        Status LookupStatus = {0};
        
        // Skip 0 to use as nil value
-       app_key_id Id = Input->Text.Count + 1;
+       app_key_idx Id = Input->Text.Count + 1;
        app_key *Key = Input->Text.Buffer + Id;
        Input->Text.Count += 1;
        b32 Handled = true;
@@ -1244,10 +1244,7 @@ P_PROCESS_MESSAGES()
        
        if(Handled)
        {
-        if(Input->Text.First == 0) Input->Text.First = Id;
-        if(Input->Text.Last  != 0) Input->Text.Buffer[Input->Text.Last].Next = Id;
-        Key->Prev = Input->Text.Last;
-        Input->Text.Last = Id;
+        DLLIDAppend(Input->Text.Buffer, Id, Input->Text.First, Input->Text.Last);
        }
       }
      }

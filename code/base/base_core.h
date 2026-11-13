@@ -289,17 +289,27 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 //~ List macros
 #define CheckNil(Datum, Nil) (Datum == 0 || Datum == Nil)
 
-#define DLLAppend(Node, First, Last) \
-((!First ? First = Node : 0), \
-(Last ? Last->Next = Node : 0), \
-Node->Prev = Last, \
-Last = Node)
-
 #define DLLAppendNil(Node, First, Last, Nil) \
 ((CheckNil(First, Nil) ? First = Node : 0), \
 (!CheckNil(Last, Nil) ? Last->Next = Node : 0), \
 Node->Prev = Last, \
 Last = Node)
+
+#if 1
+# define DLLAppend(Node, First, Last) DLLAppendNil(Node, First, Last, 0)
+#else
+# define DLLAppend(Node, First, Last) \
+((!First ? First = Node : 0), \
+(Last ? Last->Next = Node : 0), \
+Node->Prev = Last, \
+Last = Node)
+#endif
+
+#define DLLIDAppend(Buffer, Idx, First, Last) \
+((First == 0 ? First = Idx : 0), \
+(Last != 0 ? Buffer[Last].Next = Idx : 0), \
+Buffer[Idx].Prev = Last, \
+Last = Idx)
 
 #define DLLInsertNil(Node, To, First, Last) \
 

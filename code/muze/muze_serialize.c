@@ -43,7 +43,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   MS_Ser(Serializer, &Piece->Staffs[0].Key); 
   MS_Ser(Serializer, &Piece->Staffs[0].Minor); 
   Piece->Staffs[0].Minor ^= 1; // Used to be "Major"
-  Piece->Staffs[0].Octave = 5;
+  Piece->Staffs[0].Octave = 4;
  }
  else
  {

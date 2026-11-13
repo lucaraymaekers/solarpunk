@@ -19,6 +19,7 @@
   flat in f32 VS_BorderThickness;
   flat in f32 VS_Softness;
   flat in f32 VS_HasTexture;
+  flat in v2 VS_Viewport;
   
   uniform sampler2D Texture;
   
@@ -53,7 +54,7 @@
     v2 Max = VS_Clip.zw;
     v2 Pos = gl_FragCoord.xy;
     
-    Pos.y = 900 - Pos.y;
+    Pos.y = VS_Viewport.y - Pos.y;
     
     if(!(Pos.x >= Min.x && Pos.x <= Max.x &&
          Pos.y >= Min.y && Pos.y <= Max.y))

@@ -7,7 +7,7 @@
 #define f32 float
 #define b32 int
   
-  uniform v2 Viewport;
+  uniform v2 U_Viewport;
   
   out v2 VS_Pos;
   out v4 VS_Dest;
@@ -20,6 +20,7 @@
   flat out f32 VS_BorderThickness;
   flat out f32 VS_Softness;
   flat out f32 VS_HasTexture;
+  flat out v2 VS_Viewport;
   layout (location = 0) in v4 I_Dest;
  layout (location = 1) in v4 I_TexSrc;
  layout (location = 2) in v4 I_Clip;
@@ -45,7 +46,7 @@
     v2 PosInQuad = (Vertices[gl_VertexID] + 1.0) * 0.5;
     PixelPos = mix(Min, Max, PosInQuad);
     
-    ClipPos = (PixelPos / Viewport) * 2.0 - 1.0;
+    ClipPos = (PixelPos / U_Viewport) * 2.0 - 1.0;
     ClipPos.y = -ClipPos.y;
     
     HalfSize = (Max - Min)/2.0;
@@ -74,6 +75,7 @@
    VS_BorderThickness = I_BorderThickness;
    VS_Softness = I_Softness;
    VS_HasTexture = I_HasTexture;
+   VS_Viewport = U_Viewport;
    
    gl_Position = v4(ClipPos, 0.0, 1.0);
   }

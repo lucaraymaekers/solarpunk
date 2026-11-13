@@ -1117,21 +1117,48 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     NotePos.Y += .5f*StaffLineWidth;
     NotePos.Y += ((f32)Note->StaffIdx*2.f*StaffHeight);
     
+    b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
+                       UI_IsActive(Box));
+    v2 MousePos = V2V2S32(Input->Mouse.Pos);
+    
     if(0) {}
     else if(Note->Kind == PieceNoteKind_Rest)
     {
+     b32 IsHovered = false;
+     b32 IsSelected = false;
      // Each increment is halving the value.
      s32 WholeRest = 0xE4E3;
-     
      f32 WholeRestLength = 4.f;
      
-     f32 Size = -Log2F32(NoteLength/WholeRestLength);
+     font *Font = UI_State->Fonts[FontKind_Music];
      
+     f32 Size = -Log2F32(NoteLength/WholeRestLength);
      s32 Increment = (s32)RoundF32(Size);
      s32 Codepoint = WholeRest + Increment;
      
-     font *Font = UI_State->Fonts[FontKind_Music];
-     DrawRectChar(UI_State->Atlas, Font, NotePos, Codepoint, NoteColor);
+     rect_instance *Instance = DrawRectChar(UI_State->Atlas, Font, NotePos, Codepoint, NoteColor);
+     
+     IsSelected = (Idx == Piece->SelectedNoteIdx);
+     
+     if(InputIsOurs)
+     {
+      IsHovered = IsInsideRectV2(MousePos, Instance->Dest);
+      
+      if(IsHovered && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
+      {
+       PushCommand(App, Command_PieceSelectNote)->U64 = Idx;
+      }
+     }
+     
+     if(IsSelected)
+     {
+      RenderRectSetColor(Instance, Color_Orange);
+     }
+     
+     if(IsHovered)
+     {
+      RenderRectSetColor(Instance, Color_Blue);
+     }
     }
     else if(Note->Kind == PieceNoteKind_Pitch && !Note->Hidden)
     {
@@ -1173,9 +1200,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      v4 TailBounds = {0};
      // Is Hovered and compute bounds
      {
-      b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
-                         UI_IsActive(Box));
-      v2 MousePos = V2V2S32(Input->Mouse.Pos);
       
       HeadBounds = RectFromSize(NotePos, NoteDim);
       
@@ -2264,7 +2288,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    
    ui_box *Root = App->ListerBox;
    {    
-    Root->Key.U64[0] = U64HashFromSeedStr8((u64)Root, S8("Root"));
+    Root->Key.U64[0] = U64HashFromSeedStr8((u64)Root, S8("ListerRoot"));
     Root->FixedPos = V2(0.f, 0.f);
     Root->FixedSize = BufferDim;
     Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
@@ -2361,17 +2385,23 @@ UPDATE_AND_RENDER(UpdateAndRender)
             
             UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
             {
-             b32 IsFirstItem = (Idx == MinIdx);
-             b32 ItemSelected = (Button(.String = ItemString,
-                                        .Text = Item->Name, 
-                                        .Disabled = Selected, 
-                                        .BackgroundColor = (IsFirstItem ? 
-                                                            Color_Night1 :
-                                                            Color_ButtonBackground),
-                                        .DisabledBackgroundColor = Color_Yellow, 
-                                        .Padding = ItemPadding,
-                                        .ClipSize = false).Released || 
-                                 (App->ListerReturnPressed && IsFirstItem));
+             b32 IsFirstItem = false;
+             b32 ItemSelected = false;
+             
+             IsFirstItem = (Idx == MinIdx);
+             
+             UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
+              ItemSelected = (Button(.String = ItemString,
+                                     .Text = Item->Name, 
+                                     .Disabled = Selected, 
+                                     .BackgroundColor = (IsFirstItem ? 
+                                                         Color_Night1 :
+                                                         Color_ButtonBackground),
+                                     .DisabledBackgroundColor = Color_Yellow, 
+                                     .Padding = ItemPadding,
+                                     .ClipSize = false).Released || 
+                              (App->ListerReturnPressed && IsFirstItem));
+             
              if(ItemSelected)
              {
               switch(App->ListerKind)
@@ -2451,7 +2481,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   {
    ui_box *Root = App->TopBox;
    {    
-    Root->Key.U64[0] = U64HashFromSeedStr8((u64)Root, S8("Root"));
+    Root->Key.U64[0] = U64HashFromSeedStr8((u64)Root, S8("PanelsRoot"));
     Root->FixedPos = V2(0.f, 0.f);
     Root->FixedSize = BufferDim;
     Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
@@ -2475,6 +2505,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      UI_FillAll() UI_Push()
      {      
       panel *ResizePanel = NilPanel;
+      
       
       panel *Panel = App->FirstPanel;
       for(;!IsNilPanel(Panel);)
@@ -3412,11 +3443,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {
      if(Piece->Metronome)
      {
-      Piece->MetronomeTime = (Piece->IsPlaying ? Piece->PlayPos : 0.f);
       Piece->Metronome = false;
      }
      else
      {
+      Piece->MetronomeTime = (Piece->IsPlaying ? Piece->PlayPos : 0.f);
       Piece->Metronome = true;
      }
     } break;

@@ -269,7 +269,7 @@ BASE_ENTRY_POINT()
   s32 WindowBorderSize = 2;
   app_offscreen_buffer WindowBuffer = {0};
   WindowBuffer.Dim.X = 1600;
-  WindowBuffer.Dim.Y = 900 ;
+  WindowBuffer.Dim.Y = 900;
   WindowBuffer.BytesPerPixel = 4;
   WindowBuffer.Pitch = WindowBuffer.BytesPerPixel*WindowBuffer.Dim.X;
   WindowBuffer.Pixels = PushArray(PermanentArena, u8, (u64)(WindowBuffer.Pitch*WindowBuffer.Dim.Y));
@@ -393,7 +393,7 @@ BASE_ENTRY_POINT()
   b32 Paused = false;
   b32 Logging = false;
   
-  // NOTE(luca): 10 minutes of gameplay
+  // NOTE(luca): 20 minutes of gameplay, at 60Hz this is ~120MB
   u64 ReplayMaxRecordingFramesCount = (u64)GameUpdateHz * 60 * 10;
   u64 ReplayMaxBufferSize = AppMemory.MemorySize + (ReplayMaxRecordingFramesCount*sizeof(app_input));
   Replay.Buffer = PushArray(PermanentArena, u8, ReplayMaxBufferSize);

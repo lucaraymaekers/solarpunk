@@ -28,6 +28,8 @@ typedef HGLRC WINAPI wglCreateContextAttribsARBProc(HDC hDC,
                                                     const int *Attribs);
 global_variable wglCreateContextAttribsARBProc *wglCreateContextAttribsARB;
 
+#define RL_PLATFORM_WIN32_DO_RESIZING 1
+
 //~ Types
 typedef struct win32_context win32_context;
 struct win32_context
@@ -184,7 +186,7 @@ Win32MainWindowCallback(HWND Window,
   
   case WM_SIZE:
   {
-#if 0
+#if RL_PLATFORM_WIN32_DO_RESIZING
    GlobalBufferWidth = LOWORD(LParam);
    GlobalBufferHeight = HIWORD(LParam);
 #endif
@@ -193,16 +195,33 @@ Win32MainWindowCallback(HWND Window,
   
   case WM_SETCURSOR:
   {
-   if(GlobalCursor)
-   {
-    Result = DefWindowProcA(Window, Message, WParam, LParam);
-    
-    SetCursor(LoadCursorA(0, GlobalCursor));
+   // NOTE(luca): Do not override cursor when resizing window.
+   if(LOWORD(LParam) == HTCLIENT)
+   {    
+    if(GlobalCursor)
+    {
+     Result = DefWindowProcA(Window, Message, WParam, LParam);
+     
+     SetCursor(LoadCursorA(0, GlobalCursor));
+    }
+    else
+    {
+     SetCursor(0);
+    }
    }
    else
    {
-    SetCursor(0);
+    Result = DefWindowProcA(Window, Message, WParam, LParam);
    }
+  } break;
+  
+  case WM_GETMINMAXINFO:
+  {
+   MINMAXINFO *Info = (MINMAXINFO *)LParam;
+   
+   // NOTE(luca): Minimum window size
+   Info->ptMinTrackSize.x = 640;
+   Info->ptMinTrackSize.y = 360;
   } break;
   
   case WM_DESTROY:
@@ -453,6 +472,8 @@ P_INIT()
  {
   GlobalCursor = IDC_ARROW;
   GlobalRunning = Running;
+  GlobalBufferWidth = Buffer->Dim.X;
+  GlobalBufferHeight = Buffer->Dim.Y;
   
   HINSTANCE Instance = GetModuleHandle(0);
   
@@ -466,7 +487,16 @@ P_INIT()
   if(RegisterClassA(&WindowClass))
   {
    RECT WindowRect = { 0, 0, Buffer->Dim.X, Buffer->Dim.Y };
-   DWORD Style = WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
+   DWORD Style = (WS_VISIBLE |  
+                  WS_OVERLAPPED |
+                  WS_CAPTION |     // window title bar
+#if RL_PLATFORM_WIN32_DO_RESIZING
+                  WS_SIZEBOX |     // same as below
+                  WS_THICKFRAME |  // resize with window borders
+                  WS_MINIMIZEBOX | // minimize button
+                  WS_MAXIMIZEBOX | // maximize button
+#endif
+                  WS_SYSMENU);     // close button ;
    
    AdjustWindowRect(&WindowRect, Style, FALSE);
    
@@ -582,7 +612,9 @@ P_PROCESS_MESSAGES()
   u64 ReadPos = (NotesQueue->ReadPos%NotesQueue->Size);
   u64 ItemsInQueueCount = (NotesQueue->WritePos - NotesQueue->ReadPos); 
   Input->MIDI.EventCount = ItemsInQueueCount;
-  Input->MIDI.Events = NotesQueue->Events + ReadPos;
+  MemoryCopy(Input->MIDI.Events,
+             NotesQueue->Events + ReadPos,
+             (ItemsInQueueCount*sizeof(app_midi_event)));
   NotesQueue->ReadPos += ItemsInQueueCount;
  }
  
@@ -763,7 +795,7 @@ P_PROCESS_MESSAGES()
       }
       
       // Use first as nil
-      app_key_id Id = Input->Text.Count + 1;
+      app_key_idx Id = Input->Text.Count + 1;
       app_key *Key = Input->Text.Buffer + Id;
       Input->Text.Count += 1;
       b32 Handled = true;
@@ -863,11 +895,7 @@ P_PROCESS_MESSAGES()
        
        if(Handled)
        {
-        // Append key
-        if(Input->Text.First == 0) Input->Text.First = Id;
-        if(Input->Text.Last  != 0) Input->Text.Buffer[Input->Text.Last].Next = Id;
-        Key->Prev = Input->Text.Last;
-        Input->Text.Last = Id;
+        DLLIDAppend(Input->Text.Buffer, Id, Input->Text.First, Input->Text.Last);
        }
       }
      }
@@ -882,10 +910,9 @@ P_PROCESS_MESSAGES()
    }
   }
   
-#if 0
-  // @resize TODO(luca): Does not work when window is minimized.
-  Buffer->Width = GlobalBufferWidth;
-  Buffer->Height = GlobalBufferHeight;
+#if RL_PLATFORM_WIN32_DO_RESIZING
+  Buffer->Dim.X = GlobalBufferWidth;
+  Buffer->Dim.Y = GlobalBufferHeight;
 #endif
   
   // Mouse

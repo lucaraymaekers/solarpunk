@@ -245,16 +245,15 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
    RectShader = GL_ProgramFromShaders(VertexShader, FragmentShader);
    glUseProgram(RectShader);
    
-   // Uniforms
-   {
-    gl_int UViewport = glGetUniformLocation(RectShader, "Viewport");
-    glUniform2f(UViewport, V2Arg(BufferDim));
-   }
-   
    Render->RectShader = RectShader;
    Render->ShadersCompiled = true;
   }
-  
+ }
+ 
+ // Uniforms
+ {
+  gl_int UViewport = glGetUniformLocation(Render->RectShader, "U_Viewport");
+  glUniform2f(UViewport, V2Arg(BufferDim));
  }
  
  // NOTE(luca): This cannot be shared between platform and app.  For now it is used for fonts
@@ -289,6 +288,15 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
  glEnable(GL_MULTISAMPLE);
  
  glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (gl_int)GlobalRectsCount);
+}
+
+internal void
+RenderRectSetColor(rect_instance *Instance, v4 Color)
+{
+ Instance->Color0 = Color;
+ Instance->Color1 = Color;
+ Instance->Color2 = Color;
+ Instance->Color3 = Color;
 }
 
 internal void 
