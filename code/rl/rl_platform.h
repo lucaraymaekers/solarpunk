@@ -62,6 +62,36 @@ enum platform_key
  PlatformKey_Alt,
  PlatformKey_Super,
  
+ PlatformKey_A,
+ PlatformKey_B,
+ PlatformKey_C,
+ PlatformKey_D,
+ PlatformKey_E,
+ PlatformKey_F,
+ PlatformKey_G,
+ PlatformKey_H,
+ PlatformKey_I,
+ PlatformKey_J,
+ PlatformKey_K,
+ PlatformKey_L,
+ PlatformKey_M,
+ PlatformKey_N,
+ PlatformKey_O,
+ PlatformKey_P,
+ PlatformKey_Q,
+ PlatformKey_R,
+ PlatformKey_S,
+ PlatformKey_T,
+ PlatformKey_U,
+ PlatformKey_V,
+ PlatformKey_W,
+ PlatformKey_X,
+ PlatformKey_Y,
+ PlatformKey_Z,
+ PlatformKey_Minus,
+ PlatformKey_Comma,
+ PlatformKey_Space,
+ 
  PlatformKey_Count,
 };
 typedef enum platform_key platform_key;
@@ -96,7 +126,6 @@ struct app_key
 typedef struct app_button_state app_button_state;
 struct app_button_state
 {
- s32 Modifiers;
  s32 HalfTransitionCount;
  b32 EndedDown;
 };

@@ -1,5 +1,5 @@
 
-@table(Name, NeedsParam, Tag, Description, Key Control, Shift, Alt)
+@table(Name, NeedsParam, Tag, Description, Key, Control, Shift, Alt)
 CommandsTable:
 {
  { None,                       false, "",       "Null Command",                   None  0 0 0 }
@@ -24,7 +24,7 @@ CommandsTable:
  { PieceStartPlaying,          false, "Piece",  "Start playing",                  None  0 0 0 }
  { PieceStopPlaying,           false, "Piece",  "Stop playing",                   None  0 0 0 }
  { PieceTogglePracticing,      false, "Piece",  "Toggle practicing",              None  0 0 0 }
- { PieceStop,                  false, "Piece",  "Stop",                          .None  0 0 0 }
+ { PieceStop,                  false, "Piece",  "Stop",                          None  0 0 0 }
  { PieceClear,                 false, "Piece",  "Clear",                          None  0 0 0 }
  { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0 }
  { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0 }
@@ -42,6 +42,8 @@ CommandsTable:
  { CloseLister,                false, "Lister", "Close",                          None  0 0 0 }
  { OpenLister,                 true,  "Lister", "Open",                           None  0 0 0 } 
 }
+
+//- Commands 
 
 @data_enum("command_kind")
 CommandKind:
@@ -83,6 +85,37 @@ CommandHasParam:
   ```$(NeedsParam),
  ```;
 }
+
+
+@data
+{
+ ```
+  typedef struct key_bind key_bind;
+ struct key_bind
+ {
+  b32 Control;
+  b32 Shift;
+  b32 Alt;
+  platform_key Key;
+  
+  command_kind Command;
+ };
+ ```;
+}
+
+@data_table("key_bind")
+DefaultKeyBinds:
+{
+ @expand(CommandsTable)
+  ```
+ {
+  .Shift = $(Shift), .Control = $(Control), .Alt = $(Alt),
+  .Key = PlatformKey_$(Key),
+  .Command = Command_$(Name),
+ },```;
+}
+
+//- Panels 
 
 @table(Name, DisplayName)
 PanelTypes:

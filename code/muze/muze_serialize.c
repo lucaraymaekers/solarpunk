@@ -25,9 +25,26 @@ MS_PieceNote(ms_serializer *Serializer, piece_note *Note)
  MS_Add(MSV_Initial, &Note->Kind);
  MS_Add(MSV_Initial, &Note->Start);
  MS_Add(MSV_Initial, &Note->Length);
- MS_Add(MSV_Initial, &Note->Pitch);
+ 
+ if(MS_Before(MSV_PieceNoteVelocity))
+ {
+  s32 Pitch = 0;
+  MS_Ser(Serializer, &Pitch);
+  Note->Pitch = (u8)Pitch;
+ }
+ else
+ {
+  MS_Ser(Serializer, &Note->Pitch);
+ }
+ 
  MS_Add(MSV_PieceNoteHidden, &Note->Hidden);
  MS_Add(MSV_PieceMultiStaff, &Note->StaffIdx);
+ MS_Add(MSV_PieceNoteVelocity, &Note->Velocity);
+ 
+ if(MS_Before(MSV_PieceNoteVelocity))
+ {
+  Note->Velocity = 64;
+ }
 }
 
 internal void
@@ -37,7 +54,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  MS_Add(MSV_Initial, &Piece->TimeSigNum);
  MS_Add(MSV_Initial, &Piece->TimeSigDen);
  
- if(Serializer->Version < MSV_PieceMultiStaff)
+ if(MS_Before(MSV_PieceMultiStaff))
  {
   Piece->StaffCount = 1;
   MS_Ser(Serializer, &Piece->Staffs[0].Key); 
@@ -57,7 +74,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  MS_Add(MSV_Initial, &Piece->RecordLength);
  MS_Add(MSV_Initial, &Piece->NoteCount);
  
- if(Serializer->Version >= MSV_Initial)
+ if(MS_After(MSV_Initial))
  {
   for EachIndex(Idx, Piece->NoteCount)
   {
@@ -65,7 +82,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   }
  }
  
- if(Serializer->Version < MSV_PieceNoteKindAddAndZerothNote)
+ if(MS_Before(MSV_PieceNoteKindAddAndZerothNote))
  {
   if(Piece->NoteCount == ArrayCount(Piece->Notes))
   {
@@ -93,7 +110,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  
  MS_Add(MSV_Initial, &Piece->BarWrappingDisabled);
  
- if(Serializer->Version < MSV_PieceMultiStaff)
+ if(MS_Before(MSV_PieceMultiStaff))
  {
   Piece->BarWrappingDisabled ^= 1;
  }

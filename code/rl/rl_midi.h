@@ -5,14 +5,22 @@
 typedef union midi_message midi_message;
 union midi_message
 {
-    u32 U32[1];
-    u8 U8[4];
+ u32 U32[1];
+ u8 U8[4];
+ 
+ struct
+ {
+  u8 Type;
+  u8 Pitch;
+  u8 Velocity;
+  u8 Nothing;
+ };
 };
 
 typedef enum midi_event_type midi_event_type;
 enum midi_event_type
 {
-    MIDIEventType_NoteOn = 0x90,
-    MIDIEventType_NoteOff = 0x80,
-        MIDIEventType_Control = 0xB0,
+ MIDIEventType_NoteOn = 0x90,
+ MIDIEventType_NoteOff = 0x80,
+ MIDIEventType_Control = 0xB0,
 };

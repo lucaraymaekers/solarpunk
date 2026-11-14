@@ -19,7 +19,8 @@ UI_IconKind_Record,
 };
 typedef enum icon_kind icon_kind;
 
-str8 UI_Icons[] = {
+str8 UI_Icons[] =
+{
 {((u8 []){UI_IconKind_Record + ' '}), 1 },
  {((u8 []){UI_IconKind_Pause + ' '}), 1 },
  {((u8 []){UI_IconKind_Stop + ' '}), 1 },

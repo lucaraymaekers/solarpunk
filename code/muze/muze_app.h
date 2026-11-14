@@ -20,7 +20,9 @@ struct piece_note
  piece_note_kind Kind;
  f32 Start;
  f32 Length;
- s32 Pitch;
+ u8 Pitch;
+ u8 Velocity;
+ 
  b32 Hidden;
  s32 StaffIdx;
 };

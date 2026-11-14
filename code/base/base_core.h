@@ -455,11 +455,11 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 typedef unsigned char uchar;
 
-#define U8Max 0xff
-#define U16Max 0xffff
+#define U8Max (u8)0xff
+#define U16Max (u16)0xffff
 #define S32Min ((s32)0x80000000)
 #define S32Max ((s32)0x7fffffff)
-#define U32Min 0
+#define U32Min (u32)0
 #define U32Max ((u32)-1)
 #define U64Max ((u64)-1)
 

@@ -21,6 +21,7 @@ enum ms_version
  MSV_PieceNoteHidden,
  MSV_PieceMultiStaff,
  MSV_StaffCleffKind,
+ MSV_PieceNoteVelocity,
  MSV_Count,
 };
 typedef enum ms_serializer_version ms_serializer_version;
@@ -31,14 +32,17 @@ internal void MS_Struct(ms_serializer *Serializer, void *Value, u64 Size);
 #define MS_Ser(Serializer, Value) \
 MS_Struct(Serializer, Value, (sizeof(*Value)))
 
+#define MS_After(_Version) Serializer->Version >= _Version
+#define MS_Before(_Version) Serializer->Version < _Version
+
 #define MS_Add(VersionAdded, Value) \
-if(Serializer->Version >= VersionAdded) MS_Ser(Serializer, Value)
+if(MS_After(VersionAdded)) MS_Ser(Serializer, Value)
 
 #define MS_Rem(VersionAdded, VersionRemoved, Value) \
 do { \
 TypeOf(*Value) Dummy = {0}; \
-if(Serializer->Version >= VersionAdded && \
-Serializer->Version < VersionRemoved) \
+if(MS_After(VersionAdded) && \
+MS_Before(VersionRemoved)) \
 { \
 MS_Ser(Serializer, &Dummy); \
 } \

@@ -213,7 +213,6 @@ ResetButtons(app_button_state *NewButtons, app_button_state *OldButtons, u64 Cou
   app_button_state *OldButton = OldButtons + Idx;
   NewButton->EndedDown = OldButton->EndedDown;
   NewButton->HalfTransitionCount = 0;
-  NewButton->Modifiers = 0;
  }
 }
 

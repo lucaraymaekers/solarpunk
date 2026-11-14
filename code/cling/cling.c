@@ -381,7 +381,7 @@ BASE_ENTRY_POINT()
               if(!MD_NodeIsNil(GenDataTable))
               {
                TypeName = GenDataTable->first_child->string;
-               S8ListPush(Str8Fmt("%S %S[] = {\n", TypeName, Node->string)); 
+               S8ListPush(Str8Fmt("%S %S[] =\n{\n", TypeName, Node->string)); 
               }
               
               if(!MD_NodeIsNil(GenDataStruct))

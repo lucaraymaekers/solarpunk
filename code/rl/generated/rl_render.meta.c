@@ -18,7 +18,8 @@ v4 Dest;
 };
 NO_STRUCT_PADDING_END
 
-s32 RectVSAttributeOffsets[] = {
+s32 RectVSAttributeOffsets[] =
+{
 4,4,4,4,4,4,4,4,1,1,1,
 };
 

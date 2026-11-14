@@ -59,6 +59,10 @@ global_variable piece *NilPiece;
 
 global_variable f32 *dtForFrame;
 
+global_variable platform_midi_get_devices	*PlatformMIDIGetDevices;
+global_variable platform_midi_send	*PlatformMIDISend;
+global_variable platform_midi_listen	*PlatformMIDIListen;
+
 //~ Helpers
 internal inline b32
 EqualsWithEpsilon(f32 A, f32 B, f32 Epsilon)
@@ -556,8 +560,8 @@ PushCommand(app_state *App, command_kind Kind)
 
 //~ Muze - Piece
 internal piece_note *
-PieceNoteAddCode(piece *Piece, 
-                 piece_note_kind Kind, s32 Pitch, f32 Length)
+PieceCodeNoteAdd(piece *Piece, 
+                 piece_note_kind Kind, u8 Pitch, f32 Length)
 {
  piece_note *Note = NilPieceNote;
  
@@ -575,9 +579,10 @@ PieceNoteAddCode(piece *Piece,
   }
   
   Note->Kind = Kind;
-  Note->Pitch = Pitch + Note_Count*Piece->Staffs[0].Octave;
+  Note->Pitch = Pitch + (u8)(Note_Count*Piece->Staffs[0].Octave);
   Note->Length = Length;
   Note->Start = Piece->RecordLength;
+  Note->Velocity = 64;
   
   Piece->NoteCount += 1;
   Piece->RecordLength += Length;
@@ -669,13 +674,46 @@ PieceAlloc(app_state *App)
 }
 
 internal void
-PieceStopPlaying(piece *Piece)
+MIDIOutputMutePiecePlayingNotes(app_state *App, piece *Piece)
+{
+ if(App->OutputMIDIEnabled)
+ {
+  for EachIndex(Idx, Piece->NoteCount)
+  {
+   piece_note *Note = Piece->Notes + Idx;
+   
+   f32 Start = Note->Start;
+   f32 End = Note->Start + Note->Length;
+   
+   b32 NoteIsPlaying = (Start <= Piece->PlayPos && Piece->PlayPos < End);
+   if(NoteIsPlaying)
+   {   
+    midi_message Message = {0};
+    Message.U8[0] = MIDIEventType_NoteOff;
+    Message.U8[1] = Note->Pitch;
+    
+    PlatformMIDISend(App->Out, Message.U32[0]);
+   }
+  }
+ }
+ 
+}
+
+internal void
+PieceStopPlaying(app_state *App, piece *Piece)
 {
  if(Piece->IsPlaying)
  {
-  tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
   Piece->IsPlaying = false;
+  
+  if(!App->OutputSynthDisabled)
+  {   
+   tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
+  }
+  
+  MIDIOutputMutePiecePlayingNotes(App, Piece);
  }
+ 
 }
 
 #if 0
@@ -820,8 +858,8 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
  // are placed on the end of the bar and not on the next bar's start.
  if(AlignToEnd)
  {
-        BarIdx = (Start == 0.f ? 0 : (s32)CeilF32(Start/(f32)BeatsPerBar) - 1);
-        Remainder = Start - (f32)BeatsPerBar*(f32)BarIdx;
+  BarIdx = (Start == 0.f ? 0 : (s32)CeilF32(Start/(f32)BeatsPerBar) - 1);
+  Remainder = Start - (f32)BeatsPerBar*(f32)BarIdx;
  }
  else
  {
@@ -835,7 +873,7 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
   BarIdx = (BarIdx%BarsPerWidth);
   //Pos.Y += (f32)HeightIdx*2.f*StaffHeight;
   
-        f32 SizeToNextBar = ((f32)Piece->StaffCount*2.f*StaffHeight + StaffHeight);
+  f32 SizeToNextBar = ((f32)Piece->StaffCount*2.f*StaffHeight + StaffHeight);
   
   Pos.Y += (f32)HeightIdx*SizeToNextBar;
  }
@@ -1654,6 +1692,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
  GlobalIsProfiling = Memory->IsProfiling;
  ThreadContext = Memory->ThreadCtx;
  ExeDirPath = Memory->ExeDirPath;
+ PlatformMIDIGetDevices = Memory->PlatformMIDIGetDevices;
+ PlatformMIDIListen = Memory->PlatformMIDIListen;
+ PlatformMIDISend = Memory->PlatformMIDISend;
  
  //- Some constants 
  Input->PlatformCursor = PlatformCursorShape_Arrow;
@@ -1712,7 +1753,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   }
  }
  
- platform_midi_get_devices_result Devices = Memory->PlatformMIDIGetDevices();
+ platform_midi_get_devices_result Devices = PlatformMIDIGetDevices();
  
  local_persist s32 GLADVersion = 0;
  if(Memory->Reloaded)
@@ -1903,6 +1944,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
   {
    s32 ModifiersWithoutShift = (Key->Modifiers & ~PlatformKeyModifier_Shift);
    
+   if(Key->Modifiers == PlatformKeyModifier_Control &&
+      !Key->IsSymbol &&
+      Key->Codepoint == 'u')
+   {
+    App->Text.Size = 0;
+   }
+   
    if(ModifiersWithoutShift == PlatformKeyModifier_None)
    {
     if(!Key->IsSymbol)
@@ -1982,7 +2030,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     switch(Key->Codepoint)
     {
+#if MUZE_INTERNAL     
      case 'b': DebugBreak(); break;
+#endif
      
      default:
      {
@@ -2658,7 +2708,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  {
                   M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
                   Piece->IsRecording = false;
-                  PieceStopPlaying(Piece);
+                  PieceStopPlaying(App, Piece);
                  }
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
@@ -2730,7 +2780,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                  if(M_Button(S8("Clear")))
                 {
-                 PieceStopPlaying(Piece);
+                 PieceStopPlaying(App, Piece);
                  Piece->IsRecording = false;
                  Piece->NoteCount = 1;
                  Piece->PracticeNoteCount = 0;
@@ -3054,7 +3104,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                            Piece->PracticeEnd);
                   
                   
-                  M_Labelf("Selected Panel: %S /* (%p)"
+                  M_Labelf("Selected Panel: %S (%p)"
                            "###SelectedPanel",
                            PanelTypeStrings[App->SelectedPanel->Kind],
                            App->SelectedPanel);
@@ -3285,7 +3335,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     case Command_SelectInputDevice:
     {
      App->In = *Command->Device;
-     Memory->PlatformMIDIListen(App->In);
+     PlatformMIDIListen(App->In);
     } break;
     
     case Command_SelectOutputDevice:
@@ -3316,6 +3366,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
     } break;
     case Command_ToggleMIDIOutput:
     {
+     if(Piece->IsPlaying)
+     {
+      MIDIOutputMutePiecePlayingNotes(App, Piece);
+     }
      App->OutputMIDIEnabled ^= 1;
     } break;
     case Command_ToggleVirtualKeyboardInput:
@@ -3331,7 +3385,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
      App->OutputSynthDisabled ^= 1;
     } break;
    }
-   
    
    //- Lister commands 
    {   
@@ -3400,7 +3453,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
      else
      {
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-      PieceStopPlaying(Piece);
+      PieceStopPlaying(App, Piece);
       Piece->IsPracticing = false;
       Piece->IsRecording = true;
      }
@@ -3420,12 +3473,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceStopPlaying:
     {
-     PieceStopPlaying(Command->Piece);
+     PieceStopPlaying(App, Piece);
     } break;
     
     case Command_PieceStop:
     {
-     PieceStopPlaying(Piece);
+     PieceStopPlaying(App, Piece);
      if(Piece->IsPracticing)
      {
       Piece->PlayPos = Piece->PracticeStart;
@@ -3471,7 +3524,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
       
       // Conflicts
-      PieceStopPlaying(Piece);
+      PieceStopPlaying(App, Piece);
       Piece->IsRecording = false;
       
       // If Start = End, which should only be possible when unitiliazed set End to next bar.
@@ -3540,11 +3593,56 @@ UPDATE_AND_RENDER(UpdateAndRender)
      
     } break;
    }
-   
   }
-  
  }
  
+ //- Virtual MIDI keyboard 
+ {
+  if(App->InputVirtualKeyboardEnabled)
+  {
+   u8 Octave = 5;
+   
+   for EachElement(Idx, Input->MIDI.Buttons)
+   {
+    app_button_state Key = Input->MIDI.Buttons[Idx];
+    b32 Pressed = (Key.HalfTransitionCount != 0 && Key.EndedDown);
+    b32 Released = (Key.HalfTransitionCount != 0 && !Key.EndedDown);
+    u8 Pitch = (u8)Idx + Octave*(u8)Note_Count;
+    
+    if(Pressed)
+    {
+     if(Input->MIDI.EventCount < ArrayCount(Input->MIDI.Events))
+     {
+      app_midi_event *Event = Input->MIDI.Events + Input->MIDI.EventCount;
+      Input->MIDI.EventCount += 1;
+      
+      midi_message Message = {0};
+      Message.Type = MIDIEventType_NoteOn;
+      Message.Pitch = Pitch; 
+      Message.Velocity = 64;
+      
+      Event->Message = Message.U32[0];
+     }
+    }
+    
+    if(Released)
+    {
+     if(Input->MIDI.EventCount < ArrayCount(Input->MIDI.Events))
+     {
+      app_midi_event *Event = Input->MIDI.Events + Input->MIDI.EventCount;
+      Input->MIDI.EventCount += 1;
+      
+      midi_message Message = {0};
+      Message.Type = MIDIEventType_NoteOff;
+      Message.Pitch = Pitch;
+      
+      Event->Message = Message.U32[0];
+     }
+    }
+    
+   }
+  }
+ }
  
  //- Update pieces 
  {
@@ -3594,14 +3692,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
         f32 Start = Note->Start;
         f32 End = Start + Note->Length;
         
-        b32 NoteIsPlaying = PieceWasTimestampPlayed(Piece, Start);
+        b32 NoteWasPlayed = PieceWasTimestampPlayed(Piece, Start);
         b32 NoteHasEnded = PieceWasTimestampPlayed(Piece, End);
         
         if(!App->OutputSynthDisabled)
         {        
-         if(NoteIsPlaying)
+         if(NoteWasPlayed)
          {
-          TSFPlayNote(App, Piece->Channel, Note->Pitch, .2f); 
+          TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Note->Velocity); 
          }
          
          if(NoteHasEnded)
@@ -3609,6 +3707,29 @@ UPDATE_AND_RENDER(UpdateAndRender)
           tsf_channel_note_off(GlobalTSF, Piece->Channel, Note->Pitch);
          }
         }
+        
+        if(App->OutputMIDIEnabled)
+        {
+         if(NoteWasPlayed)
+         {
+          midi_message Message = {0};
+          Message.Type = MIDIEventType_NoteOn;
+          Message.Pitch = (u8)Note->Pitch;
+          Message.Velocity = Note->Velocity;
+          
+          PlatformMIDISend(App->Out, Message.U32[0]);
+         }
+         
+         if(NoteHasEnded)
+         {
+          midi_message Message = {0};
+          Message.Type = MIDIEventType_NoteOff;
+          Message.Pitch = Note->Pitch;
+          
+          PlatformMIDISend(App->Out, Message.U32[0]);
+         }
+        }
+        
        }
       }
      }
@@ -3646,24 +3767,23 @@ UPDATE_AND_RENDER(UpdateAndRender)
      app_midi_event *Event = Input->MIDI.Events + Idx;
      midi_message Message = {Event->Message};
      u8 Status = Message.U8[0];
-     u8 Data1  = Message.U8[1];
-     u8 Data2 = Message.U8[2];
      u8 Type = Status & 0xF0;
      u8 Channel = Status & 0x0F;
      
      if(0) {}
-     else if(Type == MIDIEventType_NoteOn && Data2 > 0)
+     else if(Type == MIDIEventType_NoteOn && Message.Velocity > 0)
      {
       if(Piece->NoteCount < ArrayCount(Piece->Notes))
       { 
        piece_note *Note = Piece->Notes + Piece->NoteCount;
-       u8 Pitch = Data1;
-       u8 Velocity = Data2;
+       u8 Pitch = Message.Pitch;
+       u8 Velocity = Message.Velocity;
        
        Note->Kind = PieceNoteKind_Pitch;
        Note->Pitch = Pitch;
        Note->Length = 0.f;
        Note->Start = Piece->RecordLength;
+       Note->Velocity = Message.Velocity;
        
        s32 PitchDiff = S32Max;
        for EachIndex(StaffIdx, Piece->StaffCount)
@@ -3686,13 +3806,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
       }
      }
      else if(Type == MIDIEventType_NoteOff ||
-             (Type == MIDIEventType_NoteOn && Data2 == 0))
+             (Type == MIDIEventType_NoteOn && Message.Velocity == 0))
      {
       // Find first note with same pitch and set its length.
       for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
       {
        piece_note *Note = Piece->Notes + NoteIdx;
-       u8 Pitch = Data1;
+       u8 Pitch = Message.Pitch;
        
        tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
        

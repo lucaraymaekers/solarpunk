@@ -8,19 +8,22 @@ Type_asm,
 };
 typedef enum type_kind type_kind;
 
-str8 TypeStrings[] = {
+str8 TypeStrings[] =
+{
 {(u8 *)"asm", 3},
  {(u8 *)"c", 1},
  
 };
 
-str8 TypePaths[] = {
+str8 TypePaths[] =
+{
 {(u8 *)"embedded_fundamentals", 21},
  {(u8 *)"c_fundamentals", 14},
  
 };
 
-str8 ConfigTable[] = {
+str8 ConfigTable[] =
+{
 {(u8 *)"0", 1},
  
 };
