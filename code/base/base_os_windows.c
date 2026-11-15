@@ -350,7 +350,7 @@ WinMain(HINSTANCE Instance,
 {
  GlobalDebuggerIsAttached = raddbg_is_attached();
  
-#if !BASE_CONSOLE_APPLICATION    
+#if BASE_CONSOLE_APPLICATION    
  if(!GetStdHandle(STD_OUTPUT_HANDLE))
  {
   if(AttachConsole(ATTACH_PARENT_PROCESS))

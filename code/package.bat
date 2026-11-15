@@ -24,7 +24,9 @@ cd %dir%
 
 copy /Y ..\..\build\muze.exe
 copy /Y ..\..\build\muze_app.dll
-copy /Y ..\..\data\font_*.ttf
+copy /Y ..\..\data\font_text_regular.ttf
+copy /Y ..\..\data\font_icons.ttf
+copy /Y ..\..\data\font_music_text.otf
 copy /Y ..\..\data\muze\sounds\sounds.sf2
 copy /Y ..\..\data\muze\song.muze_piece
 
