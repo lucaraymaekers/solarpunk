@@ -91,6 +91,16 @@ enum platform_key
  PlatformKey_Minus,
  PlatformKey_Comma,
  PlatformKey_Space,
+ PlatformKey_0,
+ PlatformKey_1,
+ PlatformKey_2,
+ PlatformKey_3,
+ PlatformKey_4,
+ PlatformKey_5,
+ PlatformKey_6,
+ PlatformKey_7,
+ PlatformKey_8,
+ PlatformKey_9,
  
  PlatformKey_Count,
 };

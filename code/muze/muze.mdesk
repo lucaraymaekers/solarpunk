@@ -17,14 +17,15 @@ CommandsTable:
  { SplitSelectedPanelX,        false, "Panel",  "Split on X axis",                P     1 0 0 }
  { SplitSelectedPanelY,        false, "Panel",  "Split on Y axis",                Minus 1 0 0 }
  { SelectNextPanel,            false, "Panel",  "Select next",                    Comma 1 0 0 }
- { SetPanelType,               true,  "Panel",  "Set type",                       T     1 0 0 }
+ { SelectPanelType,            false, "Panel",  "Select panel type",              T     1 0 0 }
+ { SetPanelType,               true,  "Panel",  "Set type",                       None  0 0 0 }
  //- Piece 
  { PieceToggleRecording,       false, "Piece",  "Toggle recording",               Space 0 0 0 }
  { PieceTogglePlaying,         false, "Piece",  "Toggle playing",                 None  0 0 0 }
  { PieceStartPlaying,          false, "Piece",  "Start playing",                  None  0 0 0 }
  { PieceStopPlaying,           false, "Piece",  "Stop playing",                   None  0 0 0 }
  { PieceTogglePracticing,      false, "Piece",  "Toggle practicing",              None  0 0 0 }
- { PieceStop,                  false, "Piece",  "Stop",                          None  0 0 0 }
+ { PieceStop,                  false, "Piece",  "Stop",                           None  0 0 0 }
  { PieceClear,                 false, "Piece",  "Clear",                          None  0 0 0 }
  { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0 }
  { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0 }
@@ -41,6 +42,7 @@ CommandsTable:
  //- Lister
  { CloseLister,                false, "Lister", "Close",                          None  0 0 0 }
  { OpenLister,                 true,  "Lister", "Open",                           None  0 0 0 } 
+ { SelectCommand,              false, "Lister", "Commands",                       F1    0 0 0 }
 }
 
 //- Commands 

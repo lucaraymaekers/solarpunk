@@ -14,6 +14,7 @@ Command_None,
  Command_SplitSelectedPanelX,
  Command_SplitSelectedPanelY,
  Command_SelectNextPanel,
+ Command_SelectPanelType,
  Command_SetPanelType,
  Command_PieceToggleRecording,
  Command_PieceTogglePlaying,
@@ -36,6 +37,7 @@ Command_None,
  Command_PieceTrimAtFirstNote,
  Command_CloseLister,
  Command_OpenLister,
+ Command_SelectCommand,
  Command_Count
 };
 typedef enum command_kind command_kind;
@@ -55,6 +57,7 @@ str8 CommandsDescriptions[] =
  {(u8 *)"Split on X axis", 15},
  {(u8 *)"Split on Y axis", 15},
  {(u8 *)"Select next", 11},
+ {(u8 *)"Select panel type", 17},
  {(u8 *)"Set type", 8},
  {(u8 *)"Toggle recording", 16},
  {(u8 *)"Toggle playing", 14},
@@ -77,6 +80,7 @@ str8 CommandsDescriptions[] =
  {(u8 *)"Trim piece start at first note", 30},
  {(u8 *)"Close", 5},
  {(u8 *)"Open", 4},
+ {(u8 *)"Commands", 8},
  
 };
 
@@ -96,6 +100,7 @@ str8 CommandsTags[] =
  {(u8 *)"Panel", 5},
  {(u8 *)"Panel", 5},
  {(u8 *)"Panel", 5},
+ {(u8 *)"Panel", 5},
  {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
@@ -115,6 +120,7 @@ str8 CommandsTags[] =
  {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
  {(u8 *)"Piece", 5},
+ {(u8 *)"Lister", 6},
  {(u8 *)"Lister", 6},
  {(u8 *)"Lister", 6},
  
@@ -135,20 +141,12 @@ false,
  false,
  false,
  false,
- true,
- false,
- false,
- false,
- false,
- false,
- false,
- false,
- false,
- false,
- false,
  false,
  true,
- true,
+ false,
+ false,
+ false,
+ false,
  false,
  false,
  false,
@@ -157,6 +155,16 @@ false,
  false,
  false,
  true,
+ true,
+ false,
+ false,
+ false,
+ false,
+ false,
+ false,
+ false,
+ true,
+ false,
  
 };
 
@@ -243,6 +251,11 @@ key_bind DefaultKeyBinds[] =
  {
   .Shift = 0, .Control = 1, .Alt = 0,
   .Key = PlatformKey_T,
+  .Command = Command_SelectPanelType,
+ },
+ {
+  .Shift = 0, .Control = 0, .Alt = 0,
+  .Key = PlatformKey_None,
   .Command = Command_SetPanelType,
  },
  {
@@ -349,6 +362,11 @@ key_bind DefaultKeyBinds[] =
   .Shift = 0, .Control = 0, .Alt = 0,
   .Key = PlatformKey_None,
   .Command = Command_OpenLister,
+ },
+ {
+  .Shift = 0, .Control = 0, .Alt = 0,
+  .Key = PlatformKey_F1,
+  .Command = Command_SelectCommand,
  },
 };
 

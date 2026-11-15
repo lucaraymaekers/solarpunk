@@ -13,6 +13,9 @@
 # define OS_LINUX 1
 #elif defined(_WIN32)
 # define OS_WINDOWS 1
+// TODO(luca): Try MACOS
+#elif defined(__APPLE__) && defined(__MACH__)
+# define OS_LINUX 1
 #endif
 
 // Detect compiler

@@ -1994,38 +1994,60 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
   b32 Handled = true;
   
+  for EachElement(Idx, DefaultKeyBinds)
+  {
+   key_bind *KeyBind = DefaultKeyBinds + Idx;
+   
+   s32 Mask = 0;
+   if(KeyBind->Shift)   Mask |= PlatformKeyModifier_Shift;
+   if(KeyBind->Control) Mask |= PlatformKeyModifier_Control;
+   if(KeyBind->Alt)     Mask |= PlatformKeyModifier_Alt;
+   
+   b32 IsMatch = false;
+   
+   b32 KeyIsAlpha = (PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_9);  
+   
+   if(!Key->IsSymbol && KeyIsAlpha)
+   {
+    if(PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_Z)
+    {
+     IsMatch = (Key->Codepoint == ('a' + (KeyBind->Key - PlatformKey_A)));
+    }
+    else if(PlatformKey_0 <= KeyBind->Key && KeyBind->Key <= PlatformKey_9)
+    {
+     IsMatch = (Key->Codepoint == ('0' + (KeyBind->Key - PlatformKey_0)));
+    }
+    else if(KeyBind->Key == PlatformKey_Minus)
+    {
+     IsMatch = (Key->Codepoint == '-');
+    }
+    else if(KeyBind->Key == PlatformKey_Comma)
+    {
+     IsMatch = (Key->Codepoint == ',');
+    }
+    else if(KeyBind->Key == PlatformKey_Space)
+    {
+     IsMatch = (Key->Codepoint == ' ');
+    }
+   }
+   else
+   {
+    IsMatch = (Key->Codepoint == KeyBind->Key);
+   }
+   
+   if(IsMatch && Key->Modifiers == Mask)
+   {
+    PushCommand(App, KeyBind->Command);
+   }
+   
+  }
+  
   if(!Key->IsSymbol)
   {
    if(Control)
    {
     switch(Key->Codepoint)
     {
-     case 'p': 
-     {
-      if(!Shift)
-      {
-       PushCommand(App, Command_SplitSelectedPanelX);
-      }
-      else
-      {
-       PushCommand(App, Command_ClosePanel);
-      }
-     } break;
-     
-     case 't': PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_PanelTypes; break;
-     
-     case '-':
-     {
-      PushCommand(App, Command_SplitSelectedPanelY);
-     } break;
-     
-     case ',':
-     {
-      PushCommand(App, Command_SelectNextPanel);
-     } break;
-     
-     case 's': PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Instruments; break;
-     
      default: 
      {
       Handled = false;
@@ -2050,10 +2072,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     switch(Key->Codepoint)
     {
-     case ' ': 
-     {
-      PushCommand(App, Command_PieceToggleRecording); 
-     } break;
      default: 
      {
       Handled = false;
@@ -2066,11 +2084,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
   {
    switch(Key->Codepoint)
    {
-    case PlatformKey_F1:
-    {
-     PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Commands;
-    } break;
-    
     case PlatformKey_Return:
     {
      if(App->ListerOpened)
@@ -2487,7 +2500,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 command *Command = PushCommand(App, Command_SetPanelType);
                 Command->PanelKind = (panel_kind)Item->Idx;
                } break;
-               
                
                case ListerKind_Commands:
                {
@@ -3397,6 +3409,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
      App->ListerScroll = 0.f;
      App->Text.Size = 0;
     } break;
+    
+    case Command_SelectCommand:
+    {
+     PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Commands;
+    } break;
    }
    
    //- Panel commands 
@@ -3421,6 +3438,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
     case Command_SelectNextPanel:
     {
      App->SelectedPanel = PanelNextLeaf(App->SelectedPanel, false);
+    } break;
+    
+    case Command_SelectPanelType:
+    {
+     PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_PanelTypes; 
     } break;
     
     case Command_SetPanelType:
