@@ -824,14 +824,14 @@ UI_CUSTOM_DRAW(CustomDrawPiano)
                     UI_IsActive(Box));
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  
- 
  for EachIndex(Idx, KeyCount)
  {
   f32 X = Pos.X + (f32)Idx*(KeyWidth + GapSize);
   
   v4 Color = V4F32(.93f);
   v4 Dest = RectFromSize(V2(X, Pos.Y), V2(KeyWidth, Height));
-  if(IsInsideRectV2(MousePos, Dest)) V3Math Color.E *= 0.9f;
+  b32 IsHovered = (InputIsOurs && IsInsideRectV2(MousePos, Dest));
+  if(IsHovered) V3Math Color.E *= 0.9f;
   DrawRect(Dest, Color, 0.f, 0.f, 0.f);
  }
 }
@@ -1994,7 +1994,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   b32 Handled = false;
   
 #if MUZE_INTERNAL  
-  if(!Key->IsSymbol && Alt && Key->Codepoint == 'b')
+  if(!Key->IsSymbol && Key->Modifiers == PlatformKeyModifier_Alt && Key->Codepoint == 'b')
   {
    DebugBreak();
    Handled = true;
@@ -2355,6 +2355,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
        UI_BorderColor(Color_Snow2)
        UI_BackgroundColor(Color_Night0)
        UI_AddBox(S8("Lister"), 
+                 UI_BoxFlag_MouseClickable|
                  UI_BoxFlag_Clip|
                  UI_BoxFlag_DrawBorders|
                  UI_BoxFlag_DrawBackground|
@@ -2435,17 +2436,43 @@ UPDATE_AND_RENDER(UpdateAndRender)
              
              IsFirstItem = (Idx == MinIdx);
              
-             UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
-              ItemSelected = (Button(.String = ItemString,
-                                     .Text = Item->Name, 
-                                     .Disabled = Selected, 
-                                     .BackgroundColor = (IsFirstItem ? 
-                                                         Color_Night1 :
-                                                         Color_ButtonBackground),
-                                     .DisabledBackgroundColor = Color_Yellow, 
-                                     .Padding = ItemPadding,
-                                     .ClipSize = false).Released || 
-                              (App->ListerReturnPressed && IsFirstItem));
+#define MUZE_WIP_LISTER 0
+#if MUZE_WIP_LISTER
+             UI_AddBox(ItemString, UI_BoxFlag_DrawBorders);
+             
+             UI_Push()
+              UI_Row()
+              
+             {              
+              UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+               UI_AddBox(Str8Fmt("Helloo###%d", Idx), 0);
+              UI_PaddingAround(UI_SizePx(5.f, 1.f))
+               UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+               UI_Softness(.5f)
+               UI_CornerRadii(V4F32(10.f))
+               UI_BackgroundColor(Color_Yellow)
+               UI_AddBox(Str8Fmt("Hello###%d", Idx), 
+                         UI_BoxFlag_DrawBackground |
+                         UI_BoxFlag_DrawDisplayString | 
+                         UI_BoxFlag_CenterTextVertically |
+                         UI_BoxFlag_CenterTextHorizontally);
+#endif
+              
+              UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
+               ItemSelected = (Button(.String = ItemString,
+                                      .Text = Item->Name, 
+                                      .Disabled = Selected, 
+                                      .BackgroundColor = (IsFirstItem ? 
+                                                          Color_Night1 :
+                                                          Color_ButtonBackground),
+                                      .DisabledBackgroundColor = Color_Yellow, 
+                                      .Padding = ItemPadding,
+                                      .ClipSize = false).Released || 
+                               (App->ListerReturnPressed && IsFirstItem));
+              
+#if MUZE_WIP_LISTER     
+             }
+#endif
              
              if(ItemSelected)
              {
@@ -4005,6 +4032,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
   }
   
  }
+ 
+ 
  
  //- Rendering 
  

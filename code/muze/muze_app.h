@@ -265,7 +265,37 @@ struct lister_item
  u64 Idx;
 };
 
-//- UI 
+
+enum lister_entry_kind
+{
+ // A bool could be an f32 that goes from 0 to 1 with step 1
+ // A bool could also be a command that toggles that value
+ // A command has a key bind
+ 
+ ListerEntryKind_None,
+ ListerEntryKind_Bool,
+ ListerEntryKind_F32,
+ ListerEntryKind_Command,
+};
+typedef enum lister_entry_kind lister_entry_kind;
+
+struct lister_entry
+{
+ lister_entry_kind Kind;
+ 
+ str8_array Tags; // Also searchable
+ str8 Icon;
+ str8 Text; // Searchable
+ str8 Description;
+ 
+ b32 *Bool;
+ f32 Min;
+ f32 Max;
+ f32 Step;
+ command_kind Command;
+};
+
+//~ UI 
 typedef struct piece_box_data piece_box_data;
 struct piece_box_data
 {
