@@ -18,14 +18,13 @@ cd ..\build
 call ..\code\build.bat -Muze -Slow %mode%
 
 :: Create clean directory
-IF EXIST .\muze rmdir /s /q %dir%
+IF EXIST %dir% rmdir /s /q %dir%
 mkdir %dir%
 cd %dir%
 
 copy /Y ..\..\build\muze.exe
 copy /Y ..\..\build\muze_app.dll
-copy /Y ..\..\data\font_regular.ttf
-copy /Y ..\..\data\icons.ttf
+copy /Y ..\..\data\font_*.ttf
 copy /Y ..\..\data\muze\sounds\sounds.sf2
 copy /Y ..\..\data\muze\song.muze_piece
 
