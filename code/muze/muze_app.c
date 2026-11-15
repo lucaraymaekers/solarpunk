@@ -1973,6 +1973,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
      {
       default: break;
       
+      case PlatformKey_Return:
+      {
+       App->ListerReturnPressed = true;
+      } break;
+      
       case PlatformKey_BackSpace:
       {
        App->Text.Size -= !!(App->Text.Size > 0);
@@ -1986,112 +1991,82 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  for EachTextButton(Key, Id, Input)
  {
-  b32 Control = Key->Modifiers & PlatformKeyModifier_Control;
-  b32 Shift = Key->Modifiers & PlatformKeyModifier_Shift;
-  b32 Alt = Key->Modifiers & PlatformKeyModifier_Alt;
-  s32 ModifiersShiftIgnored = (Key->Modifiers & ~PlatformKeyModifier_Shift);
-  b32 None = (Key->Modifiers == PlatformKeyModifier_None);
+  b32 Handled = false;
   
-  b32 Handled = true;
-  
-  for EachElement(Idx, DefaultKeyBinds)
+#if MUZE_INTERNAL  
+  if(!Key->IsSymbol && Alt && Key->Codepoint == 'b')
   {
-   key_bind *KeyBind = DefaultKeyBinds + Idx;
-   
-   s32 Mask = 0;
-   if(KeyBind->Shift)   Mask |= PlatformKeyModifier_Shift;
-   if(KeyBind->Control) Mask |= PlatformKeyModifier_Control;
-   if(KeyBind->Alt)     Mask |= PlatformKeyModifier_Alt;
-   
-   b32 IsMatch = false;
-   
-   b32 KeyIsAlpha = (PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_9);  
-   
-   if(!Key->IsSymbol && KeyIsAlpha)
-   {
-    if(PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_Z)
-    {
-     IsMatch = (Key->Codepoint == ('a' + (KeyBind->Key - PlatformKey_A)));
-    }
-    else if(PlatformKey_0 <= KeyBind->Key && KeyBind->Key <= PlatformKey_9)
-    {
-     IsMatch = (Key->Codepoint == ('0' + (KeyBind->Key - PlatformKey_0)));
-    }
-    else if(KeyBind->Key == PlatformKey_Minus)
-    {
-     IsMatch = (Key->Codepoint == '-');
-    }
-    else if(KeyBind->Key == PlatformKey_Comma)
-    {
-     IsMatch = (Key->Codepoint == ',');
-    }
-    else if(KeyBind->Key == PlatformKey_Space)
-    {
-     IsMatch = (Key->Codepoint == ' ');
-    }
-   }
-   else
-   {
-    IsMatch = (Key->Codepoint == KeyBind->Key);
-   }
-   
-   if(IsMatch && Key->Modifiers == Mask)
-   {
-    PushCommand(App, KeyBind->Command);
-   }
-   
+   DebugBreak();
+   Handled = true;
+   goto KeyHandled;
   }
+#endif
+  
+  // NOTE(luca): Check if key bind was pressed and push command accordingly
+  {  
+   for EachElement(Idx, DefaultKeyBinds)
+   {
+    key_bind *KeyBind = DefaultKeyBinds + Idx;
+    
+    s32 Mask = 0;
+    if(KeyBind->Shift)   Mask |= PlatformKeyModifier_Shift;
+    if(KeyBind->Control) Mask |= PlatformKeyModifier_Control;
+    if(KeyBind->Alt)     Mask |= PlatformKeyModifier_Alt;
+    
+    b32 IsMatch = false;
+    
+    b32 KeyIsAlpha = (PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_9);  
+    
+    if(!Key->IsSymbol && KeyIsAlpha)
+    {
+     if(PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_Z)
+     {
+      IsMatch = (Key->Codepoint == ('a' + (KeyBind->Key - PlatformKey_A)));
+     }
+     else if(PlatformKey_0 <= KeyBind->Key && KeyBind->Key <= PlatformKey_9)
+     {
+      IsMatch = (Key->Codepoint == ('0' + (KeyBind->Key - PlatformKey_0)));
+     }
+     else if(KeyBind->Key == PlatformKey_Minus)
+     {
+      IsMatch = (Key->Codepoint == '-');
+     }
+     else if(KeyBind->Key == PlatformKey_Comma)
+     {
+      IsMatch = (Key->Codepoint == ',');
+     }
+     else if(KeyBind->Key == PlatformKey_Space)
+     {
+      IsMatch = (Key->Codepoint == ' ');
+     }
+    }
+    else
+    {
+     IsMatch = (Key->Codepoint == KeyBind->Key);
+    }
+    
+    if(IsMatch && Key->Modifiers == Mask)
+    {
+     PushCommand(App, KeyBind->Command);
+     // TODO(luca): We could still run to detect conflicting key binds.
+     Handled = true;
+     break;
+    }
+    
+   }
+  }
+  
+  if(Handled) goto KeyHandled;
+  Handled = true;
   
   if(!Key->IsSymbol)
   {
-   if(Control)
-   {
-    switch(Key->Codepoint)
-    {
-     default: 
-     {
-      Handled = false;
-     } break;
-    }
-   }
-   else if(Alt)
-   {
-    switch(Key->Codepoint)
-    {
-#if MUZE_INTERNAL     
-     case 'b': DebugBreak(); break;
-#endif
-     
-     default:
-     {
-      Handled = false;
-     } break;
-    }
-   }
-   else
-   {
-    switch(Key->Codepoint)
-    {
-     default: 
-     {
-      Handled = false;
-     } break;
-    }
-   }
-   
+   Handled = false;
   }
   else
   {
    switch(Key->Codepoint)
    {
-    case PlatformKey_Return:
-    {
-     if(App->ListerOpened)
-     {
-      App->ListerReturnPressed = true;
-     }
-    } break;
-    
     case PlatformKey_Escape:
     {
      if(App->ListerOpened)
@@ -2111,6 +2086,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    }
   }
   
+  KeyHandled:;
   if(Handled)
   {
    RemoveTextButton(Input, Id);
