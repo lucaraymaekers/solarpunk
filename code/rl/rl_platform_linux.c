@@ -1321,10 +1321,6 @@ P_PROCESS_MESSAGES()
     app_button_state *Button = &Input->Mouse.Buttons[ButtonType];
     
     ProcessKeyPress(Button, IsDown);
-    
-    if(Shift)   Button->Modifiers |= PlatformKeyModifier_Shift;
-    if(Control) Button->Modifiers |= PlatformKeyModifier_Control;
-    if(Alt)     Button->Modifiers |= PlatformKeyModifier_Alt;
    } break;
    
    case MotionNotify:
