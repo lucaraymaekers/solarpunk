@@ -579,7 +579,7 @@ PieceCodeNoteAdd(piece *Piece,
   }
   
   Note->Kind = Kind;
-  Note->Pitch = Pitch + (u8)(Note_Count*Piece->Staffs[0].Octave);
+  Note->Pitch = Pitch + MiddleC;
   Note->Length = Length;
   Note->Start = Piece->RecordLength;
   Note->Velocity = 64;
@@ -1214,10 +1214,16 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      
      // Calculate position
      {
-      s32 RelOctave = Piece->Staffs[Note->StaffIdx].Octave;
+      staff *Staff = Piece->Staffs + Note->StaffIdx;
+      s32 RelOctave = Staff->Octave;
       // Get Y From pitch
       // Sets the notes at the octave's C
       s32 MinStepCount = -(BaseNote_Count + 2);
+      if(Staff->ClefKind == ClefKind_Bass)
+      {
+       MinStepCount = -4;
+      }
+      
       f32 StepSize = NoteSize/2.f;
       
       s32 NoteOctave = Note->Pitch/Note_Count;
@@ -1596,7 +1602,7 @@ M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
  f32 ScrollbarSize = 16.f;
  f32 Padding = 2.f;
  
- f32 ThumbSize = 64.f;
+ f32 ThumbSize = 48.f;
  f32 HalfThumbSize = .5f*ThumbSize;
  
  ui_box *Scrollbar;
@@ -2261,7 +2267,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {
      StartIdx = 1;
      
-     u64 Count = ArrayCount(CommandsWithoutParam);
+     u64 Count = Command_Count;
      NameList = PushArray(FrameArena, str8, Count);
      for EachIndex(Idx, Count)
      {
@@ -2358,7 +2364,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
        UI_SemanticHeight(UI_SizePx(ListerDim.Y, 1.f))
        UI_BorderThickness(ListerBorderSize)
        UI_BorderColor(Color_Snow2)
-       UI_BackgroundColor(Color_Night1)
+       UI_BackgroundColor(Color_Night0)
        UI_AddBox(S8("Lister"), 
                  UI_BoxFlag_Clip|
                  UI_BoxFlag_DrawBorders|
@@ -2767,10 +2773,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
                  }
                 }
                 
-                UI_FillWidth()
-                 UI_AddBox(S8("TopSpacer"), 
-                           UI_BoxFlag_DrawBackground|
-                           UI_BoxFlag_DrawBorders);
                 UI_SemanticWidth(UI_SizePx(200.f, 1))
                  Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
                                        Str8Fmt("%3.0f", Piece->BPM),
@@ -2780,17 +2782,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                  if(M_Button(S8("Clear")))
                 {
-                 PieceStopPlaying(App, Piece);
-                 Piece->IsRecording = false;
-                 Piece->NoteCount = 1;
-                 Piece->PracticeNoteCount = 0;
-                 Piece->RecordLength = 0.f;
-                 Piece->PlayPos = 0.f;
-                 Piece->PracticePos = 0.f;
-                 Piece->PracticeEnd = 0.f;
-                 Piece->PracticeStart = 0.f;
-                 Piece->SelectedNoteIdx = 0;
+                 PushCommand(App, Command_PieceClear);
                 }
+                
+                UI_FillWidth()
+                 UI_AddBox(S8("TopSpacer"), 
+                           UI_BoxFlag_DrawBackground|
+                           UI_BoxFlag_DrawBorders);
                 
                }
                
@@ -2961,7 +2959,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 {
                  // Select MIDI Input device
                  {
-                  if(UI_ButtonWithToggle(S8("Toggle keyboard input"), App->InputVirtualKeyboardEnabled,
+                  if(UI_ButtonWithToggle(S8("Toggle keyboard input"), !App->InputVirtualKeyboardDisabled,
                                          ItemPadding, Color_Yellow).OneClicked)
                   {
                    PushCommand(App, Command_ToggleVirtualKeyboardInput);
@@ -3374,7 +3372,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     } break;
     case Command_ToggleVirtualKeyboardInput:
     {
-     App->InputVirtualKeyboardEnabled ^= 1;
+     App->InputVirtualKeyboardDisabled ^= 1;
     } break;
     case Command_ToggleSynthOutput:
     {
@@ -3492,6 +3490,20 @@ UPDATE_AND_RENDER(UpdateAndRender)
      Piece->PracticePos = Piece->PracticeStart;
     } break;
     
+    case Command_PieceClear:
+    {
+     PieceStopPlaying(App, Piece);
+     Piece->IsRecording = false;
+     Piece->NoteCount = 1;
+     Piece->PracticeNoteCount = 0;
+     Piece->RecordLength = 0.f;
+     Piece->PlayPos = 0.f;
+     Piece->PracticePos = 0.f;
+     Piece->PracticeEnd = 0.f;
+     Piece->PracticeStart = 0.f;
+     Piece->SelectedNoteIdx = 0;
+    } break;
+    
     case Command_PieceToggleMetronome:
     {
      if(Piece->Metronome)
@@ -3578,14 +3590,17 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceAddStaff:
     {
-     staff *PreviousStaff = Piece->Staffs + (Piece->StaffCount - 1);
-     staff *Staff = Piece->Staffs + Piece->StaffCount;
-     
-     *Staff = *PreviousStaff;
-     // Two octaves below
-     Staff->Octave -= 1;
-     
-     Piece->StaffCount += 1;
+     if(Piece->StaffCount < 2)
+     {
+      staff *PreviousStaff = Piece->Staffs + (Piece->StaffCount - 1);
+      staff *Staff = Piece->Staffs + Piece->StaffCount;
+      Piece->StaffCount += 1;
+      
+      *Staff = *PreviousStaff;
+      
+      Staff->Octave = 4;
+      Staff->ClefKind = ClefKind_Bass;
+     }
     } break;
     
     case Command_PieceTrimAtFirstNote:
@@ -3598,16 +3613,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  //- Virtual MIDI keyboard 
  {
-  if(App->InputVirtualKeyboardEnabled)
+  if(!App->InputVirtualKeyboardDisabled && !App->ListerOpened)
   {
-   u8 Octave = 5;
-   
    for EachElement(Idx, Input->MIDI.Buttons)
    {
     app_button_state Key = Input->MIDI.Buttons[Idx];
     b32 Pressed = (Key.HalfTransitionCount != 0 && Key.EndedDown);
     b32 Released = (Key.HalfTransitionCount != 0 && !Key.EndedDown);
-    u8 Pitch = (u8)Idx + Octave*(u8)Note_Count;
+    u8 Pitch = (u8)Idx + MiddleC;
     
     if(Pressed)
     {
@@ -3776,28 +3789,20 @@ UPDATE_AND_RENDER(UpdateAndRender)
       if(Piece->NoteCount < ArrayCount(Piece->Notes))
       { 
        piece_note *Note = Piece->Notes + Piece->NoteCount;
+       MemoryZero(Note);
+       
        u8 Pitch = Message.Pitch;
        u8 Velocity = Message.Velocity;
        
        Note->Kind = PieceNoteKind_Pitch;
        Note->Pitch = Pitch;
-       Note->Length = 0.f;
        Note->Start = Piece->RecordLength;
        Note->Velocity = Message.Velocity;
        
-       s32 PitchDiff = S32Max;
-       for EachIndex(StaffIdx, Piece->StaffCount)
-       {        
-        s32 Octave = Piece->Staffs[StaffIdx].Octave;
-        
-        s32 Diff = (Note->Pitch - (Octave*12));
-        if(Diff < 0) Diff *= -1;
-        
-        if(Diff < PitchDiff)
-        {
-         Note->StaffIdx = StaffIdx;
-         PitchDiff = Diff;
-        }
+       s32 MinPitch = Piece->Staffs[0].Octave*Note_Count;
+       if(Note->Pitch < MinPitch)
+       {
+        Note->StaffIdx = 1;
        }
        
        TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Velocity);

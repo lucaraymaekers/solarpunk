@@ -16,7 +16,7 @@ MS_Staff(ms_serializer *Serializer, staff *Staff)
  MS_Add(MSV_PieceMultiStaff, &Staff->Key);
  MS_Add(MSV_PieceMultiStaff, &Staff->Minor);
  MS_Add(MSV_PieceMultiStaff, &Staff->Octave);
- MS_Add(MSV_StaffCleffKind, &Staff->CleffKind);
+ MS_Add(MSV_StaffClefKind, &Staff->ClefKind);
 }
 
 internal void
@@ -60,7 +60,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   MS_Ser(Serializer, &Piece->Staffs[0].Key); 
   MS_Ser(Serializer, &Piece->Staffs[0].Minor); 
   Piece->Staffs[0].Minor ^= 1; // Used to be "Major"
-  Piece->Staffs[0].Octave = 4;
+  Piece->Staffs[0].Octave = 5;
  }
  else
  {

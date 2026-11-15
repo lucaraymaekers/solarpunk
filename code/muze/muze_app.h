@@ -27,13 +27,13 @@ struct piece_note
  s32 StaffIdx;
 };
 
-typedef enum cleff_kind cleff_kind;
-enum cleff_kind
+typedef enum clef_kind clef_kind;
+enum clef_kind
 {
- CleffKind_Treble,
- CleffKind_Bass,
- CleffKind_Alto,
- CleffKind_Tenor,
+ ClefKind_Treble, // Sol
+ ClefKind_Bass,   // Fa
+ ClefKind_Alto,   // ?
+ ClefKind_Tenor,  // Ut
 };
 
 typedef struct staff staff;
@@ -42,7 +42,7 @@ struct staff
  note_pitch Key;
  b32 Minor;
  s32 Octave;
- cleff_kind CleffKind;
+ clef_kind ClefKind;
 };
 
 typedef struct piece piece; 
@@ -232,7 +232,7 @@ struct app_state
  b32 OutputMIDIEnabled;
  b32 OutputSynthDisabled;
  b32 InputMIDIDisabled;
- b32 InputVirtualKeyboardEnabled;
+ b32 InputVirtualKeyboardDisabled;
  
  arena *PieceArena;
  piece *FirstPiece;
@@ -284,5 +284,7 @@ struct custom_draw__single_line_text_input_params
 
 //~ Globals
 #define DefaultHeightPx 20
+
+#define MiddleC 5*Note_Count
 
 #endif //MUZE_APP_H

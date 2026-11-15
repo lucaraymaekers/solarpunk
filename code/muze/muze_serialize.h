@@ -20,7 +20,7 @@ enum ms_version
  MSV_PieceNoteKindAddAndZerothNote,
  MSV_PieceNoteHidden,
  MSV_PieceMultiStaff,
- MSV_StaffCleffKind,
+ MSV_StaffClefKind,
  MSV_PieceNoteVelocity,
  MSV_Count,
 };
