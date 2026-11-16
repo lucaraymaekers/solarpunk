@@ -154,6 +154,15 @@ commands =
   .footer_panel = false,
   .cursor_at_end = false,
  },
+ .build_last_sample = 
+ {
+  .out = "*compilation*", 
+  .linux = "./build/sampler -last -compile",
+  .win = ".\\build\\sampler -last -compile",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
  
  .run = 
  {

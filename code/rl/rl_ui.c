@@ -203,17 +203,28 @@ UI_AddBox(str8 String, s32 Flags)
    }
   }
   
-  // TODO(luca): Seed with sibling's hash as well?
+  ui_box *Search = ((!UI_State->AppendToParent && 
+                     !UI_IsNilBox(UI_State->Current->Parent)) ?
+                    UI_State->Current->Parent :
+                    UI_State->Current);
   
-  ui_box *Search = UI_NilBox;
+  // NOTE(luca): This is to differentiate when two boxes are added next to each other
+  // with the same parent and the same string.
+  
+  if(!UI_State->AppendToParent &&
+     S8Match(UI_State->Current->String, String, 0))
+  {
+   Search = UI_State->Current;
+  }
+  
   // Find youngest parent with non-zero key
   {
-   for(Search = UI_State->Current; 
-       UI_KeyMatch(Search->Key, UI_KeyNull()) &&
-       Search != UI_State->Root;
+   for(;
+       UI_KeyMatch(Search->Key, UI_KeyNull());
        Search = Search->Parent);
   }
   
+  // TODO(luca): Seed with sibling's hash as well?
   u64 AncestorKey = Search->Key.U64[0];
   Key.U64[0] = U64HashFromSeedStr8(AncestorKey, String);
   
@@ -811,21 +822,12 @@ UI_CalculatePositions(ui_box *Root)
   
   // Update animated position
   {
-   
-   if(UI_IsDebugBox(Box))
-   {
-    Log("LastTouchedFrameIdx: %llu, Diff: %llu\n", 
-        Box->LastTouchedFrameIdx,
-        UI_State->FrameIdx - Box->LastTouchedFrameIdx);
-    
-   }
-   
    for UI_EachAxis(Axis)
    {
     b32 Animate = (UI_State->IsAnimating && 
                    (Box->Flags & UI_BoxFlag_AnimatePosX << Axis));
     
-#if 0    
+#if 1
     // NOTE(luca): This is a hack to detect when the box was created and to snap the 
     // animated position to the fixed position.  AnimatedPos should never equal 0 since
     // we are using exponential smoothing that cannot reach exact value.

@@ -78,9 +78,49 @@ UI_Checkbox(b32 Toggled, v4 EnabledColor)
       UI_CornerRadii(V4F32(CircleWidth/2.f - 3.f))
 #endif
       
-      UI_AddBox(S8("Circle"), (UI_BoxFlag_Clip|
-                               UI_BoxFlag_DrawBackground|
-                               UI_BoxFlag_AnimatePosX));
+      {
+       ui_box *Circle = UI_AddBox(S8("Circle"), (UI_BoxFlag_Clip|
+                                                 UI_BoxFlag_DrawBackground|
+                                                 UI_BoxFlag_AnimatePosX));
+#if 1
+       local_persist u64 CircleParentCount = 0;
+       local_persist u64 CircleParentKey = 0;
+       
+       local_persist u64 FirstChildKey = 0;
+       
+       ui_box *CircleParent = Circle->Parent;
+       for EachCount(CircleParentCount)
+       {
+        CircleParent = CircleParent->Parent;
+       }
+       
+       if(DebugBreakPoints[0].Active)
+       {
+        ui_box *Parent = Circle->Parent;
+        Log("\n");
+        for EachCount(CircleParentCount + 1)
+        {
+         Log("%S: %llu\n", Parent->String, Parent->Key.U64[0]);
+         Parent = Parent->Parent;
+        }
+        
+        if(CircleParent->First->Key.U64[0] != FirstChildKey)
+        {
+         FirstChildKey = CircleParent->First->Key.U64[0];
+        }
+        
+        if(CircleParent->Key.U64[0] != CircleParentKey)
+        {
+         CircleParentCount += 1;
+         CircleParentKey = CircleParent->Parent->Key.U64[0];
+         
+         
+         FirstChildKey = CircleParent->First->Key.U64[0];
+        }
+       }
+#endif
+       
+      }
      }
     }
    }

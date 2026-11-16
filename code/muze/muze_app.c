@@ -2507,11 +2507,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
            UI_Push()
           {
            MaxIdx = Min(FilteredEntryCount, MinIdx + ShowItemCount + 1);
+           
            UI_Spacer(UI_SizePx(ItemHeight*(f32)MinIdx, 1.f));
+           
            for(s32 Idx = MinIdx; Idx < MaxIdx; Idx += 1)
            {
             lister_entry *Entry = FilteredEntries + Idx;
-            str8 ItemString = Str8Fmt("Item%d", Idx);
+            str8 ItemString = Str8Fmt("Item%d", Entry->Idx);
             
             b32 Selected = (SelectedIdx == Entry->Idx);
             
@@ -2549,7 +2551,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
               }
 #endif
               
-              UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
+              UI_FillWidth()
+               UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
                ItemSelected = (Button(.String = ItemString,
                                       .Text = Entry->Text, 
                                       .Disabled = Selected, 
@@ -2558,9 +2561,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                                           Color_ButtonBackground),
                                       .DisabledBackgroundColor = Color_Yellow, 
                                       .Padding = ItemPadding,
-                                      .ClipSize = false).Released || 
+                                      .ClipSize = false).Pressed || 
                                (App->ListerReturnPressed && IsFirstItem));
-              
               
               if(Entry->Max > 0.f)
               {         
@@ -2569,15 +2571,22 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                Entry->Step == 1.f);
                
                if(IsToggle)
-               { 
+               {
                 b32 Toggled = false;
-                UI_AddBox(Str8Fmt("CheckBox##%d", Entry->Idx), 0);
+                
+                DebugBrokeIf(0, Entry->Command == Command_PieceTogglePracticing);
+                
+                UI_SemanticWidth(UI_SizePx(50.f + 2.f*GlobalItemPadding.Value, 1.f))
+                 UI_AddBox(Str8Fmt("CheckBoxParent##%d", Entry->Idx), 0);
                 UI_PaddingAround(GlobalItemPadding)
+                 UI_SemanticWidth(UI_SizePx(50.f, 1.f))
                  Toggled = UI_Checkbox((b32)Entry->F32, Color_Yellow);
                 if(Toggled)
                 {
                  PushCommand(App, Entry->Command);
                 }
+                
+                DebugBreakPoints[0].Active = false;
                }
                else
                {

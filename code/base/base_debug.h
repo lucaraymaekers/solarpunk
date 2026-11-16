@@ -18,6 +18,7 @@ struct debug_breakpoint
 DebugBreak(); \
 DebugBreakPoints[X].Active = true; \
 })
+#define DebugBrokeIf(X, Expression) DebugBreakPoints[X].Active = (Expression)
 #define DebugBroken(X) Statement(if(!DebugBreakPoints[X].Disabled && \
 DebugBreakPoints[X].Active) \
 { \
