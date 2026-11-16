@@ -254,7 +254,7 @@ struct platform_midi_device
 typedef struct platform_midi_get_devices_result platform_midi_get_devices_result;
 struct platform_midi_get_devices_result
 {
- u64 Count;
+ s32 Count;
  platform_midi_device *Devices;
 };
 

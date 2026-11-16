@@ -3,11 +3,18 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
 {
  u8 *Dest = Serializer->Buffer.Data + Serializer->At;
  
- if(Serializer->IsReading) MemoryCopy(Value, Dest, Size);
- else                      MemoryCopy(Dest, Value, Size);
- 
- Assert(Serializer->At + Size <= Serializer->Buffer.Size);
- Serializer->At += Size;
+ if(Serializer->At < Serializer->Buffer.Size)
+ { 
+  if(Serializer->IsReading) MemoryCopy(Value, Dest, Size);
+  else                      MemoryCopy(Dest, Value, Size);
+  
+  Assert(Serializer->At + Size <= Serializer->Buffer.Size);
+  Serializer->At += Size;
+ }
+ else
+ {
+  ErrorLog("Buffer overflow while deserializing.\n");
+ }
 }
 
 internal void

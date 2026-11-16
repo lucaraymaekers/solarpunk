@@ -1909,30 +1909,56 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
   // MIDI: Select default input and output device, select's last device by default
   {
-   b32 InputFound = false;
-   b32 OutputFound = false;
+   b32 ConfigHasInputDevice = App->In.IsInput;
+   b32 ConfigHasOutputDevice = App->Out.IsOutput;
+   b32 ConfigInputFound = false;
+   b32 ConfigOutputFound = false;
+   s32 FoundInputIdx = 0;
+   s32 FoundOutputIdx = 0;
+   
    for EachIndex(Idx, Devices.Count)
    {
-    
     platform_midi_device *Device = Devices.Devices + Idx;
-    if(Device->IsOutput && 
-       (App->Out.Id == 0 ||
-        (App->Out.Id != 0 && Device->Id == App->Out.Id)))
+    
+    b32 IsDefaultDev = false;
+    
+    if(Device->IsInput)
     {
-     App->Out = *Device;
-     OutputFound = true;
+     if(ConfigHasInputDevice)
+     {
+      if(!ConfigInputFound)
+      {
+       ConfigInputFound = (App->In.Id == Device->Id);
+       FoundInputIdx = Idx;
+      }
+     }
+     
+     if(!ConfigInputFound)
+     {
+      FoundInputIdx = Idx;
+     }
     }
-    if(Device->IsInput && 
-       (App->In.Id == 0 ||
-        (App->In.Id != 0 && Device->Id == App->Out.Id)))
+    
+    if(Device->IsOutput)
     {
-     App->In = *Device;
-     InputFound = true;
+     if(ConfigHasOutputDevice)
+     {
+      if(!ConfigOutputFound)
+      {
+       ConfigOutputFound = (App->Out.Id == Device->Id);
+       FoundOutputIdx = Idx;
+      }
+     }
+     
+     if(!ConfigOutputFound)
+     {
+      FoundOutputIdx = Idx;
+     }
     }
    }
    
-   if(InputFound) PushCommand(App, Command_SelectInputDevice)->Device = &App->In;
-   if(OutputFound) PushCommand(App, Command_SelectOutputDevice)->Device = &App->Out;
+   PushCommand(App, Command_SelectInputDevice)->S32 = FoundInputIdx;
+   PushCommand(App, Command_SelectOutputDevice)->S32 = FoundOutputIdx;
   }
   
   App->MaxListerEntryCount = KB(64);
@@ -2679,14 +2705,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                
                case ListerKind_MIDIInput:
                {
-                command *Command = PushCommand(App, Command_SelectInputDevice);
-                Command->Device = Devices.Devices + Entry->S32;
+                PushCommand(App, Command_SelectInputDevice)->S32 = Entry->S32;
                } break;
                
                case ListerKind_MIDIOutput:
                {
-                command *Command = PushCommand(App, Command_SelectOutputDevice);
-                Command->Device = Devices.Devices + Entry->S32;;
+                PushCommand(App, Command_SelectOutputDevice)->S32 = Entry->S32;;
                } break;
                
                
@@ -3523,13 +3547,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    {   
     case Command_SelectInputDevice:
     {
-     App->In = *Command->Device;
+     App->In = Devices.Devices[Command->S32];;
      PlatformMIDIListen(App->In);
     } break;
     
     case Command_SelectOutputDevice:
     {
-     App->Out = *Command->Device;
+     App->Out = Devices.Devices[Command->S32];
     } break;
     
     case Command_SelectInstrument:
