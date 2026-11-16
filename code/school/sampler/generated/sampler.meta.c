@@ -10,8 +10,8 @@ typedef enum type_kind type_kind;
 
 str8 TypeStrings[] =
 {
-{asm},
- {c},
+{(u8 *)"asm", 3},
+ {(u8 *)"c", 1},
  
 };
 
@@ -24,7 +24,7 @@ str8 TypePaths[] =
 
 str8 ConfigTable[] =
 {
-{(u8 *)"0", 1},
+{(u8 *)"11", 2},
  
 };
 
@@ -40,7 +40,7 @@ str8 CTemplateText = {(u8 *)"\n"
 "   return 0;\n"
 "  }\n"
 "  \n"
-"  ", 125}
+"  ", 125};
 str8 AsmTemplateText = {(u8 *)"$NOMOD51\n"
 "   \n"
 "   ;~ Defines\n"
@@ -60,4 +60,4 @@ str8 AsmTemplateText = {(u8 *)"$NOMOD51\n"
 "   $include \"aducgd1inc.asm\"\n"
 "   \n"
 "   end\n"
-"   ", 215}
+"   ", 215};

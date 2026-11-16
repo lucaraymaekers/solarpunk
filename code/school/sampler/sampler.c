@@ -37,6 +37,7 @@ BASE_ENTRY_POINT()
  b32 Compile = false;
  b32 Run = false;
  b32 Convert = false;
+ b32 Print = false;
  
  //- Command line options 
  cmd_line *CmdLine = &Params->CmdLine;
@@ -47,6 +48,8 @@ BASE_ENTRY_POINT()
  Compile = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("compile"), S8("compile sample"));
  Run = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("run"), S8("run sample"));
  Convert = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("convert"), S8("convert spaces to tabs in sample"));
+ Print = CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("print"), S8("print sample name"));
+ 
  if(Copy || Compile || Run) Last = true;
  if(Copy) New  = true;
  
@@ -152,7 +155,7 @@ BASE_ENTRY_POINT()
  //- Do all command-line options 
  if(!ShouldQuit && !ShowHelp)
  {
-  ShowHelp = false;
+  ShowHelp = true;
   
   u64 LastIdx = 0;
   // %s/file_name_%llu.ext
@@ -175,8 +178,16 @@ BASE_ENTRY_POINT()
   
   str8 FilePath = Str8Fmt(CSS8(FilePathFormat), PrefixPath, Idx);
   
+  if(Print)
+  {
+   ShowHelp = false;
+   Log("%S\n", FilePath);
+  }
+  
   if(New)
   {
+   ShowHelp = false;
+   
    if(Copy && FileFound)
    {
     // If Copy and there is a file to copy, we use this file as the template text instead.
@@ -190,6 +201,8 @@ BASE_ENTRY_POINT()
   
   if(Convert)
   {
+   ShowHelp = false;
+   
    str8 InFile = OS_ReadEntireFileIntoMemory(CSS8(FilePath));
    str8 OutFile = PushS8(Arena, InFile.Size);
    b32 OnLineStart = true;
@@ -223,6 +236,8 @@ BASE_ENTRY_POINT()
   
   if(Compile) 
   {
+   ShowHelp = false;
+   
    if(0) {}
    else if(Type == Type_c)
    {                
@@ -235,10 +250,10 @@ BASE_ENTRY_POINT()
     {
      Log("[Sampler asm51]\n");
      
-                    Log("Preprocessing %S\n", FileName);
-                    str8 Command = OS_PathFromExe(CmdLine,
-                                                  Str8Fmt("/pp -o=%S.pp %S", FileNameWithoutExt, FilePath));
-                    cng_command_result CommandResult = Cng_RunCommand(Command);
+     Log("Preprocessing %S\n", FileName);
+     str8 Command = OS_PathFromExe(CmdLine,
+                                   Str8Fmt("/pp -o=%S.pp %S", FileNameWithoutExt, FilePath));
+     cng_command_result CommandResult = Cng_RunCommand(Command);
      if(!CommandResult.Succeeded)
       goto Fail;
      
@@ -255,7 +270,7 @@ BASE_ENTRY_POINT()
                                  "--include %S "
                                  "-o %S.hex %S",
                                  PrefixPath, FileNameWithoutExt, FilePath);
-                    if(!Cng_RunCommand(BuildCommand).Succeeded)
+     if(!Cng_RunCommand(BuildCommand).Succeeded)
       goto Fail;
     }
    }
@@ -266,14 +281,14 @@ BASE_ENTRY_POINT()
    if(0) {}
    else if(Type == Type_c)
    {
-                str8 ExeFilePath = OS_PathFromExe(CmdLine, S8Cat(S8(SLASH), FileNameWithoutExt));
+    str8 ExeFilePath = OS_PathFromExe(CmdLine, S8Cat(S8(SLASH), FileNameWithoutExt));
     Cng_RunCommand(ExeFilePath);
    }
    else if(Type == Type_asm)
-            {
-                str8 Command = OS_PathFromExe(CmdLine,
-                                              Str8Fmt(SLASH "lsd -run %S.hex", FileNameWithoutExt));
-                Cng_RunCommand(Command);
+   {
+    str8 Command = OS_PathFromExe(CmdLine,
+                                  Str8Fmt(SLASH "lsd -run %S.hex", FileNameWithoutExt));
+    Cng_RunCommand(Command);
    }
   }
  }

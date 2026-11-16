@@ -2,14 +2,14 @@
 @table(Name, Path)
 S_Types:
 {
- { asm "embedded_fundamentals" }
- { c   "c_fundamentals"        }
+ { "asm" "embedded_fundamentals" }
+ { "c"   "c_fundamentals"        }
 }
 
 @table(Name)
 S_Config:
 {
- { "0" }
+ { "11" }
 }
 
 //~ Data
@@ -101,12 +101,12 @@ CSampleCode:
 CSample:
 {
  @expand(CSampleCode) @strings @cstring_lit
-  `str8 CTemplateText = {$(Code)}`;
+  `str8 CTemplateText = {$(Code)};`;
 }
 
 @data
 AsmSample:
 {
  @expand(AsmSampleCode) @strings @cstring_lit
-  `str8 AsmTemplateText = {$(Code)}`;
+  `str8 AsmTemplateText = {$(Code)};`;
 }
