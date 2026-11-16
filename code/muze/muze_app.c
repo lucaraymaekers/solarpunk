@@ -2018,11 +2018,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {
      if(PlatformKey_A <= Info->Key && Info->Key <= PlatformKey_Z)
      {
-      IsMatch = (Key->Codepoint == ('a' + (Info->Key - PlatformKey_A)));
+      IsMatch = (Key->Codepoint == (rune)('a' + (Info->Key - PlatformKey_A)));
      }
      else if(PlatformKey_0 <= Info->Key && Info->Key <= PlatformKey_9)
      {
-      IsMatch = (Key->Codepoint == ('0' + (Info->Key - PlatformKey_0)));
+      IsMatch = (Key->Codepoint == (rune)('0' + (Info->Key - PlatformKey_0)));
      }
      else if(Info->Key == PlatformKey_Minus)
      {
@@ -2039,7 +2039,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     }
     else
     {
-     IsMatch = (Key->Codepoint == Info->Key);
+     IsMatch = (Key->Codepoint == (rune)Info->Key);
     }
     
     if(IsMatch && Key->Modifiers == Mask)
@@ -2179,13 +2179,13 @@ UPDATE_AND_RENDER(UpdateAndRender)
    str8 Title = {0};
    
    s32 EntryCount = 0;
-   lister_entry *Entries = PushArrayZero(FrameArena, lister_entry, App->MaxListerEntryCount);
+   lister_entry *Entries = PushArrayZero(FrameArena, lister_entry, (u64)App->MaxListerEntryCount);
    
    // Output
    platform_midi_device *OutDevices = 0;
    
    s32 FilteredEntryCount = 0;
-   lister_entry *FilteredEntries = PushArray(FrameArena, lister_entry, App->MaxListerEntryCount);
+   lister_entry *FilteredEntries = PushArray(FrameArena, lister_entry, (u64)App->MaxListerEntryCount);
    
    switch(App->ListerKind)
    {
@@ -2219,7 +2219,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       {
        Entry->Tag = CommandsMetaInfo[Idx].Tag;
        Entry->Text = CommandsMetaInfo[Idx].Description;
-       Entry->Command = Idx;
+       Entry->Command = (command_kind)Idx;
        
        EntryCount += 1;
       }
@@ -2312,7 +2312,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      
      Title = S8("Select panel type");
      panel *Panel = App->SelectedPanel;
-     SelectedIdx = Panel->Kind;
+     SelectedIdx = (s32)Panel->Kind;
      
      for EachIndex(Idx, EntryCount)
      {
@@ -3595,7 +3595,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_OpenLister:
     {
      App->ListerOpened = true;
-     App->ListerKind = Command->S32;
+     App->ListerKind = (lister_kind)Command->S32;
      App->ListerScroll = 0.f;
      App->Text.Size = 0;
     } break;
@@ -3637,7 +3637,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_SetPanelType:
     {
-     Command->Panel->Kind = Command->S32;
+     Command->Panel->Kind = (panel_kind)Command->S32;
      MemoryZero(&Command->Panel->Scroll);
     } break;
    }

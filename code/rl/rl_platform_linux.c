@@ -593,10 +593,7 @@ P_INIT()
   if(Found)
   {
    XSetWindowAttributes WindowAttributes = {0};
-   WindowAttributes.bit_gravity = StaticGravity;
-#if RL_PLATFORM_INTERNAL            
-   WindowAttributes.background_pixel = 0xFF00FF;
-#endif
+   WindowAttributes.bit_gravity = StaticGravity;WindowAttributes.background_pixel = 0x00000000;
    WindowAttributes.colormap = XCreateColormap(DisplayHandle, RootWindow, WindowVisualInfo.visual, AllocNone);
    WindowAttributes.event_mask = (StructureNotifyMask | 
                                   KeyPressMask | KeyReleaseMask | 
@@ -630,6 +627,8 @@ P_INIT()
 #if !RL_PLATFORM_LINUX_DO_RESIZING
      LinuxSetSizeHint(DisplayHandle, WindowHandle, Buffer->Dim.X, Buffer->Dim.Y, Buffer->Dim.X, Buffer->Dim.Y);
 #endif
+     
+     LinuxSetSizeHint(DisplayHandle, WindowHandle, 640, 360, Buffer->Dim.X, Buffer->Dim.Y);
      
      b32 DisableWindowDecorations = false;
      // Disable window decorations
