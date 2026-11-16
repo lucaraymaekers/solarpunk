@@ -1706,6 +1706,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  //- Init state 
  OS_ProfileInit(" G");
  
+ str8 ConfigPath = S8("config.muze_settings");
+ 
  arena *PermanentArena;
  app_state *App;
  {
@@ -1903,6 +1905,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
    }
   }
   
+  DebugBreak();
+  MS_SerializeConfig(FrameArena, true, ConfigPath, App);
   
   // MIDI: Select default input and output device, select's last device by default
   {
@@ -1910,13 +1914,18 @@ UPDATE_AND_RENDER(UpdateAndRender)
    b32 OutputFound = false;
    for EachIndex(Idx, Devices.Count)
    {
+    
     platform_midi_device *Device = Devices.Devices + Idx;
-    if(Device->IsOutput)
+    if(Device->IsOutput && 
+       (App->Out.Id == 0 ||
+        (App->Out.Id != 0 && Device->Id == App->Out.Id)))
     {
      App->Out = *Device;
      OutputFound = true;
     }
-    if(Device->IsInput)
+    if(Device->IsInput && 
+       (App->In.Id == 0 ||
+        (App->In.Id != 0 && Device->Id == App->Out.Id)))
     {
      App->In = *Device;
      InputFound = true;
@@ -1993,7 +2002,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #if MUZE_INTERNAL  
   if(!Key->IsSymbol && Key->Modifiers == PlatformKeyModifier_Alt && Key->Codepoint == 'b')
   {
-   DebugBreak();
    Handled = true;
    goto KeyHandled;
   }
@@ -2328,7 +2336,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
 #endif
     } break;
     
-#if 0
+    
     case ListerKind_MIDIInput:
     case ListerKind_MIDIOutput:
     {
@@ -2336,33 +2344,29 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      
      b32 IsInput = (App->ListerKind == ListerKind_MIDIInput);
      
-     NameList = PushArray(FrameArena, str8, Devices.Count);
-     OutDevices = PushArray(FrameArena, platform_midi_device, Devices.Count);
      for EachIndex(Idx, Devices.Count)
      {
       platform_midi_device *Device = Devices.Devices + Idx;
-      platform_midi_device *Out = OutDevices + NameListSize;
-      str8 *Name = NameList + NameListSize;
       
       if((IsInput && Device->IsInput) ||
          (!IsInput && Device->IsOutput))
       {
-       *Name = Device->Name;
-       *Out = *Device;
+       lister_entry *Entry = Entries + EntryCount;
+       EntryCount += 1;
+       
+       Entry->Text = Device->Name;
+       Entry->S32 = (s32)Idx;
        
        if((IsInput && (Device->Id == App->In.Id)) ||
           (!IsInput && (Device->Id == App->Out.Id)))
        {
-        SelectedIdx = NameListSize;
+        SelectedIdx = (s32)Idx;
        }
-       
-       NameListSize += 1;
       }
      }
     } break;
     
     
-#endif
    }
    
    for(s32 Idx = StartIdx; Idx < EntryCount; Idx += 1)
@@ -2685,21 +2689,18 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 }
                } break;
                
-#if 0               
-               
                case ListerKind_MIDIInput:
                {
                 command *Command = PushCommand(App, Command_SelectInputDevice);
-                Command->Device = OutDevices + Item->Idx;
+                Command->Device = Devices.Devices + Entry->S32;
                } break;
                
                case ListerKind_MIDIOutput:
                {
                 command *Command = PushCommand(App, Command_SelectOutputDevice);
-                Command->Device = OutDevices + Item->Idx;
+                Command->Device = Devices.Devices + Entry->S32;;
                } break;
                
-#endif
                
               }
               
@@ -4246,7 +4247,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
  
  // Save config
  {
-  MS_SerializeConfig(FrameArena, false, S8("config.muze_settings"), App);
+  MS_SerializeConfig(FrameArena, false, ConfigPath, App);
  }
  
  //- Rendering 

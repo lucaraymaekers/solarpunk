@@ -161,13 +161,16 @@ M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
 internal void 
 MS_Config(ms_serializer *Serializer, app_state *App)
 {
- 
+ MS_Ser(Serializer, &App->In);
+ MS_Ser(Serializer, &App->Out);
 }
 
-internal void
+internal b32
 MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
 {
+ b32 Result = !Read;
  ms_serializer Serializer = {0};
+ 
  Serializer.IsReading = Read;
  
  char *FilePath = PathFromExe(Path);
@@ -175,12 +178,14 @@ MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
  if(Serializer.IsReading)
  {
   Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
+  if(Serializer.Buffer.Size) Result = true;
  }
  else
  {
   Serializer.Buffer = PushS8(Arena, KB(64));
  }
  
+ Serializer.Version = MSV_Latest;
  MS_Ser(&Serializer, &Serializer.Version);
  
  if(Serializer.Version <= MSV_Latest)
@@ -202,4 +207,6 @@ MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
   str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
   OS_WriteEntireFile(FilePath, Out);
  }
+ 
+ return Result;
 }
