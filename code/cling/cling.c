@@ -451,6 +451,8 @@ BASE_ENTRY_POINT()
                      field_hash_node *FieldHash = GetFieldHashNode(FieldName, TableHash->Key, HashArraySize, FieldHashArray);
                      MD_Node *Field = MD_NodeAtIndex(TableRow->first_child, (int)FieldHash->Idx);
                      
+                     b32 IsStringLiteral = (Field->string.Size != Field->raw_string.Size); 
+                     
                      if(GenCStringLiteral)
                      {
                       u64 Extra = 0;
@@ -508,17 +510,16 @@ BASE_ENTRY_POINT()
                       
                       OutString = CString;
                       
-                      if(GenStrings)
+                      if(GenStrings && IsStringLiteral)
                       {
                        OutString = Str8Fmt("(u8 *)%S, %llu", OutString, OutString.Size - Extra);
                       }
-                      
                      }
                      else
                      {
                       OutString = Field->string;
                       
-                      if(GenStrings)
+                      if(GenStrings && IsStringLiteral)
                       {
                        OutString = Str8Fmt("(u8 *)\"%S\", %llu", OutString, OutString.Size);
                       }

@@ -315,7 +315,6 @@ UI_AddBox(str8 String, s32 Flags)
   UI_State->Current = Box;
  }
  
- 
  if(Box == Box->First ||
     Box == Box->Next || 
     Box == Box->Prev || 
@@ -811,11 +810,31 @@ UI_CalculatePositions(ui_box *Root)
   }
   
   // Update animated position
-  {    
+  {
+   
+   if(UI_IsDebugBox(Box))
+   {
+    Log("LastTouchedFrameIdx: %llu, Diff: %llu\n", 
+        Box->LastTouchedFrameIdx,
+        UI_State->FrameIdx - Box->LastTouchedFrameIdx);
+    
+   }
+   
    for UI_EachAxis(Axis)
    {
     b32 Animate = (UI_State->IsAnimating && 
                    (Box->Flags & UI_BoxFlag_AnimatePosX << Axis));
+    
+#if 0    
+    // NOTE(luca): This is a hack to detect when the box was created and to snap the 
+    // animated position to the fixed position.  AnimatedPos should never equal 0 since
+    // we are using exponential smoothing that cannot reach exact value.
+    if(Box->AnimatedPos.e[Axis] == 0.f)
+    {
+     Box->AnimatedPos.e[Axis] = Box->FixedPos.e[Axis];
+    }
+#endif
+    
     if(Animate)
     {
      Box->AnimatedPos.e[Axis] += (Box->FixedPos.e[Axis] - Box->AnimatedPos.e[Axis])*UI_State->AnimSpeed;

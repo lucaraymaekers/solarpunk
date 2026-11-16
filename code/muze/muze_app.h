@@ -88,7 +88,7 @@ struct piece
  // UI
  v2 PrevPlayPos; // For animating
  v2 PrevPracticePos; // For animating
- b32 BarWrappingDisabled;
+ b32 BarWrapping;
  f32 BarPadding;
  f32 BeatWidth;
  f32 NoteSize;
@@ -147,6 +147,40 @@ struct drag_data
 };
 
 //~ State
+
+//- Lister
+enum lister_entry_kind
+{
+ // A bool could be an f32 that goes from 0 to 1 with step 1
+ // A bool could also be a command that toggles that value
+ // A command has a key bind
+ 
+ ListerEntryKind_None,
+ ListerEntryKind_B32,
+ ListerEntryKind_F32,
+ ListerEntryKind_Command,
+};
+typedef enum lister_entry_kind lister_entry_kind;
+
+typedef struct lister_entry lister_entry;
+struct lister_entry
+{
+ str8 Icon;
+ str8 Tag;
+ str8 Text;
+ str8 Description;
+ 
+ s32 S32;
+ f32 F32;
+ f32 Min;
+ f32 Max;
+ f32 Step;
+ command_kind Command;
+ 
+ // Computed when filtered
+ s32 Idx;
+};
+
 enum lister_kind
 {
  ListerKind_Instruments,
@@ -155,10 +189,12 @@ enum lister_kind
  ListerKind_DebugInfo,
  ListerKind_PanelTypes,
  ListerKind_Commands,
+ ListerKind_Everything,
  ListerKind_Count,
 };
 typedef enum lister_kind lister_kind;
 
+//- Commands
 typedef struct command command;
 struct command
 {
@@ -179,6 +215,7 @@ struct command
  ms_serializer Serializer;
 };
 
+//- App 
 typedef struct app_state app_state;
 struct app_state
 {
@@ -217,6 +254,7 @@ struct app_state
  // UI 
  ui_box *TopBox;
  ui_box *ListerBox;
+ s32 MaxListerEntryCount;
  f32 ListerScroll;
  b32 ListerOpened;
  b32 ListerReturnPressed;
@@ -253,46 +291,10 @@ struct app_state
  u64 MaxDebugStringCount;
  u64 DebugStringCount;
  str8 *DebugStrings;
+ str8 *DebugStringTags;
  
  //- Rendering 
  gl_render_state Render;
-};
-
-typedef struct lister_item lister_item;
-struct lister_item
-{
- str8 Name;
- u64 Idx;
-};
-
-
-enum lister_entry_kind
-{
- // A bool could be an f32 that goes from 0 to 1 with step 1
- // A bool could also be a command that toggles that value
- // A command has a key bind
- 
- ListerEntryKind_None,
- ListerEntryKind_Bool,
- ListerEntryKind_F32,
- ListerEntryKind_Command,
-};
-typedef enum lister_entry_kind lister_entry_kind;
-
-struct lister_entry
-{
- lister_entry_kind Kind;
- 
- str8_array Tags; // Also searchable
- str8 Icon;
- str8 Text; // Searchable
- str8 Description;
- 
- b32 *Bool;
- f32 Min;
- f32 Max;
- f32 Step;
- command_kind Command;
 };
 
 //~ UI 

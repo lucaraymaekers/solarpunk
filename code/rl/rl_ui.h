@@ -141,13 +141,6 @@ struct ui_box_rec
  s64 PopCount;
 };
 
-typedef struct ui_box_node ui_box_node;
-struct ui_box_node
-{
- ui_box *Box;
- ui_box_node *Next;
-};
-
 //- Stack nodes 
 UI_LayoutStacks
 

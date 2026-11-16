@@ -1,48 +1,49 @@
 
-@table(Name, NeedsParam, Tag, Description, Key, Control, Shift, Alt)
+@table(Name, NeedsParam, Tag, Description, Key, Control, Shift, Alt, Min, Max, Step)
 CommandsTable:
 {
- { None,                       false, "",       "Null Command",                   None  0 0 0 }
+ { None,                       false, "",       "Null Command",                   None  0 0 0    0.f 0.f 1.f }
  //- App
- { SetFontSize,                true,  "App",    "Set font size",                  None  0 0 0 }
- { SelectInputDevice,          true,  "App",    "Select MIDI input device",       None  0 0 0 }
- { SelectOutputDevice,         true,  "App",    "Select MIDI output device",      None  0 0 0 }
- { SelectInstrument,           true,  "App",    "Select Synth output instrument", None  0 0 0 }
- { ToggleMIDIInput,            false, "App",    "Toggle MIDI input",              None  0 0 0 }
- { ToggleMIDIOutput,           false, "App",    "Toggle MIDI output",             None  0 0 0 }
- { ToggleVirtualKeyboardInput, false, "App",    "Toggle Virtual Keyboard input",  None  0 0 0 }
- { ToggleSynthOutput,          false, "App",    "Toggle Synth output",            None  0 0 0 } 
+ { SetFontSize,                true,  "App",    "Set font size",                  None  0 0 0    0.f 0.f 1.f }
+ { SelectInputDevice,          true,  "App",    "Select MIDI input device",       None  0 0 0    0.f 0.f 1.f }
+ { SelectOutputDevice,         true,  "App",    "Select MIDI output device",      None  0 0 0    0.f 0.f 1.f }
+ { SelectInstrument,           true,  "App",    "Select Synth output instrument", None  0 0 0    0.f 0.f 1.f }
+ { ToggleMIDIInput,            false, "App",    "Toggle MIDI input",              None  0 0 0    0.f 1.f 1.f }
+ { ToggleMIDIOutput,           false, "App",    "Toggle MIDI output",             None  0 0 0    0.f 1.f 1.f }
+ { ToggleVirtualKeyboardInput, false, "App",    "Toggle Virtual Keyboard input",  None  0 0 0    0.f 1.f 1.f }
+ { ToggleOutputSynth,          false, "App",    "Toggle Synth output",            None  0 0 0    0.f 1.f 1.f }  
  //- Panels 
- { ClosePanel,                 false, "Panel",  "Close",                          P     1 1 0 }  
- { SplitSelectedPanelX,        false, "Panel",  "Split on X axis",                P     1 0 0 }
- { SplitSelectedPanelY,        false, "Panel",  "Split on Y axis",                Minus 1 0 0 }
- { SelectNextPanel,            false, "Panel",  "Select next",                    Comma 1 0 0 }
- { SelectPanelType,            false, "Panel",  "Select panel type",              T     1 0 0 }
- { SetPanelType,               true,  "Panel",  "Set type",                       None  0 0 0 }
+ { ClosePanel,                 false, "Panel",  "Close",                          P     1 1 0    0.f 0.f 1.f }
+ { SplitSelectedPanelX,        false, "Panel",  "Split on X axis",                P     1 0 0    0.f 0.f 1.f }
+ { SplitSelectedPanelY,        false, "Panel",  "Split on Y axis",                Minus 1 0 0    0.f 0.f 1.f }
+ { SelectNextPanel,            false, "Panel",  "Select next",                    Comma 1 0 0    0.f 0.f 1.f }
+ { SelectPanelType,            false, "Panel",  "Select panel type",              T     1 0 0    0.f 0.f 1.f }
+ { SetPanelType,               true,  "Panel",  "Set type",                       None  0 0 0    0.f 0.f 1.f }
  //- Piece 
- { PieceToggleRecording,       false, "Piece",  "Toggle recording",               Space 0 0 0 }
- { PieceTogglePlaying,         false, "Piece",  "Toggle playing",                 None  0 0 0 }
- { PieceStartPlaying,          false, "Piece",  "Start playing",                  None  0 0 0 }
- { PieceStopPlaying,           false, "Piece",  "Stop playing",                   None  0 0 0 }
- { PieceTogglePracticing,      false, "Piece",  "Toggle practicing",              None  0 0 0 }
- { PieceStop,                  false, "Piece",  "Stop",                           None  0 0 0 }
- { PieceClear,                 false, "Piece",  "Clear",                          None  0 0 0 }
- { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0 }
- { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0 }
- { PieceToggleStrictTiming,    false, "Piece",  "Toggle strict timing practice",  None  0 0 0 }
- { PieceToggleLooping,         false, "Piece",  "Toggle looping",                 None  0 0 0 }
- { PieceSetBPM,                true,  "Piece",  "Set BPM",                        None  0 0 0 }
- { PieceSelectNote,            true,  "Piece",  "Select note",                    None  0 0 0 }
- { PieceDeselectNote,          false, "Piece",  "Deselect note",                  None  0 0 0 }
- { PieceDeleteNote,            false, "Piece",  "Delete note",                    None  0 0 0 }
- { PieceSetNoteLength,         false, "Piece",  "Set note length",                None  0 0 0 }
- { PieceSelectInstrument,      false, "Piece",  "Select instrument",              S     1 0 0 }
- { PieceAddStaff,              false, "Piece",  "Add bass staff",                 None  0 0 0 }
- { PieceTrimAtFirstNote,       false, "Piece",  "Trim piece start at first note", None  0 0 0 }
+ { PieceToggleRecording,       false, "Piece",  "Toggle recording",               Space 0 0 0    0.f 1.f 1.f }
+ { PieceTogglePlaying,         false, "Piece",  "Toggle playing",                 None  0 0 0    0.f 1.f 1.f }
+ // Don't need a param, but is better to hide from lister
+ { PieceStartPlaying,          true,  "Piece",  "Start playing",                  None  0 0 0    0.f 0.f 1.f }
+ { PieceStopPlaying,           true,  "Piece",  "Stop playing",                   None  0 0 0    0.f 0.f 1.f }
+ { PieceTogglePracticing,      false, "Piece",  "Toggle practicing",              None  0 0 0    0.f 1.f 1.f }
+ { PieceStop,                  false, "Piece",  "Stop",                           None  0 0 0    0.f 0.f 1.f }
+ { PieceClear,                 false, "Piece",  "Clear",                          None  0 0 0    0.f 0.f 1.f }
+ { PieceToggleMetronome,       false, "Piece",  "Toggle metronome",               None  0 0 0    0.f 1.f 1.f }
+ { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0    0.f 1.f 1.f }
+ { PieceToggleStrictTiming,    false, "Piece",  "Toggle strict timing practice",  None  0 0 0    0.f 1.f 1.f }
+ { PieceToggleLooping,         false, "Piece",  "Toggle looping",                 None  0 0 0    0.f 1.f 1.f }
+ { PieceSetBPM,                true,  "Piece",  "Set BPM",                        None  0 0 0    0.f 0.f 1.f }
+ { PieceSelectNote,            true,  "Piece",  "Select note",                    None  0 0 0    0.f 0.f 1.f }
+ { PieceDeselectNote,          false, "Piece",  "Deselect note",                  None  0 0 0    0.f 0.f 1.f }
+ { PieceDeleteNote,            false, "Piece",  "Delete note",                    None  0 0 0    0.f 0.f 1.f }
+ { PieceSetNoteLength,         false, "Piece",  "Set note length",                None  0 0 0    0.f 0.f 1.f }
+ { PieceSelectInstrument,      false, "Piece",  "Select instrument",              S     1 0 0    0.f 0.f 1.f }
+ { PieceAddStaff,              false, "Piece",  "Add bass staff",                 None  0 0 0    0.f 0.f 1.f }
+ { PieceTrimAtFirstNote,       false, "Piece",  "Trim from start to first note",  None  0 0 0    0.f 0.f 1.f }
  //- Lister
- { CloseLister,                false, "Lister", "Close",                          None  0 0 0 }
- { OpenLister,                 true,  "Lister", "Open",                           None  0 0 0 } 
- { SelectCommand,              false, "Lister", "Commands",                       F1    0 0 0 }
+ { CloseLister,                true,  "Lister", "Close",                          None  0 0 0    0.f 0.f 1.f }
+ { OpenLister,                 true,  "Lister", "Open",                           None  0 0 0    0.f 0.f 1.f }  
+ { SelectCommand,              true,  "Lister", "Commands",                       F1    0 0 0    0.f 0.f 1.f }
 }
 
 //- Commands 
@@ -56,56 +57,51 @@ CommandKind:
  `Command_Count`;
 }
 
-@data_table("str8")
-CommandsDescriptions:
-{
- @expand(CommandsTable) @strings
-  ```{$(Description)},
- ```;
-}
-
-@data_table("str8")
-CommandsTags:
-{
- @expand(CommandsTable) @strings
-  ```{$(Tag)},
- ```;
-}
-
-@data_table("b32")
-CommandHasParam:
-{
- @expand(CommandsTable)
-  ```$(NeedsParam),
- ```;
-}
-
 @data
 {
  ```
-  typedef struct key_bind key_bind;
- struct key_bind
+  typedef struct command_meta_info command_meta_info;
+ struct command_meta_info
  {
+  command_kind Command;
+  b32 NeedsParam;
+  str8 Tag;
+  str8 Description;
+  
   b32 Control;
   b32 Shift;
   b32 Alt;
   platform_key Key;
   
-  command_kind Command;
+  f32 Min;
+  f32 Max;
+  f32 Step;
  };
  ```;
 }
 
-@data_table("key_bind")
-DefaultKeyBinds:
+@data_table("command_meta_info")
+CommandsMetaInfo:
 {
- @expand(CommandsTable)
+ @expand(CommandsTable) @strings
   ```
  {
-  .Shift = $(Shift), .Control = $(Control), .Alt = $(Alt),
-  .Key = PlatformKey_$(Key),
   .Command = Command_$(Name),
- },```;
+  .NeedsParam = $(NeedsParam),
+  
+  .Tag = {$(Tag)},
+  .Description = {$(Description)},
+  
+  .Key = PlatformKey_$(Key),
+  .Shift = $(Shift),
+  .Control = $(Control),
+  .Alt = $(Alt),
+  
+  .Min = $(Min),
+  .Max = $(Max),
+  .Step = $(Step),
+ },
+ ```
 }
 
 //- Panels 
@@ -114,9 +110,9 @@ DefaultKeyBinds:
 PanelTypes:
 {
  { Empty,    "Empty"    }
+ { Debug,    "Debug"    }
  { Piece,    "Piece"    }
  { Controls, "Controls" }
- { Debug,    "Debug"    }
  { Piano,    "Piano"    }
 }
 

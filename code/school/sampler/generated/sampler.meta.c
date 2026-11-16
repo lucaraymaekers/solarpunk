@@ -10,8 +10,8 @@ typedef enum type_kind type_kind;
 
 str8 TypeStrings[] =
 {
-{(u8 *)"asm", 3},
- {(u8 *)"c", 1},
+{asm},
+ {c},
  
 };
 

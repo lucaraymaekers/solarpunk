@@ -108,11 +108,11 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   }
  }
  
- MS_Add(MSV_Initial, &Piece->BarWrappingDisabled);
+ MS_Add(MSV_Initial, &Piece->BarWrapping);
  
  if(MS_Before(MSV_PieceMultiStaff))
  {
-  Piece->BarWrappingDisabled ^= 1;
+  Piece->BarWrapping ^= 1;
  }
 }
 

@@ -721,6 +721,228 @@ PieceStopPlaying(app_state *App, piece *Piece)
 #endif
 
 //~ UI 
+internal void
+DebugStringAdd(app_state *App, str8 Tag, char *Format, ...)
+{
+ if(App->DebugStringCount < App->MaxDebugStringCount)
+ {
+  va_list Args;
+  va_start(Args, Format);
+  str8 String = Str8VFmt(Format, Args);
+  
+  App->DebugStringTags[App->DebugStringCount] = Tag;
+  App->DebugStrings[App->DebugStringCount] = String;
+  App->DebugStringCount += 1;
+ }
+}
+
+#define M_Button(ButtonText, ...) \
+Button(.Text = ButtonText, .CenterText = true, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
+
+#define M_IconButton(Kind, Name, ...) \
+M_Button(UI_Icons[Kind], .String = Name, ##__VA_ARGS__)
+
+#define M_ControlButton(ButtonText, ...) \
+Button(.Text = ButtonText, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
+
+#define M_SimpleToggleButton(ButtonText, Toggled, Color, ...) \
+Button(.Text = ButtonText, .Padding = GlobalItemPadding, .HasToggle = true, .ToggleToggled = Toggled, Color_Green, .ToggleToggledColor = Color, ##__VA_ARGS__).OneClicked
+
+typedef struct m_slider_result m_slider_result;
+struct m_slider_result
+{
+ f32 Value;
+ b32 Clicked;
+};
+
+typedef struct m_slider_params m_slider_params;
+struct m_slider_params
+{
+ str8 String; 
+ str8 DisplayString; 
+ str8 ValueString;
+ ui_size SliderSize;
+ b32 Align;
+ 
+ f32 StepValue;
+ f32 StepMin; 
+ f32 StepMax; 
+ f32 StepSize;
+ 
+ b32 IsClickable;
+};
+
+#define M_Slider(Str, DisplayStr, ValueStr, Value, Min, Max, Step, Clickable, ...) \
+M_Slider_((m_slider_params){ \
+.String = Str, \
+.DisplayString = DisplayStr, \
+.ValueString = ValueStr, \
+.SliderSize = UI_SizeFull(), \
+.Align = true, \
+.StepValue = Value, \
+.StepMin = Min, \
+.StepMax = Max, \
+.StepSize = Step, \
+.IsClickable = Clickable, \
+##__VA_ARGS__})
+
+internal m_slider_result
+M_Slider_(m_slider_params Params)
+{
+ m_slider_result Result = {0};
+ 
+ str8 String = Params.String; 
+ str8 DisplayString = Params.DisplayString; 
+ str8 ValueString = Params.ValueString;
+ ui_size SliderSize = Params.SliderSize;
+ b32 NoAlign = !Params.Align;
+ 
+ f32 Value = Params.StepValue;
+ f32 Min = Params.StepMin; 
+ f32 Max = Params.StepMax; 
+ f32 Step = Params.StepSize;
+ 
+ b32 Clickable = Params.IsClickable;
+ 
+ s32 Flags = (UI_BoxFlag_Clip|
+              UI_BoxFlag_DrawBorders|
+              UI_BoxFlag_DrawBackground);
+ 
+ if(Clickable)
+ {
+  Flags |= (UI_BoxFlag_MouseClickable|
+            UI_BoxFlag_DrawHotEffects|
+            UI_BoxFlag_DrawActiveEffects);
+ }
+ 
+ {
+  ui_box *Slider;
+  UI_BackgroundColor(Color_ButtonBackground)
+   Slider = UI_AddBox(String, Flags);
+  
+  UI_PaddingAround(GlobalItemPadding)
+  {
+   if(DisplayString.Size > 0)
+   {
+    ui_box *Box;
+    UI_SemanticWidth(UI_SizeText(1.f, 1.f))
+     Box = UI_AddBox(S8("SliderText"),
+                     UI_BoxFlag_DrawDisplayString|
+                     UI_BoxFlag_CenterTextVertically);
+    Box->DisplayString = DisplayString;
+   }
+   
+   if(!NoAlign)
+   {   
+    UI_Spacer(UI_SizeFull());
+   }
+   
+   if(ValueString.Size > 0)
+   {
+    ui_box *Box;
+    UI_SemanticWidth(UI_SizeText(1.f, 1.f))
+     Box = UI_AddBox(S8("ValueText"),
+                     UI_BoxFlag_DrawDisplayString|
+                     UI_BoxFlag_CenterTextVertically);
+    Box->DisplayString = ValueString;
+    
+    UI_Spacer(GlobalItemPadding);
+   }
+   
+   UI_SemanticWidth(SliderSize)
+    UI_BackgroundColor(Color_Orange)
+    UI_BorderColor(Color_Black)
+    Result.Value = UI_Slider(Value, Min, Max, Step, 0, true);
+  }
+  
+  Result.Clicked = Slider->Clicked;
+ }
+ 
+ return Result;
+}
+
+internal f32
+M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
+{
+ f32 Result = 0.f;
+ 
+ f32 ScrollbarSize = 16.f;
+ f32 Padding = 2.f;
+ 
+ f32 ThumbSize = 48.f;
+ f32 HalfThumbSize = .5f*ThumbSize;
+ 
+ ui_box *Scrollbar;
+ ui_box *Thumb;
+ ui_box *Spacer;
+ 
+ app_input *Input = UI_State->Input;
+ 
+ UI_BackgroundColor(Color_Night3)
+  UI_LayoutAxis(Axis)
+  UI_SemanticSizeOnAxis(Axis, UI_SizeParent(1.f, 0.f))
+  UI_SemanticSizeOnAxis(1 - Axis, UI_SizePx(ScrollbarSize, 1.f))
+  UI_AddBox(S8("ScrollbarParent"), 
+            UI_BoxFlag_Clip|
+            UI_BoxFlag_DrawBackground);
+ 
+ UI_PaddingAround(UI_SizePx(Padding, 1.f))
+ {
+  UI_LayoutAxis(Axis)
+   UI_FillAll()
+   Scrollbar = UI_AddBox(S8("Scrollbar"), UI_BoxFlag_MouseClickable);
+  
+#if 0  
+  // TODO(luca): Grow scroll bar proportional to amount to scroll.
+  ThumbSize = Scrollbar->FixedSize.e[Axis]/TotalSize*200.f;
+  HalfThumbSize = ThumbSize*.5f;
+#endif
+  
+  UI_Push()
+  {                                                    
+   f32 ScrollableSize = Scrollbar->FixedSize.e[Axis] - ThumbSize;
+   f32 Factor = TotalSize/ScrollableSize;
+   
+   Spacer = UI_AddBox(S8("Spacer"), 0);
+   
+   UI_FillOnAxis(1 - Axis)
+    UI_SemanticSizeOnAxis(Axis, UI_SizePx(ThumbSize, 1.f))
+    UI_BorderColor(Color_Black)
+    UI_BackgroundColor(Color_Orange)
+    Thumb = UI_AddBox(S8("Thumb"), 
+                      UI_BoxFlag_Clip|
+                      UI_BoxFlag_DrawBackground|
+                      UI_BoxFlag_DrawBorders|
+                      UI_BoxFlag_MouseClickable|
+                      UI_BoxFlag_DrawHotEffects|
+                      UI_BoxFlag_DrawActiveEffects);
+   
+   // Clamp in container shrunk.
+   f32 ScrollP = Min(Scroll, TotalSize);
+   
+   if(UI_IsActive(Thumb) || UI_IsActive(Scrollbar))
+   {                                                                            
+    f32 MouseP = (f32)Input->Mouse.Pos.e[Axis];
+    f32 RelP = MouseP - Scrollbar->FixedPos.e[Axis];
+    RelP -= HalfThumbSize;
+    RelP = Clamp(0, RelP, ScrollableSize);
+    
+    ScrollP = RelP*Factor;
+   }
+   
+   Result = ScrollP;
+   
+   f32 SpaceBeforeThumb = (Factor > 0.f ? ScrollP/Factor : 0.f);
+   
+   Spacer->SemanticSize[Axis] = UI_SizePx(SpaceBeforeThumb, 1.f);
+   Spacer->SemanticSize[1 - Axis] = UI_SizeParent(1.f, 0.f);
+  }
+  
+ }
+ 
+ return Result;
+}
+
 internal ui_box *
 M_Label(str8 String)
 {
@@ -746,6 +968,12 @@ M_Labelf(char *Format, ...)
  Result = M_Label(String);
  
  return Result;
+}
+
+internal void
+M_ControlLabel(str8 Name)
+{
+ UI_BackgroundColor(Color_Frost2) M_Label(Name);
 }
 
 typedef struct display_unit display_unit;
@@ -786,20 +1014,16 @@ internal void
 DebugStringAddArena(app_state *App, str8 Name, arena *Arena)
 {
  if(Arena)
-  
  {  
   display_unit PosUnit = DisplayUnitFromSize((f32)Arena->Pos);
   display_unit SizeUnit = DisplayUnitFromSize((f32)Arena->Size);
   
-  str8 String = Str8Fmt("(mem) %S: %.3f%S/%.1f%S", 
-                        Name, 
-                        (f32)Arena->Pos/(f32)PosUnit.Value, 
-                        PosUnit.Name, 
-                        (f32)Arena->Size/(f32)SizeUnit.Value,
-                        SizeUnit.Name);
-  
-  App->DebugStrings[App->DebugStringCount] = String;
-  App->DebugStringCount += 1;
+  DebugStringAdd(App, S8("mem"), "%S: %.3f%S/%.1f%S", 
+                 Name, 
+                 (f32)Arena->Pos/(f32)PosUnit.Value, 
+                 PosUnit.Name, 
+                 (f32)Arena->Size/(f32)SizeUnit.Value,
+                 SizeUnit.Name);
  }
 }
 
@@ -867,7 +1091,7 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
   Remainder = ModF32(Start, Piece->TimeSigNum);
  }
  
- if(!Piece->BarWrappingDisabled)
+ if(!Piece->BarWrapping)
  {
   s32 HeightIdx = BarIdx/BarsPerWidth;
   BarIdx = (BarIdx%BarsPerWidth);
@@ -965,7 +1189,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
       Dest = RectFromSize(BarPos, V2(2.f, StaffHeight));
       DrawRect(Dest, StaffColor, 0.f, 0.f, 0.f); 
       
-      if(!Piece->BarWrappingDisabled)
+      if(!Piece->BarWrapping)
       {
        BarPos.X = StaffPos.X;
        BarPos.Y += (f32)Piece->StaffCount*2.f*StaffHeight + StaffHeight;
@@ -1454,234 +1678,6 @@ UI_CUSTOM_DRAW(CustomDrawSingleLineTextInput)
  }
 }
 
-//~ UI 
-internal void
-DebugStringAdd(app_state *App, char *Format, ...)
-{
- if(App->DebugStringCount < App->MaxDebugStringCount)
- {
-  va_list Args;
-  va_start(Args, Format);
-  
-  str8 String = Str8VFmt(Format, Args);
-  App->DebugStrings[App->DebugStringCount] = String;
-  App->DebugStringCount += 1;
- }
-}
-
-#define M_Button(ButtonText, ...) \
-Button(.Text = ButtonText, .CenterText = true, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
-
-#define M_IconButton(Kind, Name, ...) \
-M_Button(UI_Icons[Kind], .String = Name, ##__VA_ARGS__)
-
-#define M_ControlButton(ButtonText, ...) \
-Button(.Text = ButtonText, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
-
-#define M_SimpleToggleButton(ButtonText, Toggled, Color, ...) \
-Button(.Text = ButtonText, .Padding = GlobalItemPadding, .HasToggle = true, .ToggleToggled = Toggled, Color_Green, .ToggleToggledColor = Color, ##__VA_ARGS__).OneClicked
-
-typedef struct m_slider_result m_slider_result;
-struct m_slider_result
-{
- f32 Value;
- b32 Clicked;
-};
-
-typedef struct m_slider_params m_slider_params;
-struct m_slider_params
-{
- str8 String; 
- str8 DisplayString; 
- str8 ValueString;
- ui_size SliderSize;
- b32 Align;
- 
- f32 StepValue;
- f32 StepMin; 
- f32 StepMax; 
- f32 StepSize;
- 
- b32 IsClickable;
-};
-
-#define M_Slider(Str, DisplayStr, ValueStr, Value, Min, Max, Step, Clickable, ...) \
-M_Slider_((m_slider_params){ \
-.String = Str, \
-.DisplayString = DisplayStr, \
-.ValueString = ValueStr, \
-.SliderSize = UI_SizeFull(), \
-.Align = true, \
-.StepValue = Value, \
-.StepMin = Min, \
-.StepMax = Max, \
-.StepSize = Step, \
-.IsClickable = Clickable, \
-##__VA_ARGS__})
-
-internal m_slider_result
-M_Slider_(m_slider_params Params)
-{
- m_slider_result Result = {0};
- 
- str8 String = Params.String; 
- str8 DisplayString = Params.DisplayString; 
- str8 ValueString = Params.ValueString;
- ui_size SliderSize = Params.SliderSize;
- b32 NoAlign = !Params.Align;
- 
- f32 Value = Params.StepValue;
- f32 Min = Params.StepMin; 
- f32 Max = Params.StepMax; 
- f32 Step = Params.StepSize;
- 
- b32 Clickable = Params.IsClickable;
- 
- s32 Flags = (UI_BoxFlag_Clip|
-              UI_BoxFlag_DrawBorders|
-              UI_BoxFlag_DrawBackground);
- 
- if(Clickable)
- {
-  Flags |= (UI_BoxFlag_MouseClickable|
-            UI_BoxFlag_DrawHotEffects|
-            UI_BoxFlag_DrawActiveEffects);
- }
- 
- {
-  ui_box *Slider;
-  UI_BackgroundColor(Color_ButtonBackground)
-   Slider = UI_AddBox(String, Flags);
-  
-  UI_PaddingAround(GlobalItemPadding)
-  {
-   if(DisplayString.Size > 0)
-   {
-    ui_box *Box;
-    UI_SemanticWidth(UI_SizeText(1.f, 1.f))
-     Box = UI_AddBox(S8("SliderText"),
-                     UI_BoxFlag_DrawDisplayString|
-                     UI_BoxFlag_CenterTextVertically);
-    Box->DisplayString = DisplayString;
-   }
-   
-   if(!NoAlign)
-   {   
-    UI_Spacer(UI_SizeFull());
-   }
-   
-   if(ValueString.Size > 0)
-   {
-    ui_box *Box;
-    UI_SemanticWidth(UI_SizeText(1.f, 1.f))
-     Box = UI_AddBox(S8("ValueText"),
-                     UI_BoxFlag_DrawDisplayString|
-                     UI_BoxFlag_CenterTextVertically);
-    Box->DisplayString = ValueString;
-    
-    UI_Spacer(GlobalItemPadding);
-   }
-   
-   UI_SemanticWidth(SliderSize)
-    UI_BackgroundColor(Color_Orange)
-    UI_BorderColor(Color_Black)
-    Result.Value = UI_Slider(Value, Min, Max, Step, 0, true);
-  }
-  
-  Result.Clicked = Slider->Clicked;
- }
- 
- return Result;
-}
-
-internal f32
-M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
-{
- f32 Result = 0.f;
- 
- f32 ScrollbarSize = 16.f;
- f32 Padding = 2.f;
- 
- f32 ThumbSize = 48.f;
- f32 HalfThumbSize = .5f*ThumbSize;
- 
- ui_box *Scrollbar;
- ui_box *Thumb;
- ui_box *Spacer;
- 
- app_input *Input = UI_State->Input;
- 
- UI_BackgroundColor(Color_Night3)
-  UI_LayoutAxis(Axis)
-  UI_SemanticSizeOnAxis(Axis, UI_SizeParent(1.f, 0.f))
-  UI_SemanticSizeOnAxis(1 - Axis, UI_SizePx(ScrollbarSize, 1.f))
-  UI_AddBox(S8("ScrollbarParent"), 
-            UI_BoxFlag_Clip|
-            UI_BoxFlag_DrawBackground);
- 
- UI_PaddingAround(UI_SizePx(Padding, 1.f))
- {
-  UI_LayoutAxis(Axis)
-   UI_FillAll()
-   Scrollbar = UI_AddBox(S8("Scrollbar"), UI_BoxFlag_MouseClickable);
-  
-#if 0  
-  // TODO(luca): Grow scroll bar proportional to amount to scroll.
-  ThumbSize = Scrollbar->FixedSize.e[Axis]/TotalSize*200.f;
-  HalfThumbSize = ThumbSize*.5f;
-#endif
-  
-  UI_Push()
-  {                                                    
-   f32 ScrollableSize = Scrollbar->FixedSize.e[Axis] - ThumbSize;
-   f32 Factor = TotalSize/ScrollableSize;
-   
-   Spacer = UI_AddBox(S8("Spacer"), 0);
-   
-   UI_FillOnAxis(1 - Axis)
-    UI_SemanticSizeOnAxis(Axis, UI_SizePx(ThumbSize, 1.f))
-    UI_BorderColor(Color_Black)
-    UI_BackgroundColor(Color_Orange)
-    Thumb = UI_AddBox(S8("Thumb"), 
-                      UI_BoxFlag_Clip|
-                      UI_BoxFlag_DrawBackground|
-                      UI_BoxFlag_DrawBorders|
-                      UI_BoxFlag_MouseClickable|
-                      UI_BoxFlag_DrawHotEffects|
-                      UI_BoxFlag_DrawActiveEffects);
-   
-   // Clamp in container shrunk.
-   f32 ScrollP = Min(Scroll, TotalSize);
-   
-   if(UI_IsActive(Thumb) || UI_IsActive(Scrollbar))
-   {                                                                            
-    f32 MouseP = (f32)Input->Mouse.Pos.e[Axis];
-    f32 RelP = MouseP - Scrollbar->FixedPos.e[Axis];
-    RelP -= HalfThumbSize;
-    RelP = Clamp(0, RelP, ScrollableSize);
-    
-    ScrollP = RelP*Factor;
-   }
-   
-   Result = ScrollP;
-   
-   f32 SpaceBeforeThumb = (Factor > 0.f ? ScrollP/Factor : 0.f);
-   
-   Spacer->SemanticSize[Axis] = UI_SizePx(SpaceBeforeThumb, 1.f);
-   Spacer->SemanticSize[1 - Axis] = UI_SizeParent(1.f, 0.f);
-  }
-  
- }
- 
- return Result;
-}
-
-internal void
-M_ControlLabel(str8 Name)
-{
- UI_BackgroundColor(Color_Frost2) M_Label(Name);
-}
-
 //~ EntryPoint
 C_LINKAGE
 UPDATE_AND_RENDER(UpdateAndRender)
@@ -1931,6 +1927,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    if(OutputFound) PushCommand(App, Command_SelectOutputDevice)->Device = &App->Out;
   }
   
+  App->MaxListerEntryCount = KB(64);
   App->MaxDebugStringCount = 128;
  }
  
@@ -2004,50 +2001,50 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
   // NOTE(luca): Check if key bind was pressed and push command accordingly
   {  
-   for EachElement(Idx, DefaultKeyBinds)
+   for EachElement(Idx, CommandsMetaInfo)
    {
-    key_bind *KeyBind = DefaultKeyBinds + Idx;
+    command_meta_info *Info = CommandsMetaInfo + Idx;
     
     s32 Mask = 0;
-    if(KeyBind->Shift)   Mask |= PlatformKeyModifier_Shift;
-    if(KeyBind->Control) Mask |= PlatformKeyModifier_Control;
-    if(KeyBind->Alt)     Mask |= PlatformKeyModifier_Alt;
+    if(Info->Shift)   Mask |= PlatformKeyModifier_Shift;
+    if(Info->Control) Mask |= PlatformKeyModifier_Control;
+    if(Info->Alt)     Mask |= PlatformKeyModifier_Alt;
     
     b32 IsMatch = false;
     
-    b32 KeyIsAlpha = (PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_9);  
+    b32 KeyIsAlpha = (PlatformKey_A <= Info->Key && Info->Key <= PlatformKey_9);  
     
     if(!Key->IsSymbol && KeyIsAlpha)
     {
-     if(PlatformKey_A <= KeyBind->Key && KeyBind->Key <= PlatformKey_Z)
+     if(PlatformKey_A <= Info->Key && Info->Key <= PlatformKey_Z)
      {
-      IsMatch = (Key->Codepoint == ('a' + (KeyBind->Key - PlatformKey_A)));
+      IsMatch = (Key->Codepoint == ('a' + (Info->Key - PlatformKey_A)));
      }
-     else if(PlatformKey_0 <= KeyBind->Key && KeyBind->Key <= PlatformKey_9)
+     else if(PlatformKey_0 <= Info->Key && Info->Key <= PlatformKey_9)
      {
-      IsMatch = (Key->Codepoint == ('0' + (KeyBind->Key - PlatformKey_0)));
+      IsMatch = (Key->Codepoint == ('0' + (Info->Key - PlatformKey_0)));
      }
-     else if(KeyBind->Key == PlatformKey_Minus)
+     else if(Info->Key == PlatformKey_Minus)
      {
       IsMatch = (Key->Codepoint == '-');
      }
-     else if(KeyBind->Key == PlatformKey_Comma)
+     else if(Info->Key == PlatformKey_Comma)
      {
       IsMatch = (Key->Codepoint == ',');
      }
-     else if(KeyBind->Key == PlatformKey_Space)
+     else if(Info->Key == PlatformKey_Space)
      {
       IsMatch = (Key->Codepoint == ' ');
      }
     }
     else
     {
-     IsMatch = (Key->Codepoint == KeyBind->Key);
+     IsMatch = (Key->Codepoint == Info->Key);
     }
     
     if(IsMatch && Key->Modifiers == Mask)
     {
-     PushCommand(App, KeyBind->Command);
+     PushCommand(App, Info->Command);
      // TODO(luca): We could still run to detect conflicting key binds.
      Handled = true;
      break;
@@ -2128,6 +2125,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    OS_ProfileAndPrint("Render setup");
    
    App->DebugStrings = PushArray(FrameArena, str8, App->MaxDebugStringCount);
+   App->DebugStringTags = PushArray(FrameArena, str8, App->MaxDebugStringCount);
    App->DebugStringCount = 0;
    { 
     ui_box *Hot = UI_BoxFromKey(UI_State->Hot);
@@ -2146,12 +2144,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
      // dereference them we just skip the frame where reloaded.
      StringsScratchTemp(UI_State->FrameArenaBack)
      {
-      DebugStringAdd(App, "(ui) Active: %S", ActiveString);
-      DebugStringAdd(App, "(ui) Hot: %S", HotString);
-      DebugStringAdd(App, "(ui) Active->tHot = %.2f", Active->tHot);
-      DebugStringAdd(App, "(ui) Active->tActive = %.2f", Active->tActive);
-      DebugStringAdd(App, "(ui) Hot->tHot = %.2f", Hot->tHot);
-      DebugStringAdd(App, "(ui) Hot->tActive = %.2f", Hot->tActive);
+      DebugStringAdd(App, S8("ui"), "Active: %S", ActiveString);
+      DebugStringAdd(App, S8("ui"), "Hot: %S", HotString);
+      DebugStringAdd(App, S8("ui"), "Active->tHot = %.2f", Active->tHot);
+      DebugStringAdd(App, S8("ui"), "Active->tActive = %.2f", Active->tActive);
+      DebugStringAdd(App, S8("ui"), "Hot->tHot = %.2f", Hot->tHot);
+      DebugStringAdd(App, S8("ui"), "Hot->tActive = %.2f", Hot->tActive);
       
       DebugStringAddArena(App, S8("Perm"), PermanentArena);
       DebugStringAddArena(App, S8("Frame"), FrameArena);
@@ -2176,32 +2174,147 @@ UPDATE_AND_RENDER(UpdateAndRender)
    f32 ListerBorderSize = 2.f;
    
    // Input
-   u64 SelectedIdx = 0; 
-   u64 NameListSize = 0;
-   str8 *NameList = 0;
-   u64 StartIdx = 0;
+   s32 SelectedIdx = 0; 
+   s32 StartIdx = 0;
    str8 Title = {0};
    
+   s32 EntryCount = 0;
+   lister_entry *Entries = PushArrayZero(FrameArena, lister_entry, App->MaxListerEntryCount);
+   
    // Output
-   s32 FilteredItemCount = 0;
-   lister_item *FilteredItems = 0;
    platform_midi_device *OutDevices = 0;
+   
+   s32 FilteredEntryCount = 0;
+   lister_entry *FilteredEntries = PushArray(FrameArena, lister_entry, App->MaxListerEntryCount);
    
    switch(App->ListerKind)
    {
     default: InvalidPath(); break;
+    
+    case ListerKind_DebugInfo:
+    {
+     Title = S8("Search info");
+     SelectedIdx = -1;
+     
+     EntryCount = (s32)App->DebugStringCount;
+     
+     for EachIndex(Idx, EntryCount)
+     {
+      lister_entry *Entry = Entries + Idx;
+      Entry->Text = App->DebugStrings[Idx];
+      Entry->Tag = App->DebugStringTags[Idx];
+     }
+    } break;
+    
+    case ListerKind_Commands:
+    {
+     StartIdx = 1;
+     
+     for EachIndex(Idx, Command_Count)
+     {
+      lister_entry *Entry = Entries + EntryCount;
+      piece *Piece = App->SelectedPanel->Piece;
+      
+      if(!CommandsMetaInfo[Idx].NeedsParam)
+      {
+       Entry->Tag = CommandsMetaInfo[Idx].Tag;
+       Entry->Text = CommandsMetaInfo[Idx].Description;
+       Entry->Command = Idx;
+       
+       EntryCount += 1;
+      }
+      
+      b32 IsToggle = true;
+      switch(Idx)
+      {
+       default: 
+       {
+        IsToggle = false;
+       } break;
+       
+#define CaseEntryFromB32(CommandName, Value) \
+case Command_##CommandName: Entry->F32 = (f32)Value; break;
+       
+       CaseEntryFromB32(ToggleMIDIInput, !App->InputMIDIDisabled);
+       CaseEntryFromB32(ToggleMIDIOutput, App->OutputMIDIEnabled);
+       CaseEntryFromB32(ToggleOutputSynth, !App->OutputSynthDisabled);
+       CaseEntryFromB32(ToggleVirtualKeyboardInput, !App->InputVirtualKeyboardDisabled);
+       CaseEntryFromB32(PieceToggleLooping, !Piece->LoopingDisabled);
+       CaseEntryFromB32(PieceToggleStrictTiming, Piece->PracticeStrictTiming);
+       CaseEntryFromB32(PieceToggleBarWrapping, Piece->BarWrapping);
+       CaseEntryFromB32(PieceToggleRecording, Piece->IsRecording);
+       CaseEntryFromB32(PieceTogglePlaying, Piece->IsPlaying);
+       CaseEntryFromB32(PieceTogglePracticing, Piece->IsPracticing);
+       CaseEntryFromB32(PieceToggleMetronome, Piece->Metronome);
+      }
+      
+#if MUZE_INTERNAL     
+      // Check to add toggle values to commands if forgotten.
+      {      
+       command_meta_info *Info = CommandsMetaInfo + Idx;
+       if(!IsToggle && 
+          Info->Min == 0.f && 
+          Info->Max == 1.f && 
+          Info->Step == 1.f)
+       {
+        NotImplemented();
+       }
+      }
+#endif
+      
+      if(IsToggle)
+      {
+       Entry->Min = 0.f;
+       Entry->Max = 1.f;
+       Entry->Step = 1.f;
+      }
+     }
+     
+    } break;
+    
     case ListerKind_Instruments:
     {
      Title = S8("Select instrument");
-     panel_kind Kind = App->SelectedPanel->Kind;
+     
+     EntryCount = App->InstrumentCount;
+     
      if(0) {}
-     else if(Kind == PanelKind_Piece) SelectedIdx = (u64)App->SelectedPanel->Piece->Preset; 
+     else if(App->SelectedPanel->Kind == PanelKind_Piece) 
+     {
+      SelectedIdx = App->SelectedPanel->Piece->Preset; 
+     }
      
+     for EachIndex(Idx, EntryCount)
+     {
+      lister_entry *Entry = Entries + Idx;
+      Entry->Text = App->InstrumentNames[Idx];
+      Entry->Command = Command_SelectInstrument;
+      Entry->S32 = Idx;
+     }
      
-     NameListSize = (u64)App->InstrumentCount;
-     NameList = App->InstrumentNames;
     } break;
     
+    case ListerKind_PanelTypes:
+    {
+     EntryCount = PanelKind_Count;
+     
+     Title = S8("Select panel type");
+     panel *Panel = App->SelectedPanel;
+     SelectedIdx = Panel->Kind;
+     
+     for EachIndex(Idx, EntryCount)
+     {
+      lister_entry *Entry = Entries + Idx;
+      Entry->Text = PanelTypeStrings[Idx];
+     }
+     
+     StartIdx = 1;
+#if MUZE_INTERNAL
+     StartIdx = 2;
+#endif
+    } break;
+    
+#if 0
     case ListerKind_MIDIInput:
     case ListerKind_MIDIOutput:
     {
@@ -2234,53 +2347,26 @@ UPDATE_AND_RENDER(UpdateAndRender)
      }
     } break;
     
-    case ListerKind_DebugInfo:
-    {
-     Title = S8("Search info");
-     SelectedIdx = (u64)-1;
-     NameList = App->DebugStrings;
-     NameListSize = App->DebugStringCount;
-    } break;
     
-    case ListerKind_PanelTypes:
-    {
-     Title = S8("Select panel type");
-     panel *Panel = App->SelectedPanel;
-     SelectedIdx = Panel->Kind;
-     NameList = PanelTypeStrings;
-     NameListSize = ArrayCount(PanelTypeStrings);
-     StartIdx = 1;
-    } break;
-    
-    case ListerKind_Commands:
-    {
-     StartIdx = 1;
-     
-     u64 Count = Command_Count;
-     NameList = PushArray(FrameArena, str8, Count);
-     for EachIndex(Idx, Count)
-     {
-      if(!CommandHasParam[Idx])
-      {
-       NameList[NameListSize] = Str8Fmt("%S: %S", CommandsTags[Idx], CommandsDescriptions[Idx]);
-       NameListSize += 1; 
-      }
-     }
-    } break;
+#endif
    }
    
-   FilteredItems = PushArray(FrameArena, lister_item, NameListSize);
-   
-   for(u64 Idx = StartIdx; Idx < NameListSize; Idx += 1)
+   for(s32 Idx = StartIdx; Idx < EntryCount; Idx += 1)
    {
-    lister_item *Item = FilteredItems + FilteredItemCount;
-    str8 Name = NameList[Idx];
+    lister_entry *Entry = Entries + Idx;
+    str8 Name = Str8Fmt("%S %S", Entry->Tag, Entry->Text);
     
     b32 Matched = false;
     
     // Match if Name contains App->Text case-insensitive
-    {                
-     if(App->Text.Size == 0)
+    {
+     piece *Piece = App->SelectedPanel->Piece;
+     
+     if(IsNilPiece(Piece) && S8Match(Entry->Tag, S8("Piece"), 0))
+     {
+      Matched = false;
+     }
+     else if(App->Text.Size == 0)
      {
       Matched = true;
      }
@@ -2321,9 +2407,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     if(Matched)
     {
-     Item->Name = Name;
-     Item->Idx = Idx;
-     FilteredItemCount += 1;
+     Entry->Idx = Idx;
+     FilteredEntries[FilteredEntryCount] = *Entry;
+     FilteredEntryCount += 1;
     }
    }
    
@@ -2420,14 +2506,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
           UI_FillAll()
            UI_Push()
           {
-           MaxIdx = Min(FilteredItemCount, MinIdx + ShowItemCount + 1);
+           MaxIdx = Min(FilteredEntryCount, MinIdx + ShowItemCount + 1);
            UI_Spacer(UI_SizePx(ItemHeight*(f32)MinIdx, 1.f));
            for(s32 Idx = MinIdx; Idx < MaxIdx; Idx += 1)
            {
-            lister_item *Item = FilteredItems + Idx;
+            lister_entry *Entry = FilteredEntries + Idx;
             str8 ItemString = Str8Fmt("Item%d", Idx);
             
-            b32 Selected = (SelectedIdx == Item->Idx);
+            b32 Selected = (SelectedIdx == Entry->Idx);
             
             UI_SemanticHeight(UI_SizePx(ItemHeight, 1.f))
             {
@@ -2436,31 +2522,36 @@ UPDATE_AND_RENDER(UpdateAndRender)
              
              IsFirstItem = (Idx == MinIdx);
              
-#define MUZE_WIP_LISTER 0
+#define MUZE_WIP_LISTER 1
 #if MUZE_WIP_LISTER
              UI_AddBox(ItemString, UI_BoxFlag_DrawBorders);
              
              UI_Push()
               UI_Row()
-              
              {              
-              UI_SemanticWidth(UI_SizeText(5.f, 1.f))
-               UI_AddBox(Str8Fmt("Helloo###%d", Idx), 0);
-              UI_PaddingAround(UI_SizePx(5.f, 1.f))
-               UI_SemanticWidth(UI_SizeText(5.f, 1.f))
-               UI_Softness(.5f)
-               UI_CornerRadii(V4F32(10.f))
-               UI_BackgroundColor(Color_Yellow)
-               UI_AddBox(Str8Fmt("Hello###%d", Idx), 
-                         UI_BoxFlag_DrawBackground |
-                         UI_BoxFlag_DrawDisplayString | 
-                         UI_BoxFlag_CenterTextVertically |
-                         UI_BoxFlag_CenterTextHorizontally);
+              if(Entry->Tag.Size)
+              {
+               UI_SemanticWidth(UI_SizePx(80.f, 1.f))
+                UI_AddBox(Str8Fmt("%d", Entry->Idx), 0);
+               UI_PaddingAround(UI_SizePx(5.f, 1.f))
+                UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+                UI_Softness(.5f)
+                UI_CornerRadii(V4F32(10.f))
+                UI_BackgroundColor(Color_Yellow)
+                UI_Center()
+               {
+                UI_AddBox(Entry->Tag, 
+                          UI_BoxFlag_DrawBackground |
+                          UI_BoxFlag_DrawDisplayString | 
+                          UI_BoxFlag_CenterTextVertically |
+                          UI_BoxFlag_CenterTextHorizontally);
+               }
+              }
 #endif
               
               UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
                ItemSelected = (Button(.String = ItemString,
-                                      .Text = Item->Name, 
+                                      .Text = Entry->Text, 
                                       .Disabled = Selected, 
                                       .BackgroundColor = (IsFirstItem ? 
                                                           Color_Night1 :
@@ -2469,6 +2560,32 @@ UPDATE_AND_RENDER(UpdateAndRender)
                                       .Padding = ItemPadding,
                                       .ClipSize = false).Released || 
                                (App->ListerReturnPressed && IsFirstItem));
+              
+              
+              if(Entry->Max > 0.f)
+              {         
+               b32 IsToggle = (Entry->Min == 0.f &&
+                               Entry->Max == 1.f && 
+                               Entry->Step == 1.f);
+               
+               if(IsToggle)
+               { 
+                b32 Toggled = false;
+                UI_AddBox(Str8Fmt("CheckBox##%d", Entry->Idx), 0);
+                UI_PaddingAround(GlobalItemPadding)
+                 Toggled = UI_Checkbox((b32)Entry->F32, Color_Yellow);
+                if(Toggled)
+                {
+                 PushCommand(App, Entry->Command);
+                }
+               }
+               else
+               {
+                // TODO(luca): Slider
+               }
+               
+               
+              }
               
 #if MUZE_WIP_LISTER     
              }
@@ -2481,10 +2598,19 @@ UPDATE_AND_RENDER(UpdateAndRender)
                default: InvalidPath(); break;
                
                case ListerKind_Instruments:
+               case ListerKind_DebugInfo:
+               case ListerKind_Commands:
                {
-                command *Command = PushCommand(App, Command_SelectInstrument);
-                Command->S32 = (s32)Item->Idx;
+                if(Entry->Command != Command_None)
+                {
+                 command *Command = PushCommand(App, Entry->Command);
+                 
+                 Command->S32 = Entry->S32;
+                 Command->F32 = Entry->F32;
+                }
                } break;
+               
+#if 0               
                
                case ListerKind_MIDIInput:
                {
@@ -2498,28 +2624,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 Command->Device = OutDevices + Item->Idx;
                } break;
                
-               case ListerKind_PanelTypes:
-               {
-                command *Command = PushCommand(App, Command_SetPanelType);
-                Command->PanelKind = (panel_kind)Item->Idx;
-               } break;
-               
-               case ListerKind_Commands:
-               {
-                u64 FilteredIdx = 0;
-                for EachElement(CommandIdx, CommandHasParam)
-                {
-                 if(!CommandHasParam[CommandIdx])
-                 {
-                  if(FilteredIdx == Item->Idx)
-                  {
-                   PushCommand(App, (command_kind)CommandIdx);
-                  }
-                  FilteredIdx += 1;
-                 }
-                }
-                
-               } break;
+#endif
                
               }
               
@@ -2532,8 +2637,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
          
          App->ListerReturnPressed = false;
          
-         FilteredItemCount = Max(FilteredItemCount, 1);
-         f32 TotalElementSize = (f32)(FilteredItemCount - 1)*ItemHeight;
+         FilteredEntryCount = Max(FilteredEntryCount, 1);
+         f32 TotalElementSize = (f32)(FilteredEntryCount - 1)*ItemHeight;
          
          App->ListerScroll = M_Scrollbar(Axis2_Y, TotalElementSize, App->ListerScroll);  
          Assert(App->ListerScroll >= 0.f);
@@ -2783,7 +2888,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                   }
                   if(Click.Toggled)
                   {
-                   PushCommand(App, Command_ToggleSynthOutput);
+                   PushCommand(App, Command_ToggleOutputSynth);
                   }
                  }
                 }
@@ -2897,7 +3002,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
                 f32 VerticalOverflow = 0.f;
                 // Find out if vertically overflowing and if it is, add a scrollbar
                 {
-                 if(!Piece->BarWrappingDisabled)
+                 if(!Piece->BarWrapping)
                  {
                   f32 WholeBarWidth = Piece->BeatWidth*Piece->TimeSigNum + 2.f*Piece->BarPadding;
                   s32 BarsPerWidth = (s32)((PieceBox->FixedSize.X - 2.f*Piece->BarPadding)/WholeBarWidth);
@@ -2937,7 +3042,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
              }
              
              // Scrollbar
-             if(Piece->BarWrappingDisabled)
+             if(Piece->BarWrapping)
              {
               f32 BarPadding = Piece->BarPadding;
               f32 BarCount = Max(1.f, CeilF32(Piece->RecordLength/Piece->TimeSigNum));
@@ -3389,7 +3494,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     {
      App->InputVirtualKeyboardDisabled ^= 1;
     } break;
-    case Command_ToggleSynthOutput:
+    case Command_ToggleOutputSynth:
     {
      if(!App->OutputSynthDisabled)
      {
@@ -3479,6 +3584,18 @@ UPDATE_AND_RENDER(UpdateAndRender)
       PieceStopPlaying(App, Piece);
       Piece->IsPracticing = false;
       Piece->IsRecording = true;
+     }
+    } break;
+    
+    case Command_PieceTogglePlaying:
+    {
+     if(!Piece->IsPlaying)
+     {
+      PushCommand(App, Command_PieceStartPlaying);
+     }
+     else
+     {
+      PushCommand(App, Command_PieceStopPlaying);
      }
     } break;
     
@@ -3582,7 +3699,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     
     case Command_PieceToggleBarWrapping:
     {
-     Piece->BarWrappingDisabled ^= 1;
+     Piece->BarWrapping ^= 1;
     } break;
     
     case Command_PieceDeselectNote:
