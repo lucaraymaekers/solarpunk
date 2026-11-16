@@ -203,28 +203,20 @@ UI_AddBox(str8 String, s32 Flags)
    }
   }
   
-  ui_box *Search = ((!UI_State->AppendToParent && 
-                     !UI_IsNilBox(UI_State->Current->Parent)) ?
-                    UI_State->Current->Parent :
-                    UI_State->Current);
+  ui_box *Search = UI_State->Current;
   
-  // NOTE(luca): This is to differentiate when two boxes are added next to each other
-  // with the same parent and the same string.
-  
-  if(!UI_State->AppendToParent &&
-     S8Match(UI_State->Current->String, String, 0))
+  if(UI_State->KeyFromParent)
   {
-   Search = UI_State->Current;
+   Search = UI_State->Current->Parent;
   }
   
   // Find youngest parent with non-zero key
   {
-   for(;
+   for(; 
        UI_KeyMatch(Search->Key, UI_KeyNull());
        Search = Search->Parent);
   }
   
-  // TODO(luca): Seed with sibling's hash as well?
   u64 AncestorKey = Search->Key.U64[0];
   Key.U64[0] = U64HashFromSeedStr8(AncestorKey, String);
   

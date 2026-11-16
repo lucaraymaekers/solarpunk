@@ -201,10 +201,8 @@ struct command
  command_kind Kind;
  
  panel *Panel;
- panel_kind PanelKind;
  piece *Piece;
  platform_midi_device *Device;
- lister_kind ListerKind;
  axis2 Axis;
  
  s32 S32;

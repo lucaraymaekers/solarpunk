@@ -172,6 +172,8 @@ struct ui_state
  arena *FrameArenaBack;
  
  b32 AppendToParent;
+ b32 KeyFromParent;
+ 
  ui_box *Current;
  ui_box *Root;
  struct
@@ -253,6 +255,9 @@ UI_PopSemanticSizeOnAxis(axis2 Axis)
   UI_PopSemanticHeight();
  }
 }
+
+#define UI_KeyFromParent() DeferLoop(UI_State->KeyFromParent = true, \
+UI_State->KeyFromParent = false)
 
 #define UI_SemanticSizeOnAxis(Axis, Size) \
 DeferLoop(UI_PushSemanticSizeOnAxis(Axis, Size), UI_PopSemanticSizeOnAxis(Axis))

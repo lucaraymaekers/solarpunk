@@ -2306,6 +2306,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      {
       lister_entry *Entry = Entries + Idx;
       Entry->Text = PanelTypeStrings[Idx];
+      Entry->Command = Command_SetPanelType;
+      Entry->S32 = Idx;
      }
      
      StartIdx = 1;
@@ -2526,7 +2528,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
              
 #define MUZE_WIP_LISTER 1
 #if MUZE_WIP_LISTER
-             UI_AddBox(ItemString, UI_BoxFlag_DrawBorders);
+             
+             UI_KeyFromParent()
+              UI_AddBox(ItemString, UI_BoxFlag_DrawBorders);
              
              UI_Push()
               UI_Row()
@@ -2606,6 +2610,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
               {
                default: InvalidPath(); break;
                
+               case ListerKind_PanelTypes:
                case ListerKind_Instruments:
                case ListerKind_DebugInfo:
                case ListerKind_Commands:
@@ -2752,7 +2757,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
               
               if(Type->WasClicked)
               {
-               PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_PanelTypes;
+               PushCommand(App, Command_OpenLister)->S32 = ListerKind_PanelTypes;
               }
              }
              
@@ -2767,7 +2772,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                UI_FontKind(FontKind_Icons)
                if(M_IconButton(UI_IconKind_Cog, S8("Settings"), .BackgroundColor = Color_Frost3))
               {
-               PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Commands;
+               PushCommand(App, Command_OpenLister)->S32 = ListerKind_Commands;
               }
              }
              
@@ -3105,7 +3110,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                   }
                   if(Click.Pressed)
                   {
-                   PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_MIDIInput;
+                   PushCommand(App, Command_OpenLister)->S32 = ListerKind_MIDIInput;
                   }
                   
                  }
@@ -3122,7 +3127,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                                                .String = S8("MIDIOutput"));
                   if(Click.Pressed)
                   {
-                   PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_MIDIOutput;
+                   PushCommand(App, Command_OpenLister)->S32 = ListerKind_MIDIOutput;
                   }
                   
                   if(Click.Toggled)
@@ -3173,7 +3178,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 
                 if(M_Button(S8("Debug Info"), .CenterText = false))
                 {
-                 PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_DebugInfo;
+                 PushCommand(App, Command_OpenLister)->S32 = ListerKind_DebugInfo;
                 }
                 
                 {                
@@ -3522,14 +3527,14 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_OpenLister:
     {
      App->ListerOpened = true;
-     App->ListerKind = Command->ListerKind;
+     App->ListerKind = Command->S32;
      App->ListerScroll = 0.f;
      App->Text.Size = 0;
     } break;
     
     case Command_SelectCommand:
     {
-     PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Commands;
+     PushCommand(App, Command_OpenLister)->S32 = ListerKind_Commands;
     } break;
    }
    
@@ -3559,12 +3564,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_SelectPanelType:
     {
-     PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_PanelTypes; 
+     PushCommand(App, Command_OpenLister)->S32 = ListerKind_PanelTypes; 
     } break;
     
     case Command_SetPanelType:
     {
-     Command->Panel->Kind = Command->PanelKind;
+     Command->Panel->Kind = Command->S32;
      MemoryZero(&Command->Panel->Scroll);
     } break;
    }
@@ -3736,7 +3741,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceSelectInstrument:
     {
-     PushCommand(App, Command_OpenLister)->ListerKind = ListerKind_Instruments;
+     PushCommand(App, Command_OpenLister)->S32 = ListerKind_Instruments;
     } break;
     
     case Command_PieceAddStaff:

@@ -34,7 +34,7 @@ LayoutStacks:
  { f32       HeightPx        `HeightPx`           }
  { font_kind FontKind        `FontKind_Text`      }
  { v4        Clip            `Root->Rec`          }
- { b32       Debug            `false`             }
+ { b32       Debug           `false`              }
 }
 
 @table(Type)
