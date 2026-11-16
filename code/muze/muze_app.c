@@ -4242,7 +4242,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     Piece->Notes[0] = Nil(piece_note);
    }
   }
-  
+ }
+ 
+ // Save config
+ {
+  MS_SerializeConfig(FrameArena, false, S8("config.muze_settings"), App);
  }
  
  //- Rendering 

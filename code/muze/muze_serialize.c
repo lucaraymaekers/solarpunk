@@ -155,6 +155,51 @@ M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
    str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
    OS_WriteEntireFile(FilePath, Out);
   }
-  
+ }
+}
+
+internal void 
+MS_Config(ms_serializer *Serializer, app_state *App)
+{
+ 
+}
+
+internal void
+MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
+{
+ ms_serializer Serializer = {0};
+ Serializer.IsReading = Read;
+ 
+ char *FilePath = PathFromExe(Path);
+ 
+ if(Serializer.IsReading)
+ {
+  Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
+ }
+ else
+ {
+  Serializer.Buffer = PushS8(Arena, KB(64));
+ }
+ 
+ MS_Ser(&Serializer, &Serializer.Version);
+ 
+ if(Serializer.Version <= MSV_Latest)
+ {
+  MS_Config(&Serializer, App);
+ }
+ else
+ {
+  DebugBreak();
+  ErrorLog("Cannot read file from the future.\n");
+ }
+ 
+ if(Serializer.IsReading)
+ {
+  OS_FreeFileMemory(Serializer.Buffer);
+ }
+ else
+ {
+  str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
+  OS_WriteEntireFile(FilePath, Out);
  }
 }
