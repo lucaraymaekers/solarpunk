@@ -177,6 +177,9 @@ struct lister_entry
  f32 Step;
  command_kind Command;
  
+ // If not set, that uses the Command aboves as default.
+ command_kind ButtonCommand;
+ 
  // Computed when filtered
  s32 Idx;
 };

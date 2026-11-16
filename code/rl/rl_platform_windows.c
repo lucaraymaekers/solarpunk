@@ -220,8 +220,8 @@ Win32MainWindowCallback(HWND Window,
    MINMAXINFO *Info = (MINMAXINFO *)LParam;
    
    // NOTE(luca): Minimum window size
-   Info->ptMinTrackSize.x = 640;
-   Info->ptMinTrackSize.y = 360;
+   Info->ptMinTrackSize.x = 720;
+   Info->ptMinTrackSize.y = 460;
   } break;
   
   case WM_DESTROY:

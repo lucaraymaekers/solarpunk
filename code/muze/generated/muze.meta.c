@@ -450,7 +450,7 @@ command_meta_info CommandsMetaInfo[] =
   .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
-  .Description = {(u8 *)"Stop", 4},
+  .Description = {(u8 *)"Stop everything", 15},
   
   .Key = PlatformKey_None,
   .Shift = 0,
@@ -623,7 +623,7 @@ command_meta_info CommandsMetaInfo[] =
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Delete note", 11},
   
-  .Key = PlatformKey_None,
+  .Key = PlatformKey_Delete,
   .Shift = 0,
   .Control = 0,
   .Alt = 0,
@@ -659,7 +659,7 @@ command_meta_info CommandsMetaInfo[] =
   .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
-  .Description = {(u8 *)"Select instrument", 17},
+  .Description = {(u8 *)"Select synth instrument", 23},
   
   .Key = PlatformKey_S,
   .Shift = 0,
@@ -667,7 +667,7 @@ command_meta_info CommandsMetaInfo[] =
   .Alt = 0,
   
   .Min = 0.f,
-  .Max = 0.f,
+  .Max = 1.f,
   .Step = 1.f,
   
   .SliderFmt = {(u8 *)"", 0},

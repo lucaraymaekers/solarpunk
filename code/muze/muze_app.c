@@ -2235,6 +2235,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #define CaseEntryFromB32(CommandName, Value) \
 case Command_##CommandName: Entry->F32 = (f32)Value; break;
        
+       case Command_PieceSelectInstrument:
+       {
+        Entry->Command = Command_ToggleOutputSynth;
+        Entry->ButtonCommand = Command_OpenLister;
+        Entry->F32 = (f32)!App->OutputSynthDisabled;
+        Entry->S32 = ListerKind_Instruments;
+       } break;
+       
        case Command_PieceSetBPM: 
        {
         IsToggle = false;
@@ -2540,13 +2548,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
              
              IsFirstItem = (Idx == MinIdx);
              
+             v4 BackgroundColor = (Selected ? Color_Yellow :
+                                   (IsFirstItem ? 
+                                    Color_Night1 :
+                                    Color_ButtonBackground));
+             
 #define MUZE_WIP_LISTER 1
 #if MUZE_WIP_LISTER
              
              ui_box *ItemBox;
-             UI_BackgroundColor((IsFirstItem ? 
-                                 Color_Night1 :
-                                 Color_ButtonBackground))
+             UI_BackgroundColor(BackgroundColor)
               UI_KeyFromParent()
               UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
               ItemBox = UI_AddBox(ItemString, 
@@ -2581,7 +2592,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                }
               }
 #endif
-              UI_BackgroundColor(Color_Night1)
+              
+              UI_Row() UI_Padding(GlobalItemPadding)
                UI_FillWidth()
                UI_AddBox(S8("Text"), 
                          UI_BoxFlag_DrawDisplayString|
@@ -2606,8 +2618,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 
                 UI_SemanticWidth(UI_SizePx(50.f + 2.f*PaddingMinusOne.Value, 1.f))
                  UI_AddBox(Str8Fmt("CheckBoxParent##%d", Entry->Idx), 0);
-                
-                
                 
                 UI_PaddingAround(PaddingMinusOne)
                  UI_SemanticWidth(UI_SizePx(50.f, 1.f))
@@ -2638,10 +2648,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {
                  PushCommand(App, Entry->Command)->F32 = SliderValue;
                 }
-                
-                // TODO(luca): Slider
                }
-               
                
               }
               
@@ -2651,6 +2658,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
              
              if(ItemSelected)
              {
+              PushCommand(App, Command_CloseLister);
+              
               switch(App->ListerKind)
               {
                default: InvalidPath(); break;
@@ -2660,7 +2669,14 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                case ListerKind_DebugInfo:
                case ListerKind_Commands:
                {
-                if(Entry->Command != Command_None)
+                if(Entry->ButtonCommand != Command_None)
+                {
+                 command *Command = PushCommand(App, Entry->ButtonCommand);
+                 
+                 Command->S32 = Entry->S32;
+                 Command->F32 = Entry->F32;
+                }
+                else if(Entry->Command != Command_None)
                 {
                  command *Command = PushCommand(App, Entry->Command);
                  
@@ -2687,7 +2703,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                
               }
               
-              PushCommand(App, Command_CloseLister);
              }
             }
            }
@@ -3783,12 +3798,20 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceDeleteNote:
     {
-     if(Piece->NoteCount)
+     piece_note *Note = Piece->Notes + Piece->SelectedNoteIdx;
+     if(Note->Kind == PieceNoteKind_Pitch)
      {
-      MemoryCopy(Piece->Notes + Piece->SelectedNoteIdx, 
-                 Piece->Notes + Piece->SelectedNoteIdx + 1,
-                 (Piece->NoteCount - (Piece->SelectedNoteIdx + 1))*sizeof(piece_note));
-      Piece->NoteCount -= 1;
+      Note->Kind = PieceNoteKind_Rest;
+     }
+     else
+     {     
+      if(Piece->NoteCount)
+      {
+       MemoryCopy(Note, 
+                  Note + 1,
+                  (Piece->NoteCount - (Piece->SelectedNoteIdx + 1))*sizeof(piece_note));
+       Piece->NoteCount -= 1;
+      }
      }
     } break;
     
