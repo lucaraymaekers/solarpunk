@@ -97,13 +97,6 @@ UI_Checkbox(b32 Toggled, v4 EnabledColor)
        if(DebugBreakPoints[0].Active)
        {
         ui_box *Parent = Circle->Parent;
-        Log("\n");
-        for EachCount(CircleParentCount + 1)
-        {
-         Log("%S: %llu\n", Parent->String, Parent->Key.U64[0]);
-         Parent = Parent->Parent;
-        }
-        
         if(CircleParent->First->Key.U64[0] != FirstChildKey)
         {
          FirstChildKey = CircleParent->First->Key.U64[0];

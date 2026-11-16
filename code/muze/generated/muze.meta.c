@@ -59,6 +59,7 @@ typedef enum command_kind command_kind;
   f32 Min;
   f32 Max;
   f32 Step;
+  str8 SliderFmt;
  };
  
 command_meta_info CommandsMetaInfo[] =
@@ -79,6 +80,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -96,6 +99,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -113,6 +118,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -130,6 +137,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -147,6 +156,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -164,6 +175,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -181,6 +194,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -198,6 +213,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -215,6 +232,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -232,6 +251,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -249,6 +270,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -266,6 +289,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -283,6 +308,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -300,6 +327,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -317,6 +346,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -334,6 +365,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -351,6 +384,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -368,6 +403,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -385,6 +422,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -402,6 +441,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -419,6 +460,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -436,6 +479,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -453,6 +498,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -470,6 +517,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -487,6 +536,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -504,11 +555,13 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 1.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
   .Command = Command_PieceSetBPM,
-  .NeedsParam = true,
+  .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Set BPM", 7},
@@ -519,8 +572,10 @@ command_meta_info CommandsMetaInfo[] =
   .Alt = 0,
   
   .Min = 0.f,
-  .Max = 0.f,
+  .Max = 300.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"%3.0f", 5},
  },
  
  {
@@ -538,6 +593,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -555,6 +612,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -572,6 +631,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -589,6 +650,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -606,6 +669,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -623,6 +688,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -640,6 +707,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -657,6 +726,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -674,6 +745,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
  {
@@ -691,6 +764,8 @@ command_meta_info CommandsMetaInfo[] =
   .Min = 0.f,
   .Max = 0.f,
   .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
  },
  
 };

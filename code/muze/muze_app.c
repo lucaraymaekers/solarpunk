@@ -2235,6 +2235,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #define CaseEntryFromB32(CommandName, Value) \
 case Command_##CommandName: Entry->F32 = (f32)Value; break;
        
+       case Command_PieceSetBPM: 
+       {
+        IsToggle = false;
+        Entry->F32 = Piece->BPM; break;
+       }
+       
        CaseEntryFromB32(ToggleMIDIInput, !App->InputMIDIDisabled);
        CaseEntryFromB32(ToggleMIDIOutput, App->OutputMIDIEnabled);
        CaseEntryFromB32(ToggleOutputSynth, !App->OutputSynthDisabled);
@@ -2248,10 +2254,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
        CaseEntryFromB32(PieceToggleMetronome, Piece->Metronome);
       }
       
+      command_meta_info *Info = CommandsMetaInfo + Idx;
+      
 #if MUZE_INTERNAL     
       // Check to add toggle values to commands if forgotten.
       {      
-       command_meta_info *Info = CommandsMetaInfo + Idx;
        if(!IsToggle && 
           Info->Min == 0.f && 
           Info->Max == 1.f && 
@@ -2262,12 +2269,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
 #endif
       
-      if(IsToggle)
-      {
-       Entry->Min = 0.f;
-       Entry->Max = 1.f;
-       Entry->Step = 1.f;
-      }
+      Entry->Min = Info->Min;
+      Entry->Max = Info->Max;
+      Entry->Step = Info->Step;
      }
      
     } break;
@@ -2505,6 +2509,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
            Assert(MinIdx >= 0 && "Negative MinIdx will create Item -1");
           }
           
+          f32 MaxTagLength = 0.f;
+          {
+           for EachIndex(Idx, EntryCount)
+           {
+            MaxTagLength = Max(MaxTagLength, 
+                               UI_MeasureTextWidth(Entries[Idx].Tag, &App->TextFont));
+           }
+           MaxTagLength = CeilF32(MaxTagLength);
+          }
+          
           UI_FillAll()
            UI_Push()
           {
@@ -2529,18 +2543,31 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
 #define MUZE_WIP_LISTER 1
 #if MUZE_WIP_LISTER
              
-             UI_KeyFromParent()
-              UI_AddBox(ItemString, UI_BoxFlag_DrawBorders);
+             ui_box *ItemBox;
+             UI_BackgroundColor((IsFirstItem ? 
+                                 Color_Night1 :
+                                 Color_ButtonBackground))
+              UI_KeyFromParent()
+              UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
+              ItemBox = UI_AddBox(ItemString, 
+                                  UI_BoxFlag_MouseClickable|
+                                  UI_BoxFlag_DrawBorders|
+                                  UI_BoxFlag_DrawBackground|
+                                  UI_BoxFlag_DrawHotEffects|
+                                  UI_BoxFlag_DrawActiveEffects);
              
-             UI_Push()
+             
+             UI_PaddingAround(UI_SizePx(1.f, 1.f))
               UI_Row()
-             {              
+             {
+              ui_size PaddingMinusOne = GlobalItemPadding;
+              
               if(Entry->Tag.Size)
               {
-               UI_SemanticWidth(UI_SizePx(80.f, 1.f))
+               UI_SemanticWidth(UI_SizePx(MaxTagLength + 4.f*5.f, 1.f))
                 UI_AddBox(Str8Fmt("%d", Entry->Idx), 0);
-               UI_PaddingAround(UI_SizePx(5.f, 1.f))
-                UI_SemanticWidth(UI_SizeText(5.f, 1.f))
+               UI_PaddingAround(PaddingMinusOne)
+                UI_SemanticWidth(UI_SizePx(MaxTagLength + 2.f*5.f, 1.f))
                 UI_Softness(.5f)
                 UI_CornerRadii(V4F32(10.f))
                 UI_BackgroundColor(Color_Yellow)
@@ -2554,19 +2581,14 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                }
               }
 #endif
+              UI_BackgroundColor(Color_Night1)
+               UI_FillWidth()
+               UI_AddBox(S8("Text"), 
+                         UI_BoxFlag_DrawDisplayString|
+                         UI_BoxFlag_CenterTextVertically)->DisplayString = Entry->Text;
               
-              UI_FillWidth()
-               UI_BorderColor(IsFirstItem ? Color_Black : Color_ButtonBorder)
-               ItemSelected = (Button(.String = ItemString,
-                                      .Text = Entry->Text, 
-                                      .Disabled = Selected, 
-                                      .BackgroundColor = (IsFirstItem ? 
-                                                          Color_Night1 :
-                                                          Color_ButtonBackground),
-                                      .DisabledBackgroundColor = Color_Yellow, 
-                                      .Padding = ItemPadding,
-                                      .ClipSize = false).Pressed || 
-                               (App->ListerReturnPressed && IsFirstItem));
+              ItemSelected = (ItemBox->WasClicked || 
+                              (App->ListerReturnPressed && IsFirstItem));
               
               if(Entry->Max > 0.f)
               {         
@@ -2574,15 +2596,20 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                Entry->Max == 1.f && 
                                Entry->Step == 1.f);
                
+               PaddingMinusOne.Value -= 1.f;
+               
                if(IsToggle)
                {
                 b32 Toggled = false;
                 
                 DebugBrokeIf(0, Entry->Command == Command_PieceTogglePracticing);
                 
-                UI_SemanticWidth(UI_SizePx(50.f + 2.f*GlobalItemPadding.Value, 1.f))
+                UI_SemanticWidth(UI_SizePx(50.f + 2.f*PaddingMinusOne.Value, 1.f))
                  UI_AddBox(Str8Fmt("CheckBoxParent##%d", Entry->Idx), 0);
-                UI_PaddingAround(GlobalItemPadding)
+                
+                
+                
+                UI_PaddingAround(PaddingMinusOne)
                  UI_SemanticWidth(UI_SizePx(50.f, 1.f))
                  Toggled = UI_Checkbox((b32)Entry->F32, Color_Yellow);
                 if(Toggled)
@@ -2594,6 +2621,24 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                }
                else
                {
+                command_meta_info *Info = CommandsMetaInfo + Entry->Command;
+                
+                f32 SliderValue = 0.f;
+                ui_box *Slider;
+                UI_KeyFromParent()
+                 Slider = UI_AddBox(S8("Slider"), 0);
+                UI_PaddingAround(PaddingMinusOne)
+                 UI_BorderColor(Color_Black)
+                 UI_BackgroundColor(Color_Orange)
+                 SliderValue = UI_Slider(Entry->F32, Entry->Min, Entry->Max, Entry->Step,
+                                         CSS8(Info->SliderFmt), true);
+                UI_Spacer(GlobalItemPadding);
+                
+                if(SliderValue != Entry->F32)
+                {
+                 PushCommand(App, Entry->Command)->F32 = SliderValue;
+                }
+                
                 // TODO(luca): Slider
                }
                
@@ -2908,10 +2953,18 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 }
                 
                 UI_SemanticWidth(UI_SizePx(200.f, 1))
-                 Piece->BPM = M_Slider(S8("PieceBPM"), S8("BPM"), 
-                                       Str8Fmt("%3.0f", Piece->BPM),
-                                       Piece->BPM, 0.f, 300.f, 1.f, false,
-                                       .Align = false).Value;
+                 
+                {
+                 f32 SliderValue = M_Slider(S8("PieceBPM"), S8("BPM"), 
+                                            Str8Fmt("%3.0f", Piece->BPM),
+                                            Piece->BPM, 0.f, 300.f, 1.f, false,
+                                            .Align = false).Value;
+                 
+                 if(SliderValue != Piece->BPM)
+                 {
+                  PushCommand(App, Command_PieceSetBPM)->F32 = SliderValue;
+                 }
+                }
                 
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                  if(M_Button(S8("Clear")))
@@ -3716,6 +3769,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Piece->BarWrapping ^= 1;
     } break;
     
+    case Command_PieceSetBPM:
+    {
+     Piece->BPM = Command->F32;
+    } break;
+    
     case Command_PieceDeselectNote:
     case Command_PieceSelectNote:
     {
@@ -4163,8 +4221,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
   }
   
  }
- 
- 
  
  //- Rendering 
  
