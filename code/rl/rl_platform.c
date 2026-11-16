@@ -344,7 +344,7 @@ BASE_ENTRY_POINT()
   font_atlas DebugRenderAtlas = {0};
   font TextFont = {0};
   font IconsFont = {0};
-  ui_box *DebugUIBox = 0;
+  ui_box *DebugRootBox = 0;
   {
    InitFontFromKind(&TextFont, FontKind_Text);
    InitFontFromKind(&IconsFont, FontKind_Icons);
@@ -381,6 +381,8 @@ BASE_ENTRY_POINT()
    ui_box *Box = PushArray(ROArena, ui_box, 1);
    *Box = (ui_box){Box, Box, Box, Box, Box, Box, Box};
    UI_NilBox = Box;
+   
+   DebugRootBox = UI_BoxAlloc(UI_State->Arena);
   }
   
   OS_MarkReadonly(ROArena->Base, ROArena->Size);
@@ -597,20 +599,8 @@ BASE_ENTRY_POINT()
     
     if(ShowDebugUI)
     {
-     if(DebugUIBox == 0) DebugUIBox = UI_BoxAlloc(UI_State->Arena);
-     ui_box *Root = DebugUIBox;
-     Root->FixedSize = V2V2S32(WindowBuffer.Dim);
-     Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
-     
      UI_BeginFrame(&DebugRenderAtlas, FrameIdx, NewInput);
-     
-     if(!Paused)
-     {
-      // NOTE(luca): When paused we cannot show this because it will turn the screen to black.
-      DrawRect(Root->Rec, V4(0.f, 0.f, 0.f, 0.1f), 0.f, 0.f, 0.f);
-     }
-     
-     UI_BeginLayout(Root, DebugHeightPx);
+     UI_BeginLayout(DebugRootBox, WindowBuffer.Dim, DebugHeightPx);
      
      // UI
      
@@ -928,7 +918,7 @@ BASE_ENTRY_POINT()
       NewInput->Consumed = true;
      }
      
-     UI_EndLayout(Root->First);
+     UI_EndLayout(DebugRootBox);
      
      // Prune unused boxes
      for EachIndex(Idx, UI_State->BoxTableSize)

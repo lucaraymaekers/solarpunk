@@ -1905,7 +1905,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
    }
   }
   
-  DebugBreak();
   MS_SerializeConfig(FrameArena, true, ConfigPath, App);
   
   // MIDI: Select default input and output device, select's last device by default
@@ -2435,16 +2434,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    V2Math ListerDim.E += 2.f*ListerBorderSize;
    ListerDim.Y += ItemHeight + ListerBorderSize;
    
-   ui_box *Root = App->ListerBox;
-   {    
-    Root->Key.U64[0] = U64HashFromSeedStr8((u64)Root, S8("ListerRoot"));
-    Root->FixedPos = V2(0.f, 0.f);
-    Root->FixedSize = BufferDim;
-    Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
-    Root->LastTouchedFrameIdx = UI_State->FrameIdx;
-   }
-   
-   UI_BeginLayout(Root, App->HeightPx);
+   UI_BeginLayout(App->ListerBox, Buffer->Dim, App->HeightPx);
    {        
     UI_FillAll()
      UI_Column() UI_Center()
@@ -2630,8 +2620,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {
                  PushCommand(App, Entry->Command);
                 }
-                
-                DebugBreakPoints[0].Active = false;
                }
                else
                {
@@ -2739,7 +2727,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     Root->LastTouchedFrameIdx = UI_State->FrameIdx;
    }
    
-   UI_BeginLayout(Root, App->HeightPx);
+   UI_BeginLayout(Root, Buffer->Dim, App->HeightPx);
    {            
     UI_LayoutAxis(Axis2_Y)
      UI_AddBox(S8("RootFirst"), UI_BoxFlag_Clip);
@@ -3478,7 +3466,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      NoOp();
     }
    }
-   UI_EndLayout(Root->First);
+   UI_EndLayout(Root);
    
    // Prune unused boxes
    for EachIndex(Idx, UI_State->BoxTableSize)

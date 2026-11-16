@@ -412,9 +412,13 @@ UI_BoxDepthFirstPostOrder(ui_box *Box)
 }
 
 internal void
-UI_BeginLayout(ui_box *Root, f32 HeightPx)
+UI_BeginLayout(ui_box *Root, v2s32 Dim, f32 HeightPx)
 {
- Assert(!UI_IsNilBox(Root));
+ Root->FixedSize = V2V2S32(Dim);
+ Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
+ Root->Key.U64[0] = U64HashFromSeedStr8((u64)Root, S8("Root"));
+ Root->Rec = RectFromSize(Root->FixedPos, Root->FixedSize);
+ Root->LastTouchedFrameIdx = UI_State->FrameIdx;
  
  UI_State->Current = Root;
  UI_State->Root = Root;
@@ -514,7 +518,6 @@ UI_BeginLayout(ui_box *Root, f32 HeightPx)
    UI_SetActive(UI_KeyNull());
   }
  }
- 
  
 }
 
