@@ -6,18 +6,18 @@
 //~ Types
 
 //- Muze 
-typedef enum piece_note_kind piece_note_kind;
-enum piece_note_kind
+typedef enum note_kind note_kind;
+enum note_kind
 {
- PieceNoteKind_None,
- PieceNoteKind_Rest,
- PieceNoteKind_Pitch,
+ NoteKind_None,
+ NoteKind_Rest,
+ NoteKind_Note,
 };
 
-typedef struct piece_note piece_note;
-struct piece_note
+typedef struct note note;
+struct note
 {
- piece_note_kind Kind;
+ note_kind Kind;
  f32 Start;
  f32 Length;
  u8 Pitch;
@@ -45,12 +45,12 @@ struct staff
  clef_kind ClefKind;
 };
 
-typedef struct piece_note_node piece_note_node;
-struct piece_note_node
+typedef struct note_node note_node;
+struct note_node
 {
- piece_note *V;
- piece_note_node *Next;
- piece_note_node *Prev;
+ note *V;
+ note_node *Next;
+ note_node *Prev;
 };
 
 typedef struct piece piece; 
@@ -72,13 +72,14 @@ struct piece
  staff Staffs[128];
  
  u64 NoteCount;
- piece_note Notes[KB(1)];
+ note Notes[KB(1)];
  
+ u64 SelectionCount;
  u64 SelectionNextIdx;
- piece_note_node Selection[KB(1)];
- piece_note_node *SelectionFirst;
- piece_note_node *SelectionLast;
- piece_note_node *SelectionFree;
+ note_node Selection[KB(1)];
+ note_node *SelectionFirst;
+ note_node *SelectionLast;
+ note_node *SelectionFree;
  
  b32 IsRecording;
  f32 RecordLength;
@@ -92,7 +93,7 @@ struct piece
  f32 PracticePos;
  b32 PracticeStrictTiming;
  u64 PracticeNoteCount;
- piece_note PracticeNotes[KB(1)];
+ note PracticeNotes[KB(1)];
  
  f32 MetronomeTime;
  b32 Metronome;

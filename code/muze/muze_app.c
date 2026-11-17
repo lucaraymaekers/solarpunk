@@ -43,7 +43,7 @@ NO_WARNINGS_END
 #define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
 #define IsNilNote(Note) CheckNil(Note, NilNote)
 #define IsNilVoice(Voice) CheckNil(Voice, NilVoice)
-#define IsNilPieceNote(Note) CheckNil(Note, NilPieceNote)
+#define IsNilNote(Note) CheckNil(Note, NilNote)
 
 #define Disabled() if(true) { Log("Temporarily disabled.\n"); } else
 
@@ -54,7 +54,7 @@ global_variable ui_size GlobalItemPadding;
 
 global_variable tsf *NilTSF;
 global_variable panel *NilPanel;
-global_variable piece_note *NilPieceNote;
+global_variable note *NilNote;
 global_variable piece *NilPiece;
 
 global_variable f32 *dtForFrame;
@@ -78,7 +78,7 @@ InitReadOnlyGlobals(arena *Arena)
  ArenaSetPos(Arena, 0);
  UI_NilBox = PushArray(Arena, ui_box, 1);
  NilPanel = PushArray(Arena, panel, 1);
- NilPieceNote = PushArray(Arena, piece_note, 1);
+ NilNote = PushArray(Arena, note, 1);
  NilPiece = PushArray(Arena, piece, 1);
 }
 
@@ -559,11 +559,11 @@ PushCommand(app_state *App, command_kind Kind)
 }
 
 //~ Muze - Piece
-internal piece_note *
+internal note *
 PieceCodeNoteAdd(piece *Piece, 
-                 piece_note_kind Kind, u8 Pitch, f32 Length)
+                 note_kind Kind, u8 Pitch, f32 Length)
 {
- piece_note *Note = NilPieceNote;
+ note *Note = NilNote;
  
  if(Piece->NoteCount < ArrayCount(Piece->Notes))
  { 
@@ -653,6 +653,7 @@ PieceAlloc(app_state *App)
    // First note is nil
    Result->NoteCount = 1;
    Result->PracticeNoteCount = 1;
+   Result->SetNoteLength = 1.f;
    
    Result->BarPadding = 16.f;
    Result->BeatWidth = 64.f;
@@ -680,7 +681,7 @@ MIDIOutputMutePiecePlayingNotes(app_state *App, piece *Piece)
  {
   for EachIndex(Idx, Piece->NoteCount)
   {
-   piece_note *Note = Piece->Notes + Idx;
+   note *Note = Piece->Notes + Idx;
    
    f32 Start = Note->Start;
    f32 End = Note->Start + Note->Length;
@@ -714,6 +715,15 @@ PieceStopPlaying(app_state *App, piece *Piece)
   MIDIOutputMutePiecePlayingNotes(App, Piece);
  }
  
+}
+
+internal void
+PieceDeselectNote(piece *Piece, note_node *Node)
+{
+ DLLRemove(Node, Piece->SelectionFirst, Piece->SelectionLast);
+ Node->Next = Piece->SelectionFree;
+ Piece->SelectionFree = Node;
+ Piece->SelectionCount -= 1;
 }
 
 #if 0
@@ -1354,12 +1364,12 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  
  // Draw notes
  {
-  piece_note *NoteArrays[] = {Piece->Notes, Piece->PracticeNotes};
+  note *NoteArrays[] = {Piece->Notes, Piece->PracticeNotes};
   u64 NoteCounts[] = {Piece->NoteCount, Piece->PracticeNoteCount};
   
   for EachElement(ArrayIdx, NoteArrays)
   {
-   piece_note *Notes = NoteArrays[ArrayIdx];
+   note *Notes = NoteArrays[ArrayIdx];
    u64 NoteCount = NoteCounts[ArrayIdx];
    
    s32 LowestPitch = S32Max;
@@ -1372,7 +1382,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    
    for(u64 NoteIdx = 1; NoteIdx < NoteCount; NoteIdx += 1)
    {
-    piece_note *Note = Notes + NoteIdx;
+    note *Note = Notes + NoteIdx;
     
     b32 IsHovered = false;
     b32 IsSelected = false;
@@ -1407,7 +1417,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
     // Selected
     {
-     for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+     for EachNode(Node, note_node, Piece->SelectionFirst)
      {
       if(Node->V == Note)
       {
@@ -1418,7 +1428,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     }
     
     if(0) {}
-    else if(Note->Kind == PieceNoteKind_Rest)
+    else if(Note->Kind == NoteKind_Rest)
     {
      // Each increment is halving the value.
      s32 WholeRest = 0xE4E3;
@@ -1449,7 +1459,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      }
      
     }
-    else if(Note->Kind == PieceNoteKind_Pitch && !Note->Hidden)
+    else if(Note->Kind == NoteKind_Note && !Note->Hidden)
     {
      s32 RelPitch = Note->Pitch%Note_Count;
      b32 FillHead = (NoteLength < 2.f);;
@@ -3319,6 +3329,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                            PanelTypeStrings[App->SelectedPanel->Kind],
                            App->SelectedPanel);
                   
+                  M_Labelf("Selection note count: %llu###SelNoteCount",
+                           Piece->SelectionCount);
+                  
                   
                   for EachIndex(Idx, App->DebugStringCount)
                   {
@@ -3674,7 +3687,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       
       for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
       {
-       piece_note *Note = Piece->Notes + NoteIdx;
+       note *Note = Piece->Notes + NoteIdx;
        if(Note->Length == 0.f) Note->Length = (Piece->RecordLength - Note->Start);
       }
       
@@ -3811,24 +3824,21 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceDeselectAllNotes:
     {
-     for EachNodeSafe(Node, piece_note_node, Piece->SelectionFirst)
+     for EachNodeSafe(Node, note_node, Piece->SelectionFirst)
      {
-      DLLRemove(Node, Piece->SelectionFirst, Piece->SelectionLast);
-      
-      Node->Next = Piece->SelectionFree;
-      Piece->SelectionFree = Node;
+      PieceDeselectNote(Piece, Node);
      }
     } break;
     
     case Command_PieceDeselectNote:
     {
      u64 NoteIdx = Command->U64;
-     piece_note *Note = Piece->Notes + NoteIdx;
+     note *Note = Piece->Notes + NoteIdx;
      
-     piece_note_node *Selected = 0;
+     note_node *Selected = 0;
      // Selected
      {
-      for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+      for EachNode(Node, note_node, Piece->SelectionFirst)
       {
        if(Node->V == Note)
        {
@@ -3838,19 +3848,22 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
      }
      
-     if(Selected) DLLRemove(Selected, Piece->SelectionFirst, Piece->SelectionLast);
+     if(Selected) 
+     {
+      PieceDeselectNote(Piece, Selected);
+     }
      
     } break;
     
     case Command_PieceSelectNote:
     {
      u64 NoteIdx = Command->U64;
-     piece_note *Note = Piece->Notes + NoteIdx;
+     note *Note = Piece->Notes + NoteIdx;
      
-     piece_note_node *Selected = 0;
+     note_node *Selected = 0;
      // Selected
      {
-      for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+      for EachNode(Node, note_node, Piece->SelectionFirst)
       {
        if(Node->V == Note)
        {
@@ -3860,12 +3873,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
      }
      
-     b32 DoSelect = (Command->Kind == Command_PieceSelectNote);
-     if(!Selected && DoSelect)
+     if(!Selected)
      {
-      piece_note_node *Node = 0;
+      note_node *Node = 0;
       if(Piece->SelectionFree)
       {
+       // Take from free list
        Node = Piece->SelectionFree;
        Piece->SelectionFree = Piece->SelectionFree->Next;
       }
@@ -3878,39 +3891,53 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       
       Node->V = Note;
       DLLAppend(Node, Piece->SelectionFirst, Piece->SelectionLast);
-     }
-     else if(Selected && !DoSelect)
-     {
-      DLLRemove(Selected, Piece->SelectionFirst, Piece->SelectionLast);
-      Selected->Next = Piece->SelectionFree;
-      Piece->SelectionFree = Selected;
+      Piece->SelectionCount += 1;
      }
      
-     Piece->SetNoteLength = (1.f/(Note->Length*1.f/Piece->TimeSigDen));
     } break;
     
     case Command_PieceDeleteNote:
     {
-     for EachNodeSafe(Node, piece_note_node, Piece->SelectionFirst)
+     
+     // Sort notes by idx in array.
+     
+     for EachNodeBack(Node, note_node, Piece->SelectionLast)
      {
-      piece_note *Note = Node->V;
-      
-      if(Note->Kind == PieceNoteKind_Pitch)
+      for(note_node *Compare = Piece->SelectionFirst; 
+          Compare != Node; 
+          Compare = Compare->Next)
       {
-       Note->Kind = PieceNoteKind_Rest;
+       if(Compare->V > Compare->Next->V)
+       {
+        Swap(Compare->V, Compare->Next->V);
+       }
       }
-      else
+     }
+     
+     // NOTE(luca): Iterate backwards so that MemoryCopy works
+     for EachNodeBackSafe(Node, note_node, Piece->SelectionLast)
+     {
+      note *Note = Node->V;
+      
+      if(Note->Kind == NoteKind_Note)
+      {
+       Note->Kind = NoteKind_Rest;
+      }
+      else if(Note->Kind == NoteKind_Rest)
       {     
+#if 0
        if(Piece->NoteCount)
        {
+        // PieceDeselectNote(Piece, Node);
+        
         u64 NoteIdx = (Note - Piece->Notes); 
         MemoryCopy(Note, 
                    Note + 1,
-                   (Piece->NoteCount - (NoteIdx + 1))*sizeof(piece_note));
+                   (Piece->NoteCount - (NoteIdx + 1))*sizeof(note));
         Piece->NoteCount -= 1;
        }
-       
-       DLLRemove(Node, Piece->SelectionFirst, Piece->SelectionLast);
+#endif
+       NotImplemented();
       }
       
      }
@@ -3919,7 +3946,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceSetNoteLength:
     {
-     for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+     for EachNode(Node, note_node, Piece->SelectionFirst)
      {
       Node->V->Length = (Piece->TimeSigDen/Piece->SetNoteLength);
      }
@@ -3955,9 +3982,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      f32 MinStart = Piece->RecordLength;
      f32 MaxEnd = 0.f;
      
-     for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+     for EachNode(Node, note_node, Piece->SelectionFirst)
      {
-      piece_note *Note = Node->V;
+      note *Note = Node->V;
       
       f32 Start = Note->Start;
       f32 End = Note->Start + Note->Length;
@@ -3967,8 +3994,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      
      Piece->PracticeStart = MinStart;
      Piece->PracticeEnd = MaxEnd;
-     Piece->PlayPos = Piece->PracticeStart;
      PieceStopPlaying(App, Piece);
+     Piece->PlayPos = Piece->PracticeStart;
      
     } break;
    }
@@ -4060,9 +4087,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     {
      for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
      {
-      piece_note *Note = Piece->Notes + Idx;
+      note *Note = Piece->Notes + Idx;
       
-      if(Note->Kind == PieceNoteKind_Pitch)
+      if(Note->Kind == NoteKind_Note)
       {
        // Piece notes
        {                 
@@ -4129,7 +4156,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       
       Piece->MetronomeTime = 0.f;
       
-      if(Piece->LoopingDisabled) Piece->IsPlaying = false;
+      PieceStopPlaying(App, Piece);
+      if(!Piece->LoopingDisabled) 
+      {
+       Piece->IsPlaying = true;
+      }
+      
      }
     }
    }
@@ -4152,13 +4184,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      {
       if(Piece->NoteCount < ArrayCount(Piece->Notes))
       { 
-       piece_note *Note = Piece->Notes + Piece->NoteCount;
+       note *Note = Piece->Notes + Piece->NoteCount;
        MemoryZero(Note);
        
        u8 Pitch = Message.Pitch;
        u8 Velocity = Message.Velocity;
        
-       Note->Kind = PieceNoteKind_Pitch;
+       Note->Kind = NoteKind_Note;
        Note->Pitch = Pitch;
        Note->Start = Piece->RecordLength;
        Note->Velocity = Message.Velocity;
@@ -4180,7 +4212,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       // Find first note with same pitch and set its length.
       for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
       {
-       piece_note *Note = Piece->Notes + NoteIdx;
+       note *Note = Piece->Notes + NoteIdx;
        u8 Pitch = Message.Pitch;
        
        tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
@@ -4201,16 +4233,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    if(Piece->IsPracticing)
    {    
     u64 NotesToPlayCount = 0;
-    piece_note **NotesToPlay = PushArray(FrameArena, piece_note *, Piece->NoteCount);
-    piece_note *FirstNoteToPlay = NilPieceNote;
+    note **NotesToPlay = PushArray(FrameArena, note *, Piece->NoteCount);
+    note *FirstNoteToPlay = NilNote;
     
     // Find all notes that have to be played at PracticePos
     {
      for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
      {
-      piece_note *Note = Piece->Notes + Idx;
+      note *Note = Piece->Notes + Idx;
       
-      if(Note->Kind == PieceNoteKind_Pitch &&
+      if(Note->Kind == NoteKind_Note &&
          Piece->PracticePos <= Note->Start)
       {
        FirstNoteToPlay = Note;
@@ -4218,11 +4250,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
      }
      
-     if(!IsNilPieceNote(FirstNoteToPlay))
+     if(!IsNilNote(FirstNoteToPlay))
      {
       for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
       {
-       piece_note *Note = Piece->Notes + Idx;
+       note *Note = Piece->Notes + Idx;
        if(FirstNoteToPlay->Start == Note->Start)
        {
         NotesToPlay[NotesToPlayCount] = Note;
@@ -4254,13 +4286,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      {
       if(Piece->PracticeNoteCount < ArrayCount(Piece->PracticeNotes))
       { 
-       piece_note *Note = Piece->PracticeNotes + Piece->PracticeNoteCount;
+       note *Note = Piece->PracticeNotes + Piece->PracticeNoteCount;
        u8 Pitch = Data1;
        u8 Velocity = Data2;
        
        TSFPlayNoteU8(App, Piece->Channel, Pitch,  Velocity);
        
-       Note->Kind = PieceNoteKind_Pitch;
+       Note->Kind = NoteKind_Note;
        Note->Pitch = Pitch;
        Note->Length = 0.f;
 #if 0
@@ -4285,7 +4317,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       // Find first note with same pitch and set its length.
       for(u64 NoteIdx = 1; NoteIdx < Piece->PracticeNoteCount; NoteIdx += 1)
       {
-       piece_note *Note = Piece->PracticeNotes + NoteIdx;
+       note *Note = Piece->PracticeNotes + NoteIdx;
        
        if(Note->Pitch == Pitch)
        {
@@ -4304,13 +4336,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
          NoteToPlayIdx < NotesToPlayCount; 
          NoteToPlayIdx += 1) 
      {
-      piece_note *NoteToPlay = NotesToPlay[NoteToPlayIdx];
+      note *NoteToPlay = NotesToPlay[NoteToPlayIdx];
       
-      if(NoteToPlay->Kind == PieceNoteKind_Pitch)
+      if(NoteToPlay->Kind == NoteKind_Note)
       {   
        for(u64 Idx = 1; Idx < Piece->PracticeNoteCount; Idx += 1)
        {
-        piece_note *Note = Piece->PracticeNotes + Idx;
+        note *Note = Piece->PracticeNotes + Idx;
         
         if(!Note->Hidden && 
            Note->Start >= Piece->PracticePos && 
@@ -4366,7 +4398,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    
    if(!IsNilPiece(Piece))
    {
-    Piece->Notes[0] = Nil(piece_note);
+    Piece->Notes[0] = Nil(note);
    }
   }
  }

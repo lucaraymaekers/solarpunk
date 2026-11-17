@@ -287,6 +287,13 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 Node != 0; \
 Node = _Next, _Next = (Node != 0 ? Node->Next : 0))
 
+#define EachNodeBack(Node, type, Last) (type *Node = Last; Node != 0; Node = Node->Prev)
+
+#define EachNodeBackSafe(Node, type, Last) \
+(type *Node = (Last), *_Prev = (Node != 0 ? Node->Prev : 0); \
+Node != 0; \
+Node = _Prev, _Prev = (Node != 0 ? Node->Prev : 0))
+
 #define EachCount(Count) EachIndex(Var(_i_), Count)
 
 #define MemoryCopy(Dest, Source, Count) memmove(Dest, Source, Count)

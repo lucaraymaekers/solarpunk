@@ -141,7 +141,7 @@ OS_FreeFileMemory(str8 File)
 {
  if(File.Data)
  {
-  VirtualFree(File.Data, File.Size, MEM_RELEASE);
+  Win32LogIf(VirtualFree(File.Data, 0, MEM_RELEASE) == 0);
  }
 }
 

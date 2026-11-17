@@ -222,7 +222,6 @@ RenderClear(void)
 internal void
 RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas)
 {
- 
  if(!Render->ShadersCompiled)
  {
   gl_uint RectShader = Render->RectShader;
@@ -259,6 +258,8 @@ RenderDrawAllRectangles(gl_render_state *Render, v2 BufferDim, font_atlas *Atlas
  // NOTE(luca): This cannot be shared between platform and app.  For now it is used for fonts
  // so we just make sure that the platform (which is called first) generates the right atlas
  // font.
+ 
+ 
  GL_LoadTextureFromImage(Render->Textures[0], Atlas->Width, Atlas->Height, Atlas->Data, GL_RED, Render->RectShader, "Texture");
  
 #if RL_PLATFORM_HOT_RELOAD_SHADERS

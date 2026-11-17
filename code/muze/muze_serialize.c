@@ -27,7 +27,7 @@ MS_Staff(ms_serializer *Serializer, staff *Staff)
 }
 
 internal void
-MS_PieceNote(ms_serializer *Serializer, piece_note *Note)
+MS_PieceNote(ms_serializer *Serializer, note *Note)
 {
  MS_Add(MSV_Initial, &Note->Kind);
  MS_Add(MSV_Initial, &Note->Start);
@@ -101,9 +101,9 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   {
    if(Piece->NoteCount)
    {   
-    MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(piece_note)*(Piece->NoteCount - 1));
+    MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(note)*(Piece->NoteCount - 1));
    }
-   Piece->Notes[0] = Nil(piece_note);
+   Piece->Notes[0] = Nil(note);
   }
   
   // Increase for PieceNoteKind_None
