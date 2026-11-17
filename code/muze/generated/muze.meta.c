@@ -29,12 +29,14 @@ Command_None,
  Command_PieceToggleLooping,
  Command_PieceSetBPM,
  Command_PieceSelectNote,
+ Command_PieceDeselectAllNotes,
  Command_PieceDeselectNote,
  Command_PieceDeleteNote,
  Command_PieceSetNoteLength,
  Command_PieceSelectInstrument,
  Command_PieceAddStaff,
  Command_PieceTrimAtFirstNote,
+ Command_PieceSetPracticeRangeFromSelection,
  Command_CloseLister,
  Command_OpenLister,
  Command_SelectCommand,
@@ -598,8 +600,27 @@ command_meta_info CommandsMetaInfo[] =
  },
  
  {
-  .Command = Command_PieceDeselectNote,
+  .Command = Command_PieceDeselectAllNotes,
   .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Deselect all notes", 18},
+  
+  .Key = PlatformKey_Escape,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceDeselectNote,
+  .NeedsParam = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Deselect note", 13},
@@ -698,6 +719,25 @@ command_meta_info CommandsMetaInfo[] =
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Trim from start to first note", 29},
+  
+  .Key = PlatformKey_None,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceSetPracticeRangeFromSelection,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Set practice range from selection", 33},
   
   .Key = PlatformKey_None,
   .Shift = 0,

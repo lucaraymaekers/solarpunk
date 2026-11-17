@@ -1,37 +1,47 @@
-
-access scopes 
-asynchronous filling cache
-asynchronous eviction
--> Hold onto this data 
-
-cancel eviction paths
-
-10/11/2026
-3:44:00 Network Immediate-Mode
-
 Muze:
 
-Visual
-1. Guess on which staff the note should go
-2. AddStaff
-3. Display multiple staffs 
+Piano custom draw for visualizing note played
 
-Piano custom draw for debuggin
-
-
-
-# No
-x Visualize note played when practicing
-- Multi-Staff / Toggling staffs / 1 Staff = 1 Voice
-  - Have multiple voices in one staff.
-- Dichter und Bauer
-- Transpose everything (But not visually) *E.g., key up by 1 + all pitches up by 1
+# Now
 - ClosePanel bug
+- Dichter und Bauer
 
 - Hidden property removed from PieceNotes and only PracticeNotes.?
   - Smaller size
 
-- Command lister
+Piece Visualizer:
+- Better Markers
+- Key signature and accidentals
+
+Recording features:
+- Wait on first note played before recording
+
+Editing features:
+- Note Length should be 1/1 1/2 1/4 1/8 1/16
+- Range selection
+- Trim from start to first note
+- Round notes to nearest fraction BPM wise
+- Triolet
+- Transpose everything (But not visually) *E.g., key up by 1 + all pitches up by 1
+
+Practice features
+- Start and End from range
+
+Lister improvements:
+- MIDI device lister
+- MIDI device lister
+- Collapse MIDI device lister after-selected-path
+- Icons to entries
+- Key binds to command entries
+- Better matching algorithm: (Smith Waterman)
+  - https://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
+  - https://github.com/dmtrKovalenko/frizbee
+  - https://www.cs.cmu.edu/~ckingsf/bioinfo-lectures/gaps.pdf
+  - https://github.com/helix-editor/nucleo
+  - https://www.cs.rice.edu/~ogilvie/comp571/smith-waterman/
+  - https://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
+  - https://algorithm.tamnd.com/smith-waterman/
+- Visualize match
 
 Metronome improvements:
 - When recording wait for two ticks before recording
@@ -65,7 +75,7 @@ Bugs:
 - bug: ui: When changing the BPM too fast it can skip over the ending of the note and never stop playing the note.
 
 Demo:
-- Use showkey
+- Use showkey on Linux
 - Enqueue/Dequeue Commands
 x Select notes in sheet music view 
 x Scrolling in sheet music view
@@ -255,3 +265,9 @@ x bug: ui: Text with 0 horizontal padding will be clipped, fix this.
 x Use piece view also for recording
 x Visualize rests
 x Timeline marker for playing position in piece
+x Guess on which staff the note should go
+x AddStaff
+x Display multiple staffs 
+x Visualize note played when practicing
+x Multi-Staff
+x Command lister

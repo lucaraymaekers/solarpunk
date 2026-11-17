@@ -12,10 +12,9 @@ _EqualsWithEpsilon(f32 A, f32 B, f32 Epsilon)
 
 //~ Helpers
 internal void
-UI_ConsumeInput(app_input *Input, ui_box *Box)
+UI_ConsumeInput(app_input *Input, ui_box *Box, platform_mouse_button_type ButtonType)
 {
- Input->Consumed = true;
- UI_State->InputConsumerBox = Box;
+ Input->Consumed[ButtonType] = true;
 }
 
 internal b32
@@ -81,29 +80,29 @@ UI_KeyMatch(ui_key A, ui_key B)
 }
 
 internal b32
-UI_IsActive(ui_box *Box)
+UI_IsActive(ui_box *Box, platform_mouse_button_type Button)
 {
- b32 Result = UI_KeyMatch(UI_State->Active, Box->Key);
+ b32 Result = UI_KeyMatch(UI_State->Active[Button], Box->Key);
  return Result;
 }
 
 internal b32
-UI_IsHot(ui_box *Box)
+UI_IsHot(ui_box *Box, platform_mouse_button_type Button)
 {
- b32 Result = UI_KeyMatch(UI_State->Hot, Box->Key);
+ b32 Result = UI_KeyMatch(UI_State->Hot[Button], Box->Key);
  return Result;
 }
 
 internal void
-UI_SetHot(ui_key Key)
+UI_SetHot(ui_key Key, platform_mouse_button_type Button)
 {
- UI_State->Hot = Key;
+ UI_State->Hot[Button] = Key;
 }
 
 internal void
-UI_SetActive(ui_key Key)
+UI_SetActive(ui_key Key, platform_mouse_button_type Button)
 {
- UI_State->Active = Key;
+ UI_State->Active[Button] = Key;
 }
 
 internal ui_box *
@@ -238,7 +237,11 @@ UI_AddBox(str8 String, s32 Flags)
     Box = HashBox;
     
     // NOTE(luca): We need to clear inputs as well since we are erasing the entry.
-    Box->WasClicked = Box->Clicked = Box->Hovered = Box->Pressed = false;
+    
+    MemoryZero(Box->WasClicked);
+    MemoryZero(Box->Clicked);
+    MemoryZero(&Box->Hovered);
+    MemoryZero(Box->Pressed);
    }
    else
    {
@@ -433,89 +436,93 @@ UI_BeginLayout(ui_box *Root, v2s32 Dim, f32 HeightPx)
  {        
   app_input *Input = UI_State->Input;
   v2 MouseP = MousePosFromInput(Input);
-  app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
-  b32 MouseUp = (!MouseLeft.EndedDown);
   
-  for(ui_box *Box = UI_BoxDepthFirstPostOrderBegin(Root).Next;
-      !UI_IsNilBox(Box);
-      Box = UI_BoxDepthFirstPostOrder(Box).Next)
-  {
+  for EachElement(ButtonType, UI_State->Hot)
+  {  
+   app_button_state Button = Input->Mouse.Buttons[ButtonType];
+   b32 MouseUp = (!Button.EndedDown);
    
-   Box->Clicked = false;
-   Box->Hovered = false;
-   Box->Pressed = false;
-   Box->WasClicked = false;
-   Box->Released = false;
-   
+   for(ui_box *Box = UI_BoxDepthFirstPostOrderBegin(Root).Next;
+       !UI_IsNilBox(Box);
+       Box = UI_BoxDepthFirstPostOrder(Box).Next)
    {
-    v4 ClippedRec = RectIntersect(Box->Rec, Box->Clip);
-    if(RectValid(ClippedRec))
+    Box->Hovered = false;
+    Box->Clicked[ButtonType]    = false;
+    Box->Pressed[ButtonType]    = false;
+    Box->WasClicked[ButtonType] = false;
+    Box->Released[ButtonType]   = false;
+    
     {
-     Box->Hovered = IsInsideRectV2(MouseP, ClippedRec);;
+     v4 ClippedRec = RectIntersect(Box->Rec, Box->Clip);
+     if(RectValid(ClippedRec))
+     {
+      Box->Hovered = IsInsideRectV2(MouseP, ClippedRec);;
+     }
     }
-   }
-   
-   b32 ReceiveInput = !Input->Consumed;
-   if(ReceiveInput)
-   {
-    if(Box->Flags & UI_BoxFlag_MouseClickable)
-    {                
-     Box->Pressed = (Box->Hovered && MouseLeft.EndedDown);
-     Box->WasClicked = (Box->Hovered && WasPressed(MouseLeft));
-     
-     // Set active and hot state
-     {            
-      if(Box->Hovered)
-      {
-       if(UI_IsActive(UI_NilBox) ||
-          UI_IsActive(Box)) 
+    
+    b32 ReceiveInput = !Input->Consumed[ButtonType];
+    if(ReceiveInput)
+    {
+     if(Box->Flags & UI_BoxFlag_MouseClickable)
+     {                
+      Box->Pressed[ButtonType] = (Box->Hovered && Button.EndedDown);
+      Box->WasClicked[ButtonType] = (Box->Hovered && WasPressed(Button));
+      
+      // Set active and hot state
+      {            
+       if(Box->Hovered)
        {
-        UI_SetHot(Box->Key);
-        UI_ConsumeInput(Input, Box);
+        if(UI_IsActive(UI_NilBox, ButtonType) ||
+           UI_IsActive(Box, ButtonType)) 
+        {
+         UI_SetHot(Box->Key, ButtonType);
+         UI_ConsumeInput(Input, Box, ButtonType);
+        }
        }
-      }
-      else if(UI_IsHot(Box) && !UI_IsActive(Box))
-      {
-       UI_SetHot(UI_KeyNull());
+       else if(UI_IsHot(Box, ButtonType) && !UI_IsActive(Box, ButtonType))
+       {
+        UI_SetHot(UI_KeyNull(), ButtonType);
+       }
+       
+       if(UI_IsActive(Box, ButtonType))
+       {
+        if(MouseUp)
+        {
+         if(Box->Hovered)
+         {
+          Box->Clicked[ButtonType] = true;
+         }
+         
+         Box->Released[ButtonType] = true;
+         UI_SetActive(UI_KeyNull(), ButtonType);
+        }
+       }
+       else if(UI_IsHot(Box, ButtonType))
+       {
+        if(Box->WasClicked[ButtonType])
+        {
+         UI_SetActive(Box->Key, ButtonType);
+        }
+       }
       }
       
-      if(UI_IsActive(Box))
-      {
-       if(MouseUp)
-       {
-        if(Box->Hovered)
-        {
-         Box->Clicked = true;
-        }
-        
-        Box->Released = true;
-        UI_SetActive(UI_KeyNull());
-       }
+      // Update tHot and tActive
+      if(ButtonType == PlatformMouseButton_Left)
+      {                
+       f32 Speed = UI_State->AnimSpeed;
+       f32 HotTarget    = UI_IsHot(Box, ButtonType)    ? 1.f : 0.f;
+       f32 ActiveTarget = UI_IsActive(Box, ButtonType) ? 1.f : 0.f;
+       Box->tActive += Speed*(ActiveTarget - Box->tActive);
+       Box->tHot    += Speed*(HotTarget - Box->tHot);
       }
-      else if(UI_IsHot(Box))
-      {
-       if(Box->WasClicked)
-       {
-        UI_SetActive(Box->Key);
-       }
-      }
-     }
-     
-     // Update tHot and tActive
-     {                
-      f32 Speed = UI_State->AnimSpeed;
-      f32 HotTarget    = UI_IsHot(Box)    ? 1.f : 0.f;
-      f32 ActiveTarget = UI_IsActive(Box) ? 1.f : 0.f;
-      Box->tActive += Speed*(ActiveTarget - Box->tActive);
-      Box->tHot    += Speed*(HotTarget - Box->tHot);
      }
     }
    }
-  }
-  
-  if(MouseUp)
-  {
-   UI_SetActive(UI_KeyNull());
+   
+   if(MouseUp)
+   {
+    UI_SetActive(UI_KeyNull(), ButtonType);
+   }
   }
  }
  
@@ -544,7 +551,10 @@ UI_BeginFrame(font_atlas *Atlas, u64 FrameIdx, app_input *Input)
  
  if(!Input->PlatformWindowIsFocused) 
  {
-  Input->Consumed = true;
+  for EachElement(Idx, Input->Consumed)
+  {
+   Input->Consumed[Idx] = true;
+  }
  }
  
  /* NOTE(luca): 
@@ -900,13 +910,13 @@ UI_DrawBoxes(ui_box *Box)
 #endif
    }
    
-   if(Box->Flags & UI_BoxFlag_DrawHotEffects && UI_IsHot(Box))
+   if(Box->Flags & UI_BoxFlag_DrawHotEffects && UI_IsHot(Box, PlatformMouseButton_Left))
    {
     V3Math Color0->E *= 1.f - .3f*(Box->tHot - Box->tActive);
     V3Math Color1->E *= 1.f - .3f*(Box->tHot - Box->tActive);
    }
    
-   if(Box->Flags & UI_BoxFlag_DrawActiveEffects && UI_IsActive(Box))
+   if(Box->Flags & UI_BoxFlag_DrawActiveEffects && UI_IsActive(Box, PlatformMouseButton_Left))
    {
     V3Math Color2->E *= 1.f - .3f*(Box->tActive);
     V3Math Color3->E *= 1.f - .3f*(Box->tActive);
@@ -972,17 +982,6 @@ UI_DrawBoxes(ui_box *Box)
   
   if(Box->Flags & UI_BoxFlag_DrawBorders)
   {
-   // NOTE(luca): Highlight border when selected
-   if(0)
-   {
-    b32 Selected = (Box->Flags & UI_BoxFlag_DrawHotEffects &&
-                    (UI_IsHot(Box) || UI_IsActive(Box)));
-    if(Selected)
-    {
-     Box->BorderColor = Color_Snow2;
-    }
-   }
-   
    rect_instance *Inst = DrawRect(Dest, Box->BorderColor, 0.f, Box->BorderThickness, Box->Softness);
    V4Math Inst->CornerRadii.E = Box->CornerRadii.E;
   }

@@ -45,6 +45,14 @@ struct staff
  clef_kind ClefKind;
 };
 
+typedef struct piece_note_node piece_note_node;
+struct piece_note_node
+{
+ piece_note *V;
+ piece_note_node *Next;
+ piece_note_node *Prev;
+};
+
 typedef struct piece piece; 
 struct piece 
 {
@@ -65,7 +73,12 @@ struct piece
  
  u64 NoteCount;
  piece_note Notes[KB(1)];
- u64 SelectedNoteIdx;
+ 
+ u64 SelectionNextIdx;
+ piece_note_node Selection[KB(1)];
+ piece_note_node *SelectionFirst;
+ piece_note_node *SelectionLast;
+ piece_note_node *SelectionFree;
  
  b32 IsRecording;
  f32 RecordLength;

@@ -210,8 +210,15 @@ OS_Sleep(u32 MicroSeconds)
  // Time is in 100-nanosecond intervals
  DueTime.QuadPart = (-(s32)(MicroSeconds * 10));
  
- SetWaitableTimer(Timer, &DueTime, 0, NULL, NULL, FALSE);
- WaitForSingleObject(Timer, INFINITE);
+ if(SetWaitableTimer(Timer, &DueTime, 0, NULL, NULL, FALSE))
+ {
+  WaitForSingleObject(Timer, INFINITE);
+ }
+ else
+ {
+  Win32Log();
+ }
+ 
  CloseHandle(Timer);
 }
 

@@ -107,11 +107,11 @@ struct ui_box
  v2 AnimatedPos;
  
  // Produced from input
- b32 Clicked;
- b32 WasClicked;
  b32 Hovered;
- b32 Pressed;
- b32 Released;
+ b32 Clicked[3];
+ b32 WasClicked[3];
+ b32 Pressed[3];
+ b32 Released[3];
  
  v2 Scroll;
  
@@ -157,12 +157,12 @@ struct ui_state
  f32 AnimSpeed;
  b32 IsAnimating;
  
- ui_key Active;
- ui_key Hot;
+ // One for left, right and middle button.
+ ui_key Active[3];
+ ui_key Hot[3];
  
  // Per build information
  app_input *Input;
- ui_box *InputConsumerBox;
  font_atlas *Atlas;
  font *Fonts[FontKind_Count];
  u64 FrameIdx;

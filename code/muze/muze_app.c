@@ -737,16 +737,16 @@ DebugStringAdd(app_state *App, str8 Tag, char *Format, ...)
 }
 
 #define M_Button(ButtonText, ...) \
-Button(.Text = ButtonText, .CenterText = true, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
+UI_Button(.Text = ButtonText, .CenterText = true, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
 
 #define M_IconButton(Kind, Name, ...) \
 M_Button(UI_Icons[Kind], .String = Name, ##__VA_ARGS__)
 
 #define M_ControlButton(ButtonText, ...) \
-Button(.Text = ButtonText, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
+UI_Button(.Text = ButtonText, .Padding = GlobalItemPadding, ##__VA_ARGS__).Pressed
 
 #define M_SimpleToggleButton(ButtonText, Toggled, Color, ...) \
-Button(.Text = ButtonText, .Padding = GlobalItemPadding, .HasToggle = true, .ToggleToggled = Toggled, Color_Green, .ToggleToggledColor = Color, ##__VA_ARGS__).OneClicked
+UI_Button(.Text = ButtonText, .Padding = GlobalItemPadding, .HasToggle = true, .ToggleToggled = Toggled, Color_Green, .ToggleToggledColor = Color, ##__VA_ARGS__).OneClicked
 
 typedef struct m_slider_result m_slider_result;
 struct m_slider_result
@@ -855,7 +855,7 @@ M_Slider_(m_slider_params Params)
     Result.Value = UI_Slider(Value, Min, Max, Step, 0, true);
   }
   
-  Result.Clicked = Slider->Clicked;
+  Result.Clicked = Slider->Clicked[PlatformMouseButton_Left];
  }
  
  return Result;
@@ -920,7 +920,9 @@ M_Scrollbar(axis2 Axis, f32 TotalSize, f32 Scroll)
    // Clamp in container shrunk.
    f32 ScrollP = Min(Scroll, TotalSize);
    
-   if(UI_IsActive(Thumb) || UI_IsActive(Scrollbar))
+   platform_mouse_button_type ButtonType = PlatformMouseButton_Left;
+   
+   if(UI_IsActive(Thumb, ButtonType) || UI_IsActive(Scrollbar, ButtonType))
    {                                                                            
     f32 MouseP = (f32)Input->Mouse.Pos.e[Axis];
     f32 RelP = MouseP - Scrollbar->FixedPos.e[Axis];
@@ -1044,8 +1046,9 @@ UI_CUSTOM_DRAW(CustomDrawPiano)
  v2 Pos = Box->FixedPos;
  f32 Height = Box->FixedSize.Y;
  
- b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
-                    UI_IsActive(Box));
+ platform_mouse_button_type ButtonType = PlatformMouseButton_Left;
+ 
+ b32 InputIsOurs = (UI_IsHot(Box, ButtonType) || UI_IsActive(Box, ButtonType));
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  
  for EachIndex(Idx, KeyCount)
@@ -1329,6 +1332,26 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
   }
  }
  
+ 
+ b32 LeftInputIsOurs = (UI_IsHot(Box, PlatformMouseButton_Left) ||
+                        UI_IsActive(Box, PlatformMouseButton_Left));
+ b32 RightInputIsOurs = (UI_IsHot(Box, PlatformMouseButton_Right) ||
+                         UI_IsActive(Box, PlatformMouseButton_Right));
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ v2 MouseStart = V2V2S32(Input->Mouse.Start);
+ b32 LeftPressed = (LeftInputIsOurs && Input->Mouse.Buttons[PlatformMouseButton_Left].EndedDown);
+ b32 RightPressed = (RightInputIsOurs && Input->Mouse.Buttons[PlatformMouseButton_Right].EndedDown);
+ b32 Adding = !RightPressed;
+ 
+ v4 SelRec = {0};
+ SelRec.Min = MousePos;
+ SelRec.Max = ((LeftPressed || RightPressed) ? 
+               MouseStart : 
+               MousePos);
+ 
+ V2Math if(SelRec.Min.E > SelRec.Max.E) Swap(SelRec.Min.E, SelRec.Max.E);
+ SelRec = RectIntersect(SelRec, Box->Rec);
+ 
  // Draw notes
  {
   piece_note *NoteArrays[] = {Piece->Notes, Piece->PracticeNotes};
@@ -1347,9 +1370,12 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     HighestPitch = Max(HighestPitch, Notes[Idx].Pitch);
    }
    
-   for(u64 Idx = 1; Idx < NoteCount; Idx += 1)
+   for(u64 NoteIdx = 1; NoteIdx < NoteCount; NoteIdx += 1)
    {
-    piece_note *Note = Notes + Idx;
+    piece_note *Note = Notes + NoteIdx;
+    
+    b32 IsHovered = false;
+    b32 IsSelected = false;
     
     v2 NotePos = Pos;
     
@@ -1379,15 +1405,21 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     NotePos.Y += .5f*StaffLineWidth;
     NotePos.Y += ((f32)Note->StaffIdx*2.f*StaffHeight);
     
-    b32 InputIsOurs = ((UI_IsHot(Box) && UI_IsActive(UI_NilBox)) || 
-                       UI_IsActive(Box));
-    v2 MousePos = V2V2S32(Input->Mouse.Pos);
+    // Selected
+    {
+     for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+     {
+      if(Node->V == Note)
+      {
+       IsSelected = true;
+       break;
+      }
+     }
+    }
     
     if(0) {}
     else if(Note->Kind == PieceNoteKind_Rest)
     {
-     b32 IsHovered = false;
-     b32 IsSelected = false;
      // Each increment is halving the value.
      s32 WholeRest = 0xE4E3;
      f32 WholeRestLength = 4.f;
@@ -1400,27 +1432,22 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      
      rect_instance *Instance = DrawRectChar(UI_State->Atlas, Font, NotePos, Codepoint, NoteColor);
      
-     IsSelected = (Idx == Piece->SelectedNoteIdx);
-     
-     if(InputIsOurs)
+     if(LeftInputIsOurs || RightInputIsOurs)
      {
-      IsHovered = IsInsideRectV2(MousePos, Instance->Dest);
-      
-      if(IsHovered && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
-      {
-       PushCommand(App, Command_PieceSelectNote)->U64 = Idx;
-      }
-     }
-     
-     if(IsSelected)
-     {
-      RenderRectSetColor(Instance, Color_Orange);
+      IsHovered = RectOverlap(SelRec, Instance->Dest);
      }
      
      if(IsHovered)
      {
       RenderRectSetColor(Instance, Color_Blue);
      }
+     
+     
+     if(IsSelected)
+     {
+      RenderRectSetColor(Instance, Color_Orange);
+     }
+     
     }
     else if(Note->Kind == PieceNoteKind_Pitch && !Note->Hidden)
     {
@@ -1431,8 +1458,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      b32 IsDotted = false;
      b32 IsBarred = false;
      b32 IsSharp = !GetEl(NoteIsWhite, RelPitch);
-     b32 IsHovered = false;
-     b32 IsSelected = false;
      v2 TailPos = {0};
      b32 DebugDrawBoundingBox = false;
      
@@ -1468,20 +1493,19 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      v4 TailBounds = {0};
      // Is Hovered and compute bounds
      {
-      
       HeadBounds = RectFromSize(NotePos, NoteDim);
       
-      if(InputIsOurs)
+      if(LeftInputIsOurs || RightInputIsOurs)
       {     
-       IsHovered = IsInsideRectV2(MousePos, HeadBounds);
+       IsHovered = RectOverlap(SelRec, HeadBounds);
        
-       if(HasStem)
+       if(HasStem && !IsHovered)
        {
         f32 ExtraWidth = 3.f;
         TailBounds = RectFromSize(TailPos, TailDim);
         TailBounds.Min.X -= ExtraWidth;
         TailBounds.Max.X += ExtraWidth;
-        IsHovered |= IsInsideRectV2(MousePos, TailBounds);
+        IsHovered = RectOverlap(SelRec, TailBounds);
        }
       }
      }
@@ -1491,16 +1515,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      if(IsHovered)
      {
       NoteColor = Color_Blue;
-      
-      if(WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
-      {
-       PushCommand(App, Command_PieceSelectNote)->U64 = Idx;
-      }
-     }
-     
-     // Selected
-     {
-      IsSelected = (Idx == Piece->SelectedNoteIdx);
      }
      
      if(IsSelected)
@@ -1614,9 +1628,31 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      }
      
     }
+    
+    if(IsHovered && (LeftPressed || RightPressed))
+    {
+     PushCommand(App, (Adding ? 
+                       Command_PieceSelectNote :
+                       Command_PieceDeselectNote))->U64 = NoteIdx;
+    }
+    
    }
   }
  }
+ 
+ if(LeftPressed || RightPressed)
+ {
+  v4 BorderColor = (!RightPressed ?
+                    V4(V3Arg(Color_Black), 1.f) :
+                    V4(V3Arg(Color_Snow2), 1.f));
+  v4 Color = (!RightPressed ? 
+              V4(V3Arg(Color_Blue), .3f) :
+              V4(V3Arg(Color_Orange), .3f));
+  
+  DrawRect(SelRec, Color,       3.f, 0.f, 0.f);
+  DrawRect(SelRec, BorderColor, 3.f, 1.f, 0.f);
+ }
+ 
 }
 
 
@@ -1979,6 +2015,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  {            
   for EachTextButton(Key, Id, Input)
   {
+   b32 Handled = false;
+   
    s32 ModifiersWithoutShift = (Key->Modifiers & ~PlatformKeyModifier_Shift);
    
    if(Key->Modifiers == PlatformKeyModifier_Control &&
@@ -1986,6 +2024,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
       Key->Codepoint == 'u')
    {
     App->Text.Size = 0;
+    
+    Handled = true;
    }
    
    if(ModifiersWithoutShift == PlatformKeyModifier_None)
@@ -1996,13 +2036,23 @@ UPDATE_AND_RENDER(UpdateAndRender)
      App->Text.Size += 1;
      App->CursorAnimTime = 0.f;
      
-     RemoveTextButton(Input, Id);
+     Handled = true;
     }
     else
     {
+     Handled = true;
+     
      switch(Key->Symbol)
      {
-      default: break;
+      default: 
+      {
+       Handled = false; 
+      } break;
+      
+      case PlatformKey_Escape:
+      {
+       PushCommand(App, Command_CloseLister);
+      } break;
       
       case PlatformKey_Return:
       {
@@ -2017,6 +2067,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
      }
     }
    }
+   
+   if(Handled)
+   {
+    RemoveTextButton(Input, Id);
+   }
   }
  }
  
@@ -2027,6 +2082,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
 #if MUZE_INTERNAL  
   if(!Key->IsSymbol && Key->Modifiers == PlatformKeyModifier_Alt && Key->Codepoint == 'b')
   {
+   DebugBreak();
+   
    Handled = true;
    goto KeyHandled;
   }
@@ -2089,33 +2146,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
   if(Handled) goto KeyHandled;
   Handled = true;
   
-  if(!Key->IsSymbol)
-  {
-   Handled = false;
-  }
-  else
-  {
-   switch(Key->Codepoint)
-   {
-    case PlatformKey_Escape:
-    {
-     if(App->ListerOpened)
-     {
-      PushCommand(App, Command_CloseLister);
-     }
-     else
-     {
-      PushCommand(App, Command_PieceDeselectNote);
-     }
-    } break;
-    
-    default: 
-    {
-     Handled = false;
-    } break;
-   }
-  }
-  
   KeyHandled:;
   if(Handled)
   {
@@ -2161,15 +2191,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
    App->DebugStringTags = PushArray(FrameArena, str8, App->MaxDebugStringCount);
    App->DebugStringCount = 0;
    { 
-    ui_box *Hot = UI_BoxFromKey(UI_State->Hot);
-    ui_box *Active = UI_BoxFromKey(UI_State->Active);
-    str8 ActiveString = Active->DisplayString;
-    str8 HotString = Hot->DisplayString;
-    if(ActiveString.Size == 0) ActiveString = S8("null");
-    if(HotString.Size == 0) HotString = S8("null");
-    
-    ui_box *Box;
-    
 #if MUZE_INTERNAL
     if(!Memory->Reloaded)
     {     
@@ -2177,12 +2198,28 @@ UPDATE_AND_RENDER(UpdateAndRender)
      // dereference them we just skip the frame where reloaded.
      StringsScratchTemp(UI_State->FrameArenaBack)
      {
-      DebugStringAdd(App, S8("ui"), "Active: %S", ActiveString);
-      DebugStringAdd(App, S8("ui"), "Hot: %S", HotString);
-      DebugStringAdd(App, S8("ui"), "Active->tHot = %.2f", Active->tHot);
-      DebugStringAdd(App, S8("ui"), "Active->tActive = %.2f", Active->tActive);
-      DebugStringAdd(App, S8("ui"), "Hot->tHot = %.2f", Hot->tHot);
-      DebugStringAdd(App, S8("ui"), "Hot->tActive = %.2f", Hot->tActive);
+      
+      {
+       str8 ButtonTypeStrings[3] = {S8("L"), S8("R"), S8("M")};
+       for EachElement(ButtonType, UI_State->Hot)
+       {        
+        ui_box *Hot = UI_BoxFromKey(UI_State->Hot[ButtonType]);
+        ui_box *Active = UI_BoxFromKey(UI_State->Active[ButtonType]);
+        str8 ActiveString = Active->DisplayString;
+        str8 HotString = Hot->DisplayString;
+        if(ActiveString.Size == 0) ActiveString = S8("null");
+        if(HotString.Size == 0) HotString = S8("null");
+        
+        str8 ButtonTypeString = ButtonTypeStrings[ButtonType];
+        
+        DebugStringAdd(App, S8("ui"), "%SActive: %S", ButtonTypeString, ActiveString);
+        DebugStringAdd(App, S8("ui"), "%SHot: %S", ButtonTypeString, HotString);
+        DebugStringAdd(App, S8("ui"), "%SActive->tHot = %.2f", ButtonTypeString, Active->tHot);
+        DebugStringAdd(App, S8("ui"), "%SActive->tActive = %.2f", ButtonTypeString, Active->tActive);
+        DebugStringAdd(App, S8("ui"), "%SHot->tHot = %.2f", ButtonTypeString, Hot->tHot);
+        DebugStringAdd(App, S8("ui"), "%SHot->tActive = %.2f", ButtonTypeString, Hot->tActive);
+       }
+      }
       
       DebugStringAddArena(App, S8("Perm"), PermanentArena);
       DebugStringAddArena(App, S8("Frame"), FrameArena);
@@ -2373,20 +2410,23 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      {
       platform_midi_device *Device = Devices.Devices + Idx;
       
-      if((IsInput && Device->IsInput) ||
-         (!IsInput && Device->IsOutput))
+      b32 DeviceIsGood = ((IsInput && Device->IsInput) ||
+                          (!IsInput && Device->IsOutput));
+      u64 SelectedDeviceId = (IsInput ? App->In.Id : App->Out.Id);
+      
+      if(DeviceIsGood)
       {
        lister_entry *Entry = Entries + EntryCount;
-       EntryCount += 1;
        
+       Entry->Command = (IsInput ? Command_SelectInputDevice : Command_SelectOutputDevice);
        Entry->Text = Device->Name;
        Entry->S32 = (s32)Idx;
        
-       if((IsInput && (Device->Id == App->In.Id)) ||
-          (!IsInput && (Device->Id == App->Out.Id)))
+       if(Device->Id == SelectedDeviceId)
        {
-        SelectedIdx = (s32)Idx;
+        SelectedIdx = EntryCount;
        }
+       EntryCount += 1;
       }
      }
     } break;
@@ -2619,7 +2659,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                          UI_BoxFlag_DrawDisplayString|
                          UI_BoxFlag_CenterTextVertically)->DisplayString = Entry->Text;
               
-              ItemSelected = (ItemBox->WasClicked || 
+              ItemSelected = (ItemBox->WasClicked[PlatformMouseButton_Left] || 
                               (App->ListerReturnPressed && IsFirstItem));
               
               if(Entry->Max > 0.f)
@@ -2678,45 +2718,20 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
              {
               PushCommand(App, Command_CloseLister);
               
-              switch(App->ListerKind)
+              if(Entry->ButtonCommand != Command_None)
               {
-               default: InvalidPath(); break;
-               
-               case ListerKind_PanelTypes:
-               case ListerKind_Instruments:
-               case ListerKind_DebugInfo:
-               case ListerKind_Commands:
-               {
-                if(Entry->ButtonCommand != Command_None)
-                {
-                 command *Command = PushCommand(App, Entry->ButtonCommand);
-                 
-                 Command->S32 = Entry->S32;
-                 Command->F32 = Entry->F32;
-                }
-                else if(Entry->Command != Command_None)
-                {
-                 command *Command = PushCommand(App, Entry->Command);
-                 
-                 Command->S32 = Entry->S32;
-                 Command->F32 = Entry->F32;
-                }
-               } break;
-               
-               case ListerKind_MIDIInput:
-               {
-                PushCommand(App, Command_SelectInputDevice)->S32 = Entry->S32;
-               } break;
-               
-               case ListerKind_MIDIOutput:
-               {
-                PushCommand(App, Command_SelectOutputDevice)->S32 = Entry->S32;;
-               } break;
-               
-               
+               Entry->Command = Entry->ButtonCommand;
               }
               
+              if(Entry->Command != Command_None)
+              {
+               command *Command = PushCommand(App, Entry->Command);
+               
+               Command->S32 = Entry->S32;
+               Command->F32 = Entry->F32;
+              }
              }
+             
             }
            }
           }
@@ -2828,7 +2843,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
               str8 TypeName = PanelTypeStrings[Panel->Kind];
               Type->DisplayString = TypeName;
               
-              if(Type->WasClicked)
+              if(Type->WasClicked[PlatformMouseButton_Left])
               {
                PushCommand(App, Command_OpenLister)->S32 = ListerKind_PanelTypes;
               }
@@ -2865,7 +2880,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                                0));
               Close->DisplayString = UI_Icons[UI_IconKind_Close];
               
-              if(Close->Clicked)
+              if(Close->Clicked[PlatformMouseButton_Left])
               {
                PushCommand(App, Command_ClosePanel);
               }
@@ -2964,11 +2979,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {                
                  UI_SemanticWidth(UI_SizePx(120.f, 1.f))
                  {
-                  ui_button_result Click = Button(.Text = S8("Synth"), 
-                                                  .Padding = GlobalItemPadding, 
-                                                  .HasToggle = true,
-                                                  .ToggleToggled = !App->OutputSynthDisabled, 
-                                                  .ToggleToggledColor = Color_Yellow);
+                  ui_button_result Click = UI_Button(.Text = S8("Synth"), 
+                                                     .Padding = GlobalItemPadding, 
+                                                     .HasToggle = true,
+                                                     .ToggleToggled = !App->OutputSynthDisabled, 
+                                                     .ToggleToggledColor = Color_Yellow);
                   if(Click.Pressed)
                   {
                    PushCommand(App, Command_PieceSelectInstrument);
@@ -3017,8 +3032,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 }
                 
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                 if(M_Button(S8("Start")))
+                 if(M_Button(S8("Range")))
                 {
+#if 1
+                 PushCommand(App, Command_PieceSetPracticeRangeFromSelection);
+#else
                  f32 Start = Piece->Notes[Piece->SelectedNoteIdx].Start;
                  if(Start < Piece->PracticeEnd)
                  {
@@ -3034,6 +3052,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                    Piece->PlayPos = Piece->PracticeStart;
                   }
                  }
+#endif
                 }
                 
                 UI_FontKind(FontKind_Icons)
@@ -3043,33 +3062,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                  PushCommand(App, Command_PieceToggleStrictTiming);
                 }
                 
-                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                 if(M_Button(S8("End")))
-                {
-                 f32 Start = Piece->Notes[Piece->SelectedNoteIdx].Start;
-                 if(Start > Piece->PracticeStart)
-                 {
-                  Piece->PracticeEnd = Start;
-                  
-                  if(Start < Piece->PracticePos)
-                  {
-                   Piece->PracticePos = Piece->PracticeEnd;
-                  }
-                  
-                  if(Start < Piece->PlayPos)
-                  {
-                   Piece->PlayPos = Piece->PracticeEnd;
-                  }
-                 }
-                }
-                
                 UI_SemanticWidth(UI_SizePx(300.f, 1.f))
                  
                 {                 
-                 m_slider_result Slider = M_Slider(S8("SetNoteLength"), S8("Length"), 
-                                                   Str8Fmt(" %2.0f/8", Piece->SetNoteLength), 
+                 m_slider_result Slider = M_Slider(S8("SetNoteLength"), S8(""), 
+                                                   Str8Fmt("Length 1/%-2.0f", Piece->SetNoteLength), 
                                                    Piece->SetNoteLength, 
-                                                   1.f, 32.f, 1.f, true,
+                                                   1.f, 16.f, 1.f, true,
                                                    .Align = false); 
                  Piece->SetNoteLength = Slider.Value;
                  if(Slider.Clicked)
@@ -3257,7 +3256,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                                                UI_State->RectDebugMode, 
                                                                ItemPadding, V4(1.f, 0.f, 1.f, 1.f)).OneClicked;
                 
-                if(M_Button(S8("Debug Info"), .CenterText = false))
+                if(M_Button(S8("Search"), .CenterText = false))
                 {
                  PushCommand(App, Command_OpenLister)->S32 = ListerKind_DebugInfo;
                 }
@@ -3315,12 +3314,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                            "###PracticePos", 
                            Piece->PracticeStart, 
                            Piece->PracticeEnd);
-                  
-                  
                   M_Labelf("Selected Panel: %S (%p)"
                            "###SelectedPanel",
                            PanelTypeStrings[App->SelectedPanel->Kind],
                            App->SelectedPanel);
+                  
+                  
+                  for EachIndex(Idx, App->DebugStringCount)
+                  {
+                   M_Labelf("%S###DebugString-%llu", App->DebugStrings[Idx], Idx);
+                  }
                   
                  }
                  
@@ -3333,7 +3336,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                
                // Scrollbar
                {                                                            
-                f32 TotalElementSize = 2.f*ItemHeight;
+                f32 TotalElementSize = ItemHeight*(f32)(8 + App->DebugStringCount);
                 TotalElementSize -= ItemHeight;
                 
                 f32 Scroll = M_Scrollbar(Axis2_Y, TotalElementSize, Panel->Scroll.Y);
@@ -3365,14 +3368,15 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
               (!UI_IsNilBox(Child) && Child != PanelBox);
               Child = UI_BoxDepthFirstPreOrder(Child).Next)
           {
-           if(UI_IsActive(Child) && !UI_KeyMatch(UI_KeyNull(), Child->Key))
+           platform_mouse_button_type ButtonType = PlatformMouseButton_Left;
+           if(UI_IsActive(Child, ButtonType) && !UI_KeyMatch(UI_KeyNull(), Child->Key))
            {
             ChildIsActive = true;
             break;
            }
           }
           
-          if(PanelBox->WasClicked || ChildIsActive)
+          if(PanelBox->WasClicked[PlatformMouseButton_Left] || ChildIsActive)
           {
            App->SelectedPanel = Panel;
           }
@@ -3421,9 +3425,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
             GapBox = UI_AddBox(S8("Gap"), GapFlags);
           }
           
+          platform_mouse_button_type ButtonType = PlatformMouseButton_Left;
+          
           // Set cursor shape to resizing one
           {                                    
-           if(UI_IsHot(GapBox))
+           if(UI_IsHot(GapBox, ButtonType))
            {
             Input->PlatformCursor = (PlatformCursorShape_ResizeHorizontal +
                                      !!(LayoutAxis == Axis2_Y));
@@ -3432,7 +3438,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
           
           // Gap box (resize border)
           {                                    
-           if(UI_IsActive(GapBox))
+           if(UI_IsActive(GapBox, ButtonType))
            {
             // NOTE(luca): Since this will change the position of the elements, they will 
             // want to animate from their FixedPos to their AnimatedPos.  To reset their 
@@ -3441,7 +3447,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
             
             s32 PosOnAxis = Input->Mouse.Pos.e[LayoutAxis];
             
-            if(GapBox->WasClicked)
+            if(GapBox->WasClicked[PlatformMouseButton_Left])
             {
              DragData->StartPos = PosOnAxis;
              DragData->StartPct = P->ParentPct;
@@ -3738,7 +3744,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Piece->PracticePos = 0.f;
      Piece->PracticeEnd = 0.f;
      Piece->PracticeStart = 0.f;
-     Piece->SelectedNoteIdx = 0;
+     Piece->SelectionFirst = 0;
+     Piece->SelectionLast = 0;
     } break;
     
     case Command_PieceToggleMetronome:
@@ -3802,35 +3809,120 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Piece->BPM = Command->F32;
     } break;
     
+    case Command_PieceDeselectAllNotes:
+    {
+     for EachNodeSafe(Node, piece_note_node, Piece->SelectionFirst)
+     {
+      DLLRemove(Node, Piece->SelectionFirst, Piece->SelectionLast);
+      
+      Node->Next = Piece->SelectionFree;
+      Piece->SelectionFree = Node;
+     }
+    } break;
+    
     case Command_PieceDeselectNote:
+    {
+     u64 NoteIdx = Command->U64;
+     piece_note *Note = Piece->Notes + NoteIdx;
+     
+     piece_note_node *Selected = 0;
+     // Selected
+     {
+      for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+      {
+       if(Node->V == Note)
+       {
+        Selected = Node;
+        break;
+       }
+      }
+     }
+     
+     if(Selected) DLLRemove(Selected, Piece->SelectionFirst, Piece->SelectionLast);
+     
+    } break;
+    
     case Command_PieceSelectNote:
     {
-     Piece->SelectedNoteIdx = Command->U64;
-     Piece->SetNoteLength = Piece->Notes[Piece->SelectedNoteIdx].Length*8.f;
+     u64 NoteIdx = Command->U64;
+     piece_note *Note = Piece->Notes + NoteIdx;
+     
+     piece_note_node *Selected = 0;
+     // Selected
+     {
+      for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+      {
+       if(Node->V == Note)
+       {
+        Selected = Node;
+        break;
+       }
+      }
+     }
+     
+     b32 DoSelect = (Command->Kind == Command_PieceSelectNote);
+     if(!Selected && DoSelect)
+     {
+      piece_note_node *Node = 0;
+      if(Piece->SelectionFree)
+      {
+       Node = Piece->SelectionFree;
+       Piece->SelectionFree = Piece->SelectionFree->Next;
+      }
+      else
+      {
+       Node = Piece->Selection + Piece->SelectionNextIdx;
+       Piece->SelectionNextIdx += 1;
+      }
+      MemoryZero(Node);
+      
+      Node->V = Note;
+      DLLAppend(Node, Piece->SelectionFirst, Piece->SelectionLast);
+     }
+     else if(Selected && !DoSelect)
+     {
+      DLLRemove(Selected, Piece->SelectionFirst, Piece->SelectionLast);
+      Selected->Next = Piece->SelectionFree;
+      Piece->SelectionFree = Selected;
+     }
+     
+     Piece->SetNoteLength = (1.f/(Note->Length*1.f/Piece->TimeSigDen));
     } break;
     
     case Command_PieceDeleteNote:
     {
-     piece_note *Note = Piece->Notes + Piece->SelectedNoteIdx;
-     if(Note->Kind == PieceNoteKind_Pitch)
+     for EachNodeSafe(Node, piece_note_node, Piece->SelectionFirst)
      {
-      Note->Kind = PieceNoteKind_Rest;
-     }
-     else
-     {     
-      if(Piece->NoteCount)
+      piece_note *Note = Node->V;
+      
+      if(Note->Kind == PieceNoteKind_Pitch)
       {
-       MemoryCopy(Note, 
-                  Note + 1,
-                  (Piece->NoteCount - (Piece->SelectedNoteIdx + 1))*sizeof(piece_note));
-       Piece->NoteCount -= 1;
+       Note->Kind = PieceNoteKind_Rest;
       }
+      else
+      {     
+       if(Piece->NoteCount)
+       {
+        u64 NoteIdx = (Note - Piece->Notes); 
+        MemoryCopy(Note, 
+                   Note + 1,
+                   (Piece->NoteCount - (NoteIdx + 1))*sizeof(piece_note));
+        Piece->NoteCount -= 1;
+       }
+       
+       DLLRemove(Node, Piece->SelectionFirst, Piece->SelectionLast);
+      }
+      
      }
+     
     } break;
     
     case Command_PieceSetNoteLength:
     {
-     Piece->Notes[Piece->SelectedNoteIdx].Length = Piece->SetNoteLength/8.f;
+     for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+     {
+      Node->V->Length = (Piece->TimeSigDen/Piece->SetNoteLength);
+     }
     } break;
     
     case Command_PieceSelectInstrument:
@@ -3855,6 +3947,28 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceTrimAtFirstNote:
     {
+     
+    } break;
+    
+    case Command_PieceSetPracticeRangeFromSelection:
+    {
+     f32 MinStart = Piece->RecordLength;
+     f32 MaxEnd = 0.f;
+     
+     for EachNode(Node, piece_note_node, Piece->SelectionFirst)
+     {
+      piece_note *Note = Node->V;
+      
+      f32 Start = Note->Start;
+      f32 End = Note->Start + Note->Length;
+      MinStart = Min(MinStart, Start);
+      MaxEnd = Max(MaxEnd, End);
+     }
+     
+     Piece->PracticeStart = MinStart;
+     Piece->PracticeEnd = MaxEnd;
+     Piece->PlayPos = Piece->PracticeStart;
+     PieceStopPlaying(App, Piece);
      
     } break;
    }

@@ -157,6 +157,8 @@ enum platform_cursor_shape
 };
 typedef enum platform_cursor_shape platform_cursor_shape;
 
+#define PlatformMouseClickableButtonCount 3
+
 enum platform_mouse_button_type
 {
  PlatformMouseButton_Left = 0,
@@ -225,7 +227,7 @@ struct app_input
  } MIDI;
  
  // NOTE(luca): We can invalidate the input with this.
- b32 Consumed;
+ b32 Consumed[PlatformMouseClickableButtonCount];
  
  f32 dtForFrame;
  

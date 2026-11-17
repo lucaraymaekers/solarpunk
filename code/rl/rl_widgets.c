@@ -89,7 +89,7 @@ UI_Checkbox(b32 Toggled, v4 EnabledColor)
   }
  }
  
- Result = Box->WasClicked;
+ Result = Box->WasClicked[PlatformMouseButton_Left];
  
  return Result;
 }
@@ -119,8 +119,8 @@ struct ui_button_params
  b32 ClipSize;
 };
 
-#define Button(...) \
-Button_((ui_button_params){ \
+#define UI_Button(...) \
+_Button((ui_button_params){ \
 .Padding = UI_SizePx(0.f, 1.f), \
 .TextColor = Color_ButtonText, \
 .BackgroundColor = Color_ButtonBackground, \
@@ -137,7 +137,7 @@ struct ui_button_result
 };
 
 internal ui_button_result 
-Button_(ui_button_params Params)
+_Button(ui_button_params Params)
 {
  ui_button_result Result = {0};
  
@@ -160,8 +160,8 @@ Button_(ui_button_params Params)
                     Params.BackgroundColor)
  {
   ui_box *Box = UI_AddBox(String, ButtonFlags);
-  Result.Pressed = Box->WasClicked;
-  Result.Released = Box->Clicked;
+  Result.Pressed = Box->WasClicked[PlatformMouseButton_Left];
+  Result.Released = Box->Clicked[PlatformMouseButton_Left];
  }
  
  UI_PaddingAround(Params.Padding)
@@ -196,7 +196,7 @@ Button_(ui_button_params Params)
 }
 
 #define UI_ButtonWithToggle(ButtonText, ButtonEnabled, ButtonPadding, ButtonEnabledColor, ...) \
-Button(.Text = ButtonText, .HasToggle = true, .Padding = ButtonPadding, .ToggleToggled = ButtonEnabled, .ToggleToggledColor = ButtonEnabledColor, ##__VA_ARGS__) 
+UI_Button(.Text = ButtonText, .HasToggle = true, .Padding = ButtonPadding, .ToggleToggled = ButtonEnabled, .ToggleToggledColor = ButtonEnabledColor, ##__VA_ARGS__) 
 
 internal f32
 UI_Slider(f32 Value, f32 Min, f32 Max, f32 StepSize, char *Format, b32 Interactive)
@@ -272,7 +272,7 @@ UI_Slider(f32 Value, f32 Min, f32 Max, f32 StepSize, char *Format, b32 Interacti
  v2 MouseP = MousePosFromInput(UI_State->Input);
  app_button_state MouseLeft = UI_State->Input->Mouse.Buttons[PlatformMouseButton_Left];
  
- if(Interactive && UI_IsActive(Slider))
+ if(Interactive && UI_IsActive(Slider, PlatformMouseButton_Left))
  {
   f32 Start = DragArea->Rec.Min.X + ThumbWidth/2.f;
   f32 End = DragArea->Rec.Max.X - ThumbWidth/2.f;

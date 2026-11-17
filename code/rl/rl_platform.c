@@ -222,11 +222,11 @@ global_variable ui_size GlobalPadding;
 internal b32
 DisabledButton(str8 Text, b32 Disabled)
 {
- b32 Result = Button(.Text = Text, 
-                     .Disabled = Disabled, 
-                     .Padding = GlobalPadding,
-                     .CenterText = true,
-                     .ClipSize = true).Pressed;
+ b32 Result = UI_Button(.Text = Text, 
+                        .Disabled = Disabled, 
+                        .Padding = GlobalPadding,
+                        .CenterText = true,
+                        .ClipSize = true).Pressed;
  Result = (Result && !Disabled);
  return Result;
 }
@@ -436,7 +436,10 @@ BASE_ENTRY_POINT()
     
     // Input
     {
-     NewInput->Consumed = false;
+     for EachElement(Idx, NewInput->Consumed)
+     {
+      NewInput->Consumed[Idx] = false;
+     }
      NewInput->SkipRendering = false;
      NewInput->MIDI.EventCount = 0;
      MemoryZero(&NewInput->Text);
@@ -603,6 +606,7 @@ BASE_ENTRY_POINT()
      UI_BeginLayout(DebugRootBox, WindowBuffer.Dim, DebugHeightPx);
      
      // UI
+     platform_mouse_button_type ButtonType = PlatformMouseButton_Left;
      
      f32 ItemHeight = DebugHeightPx + 2.f*8.f;
      f32 ListWidth = 300.f;
@@ -665,12 +669,12 @@ BASE_ENTRY_POINT()
          
          for EachIndex(Axis, Axis2_Count)
          {
-          if(UI_IsActive(TopBar))
+          if(UI_IsActive(TopBar, ButtonType))
           {
            DebugUIDragOffset.e[Axis] = (f32)(NewInput->Mouse.Pos.e[Axis] - NewInput->Mouse.Start.e[Axis]);
            UI_State->IsAnimating = false;
           }
-          else if(TopBar->Released)
+          else if(TopBar->Released[PlatformMouseButton_Left])
           {
            DebugUIOffset.e[Axis] += DebugUIDragOffset.e[Axis];
            DebugUIOffset.e[Axis] = Clamp(0.f, DebugUIOffset.e[Axis], (f32)WindowBuffer.Dim.e[Axis] - List->FixedSize.e[Axis]);
@@ -913,9 +917,9 @@ BASE_ENTRY_POINT()
       }
      }
      
-     if(!UI_IsActive(UI_NilBox) || !UI_IsHot(UI_NilBox))
+     if(!UI_IsActive(UI_NilBox, ButtonType) || !UI_IsHot(UI_NilBox, ButtonType))
      {
-      NewInput->Consumed = true;
+      NewInput->Consumed[ButtonType] = true;
      }
      
      UI_EndLayout(DebugRootBox);
@@ -990,7 +994,10 @@ BASE_ENTRY_POINT()
        if(HasReachedStepTarget)
        {
         MemoryZero(ReplayInput);
-        ReplayInput->Consumed = true;
+        for EachElement(Idx, ReplayInput->Consumed)
+        {
+         ReplayInput->Consumed[Idx] = true;
+        }
         Replay.IsSkipping = false;
         ReplayInput->dtForFrame = 0.f;
        }

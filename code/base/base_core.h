@@ -280,7 +280,13 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 #define EachIndex(Index, Count)           EachIndexType(TypeOf((Count)), Index, Count)
 #define EachElement(Index, Array)         EachIndexType(umm, Index, ArrayCount(Array))
 #define EachInRange(Index, Range)         (TypeOf((Range).Min) Index = (Range).Min; Index < (Range).Max; Index += 1)
-#define EachNode(Node, t, First)      (t *Node = First; Node != 0; Node = Node->Next)
+#define EachNode(Node, t, First) (t *Node = First; Node != 0; Node = Node->Next)
+
+#define EachNodeSafe(Node, t, First) \
+(t *Node = (First), *_Next = (Node != 0 ? Node->Next : 0); \
+Node != 0; \
+Node = _Next, _Next = (Node != 0 ? Node->Next : 0))
+
 #define EachCount(Count) EachIndex(Var(_i_), Count)
 
 #define MemoryCopy(Dest, Source, Count) memmove(Dest, Source, Count)
@@ -298,15 +304,7 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 Node->Prev = Last, \
 Last = Node)
 
-#if 1
-# define DLLAppend(Node, First, Last) DLLAppendNil(Node, First, Last, 0)
-#else
-# define DLLAppend(Node, First, Last) \
-((!First ? First = Node : 0), \
-(Last ? Last->Next = Node : 0), \
-Node->Prev = Last, \
-Last = Node)
-#endif
+#define DLLAppend(Node, First, Last) DLLAppendNil(Node, First, Last, 0)
 
 #define DLLIDAppend(Buffer, Idx, First, Last) \
 ((First == 0 ? First = Idx : 0), \
@@ -314,8 +312,13 @@ Last = Node)
 Buffer[Idx].Prev = Last, \
 Last = Idx)
 
-#define DLLInsertNil(Node, To, First, Last) \
+#define DLLRemoveNil(Node, First, Last, Nil) \
+((!CheckNil(Node->Prev, Nil) ? Node->Prev->Next = Node->Next : 0), \
+(!CheckNil(Node->Next, Nil) ? Node->Next->Prev = Node->Prev : 0), \
+((Node == First) ? First = Node->Next : 0), \
+((Node == Last) ? Last = Node->Prev : 0))
 
+#define DLLRemove(Node, First, Last) DLLRemoveNil(Node, First, Last, 0)
 
 //~ Attributes
 #define internal static
