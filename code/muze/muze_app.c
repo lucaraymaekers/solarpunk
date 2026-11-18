@@ -28,6 +28,8 @@ NO_WARNINGS_END
 #include "muze/muze_serialize.h"
 #include "muze/muze_app.h"
 
+#include "muze/muze_tsf.c"
+#include "muze/muze_piece.c"
 #include "muze/muze_serialize.c"
 #include "rl/rl_renderer.c"
 #include "rl/rl_ui.c"
@@ -39,29 +41,14 @@ NO_WARNINGS_END
 #endif
 
 //~ Macros
-#define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
-#define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
-#define IsNilNote(Note) CheckNil(Note, NilNote)
-#define IsNilVoice(Voice) CheckNil(Voice, NilVoice)
-#define IsNilNote(Note) CheckNil(Note, NilNote)
 
 #define Disabled() if(true) { Log("Temporarily disabled.\n"); } else
 
 //~ Globals
-global_variable tsf *GlobalTSF;
 global_variable drag_data *DragData;
 global_variable ui_size GlobalItemPadding;
 
 global_variable tsf *NilTSF;
-global_variable panel *NilPanel;
-global_variable note *NilNote;
-global_variable piece *NilPiece;
-
-global_variable f32 *dtForFrame;
-
-global_variable platform_midi_get_devices	*PlatformMIDIGetDevices;
-global_variable platform_midi_send	*PlatformMIDISend;
-global_variable platform_midi_listen	*PlatformMIDIListen;
 
 //~ Helpers
 internal inline b32
@@ -80,29 +67,6 @@ InitReadOnlyGlobals(arena *Arena)
  NilPanel = PushArray(Arena, panel, 1);
  NilNote = PushArray(Arena, note, 1);
  NilPiece = PushArray(Arena, piece, 1);
-}
-
-internal void
-TSFPlayNote(app_state *App, s32 Channel, s32 Key, f32 Velocity)
-{
- if(!App->OutputSynthDisabled)
- {
-  tsf_channel_note_on(GlobalTSF, Channel, Key, Velocity);
- }
-}
-
-internal void
-TSFPlayNoteU8(app_state *App, s32 Channel, s32 Key, u8 Velocity)
-{
- TSFPlayNote(App, Channel, Key, ((f32)Velocity/256.f));
-}
-
-internal s32
-TSFNextChannel(app_state *App)
-{
- s32 Result = App->NextChannelIdx;
- App->NextChannelIdx += 1;
- return Result;
 }
 
 //~ Panels
@@ -557,178 +521,6 @@ PushCommand(app_state *App, command_kind Kind)
  
  return Result;
 }
-
-//~ Muze - Piece
-internal note *
-PieceCodeNoteAdd(piece *Piece, 
-                 note_kind Kind, u8 Pitch, f32 Length)
-{
- note *Note = NilNote;
- 
- if(Piece->NoteCount < ArrayCount(Piece->Notes))
- { 
-  Note = Piece->Notes + Piece->NoteCount;
-  
-  // TODO(luca): Better way?
-  // NOTE(luca): Sometimes we will add fractions which are not powers of 2, this is to
-  // correct the inaccuracies
-  f32 DecimalPart = ModF32(Piece->RecordLength, 1.f);
-  if(EqualsWithEpsilon(DecimalPart, 1.f, .0001f))
-  {
-   Piece->RecordLength += 1.f - DecimalPart;
-  }
-  
-  Note->Kind = Kind;
-  Note->Pitch = Pitch + MiddleC;
-  Note->Length = Length;
-  Note->Start = Piece->RecordLength;
-  Note->Velocity = 64;
-  
-  Piece->NoteCount += 1;
-  Piece->RecordLength += Length;
- }
- else
- {
-  ErrorLog("Note out of bounds.\n");
- }
- 
- return Note;
-}
-
-internal b32
-PiecePosPassedTimestamp(piece *Piece, f32 Pos, f32 Timestamp)
-{
- b32 Result = false;
- 
- f32 BPS = Piece->BPM/60.f;
- 
- f32 Now = Pos;
- f32 Before = Pos - BPS*(*dtForFrame);
- 
- Result = (Before < Timestamp && Timestamp <= Now);
- 
- return Result;
-}
-
-internal b32
-PieceWasTimestampPlayed(piece *Piece, f32 Timestamp)
-{
- b32 Result = PiecePosPassedTimestamp(Piece, Piece->PlayPos, Timestamp);
- return Result;
-}
-
-internal piece *
-PieceAlloc(app_state *App)
-{
- piece *Result = NilPiece;
- 
- if(App->PieceCount < App->MaxPieceCount)
- { 
-  if(!IsNilPiece(App->NextFreePiece))
-  {
-   Result = App->NextFreePiece;
-   App->NextFreePiece = Result->Next;
-  }
-  else
-  {
-   Result = PushArray(App->PieceArena, piece, 1);
-   
-   // Allocate channel
-   {   
-    Result->Channel = TSFNextChannel(App);
-    tsf_channel_set_presetindex(GlobalTSF, Result->Channel, Result->Preset);
-    tsf_channel_set_volume(GlobalTSF, Result->Channel, .3f);
-   }
-  }
-  
-  // Defaults
-  if(!IsNilPiece(Result))
-  {
-   Result->BPM = 60;
-   Result->TimeSigNum = 2;
-   Result->TimeSigDen = 4;
-   Result->StaffCount = 1;
-   Result->Staffs[0].Octave = 5;
-   
-   // First note is nil
-   Result->NoteCount = 1;
-   Result->PracticeNoteCount = 1;
-   Result->SetNoteLength = 1.f;
-   
-   Result->BarPadding = 16.f;
-   Result->BeatWidth = 64.f;
-   Result->NoteSize = 11.f;
-   Result->StaffLineWidth = 1.f;
-   Result->TailHeight = 24.f;
-  }
-  
-  DLLAppend(Result, App->FirstPiece, App->LastPiece);
-  App->PieceCount += 1;
- }
- else
- {
-  // TODO(luca): Popup?
-  ErrorLog("Max piece count reached.\n");
- }
- 
- return Result;
-}
-
-internal void
-MIDIOutputMutePiecePlayingNotes(app_state *App, piece *Piece)
-{
- if(App->OutputMIDIEnabled)
- {
-  for EachIndex(Idx, Piece->NoteCount)
-  {
-   note *Note = Piece->Notes + Idx;
-   
-   f32 Start = Note->Start;
-   f32 End = Note->Start + Note->Length;
-   
-   b32 NoteIsPlaying = (Start <= Piece->PlayPos && Piece->PlayPos < End);
-   if(NoteIsPlaying)
-   {   
-    midi_message Message = {0};
-    Message.U8[0] = MIDIEventType_NoteOff;
-    Message.U8[1] = Note->Pitch;
-    
-    PlatformMIDISend(App->Out, Message.U32[0]);
-   }
-  }
- }
- 
-}
-
-internal void
-PieceStopPlaying(app_state *App, piece *Piece)
-{
- if(Piece->IsPlaying)
- {
-  Piece->IsPlaying = false;
-  
-  if(!App->OutputSynthDisabled)
-  {   
-   tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
-  }
-  
-  MIDIOutputMutePiecePlayingNotes(App, Piece);
- }
- 
-}
-
-internal void
-PieceDeselectNote(piece *Piece, note_node *Node)
-{
- DLLRemove(Node, Piece->SelectionFirst, Piece->SelectionLast);
- Node->Next = Piece->SelectionFree;
- Piece->SelectionFree = Node;
- Piece->SelectionCount -= 1;
-}
-
-#if 0
-# include "../data/muze/muze_pieces.c"
-#endif
 
 //~ UI 
 internal void
@@ -1364,26 +1156,22 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  
  // Draw notes
  {
-  note *NoteArrays[] = {Piece->Notes, Piece->PracticeNotes};
-  u64 NoteCounts[] = {Piece->NoteCount, Piece->PracticeNoteCount};
+  note *NoteArrays[] = {Piece->FirstNote, Piece->FirstPracticeNote};
   
   for EachElement(ArrayIdx, NoteArrays)
   {
-   note *Notes = NoteArrays[ArrayIdx];
-   u64 NoteCount = NoteCounts[ArrayIdx];
+   note *FirstNote = NoteArrays[ArrayIdx];
    
    s32 LowestPitch = S32Max;
    s32 HighestPitch = S32Min;
-   for(u64 Idx = 1; Idx < NoteCount; Idx += 1)
+   for EachNote(Note, FirstNote)
    {
-    LowestPitch = Min(LowestPitch, Notes[Idx].Pitch);
-    HighestPitch = Max(HighestPitch, Notes[Idx].Pitch);
+    LowestPitch = Min(LowestPitch, Note->Pitch);
+    HighestPitch = Max(HighestPitch, Note->Pitch);
    }
    
-   for(u64 NoteIdx = 1; NoteIdx < NoteCount; NoteIdx += 1)
+   for EachNote(Note, FirstNote)
    {
-    note *Note = Notes + NoteIdx;
-    
     b32 IsHovered = false;
     b32 IsSelected = false;
     
@@ -1417,9 +1205,9 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
     // Selected
     {
-     for EachNode(Node, note_node, Piece->SelectionFirst)
+     for EachNote(Sel, Piece->FirstSel)
      {
-      if(Node->V == Note)
+      if(Sel == Note)
       {
        IsSelected = true;
        break;
@@ -1641,6 +1429,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     
     if(IsHovered && (LeftPressed || RightPressed))
     {
+     u64 NoteIdx = (Note - Piece->Notes_);
      PushCommand(App, (Adding ? 
                        Command_PieceSelectNote :
                        Command_PieceDeselectNote))->U64 = NoteIdx;
@@ -2944,14 +2733,14 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {
                  if(M_IconButton(UI_IconKind_File, S8("Open")))
                  {
-                  M_SerializePiece(FrameArena, true, PieceFilePath, Piece);
+                  MS_SerializePiece(FrameArena, true, PieceFilePath, Piece);
                   Piece->IsRecording = false;
                   PieceStopPlaying(App, Piece);
                  }
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
                  {
-                  M_SerializePiece(FrameArena, false, PieceFilePath, Piece);
+                  MS_SerializePiece(FrameArena, false, PieceFilePath, Piece);
                  }
                  
                  if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
@@ -3020,7 +2809,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 }
                 
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                 if(M_Button(S8("Clear")))
+                 if(M_Button(S8("New")))
                 {
                  PushCommand(App, Command_PieceClear);
                 }
@@ -3330,7 +3119,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                            App->SelectedPanel);
                   
                   M_Labelf("Selection note count: %llu###SelNoteCount",
-                           Piece->SelectionCount);
+                           Piece->SelCount);
                   
                   
                   for EachIndex(Idx, App->DebugStringCount)
@@ -3685,10 +3474,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       // NOTE(luca): Now that recording has stopped MIDI events with NoteOff will be ignored
       // So we manually set their length.
       
-      for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
+      for EachNote(Note, Piece->FirstNote)
       {
-       note *Note = Piece->Notes + NoteIdx;
-       if(Note->Length == 0.f) Note->Length = (Piece->RecordLength - Note->Start);
+       if(Note->Length == 0.f) 
+       {
+        Note->Length = (Piece->RecordLength - Note->Start);
+       }
       }
       
      }
@@ -3742,23 +3533,35 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       Piece->PlayPos = 0.f;
      }
      
-     Piece->PracticeNoteCount = 1;
-     Piece->PracticePos = Piece->PracticeStart;
+     // Free all practice notes
+     for EachNodeSafe(Note, note, Piece->FirstPracticeNote)
+     {
+      DLLRemoveNil(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote, NilNote);
+      PieceNoteRelease(Piece, Note);
+     }
+     
     } break;
     
     case Command_PieceClear:
     {
      PieceStopPlaying(App, Piece);
      Piece->IsRecording = false;
-     Piece->NoteCount = 1;
-     Piece->PracticeNoteCount = 0;
      Piece->RecordLength = 0.f;
      Piece->PlayPos = 0.f;
      Piece->PracticePos = 0.f;
      Piece->PracticeEnd = 0.f;
      Piece->PracticeStart = 0.f;
-     Piece->SelectionFirst = 0;
-     Piece->SelectionLast = 0;
+     
+     Piece->NoteCount_ = 0;
+     Piece->SelCount = 0;
+     Piece->NextNoteIdx = 0;
+     Piece->FreeNote = NilNote;
+     Piece->FirstNote = NilNote;
+     Piece->LastNote = NilNote;
+     Piece->FirstSel = NilNote;
+     Piece->LastSel = NilNote;
+     Piece->FirstPracticeNote = NilNote;
+     Piece->LastPracticeNote = NilNote;
     } break;
     
     case Command_PieceToggleMetronome:
@@ -3781,7 +3584,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceTogglePracticing:
     {
-     Piece->PracticeNoteCount = 1;
+     // Free all practice notes
+     for EachNodeSafe(Note, note, Piece->FirstPracticeNote)
+     {
+      DLLRemoveNil(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote, NilNote);
+      PieceNoteRelease(Piece, Note);
+     }
+     
      if(Piece->IsPracticing)
      {
       Piece->IsPracticing = false;
@@ -3824,7 +3633,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceDeselectAllNotes:
     {
-     for EachNodeSafe(Node, note_node, Piece->SelectionFirst)
+     for EachNodeSafe(Node, note, Piece->FirstSel)
      {
       PieceDeselectNote(Piece, Node);
      }
@@ -3833,22 +3642,22 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceDeselectNote:
     {
      u64 NoteIdx = Command->U64;
-     note *Note = Piece->Notes + NoteIdx;
+     note *Note = Piece->Notes_ + NoteIdx;
      
-     note_node *Selected = 0;
+     note *Selected = NilNote;
      // Selected
      {
-      for EachNode(Node, note_node, Piece->SelectionFirst)
+      for EachNode(Sel, note, Piece->FirstSel)
       {
-       if(Node->V == Note)
+       if(Sel == Note)
        {
-        Selected = Node;
+        Selected = Sel;
         break;
        }
       }
      }
      
-     if(Selected) 
+     if(!IsNilNote(Selected)) 
      {
       PieceDeselectNote(Piece, Selected);
      }
@@ -3858,86 +3667,45 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceSelectNote:
     {
      u64 NoteIdx = Command->U64;
-     note *Note = Piece->Notes + NoteIdx;
+     note *Note = Piece->Notes_ + NoteIdx;
      
-     note_node *Selected = 0;
+     note *Selected = NilNote;
      // Selected
      {
-      for EachNode(Node, note_node, Piece->SelectionFirst)
+      for EachNode(Sel, note, Piece->FirstSel)
       {
-       if(Node->V == Note)
+       if(Sel == Note)
        {
-        Selected = Node;
+        Selected = Sel;
         break;
        }
       }
      }
      
-     if(!Selected)
+     if(IsNilNote(Selected))
      {
-      note_node *Node = 0;
-      if(Piece->SelectionFree)
-      {
-       // Take from free list
-       Node = Piece->SelectionFree;
-       Piece->SelectionFree = Piece->SelectionFree->Next;
-      }
-      else
-      {
-       Node = Piece->Selection + Piece->SelectionNextIdx;
-       Piece->SelectionNextIdx += 1;
-      }
-      MemoryZero(Node);
-      
-      Node->V = Note;
-      DLLAppend(Node, Piece->SelectionFirst, Piece->SelectionLast);
-      Piece->SelectionCount += 1;
+      Selected = PieceNoteAlloc(Piece);
+      DLLAppendNil(Selected, Piece->FirstSel, Piece->LastSel, NilNote);
+      Piece->SelCount += 1;
      }
      
     } break;
     
     case Command_PieceDeleteNote:
     {
-     
      // Sort notes by idx in array.
      
-     for EachNodeBack(Node, note_node, Piece->SelectionLast)
-     {
-      for(note_node *Compare = Piece->SelectionFirst; 
-          Compare != Node; 
-          Compare = Compare->Next)
-      {
-       if(Compare->V > Compare->Next->V)
-       {
-        Swap(Compare->V, Compare->Next->V);
-       }
-      }
-     }
-     
      // NOTE(luca): Iterate backwards so that MemoryCopy works
-     for EachNodeBackSafe(Node, note_node, Piece->SelectionLast)
+     for EachNodeBackSafe(Note, note, Piece->FirstSel)
      {
-      note *Note = Node->V;
-      
       if(Note->Kind == NoteKind_Note)
       {
        Note->Kind = NoteKind_Rest;
       }
       else if(Note->Kind == NoteKind_Rest)
       {     
-#if 0
-       if(Piece->NoteCount)
-       {
-        // PieceDeselectNote(Piece, Node);
-        
-        u64 NoteIdx = (Note - Piece->Notes); 
-        MemoryCopy(Note, 
-                   Note + 1,
-                   (Piece->NoteCount - (NoteIdx + 1))*sizeof(note));
-        Piece->NoteCount -= 1;
-       }
-#endif
-       NotImplemented();
+       PieceNoteRelease(Piece, Note);
+       DLLRemoveNil(Note, Piece->FirstSel, Piece->LastSel, NilNote);
       }
       
      }
@@ -3946,9 +3714,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
     case Command_PieceSetNoteLength:
     {
-     for EachNode(Node, note_node, Piece->SelectionFirst)
+     for EachNote(Note, Piece->FirstSel)
      {
-      Node->V->Length = (Piece->TimeSigDen/Piece->SetNoteLength);
+      Note->Length = (Piece->TimeSigDen/Piece->SetNoteLength);
      }
     } break;
     
@@ -3982,10 +3750,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      f32 MinStart = Piece->RecordLength;
      f32 MaxEnd = 0.f;
      
-     for EachNode(Node, note_node, Piece->SelectionFirst)
+     for EachNote(Note, Piece->FirstSel)
      {
-      note *Note = Node->V;
-      
       f32 Start = Note->Start;
       f32 End = Note->Start + Note->Length;
       MinStart = Min(MinStart, Start);
@@ -4021,9 +3787,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       Input->MIDI.EventCount += 1;
       
       midi_message Message = {0};
-      Message.Type = MIDIEventType_NoteOn;
-      Message.Pitch = Pitch; 
-      Message.Velocity = 64;
+      Message.Note.Type = MIDIEventType_NoteOn;
+      Message.Note.Pitch = Pitch; 
+      Message.Note.Velocity = 64;
       
       Event->Message = Message.U32[0];
      }
@@ -4037,8 +3803,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       Input->MIDI.EventCount += 1;
       
       midi_message Message = {0};
-      Message.Type = MIDIEventType_NoteOff;
-      Message.Pitch = Pitch;
+      Message.Note.Type = MIDIEventType_NoteOff;
+      Message.Note.Pitch = Pitch;
       
       Event->Message = Message.U32[0];
      }
@@ -4085,10 +3851,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    {
     // Play notes
     {
-     for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
+     for EachNote(Note, Piece->FirstNote)
      {
-      note *Note = Piece->Notes + Idx;
-      
       if(Note->Kind == NoteKind_Note)
       {
        // Piece notes
@@ -4117,9 +3881,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
          if(NoteWasPlayed)
          {
           midi_message Message = {0};
-          Message.Type = MIDIEventType_NoteOn;
-          Message.Pitch = (u8)Note->Pitch;
-          Message.Velocity = Note->Velocity;
+          Message.Note.Type = MIDIEventType_NoteOn;
+          Message.Note.Pitch = (u8)Note->Pitch;
+          Message.Note.Velocity = Note->Velocity;
           
           PlatformMIDISend(App->Out, Message.U32[0]);
          }
@@ -4127,8 +3891,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
          if(NoteHasEnded)
          {
           midi_message Message = {0};
-          Message.Type = MIDIEventType_NoteOff;
-          Message.Pitch = Note->Pitch;
+          Message.Note.Type = MIDIEventType_NoteOff;
+          Message.Note.Pitch = Note->Pitch;
           
           PlatformMIDISend(App->Out, Message.U32[0]);
          }
@@ -4180,20 +3944,15 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      u8 Channel = Status & 0x0F;
      
      if(0) {}
-     else if(Type == MIDIEventType_NoteOn && Message.Velocity > 0)
+     else if(Type == MIDIEventType_NoteOn && Message.Note.Velocity > 0)
      {
-      if(Piece->NoteCount < ArrayCount(Piece->Notes))
-      { 
-       note *Note = Piece->Notes + Piece->NoteCount;
-       MemoryZero(Note);
-       
-       u8 Pitch = Message.Pitch;
-       u8 Velocity = Message.Velocity;
-       
+      note *Note = PieceNoteAlloc(Piece);
+      if(!IsNilNote(Note))
+      {
        Note->Kind = NoteKind_Note;
-       Note->Pitch = Pitch;
+       Note->Pitch = Message.Note.Pitch;
        Note->Start = Piece->RecordLength;
-       Note->Velocity = Message.Velocity;
+       Note->Velocity = Message.Note.Velocity;
        
        s32 MinPitch = Piece->Staffs[0].Octave*Note_Count;
        if(Note->Pitch < MinPitch)
@@ -4201,19 +3960,18 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
         Note->StaffIdx = 1;
        }
        
-       TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Velocity);
+       TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Note->Velocity);
        
-       Piece->NoteCount += 1;
+       Piece->NoteCount_ += 1;
       }
      }
      else if(Type == MIDIEventType_NoteOff ||
-             (Type == MIDIEventType_NoteOn && Message.Velocity == 0))
+             (Type == MIDIEventType_NoteOn && Message.Note.Velocity == 0))
      {
       // Find first note with same pitch and set its length.
-      for(u64 NoteIdx = 1; NoteIdx < Piece->NoteCount; NoteIdx += 1)
+      for EachNote(Note, Piece->FirstNote)
       {
-       note *Note = Piece->Notes + NoteIdx;
-       u8 Pitch = Message.Pitch;
+       u8 Pitch = Message.Note.Pitch;
        
        tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
        
@@ -4222,6 +3980,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
           Note->Pitch == Pitch)
        {
         Note->Length = Piece->RecordLength - Note->Start;
+        break; // Don't do other notes.
        }
       }
      }
@@ -4233,15 +3992,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    if(Piece->IsPracticing)
    {    
     u64 NotesToPlayCount = 0;
-    note **NotesToPlay = PushArray(FrameArena, note *, Piece->NoteCount);
+    note **NotesToPlay = PushArray(FrameArena, note *, Piece->NoteCount_);
     note *FirstNoteToPlay = NilNote;
     
     // Find all notes that have to be played at PracticePos
     {
-     for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
+     for EachNote(Note, Piece->FirstNote)
      {
-      note *Note = Piece->Notes + Idx;
-      
       if(Note->Kind == NoteKind_Note &&
          Piece->PracticePos <= Note->Start)
       {
@@ -4250,11 +4007,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
      }
      
+     // Find other notes that start at the same time
      if(!IsNilNote(FirstNoteToPlay))
      {
-      for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
+      for EachNote(Note, Piece->FirstNote)
       {
-       note *Note = Piece->Notes + Idx;
        if(FirstNoteToPlay->Start == Note->Start)
        {
         NotesToPlay[NotesToPlayCount] = Note;
@@ -4284,11 +4041,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      if(0) {}
      else if(Type == MIDIEventType_NoteOn && Data2 > 0)
      {
-      if(Piece->PracticeNoteCount < ArrayCount(Piece->PracticeNotes))
+      note *Note = PieceNoteAlloc(Piece);
+      
+      if(!IsNilNote(Note))
       { 
-       note *Note = Piece->PracticeNotes + Piece->PracticeNoteCount;
-       u8 Pitch = Data1;
-       u8 Velocity = Data2;
+       u8 Pitch = Message.Note.Pitch;
+       u8 Velocity = Message.Note.Velocity;
        
        TSFPlayNoteU8(App, Piece->Channel, Pitch,  Velocity);
        
@@ -4304,21 +4062,19 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
 #endif
        Note->Hidden = false;
        
-       Piece->PracticeNoteCount += 1;
+       DLLAppendNil(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote, NilNote);
       }
      }
      else if(Type == MIDIEventType_NoteOff ||
              (Type == MIDIEventType_NoteOn && Data2 == 0))
      {
-      u8 Pitch = Data1;
+      u8 Pitch = Message.Note.Pitch;
       
       tsf_channel_note_off(GlobalTSF, Piece->Channel, Pitch);
       
       // Find first note with same pitch and set its length.
-      for(u64 NoteIdx = 1; NoteIdx < Piece->PracticeNoteCount; NoteIdx += 1)
+      for EachNote(Note, Piece->FirstPracticeNote)
       {
-       note *Note = Piece->PracticeNotes + NoteIdx;
-       
        if(Note->Pitch == Pitch)
        {
         Note->Hidden = true;
@@ -4340,10 +4096,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       
       if(NoteToPlay->Kind == NoteKind_Note)
       {   
-       for(u64 Idx = 1; Idx < Piece->PracticeNoteCount; Idx += 1)
+       for EachNote(Note, Piece->FirstPracticeNote)
        {
-        note *Note = Piece->PracticeNotes + Idx;
-        
         if(!Note->Hidden && 
            Note->Start >= Piece->PracticePos && 
            Note->Pitch == NoteToPlay->Pitch)
@@ -4392,13 +4146,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     if(Piece->PracticePos >= Piece->PracticeEnd) 
     {
      Piece->PracticePos = Piece->PracticeStart;
-     Piece->PracticeNoteCount = 1;
+     
+     // Free all practice notes
+     for EachNote(Note, Piece->FirstPracticeNote)
+     {
+      PieceNoteRelease(Piece, Note);
+     }
+     Piece->FirstPracticeNote = NilNote;
+     Piece->LastPracticeNote = NilNote;
+     
     }
-   }
-   
-   if(!IsNilPiece(Piece))
-   {
-    Piece->Notes[0] = Nil(note);
    }
   }
  }

@@ -5,8 +5,9 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
  
  if(Serializer->At < Serializer->Buffer.Size)
  { 
-  if(Serializer->IsReading) MemoryCopy(Value, Dest, Size);
-  else                      MemoryCopy(Dest, Value, Size);
+  if(0) {}
+  else if(Serializer->Mode & MS_Reading) MemoryCopy(Value, Dest, Size);
+  else if(Serializer->Mode & MS_Writing) MemoryCopy(Dest, Value, Size);
   
   Assert(Serializer->At + Size <= Serializer->Buffer.Size);
   Serializer->At += Size;
@@ -27,7 +28,7 @@ MS_Staff(ms_serializer *Serializer, staff *Staff)
 }
 
 internal void
-MS_PieceNote(ms_serializer *Serializer, note *Note)
+MS_Note(ms_serializer *Serializer, note *Note)
 {
  MS_Add(MSV_Initial, &Note->Kind);
  MS_Add(MSV_Initial, &Note->Start);
@@ -79,39 +80,28 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  }
  
  MS_Add(MSV_Initial, &Piece->RecordLength);
- MS_Add(MSV_Initial, &Piece->NoteCount);
+ MS_Add(MSV_Initial, &Piece->NoteCount_);
  
- if(MS_After(MSV_Initial))
- {
-  for EachIndex(Idx, Piece->NoteCount)
+ // Notes
+ { 
+  u64 Count = 0;
+  for EachIndex(Idx, Piece->NoteCount_)
   {
-   MS_PieceNote(Serializer, (Piece->Notes + Idx)); 
+   note *Note = PieceNoteAlloc(Piece);
+   MS_Note(Serializer, Note); 
+   DLLAppendNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
+   Count += 1;
   }
+  
+  Assert(Count == Piece->NoteCount_);
  }
  
+ // Increase for PieceNoteKind_None
  if(MS_Before(MSV_PieceNoteKindAddAndZerothNote))
- {
-  if(Piece->NoteCount == ArrayCount(Piece->Notes))
+ {  
+  for EachNote(Note, Piece->FirstNote)
   {
-   // Bummer, we have to crop.
-   Log("Error: Since piece has max note amount, last note cropped.\n");
-  }
-  
-  // Move notes and make nil note
-  {
-   if(Piece->NoteCount)
-   {   
-    MemoryCopy(Piece->Notes + 1, Piece->Notes, sizeof(note)*(Piece->NoteCount - 1));
-   }
-   Piece->Notes[0] = Nil(note);
-  }
-  
-  // Increase for PieceNoteKind_None
-  {  
-   for(u64 Idx = 1; Idx < Piece->NoteCount; Idx += 1)
-   {
-    Piece->Notes[Idx].Kind += 1;
-   }
+   Note->Kind += 1;
   }
  }
  
@@ -124,14 +114,14 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
 }
 
 internal void
-M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
+MS_SerializePiece(arena *Arena, ms_mode Mode, str8 Path, piece *Piece)
 {
  ms_serializer Serializer = {0};
- Serializer.IsReading = Read;
+ Serializer.Mode = Mode;
  
  char *FilePath = PathFromExe(Path);
  
- if(Serializer.IsReading)
+ if(Serializer.Mode == MS_Reading)
  {
   Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
   if(Serializer.Buffer.Size)
@@ -150,7 +140,7 @@ M_SerializePiece(arena *Arena, b32 Read, str8 Path, piece *Piece)
    OS_FreeFileMemory(Serializer.Buffer);
   }
  }
- else
+ else if(Serializer.Mode == MS_Writing)
  {
   S8OverPush(Arena, Serializer.Buffer, KB(64), Serializer.At)
   {   
@@ -178,16 +168,17 @@ MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
  b32 Result = !Read;
  ms_serializer Serializer = {0};
  
- Serializer.IsReading = Read;
+ //- Begin 
  
  char *FilePath = PathFromExe(Path);
  
- if(Serializer.IsReading)
+ if(0) {}
+ else if(Serializer.Mode == MS_Reading)
  {
   Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
   if(Serializer.Buffer.Size) Result = true;
  }
- else
+ else if(Serializer.Mode == MS_Writing)
  {
   Serializer.Buffer = PushS8(Arena, KB(64));
  }
@@ -195,25 +186,30 @@ MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
  Serializer.Version = MSV_Latest;
  MS_Ser(&Serializer, &Serializer.Version);
  
- if(Serializer.Version <= MSV_Latest)
+ if(Serializer.Version > MSV_Latest)
  {
-  MS_Config(&Serializer, App);
- }
- else
- {
-  DebugBreak();
   ErrorLog("Cannot read file from the future.\n");
+  Serializer.At = Serializer.Buffer.Size;
  }
  
- if(Serializer.IsReading)
+ //- Data 
+ 
+ MS_Config(&Serializer, App);
+ 
+ //- End 
+ 
+ if(0) {}
+ else if(Serializer.Mode == MS_Reading)
  {
   OS_FreeFileMemory(Serializer.Buffer);
  }
- else
+ else if(Serializer.Mode == MS_Writing)
  {
   str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
   OS_WriteEntireFile(FilePath, Out);
  }
+ 
+ //- 
  
  return Result;
 }

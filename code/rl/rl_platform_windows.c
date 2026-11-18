@@ -487,7 +487,7 @@ P_INIT()
   if(RegisterClassA(&WindowClass))
   {
    RECT WindowRect = { 0, 0, Buffer->Dim.X, Buffer->Dim.Y };
-   DWORD Style = (WS_VISIBLE |  
+   DWORD Style = (//WS_VISIBLE   
                   WS_OVERLAPPED |
                   WS_CAPTION |     // window title bar
 #if RL_PLATFORM_WIN32_DO_RESIZING
@@ -590,6 +590,13 @@ P_UPDATE_IMAGE()
  win32_context *Win32 = (win32_context *)Context; 
  if(Win32)
  {
+  local_persist b32 FirstTime = true;
+  if(FirstTime)
+  {   
+   ShowWindow(Win32->Window, SW_SHOWMAXIMIZED);
+   FirstTime = false;
+  }
+  
 #if RL_PLATFORM_FORCE_SOFTWARE_RENDERING
   StretchDIBits(Win32->OwnDC,
                 0, 0, Buffer->Dim.X, Buffer->Dim.Y,

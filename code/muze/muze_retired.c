@@ -1647,3 +1647,39 @@ VoiceUIs()
   }
  }
 }
+//~ Muze - Piece
+internal note *
+PieceCodeNoteAdd(piece *Piece, 
+                 note_kind Kind, u8 Pitch, f32 Length)
+{
+ note *Note = PieceNoteAlloc;
+ 
+ if(Piece->NoteCount < ArrayCount(Piece->Notes))
+ { 
+  Note = Piece->Notes + Piece->NoteCount;
+  
+  // TODO(luca): Better way?
+  // NOTE(luca): Sometimes we will add fractions which are not powers of 2, this is to
+  // correct the inaccuracies
+  f32 DecimalPart = ModF32(Piece->RecordLength, 1.f);
+  if(EqualsWithEpsilon(DecimalPart, 1.f, .0001f))
+  {
+   Piece->RecordLength += 1.f - DecimalPart;
+  }
+  
+  Note->Kind = Kind;
+  Note->Pitch = Pitch + MiddleC;
+  Note->Length = Length;
+  Note->Start = Piece->RecordLength;
+  Note->Velocity = 64;
+  
+  Piece->NoteCount += 1;
+  Piece->RecordLength += Length;
+ }
+ else
+ {
+  ErrorLog("Note out of bounds.\n");
+ }
+ 
+ return Note;
+}

@@ -14,7 +14,7 @@ union midi_message
   u8 Pitch;
   u8 Velocity;
   u8 Nothing;
- };
+ } Note;
 };
 
 typedef enum midi_event_type midi_event_type;

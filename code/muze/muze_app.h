@@ -17,6 +17,9 @@ enum note_kind
 typedef struct note note;
 struct note
 {
+ note *Next;
+ note *Prev;
+ 
  note_kind Kind;
  f32 Start;
  f32 Length;
@@ -45,14 +48,6 @@ struct staff
  clef_kind ClefKind;
 };
 
-typedef struct note_node note_node;
-struct note_node
-{
- note *V;
- note_node *Next;
- note_node *Prev;
-};
-
 typedef struct piece piece; 
 struct piece 
 {
@@ -71,15 +66,17 @@ struct piece
  s32 StaffCount;
  staff Staffs[128];
  
- u64 NoteCount;
- note Notes[KB(1)];
- 
- u64 SelectionCount;
- u64 SelectionNextIdx;
- note_node Selection[KB(1)];
- note_node *SelectionFirst;
- note_node *SelectionLast;
- note_node *SelectionFree;
+ u64 NoteCount_;
+ u64 SelCount;
+ u64 NextNoteIdx;
+ note Notes_[KB(1)];
+ note *FreeNote;
+ note *FirstNote;
+ note *LastNote;
+ note *FirstSel;
+ note *LastSel;
+ note *FirstPracticeNote;
+ note *LastPracticeNote;
  
  b32 IsRecording;
  f32 RecordLength;
@@ -92,8 +89,6 @@ struct piece
  f32 PracticeEnd;
  f32 PracticePos;
  b32 PracticeStrictTiming;
- u64 PracticeNoteCount;
- note PracticeNotes[KB(1)];
  
  f32 MetronomeTime;
  b32 Metronome;
@@ -332,6 +327,19 @@ struct custom_draw__single_line_text_input_params
 //~ Globals
 #define DefaultHeightPx 20
 
-#define MiddleC 5*Note_Count
+#define MiddleC (5*Note_Count)
+
+global_variable panel *NilPanel;
+global_variable note *NilNote;
+global_variable piece *NilPiece;
+
+global_variable f32 *dtForFrame;
+
+//~ Macros
+#define EachNote(Node, First) EachNode(Node, note, First)
+
+#define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
+#define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
+#define IsNilNote(Note) CheckNil(Note, NilNote)
 
 #endif //MUZE_APP_H

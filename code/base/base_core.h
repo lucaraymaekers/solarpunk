@@ -322,8 +322,8 @@ Last = Idx)
 #define DLLRemoveNil(Node, First, Last, Nil) \
 ((!CheckNil(Node->Prev, Nil) ? Node->Prev->Next = Node->Next : 0), \
 (!CheckNil(Node->Next, Nil) ? Node->Next->Prev = Node->Prev : 0), \
-((Node == First) ? First = Node->Next : 0), \
-((Node == Last) ? Last = Node->Prev : 0))
+((Node == First) ? First = Node->Next : (First = Nil)), \
+((Node == Last) ? Last = Node->Prev : (Last = Nil)))
 
 #define DLLRemove(Node, First, Last) DLLRemoveNil(Node, First, Last, 0)
 

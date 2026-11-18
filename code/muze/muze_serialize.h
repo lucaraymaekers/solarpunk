@@ -4,14 +4,23 @@
 #define MUZE_SERIALIZE_H
 
 //~ Serialization
+enum ms_mode
+{
+ MS_Reading,
+ MS_Writing,
+ MS_GenStructures
+};
+typedef enum ms_mode ms_mode;
+
 typedef struct ms_serializer ms_serializer;
 struct ms_serializer
 {
+ ms_mode Mode;
+ 
+ u64 Version;
+ 
  u64 At;
  str8 Buffer;
- 
- b32 IsReading;
- u64 Version;
 };
 
 enum ms_version
@@ -22,6 +31,7 @@ enum ms_version
  MSV_PieceMultiStaff,
  MSV_StaffClefKind,
  MSV_PieceNoteVelocity,
+ MSV_PieceDLL,
  MSV_Count,
 };
 typedef enum ms_serializer_version ms_serializer_version;

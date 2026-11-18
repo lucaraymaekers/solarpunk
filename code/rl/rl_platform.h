@@ -3,10 +3,6 @@
 #if !defined(PLATFORM_H)
 #define PLATFORM_H
 
-//~ Globals
-global_variable str8 ExeDirPath = {0};
-global_variable arena *FrameArena = 0;
-
 //~ Types
 typedef u64 P_context;
 
@@ -322,6 +318,14 @@ struct app_code
  b32 Loaded;
  s64 LastWriteTime;
 };
+
+//~ Globals
+global_variable str8 ExeDirPath = {0};
+global_variable arena *FrameArena = 0;
+
+global_variable platform_midi_get_devices	*PlatformMIDIGetDevices;
+global_variable platform_midi_send	*PlatformMIDISend;
+global_variable platform_midi_listen	*PlatformMIDIListen;
 
 //~ Platform API
 // NOTE(luca): These are all the function a platform layer needs to implement.
