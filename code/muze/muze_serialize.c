@@ -169,14 +169,27 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  MS_Add(MSV_Initial, &Piece->NoteCount);
  
  // Notes
- { 
+ {
   u64 Count = 0;
-  for EachIndex(Idx, Piece->NoteCount)
+  if(0) {}
+  else if(Serializer->Mode == MS_Reading)
   {
-   note *Note = PieceNoteAlloc(Piece);
-   MS_Note(Serializer, Note); 
-   DLLAppendNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
-   Count += 1;
+   for EachIndex(Idx, Piece->NoteCount)
+   {
+    note *Note = PieceNoteAlloc(Piece);
+    MS_Note(Serializer, Note); 
+    DLLAppendNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
+    Count += 1;
+   }
+   
+  }
+  else if(Serializer->Mode == MS_Writing)
+  {
+   for EachNote(Note, Piece->FirstNote)
+   {
+    MS_Note(Serializer, Note); 
+    Count += 1;
+   }
   }
   
   Assert(Count == Piece->NoteCount);
