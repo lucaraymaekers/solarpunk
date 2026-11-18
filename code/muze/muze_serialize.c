@@ -1,3 +1,51 @@
+//-
+// Serializing code
+//-
+
+//~ API
+internal ms_serializer 
+MS_SerializeBegin(arena *Arena, str8 Path, ms_mode Mode)
+{
+ ms_serializer Serializer = {0};
+ 
+ Serializer.FilePath = PathFromExe(Path);
+ 
+ if(0) {}
+ else if(Serializer.Mode == MS_Reading)
+ {
+  Serializer.Buffer = OS_ReadEntireFileIntoMemory(Serializer.FilePath);
+ }
+ else if(Serializer.Mode == MS_Writing)
+ {
+  Serializer.Buffer = PushS8(Arena, KB(64));
+ }
+ 
+ Serializer.Version = MSV_Latest;
+ MS_Ser(&Serializer, &Serializer.Version);
+ 
+ if(Serializer.Version > MSV_Latest)
+ {
+  ErrorLog("Cannot read file from the future.\n");
+  Serializer.At = Serializer.Buffer.Size;
+ }
+ 
+ return Serializer;
+}
+
+internal void 
+MS_SerializeEnd(ms_serializer *Serializer)
+{
+ if(0) {}
+ else if(Serializer->Mode == MS_Reading)
+ {
+  OS_FreeFileMemory(Serializer->Buffer);
+ }
+ else if(Serializer->Mode == MS_Writing)
+ {
+  str8 Out = {.Data = Serializer->Buffer.Data, .Size = Serializer->At};
+  OS_WriteEntireFile(Serializer->FilePath, Out);
+ }
+}
 internal void
 MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
 {
@@ -6,8 +54,8 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
  if(Serializer->At < Serializer->Buffer.Size)
  { 
   if(0) {}
-  else if(Serializer->Mode & MS_Reading) MemoryCopy(Value, Dest, Size);
-  else if(Serializer->Mode & MS_Writing) MemoryCopy(Dest, Value, Size);
+  else if(Serializer->Mode == MS_Reading) MemoryCopy(Value, Dest, Size);
+  else if(Serializer->Mode == MS_Writing) MemoryCopy(Dest, Value, Size);
   
   Assert(Serializer->At + Size <= Serializer->Buffer.Size);
   Serializer->At += Size;
@@ -18,6 +66,7 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
  }
 }
 
+//~ Types
 internal void
 MS_Staff(ms_serializer *Serializer, staff *Staff)
 {
@@ -31,6 +80,11 @@ internal void
 MS_Note(ms_serializer *Serializer, note *Note)
 {
  MS_Add(MSV_Initial, &Note->Kind);
+ if(MS_Before(MSV_PieceNoteKindAddAndZerothNote))
+ {  
+  Note->Kind += 1;
+ }
+ 
  MS_Add(MSV_Initial, &Note->Start);
  MS_Add(MSV_Initial, &Note->Length);
  
@@ -96,15 +150,6 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
   Assert(Count == Piece->NoteCount);
  }
  
- // Increase for PieceNoteKind_None
- if(MS_Before(MSV_PieceNoteKindAddAndZerothNote))
- {  
-  for EachNote(Note, Piece->FirstNote)
-  {
-   Note->Kind += 1;
-  }
- }
- 
  MS_Add(MSV_Initial, &Piece->BarWrapping);
  
  if(MS_Before(MSV_PieceMultiStaff))
@@ -113,103 +158,9 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  }
 }
 
-internal void
-MS_SerializePiece(arena *Arena, ms_mode Mode, str8 Path, piece *Piece)
-{
- ms_serializer Serializer = {0};
- Serializer.Mode = Mode;
- 
- char *FilePath = PathFromExe(Path);
- 
- if(Serializer.Mode == MS_Reading)
- {
-  Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
-  if(Serializer.Buffer.Size)
-  {               
-   MS_Ser(&Serializer, &Serializer.Version);
-   if(Serializer.Version <= MSV_Latest)
-   {
-    MS_Piece(&Serializer, Piece);
-   }
-   else
-   {
-    DebugBreak();
-    ErrorLog("Cannot read file from the future.\n");
-   }
-   
-   OS_FreeFileMemory(Serializer.Buffer);
-  }
- }
- else if(Serializer.Mode == MS_Writing)
- {
-  S8OverPush(Arena, Serializer.Buffer, KB(64), Serializer.At)
-  {   
-   Serializer.Version = MSV_Latest;
-   
-   MS_Ser(&Serializer, &Serializer.Version);
-   MS_Piece(&Serializer, Piece);
-   
-   str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
-   OS_WriteEntireFile(FilePath, Out);
-  }
- }
-}
-
 internal void 
 MS_Config(ms_serializer *Serializer, app_state *App)
 {
  MS_Ser(Serializer, &App->In);
  MS_Ser(Serializer, &App->Out);
-}
-
-internal b32
-MS_SerializeConfig(arena *Arena, b32 Read, str8 Path, app_state *App)
-{
- b32 Result = !Read;
- ms_serializer Serializer = {0};
- 
- //- Begin 
- 
- char *FilePath = PathFromExe(Path);
- 
- if(0) {}
- else if(Serializer.Mode == MS_Reading)
- {
-  Serializer.Buffer = OS_ReadEntireFileIntoMemory(FilePath);
-  if(Serializer.Buffer.Size) Result = true;
- }
- else if(Serializer.Mode == MS_Writing)
- {
-  Serializer.Buffer = PushS8(Arena, KB(64));
- }
- 
- Serializer.Version = MSV_Latest;
- MS_Ser(&Serializer, &Serializer.Version);
- 
- if(Serializer.Version > MSV_Latest)
- {
-  ErrorLog("Cannot read file from the future.\n");
-  Serializer.At = Serializer.Buffer.Size;
- }
- 
- //- Data 
- 
- MS_Config(&Serializer, App);
- 
- //- End 
- 
- if(0) {}
- else if(Serializer.Mode == MS_Reading)
- {
-  OS_FreeFileMemory(Serializer.Buffer);
- }
- else if(Serializer.Mode == MS_Writing)
- {
-  str8 Out = {.Data = Serializer.Buffer.Data, .Size = Serializer.At};
-  OS_WriteEntireFile(FilePath, Out);
- }
- 
- //- 
- 
- return Result;
 }

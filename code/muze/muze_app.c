@@ -1739,7 +1739,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
    }
   }
   
-  MS_SerializeConfig(FrameArena, true, ConfigPath, App);
+  MS_Serialize(Serializer, FrameArena, MS_Reading, ConfigPath)
+  {
+   MS_Config(&Serializer, App);
+  }
   
   // MIDI: Select default input and output device, select's last device by default
   {
@@ -2739,14 +2742,15 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {
                  if(M_IconButton(UI_IconKind_File, S8("Open")))
                  {
-                  MS_SerializePiece(FrameArena, true, PieceFilePath, Piece);
-                  Piece->IsRecording = false;
-                  PieceStopPlaying(App, Piece);
+                  MS_Serialize(Serializer, FrameArena, MS_Reading, PieceFilePath)
+                   MS_Piece(&Serializer, Piece);
+                  PushCommand(App, Command_PieceStop);
                  }
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
                  {
-                  MS_SerializePiece(FrameArena, false, PieceFilePath, Piece);
+                  MS_Serialize(Serializer, FrameArena, MS_Writing, PieceFilePath)
+                   MS_Piece(&Serializer, Piece);
                  }
                  
                  if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
@@ -3713,20 +3717,20 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     {
      // Sort notes by idx in array.
      
-     for EachNodeBackSafe(Node, note_node, Piece->FirstSel)
+     for EachNodeSafe(Node, note_node, Piece->FirstSel)
      {
-      if(Node->V->Kind == NoteKind_Note)
+      note *Note = Node->V;
+      if(Note->Kind == NoteKind_Note)
       {
        Node->V->Kind = NoteKind_Rest;
       }
-      else if(Node->V->Kind == NoteKind_Rest)
+      else if(Note->Kind == NoteKind_Rest)
       {     
+       DLLRemoveNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
        PieceNoteRelease(Piece, Node->V);
        DLLRemove(Node, Piece->FirstSel, Piece->LastSel);
       }
-      
      }
-     
     } break;
     
     case Command_PieceSetNoteLength:
@@ -4180,7 +4184,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
  
  // Save config
  {
-  MS_SerializeConfig(FrameArena, false, ConfigPath, App);
+  MS_Serialize(Serializer, FrameArena, MS_Writing, ConfigPath)
+   MS_Config(&Serializer, App);
  }
  
  //- Rendering 

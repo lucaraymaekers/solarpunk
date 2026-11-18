@@ -21,6 +21,8 @@ struct ms_serializer
  
  u64 At;
  str8 Buffer;
+ 
+ char *FilePath;
 };
 
 enum ms_version
@@ -57,5 +59,10 @@ MS_Before(VersionRemoved)) \
 MS_Ser(Serializer, &Dummy); \
 } \
 } while(0)
+
+#define MS_Serialize(Serializer, Arena, Mode, Path) \
+for(ms_serializer Serializer = MS_SerializeBegin(Arena, Path, Mode), *_Counter = 0; \
+_Counter == 0; \
+MS_SerializeEnd(&Serializer), _Counter += 1)
 
 #endif //MUZE_SERIALIZE_H
