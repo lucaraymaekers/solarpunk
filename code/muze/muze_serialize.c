@@ -80,12 +80,12 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  }
  
  MS_Add(MSV_Initial, &Piece->RecordLength);
- MS_Add(MSV_Initial, &Piece->NoteCount_);
+ MS_Add(MSV_Initial, &Piece->NoteCount);
  
  // Notes
  { 
   u64 Count = 0;
-  for EachIndex(Idx, Piece->NoteCount_)
+  for EachIndex(Idx, Piece->NoteCount)
   {
    note *Note = PieceNoteAlloc(Piece);
    MS_Note(Serializer, Note); 
@@ -93,7 +93,7 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
    Count += 1;
   }
   
-  Assert(Count == Piece->NoteCount_);
+  Assert(Count == Piece->NoteCount);
  }
  
  // Increase for PieceNoteKind_None

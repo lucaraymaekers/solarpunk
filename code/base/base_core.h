@@ -280,7 +280,10 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 #define EachIndex(Index, Count)           EachIndexType(TypeOf((Count)), Index, Count)
 #define EachElement(Index, Array)         EachIndexType(umm, Index, ArrayCount(Array))
 #define EachInRange(Index, Range)         (TypeOf((Range).Min) Index = (Range).Min; Index < (Range).Max; Index += 1)
-#define EachNode(Node, t, First) (t *Node = First; Node != 0; Node = Node->Next)
+
+#define EachNodeNil(Node, t, First, Nil) \
+(t *Node = First; !CheckNil(Node, Nil); Node = Node->Next) 
+#define EachNode(Node, t, First) EachNodeNil(Node, t, First, 0)
 
 #define EachNodeSafe(Node, t, First) \
 (t *Node = (First), *_Next = (Node != 0 ? Node->Next : 0); \
@@ -322,8 +325,8 @@ Last = Idx)
 #define DLLRemoveNil(Node, First, Last, Nil) \
 ((!CheckNil(Node->Prev, Nil) ? Node->Prev->Next = Node->Next : 0), \
 (!CheckNil(Node->Next, Nil) ? Node->Next->Prev = Node->Prev : 0), \
-((Node == First) ? First = Node->Next : (First = Nil)), \
-((Node == Last) ? Last = Node->Prev : (Last = Nil)))
+((Node == First) ? First = Node->Next : 0), \
+((Node == Last) ? Last = Node->Prev : 0))
 
 #define DLLRemove(Node, First, Last) DLLRemoveNil(Node, First, Last, 0)
 

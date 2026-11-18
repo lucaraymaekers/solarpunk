@@ -32,7 +32,7 @@ CommandsTable:
  { PieceToggleBarWrapping,     false, "Piece",  "Toggle bar wrapping",            None  0 0 0    0.f 1.f   1.f "" }
  { PieceToggleStrictTiming,    false, "Piece",  "Toggle strict timing practice",  None  0 0 0    0.f 1.f   1.f "" }
  { PieceToggleLooping,         false, "Piece",  "Toggle looping",                 None  0 0 0    0.f 1.f   1.f "" }
- { PieceSetBPM,                false, "Piece",  "Set BPM",                        None  0 0 0    0.f 300.f 1.f "%3.0f" }
+ { PieceSetBPM,                false, "Piece",  "Set BPM",                        None  0 0 0    1.f 300.f 1.f "%3.0f" }
  { PieceSelectNote,            true,  "Piece",  "Select note",                    None  0 0 0    0.f 0.f   1.f "" }
  { PieceDeselectAllNotes,      false, "Piece",  "Deselect all notes",                  Escape 0 0 0    0.f 0.f   1.f "" }
  { PieceDeselectNote,          true,  "Piece",  "Deselect note",                  None   0 0 0    0.f 0.f   1.f "" }

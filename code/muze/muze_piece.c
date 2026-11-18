@@ -61,6 +61,10 @@ PieceAlloc(app_state *App)
    Result->NoteSize = 11.f;
    Result->StaffLineWidth = 1.f;
    Result->TailHeight = 24.f;
+   
+   Result->NotesArena = PushArena(App->PieceArena, KB(1)*sizeof(note), false);
+   Result->SelArena = PushArena(App->PieceArena, KB(1)*sizeof(note_node), false);
+   
   }
   
   DLLAppend(Result, App->FirstPiece, App->LastPiece);
@@ -80,18 +84,15 @@ PieceNoteAlloc(piece *Piece)
 {
  note *Result = NilNote;
  
- if(IsNilNote(Piece->FreeNote))
+ if(!IsNilNote(Piece->FreeNote))
  {
+  Assert(Piece->FreeNote != 0);
   Result = Piece->FreeNote;
   Piece->FreeNote = Piece->FreeNote->Next;
  }
  else
  {
-  if(Piece->NextNoteIdx < ArrayCount(Piece->Notes_))
-  {
-   Result = Piece->Notes_ + Piece->NextNoteIdx;
-   Piece->NextNoteIdx += 1;
-  }
+  Result = PushArray(Piece->NotesArena, note, 1);
  }
  
  if(!IsNilNote(Result))
@@ -148,14 +149,6 @@ PieceStopPlaying(app_state *App, piece *Piece)
   MIDIOutputMutePiecePlayingNotes(App, Piece);
  }
  
-}
-
-internal void
-PieceDeselectNote(piece *Piece, note *Note)
-{
- DLLRemoveNil(Note, Piece->FirstSel, Piece->LastSel, NilNote);
- PieceNoteRelease(Piece, Note);
- Piece->SelCount -= 1;
 }
 
 #if 0

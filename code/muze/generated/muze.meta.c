@@ -573,7 +573,7 @@ command_meta_info CommandsMetaInfo[] =
   .Control = 0,
   .Alt = 0,
   
-  .Min = 0.f,
+  .Min = 1.f,
   .Max = 300.f,
   .Step = 1.f,
   

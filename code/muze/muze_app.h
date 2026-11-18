@@ -48,6 +48,15 @@ struct staff
  clef_kind ClefKind;
 };
 
+
+typedef struct note_node note_node;
+struct note_node
+{
+ note *V;
+ note_node *Next;
+ note_node *Prev;
+};
+
 typedef struct piece piece; 
 struct piece 
 {
@@ -66,17 +75,18 @@ struct piece
  s32 StaffCount;
  staff Staffs[128];
  
- u64 NoteCount_;
  u64 SelCount;
- u64 NextNoteIdx;
- note Notes_[KB(1)];
+ u64 NoteCount;
+ arena *NotesArena;
+ arena *SelArena;
  note *FreeNote;
  note *FirstNote;
  note *LastNote;
- note *FirstSel;
- note *LastSel;
  note *FirstPracticeNote;
  note *LastPracticeNote;
+ note_node *FirstSel;
+ note_node *LastSel;
+ note_node *FreeSel;
  
  b32 IsRecording;
  f32 RecordLength;
@@ -336,7 +346,7 @@ global_variable piece *NilPiece;
 global_variable f32 *dtForFrame;
 
 //~ Macros
-#define EachNote(Node, First) EachNode(Node, note, First)
+#define EachNote(Node, First) EachNodeNil(Node, note, First, NilNote)
 
 #define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
 #define IsNilPanel(Panel) CheckNil(Panel, NilPanel)
