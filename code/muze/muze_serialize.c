@@ -8,21 +8,24 @@ MS_SerializeBegin(arena *Arena, str8 Path, ms_mode Mode)
 {
  ms_serializer Serializer = {0};
  
- Serializer.FilePath = PathFromExe(Path);
- 
- if(0) {}
- else if(Serializer.Mode == MS_Reading)
- {
-  Serializer.Buffer = OS_ReadEntireFileIntoMemory(Serializer.FilePath);
+ // Init
+ { 
+  Serializer.FilePath = PathFromExe(Path);
+  Serializer.Mode = Mode;
+  Serializer.Version = MSV_Latest;
+  
+  if(0) {}
+  else if(Serializer.Mode == MS_Reading)
+  {
+   Serializer.Buffer = OS_ReadEntireFileIntoMemory(Serializer.FilePath);
+  }
+  else if(Serializer.Mode == MS_Writing)
+  {
+   Serializer.Buffer = PushS8(Arena, KB(64));
+  }
+  
+  MS_Ser(&Serializer, &Serializer.Version);
  }
- else if(Serializer.Mode == MS_Writing)
- {
-  Serializer.Buffer = PushS8(Arena, KB(64));
- }
- 
- Serializer.Version = MSV_Latest;
- MS_Ser(&Serializer, &Serializer.Version);
- 
  
  if(Serializer.Version > MSV_Latest)
  {
@@ -125,18 +128,21 @@ MS_Note(ms_serializer *Serializer, note *Note)
 internal void
 MS_Piece(ms_serializer *Serializer, piece *Piece)
 {
- ArenaClear(Piece->NotesArena);
- ArenaClear(Piece->SelArena);
- Piece->FirstNote = NilNote;
- Piece->LastNote = NilNote;
- Piece->FirstPracticeNote = NilNote;
- Piece->LastPracticeNote = NilNote;
- Piece->FreeNote = NilNote;
- Piece->FirstSel = 0;
- Piece->LastSel = 0;
- Piece->FreeSel = 0;
- Piece->NoteCount = 0;
- Piece->SelCount = 0;
+ if(Serializer->Mode == MS_Reading)
+ {
+  ArenaClear(Piece->NotesArena);
+  ArenaClear(Piece->SelArena);
+  Piece->FirstNote = NilNote;
+  Piece->LastNote = NilNote;
+  Piece->FirstPracticeNote = NilNote;
+  Piece->LastPracticeNote = NilNote;
+  Piece->FreeNote = NilNote;
+  Piece->FirstSel = 0;
+  Piece->LastSel = 0;
+  Piece->FreeSel = 0;
+  Piece->NoteCount = 0;
+  Piece->SelCount = 0;
+ }
  
  MS_Add(MSV_Initial, &Piece->BPM);
  MS_Add(MSV_Initial, &Piece->TimeSigNum);

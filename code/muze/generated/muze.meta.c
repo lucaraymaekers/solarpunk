@@ -798,7 +798,7 @@ command_meta_info CommandsMetaInfo[] =
   .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
-  .Description = {(u8 *)"Read from file", 14},
+  .Description = {(u8 *)"Open piece file", 15},
   
   .Key = PlatformKey_O,
   .Shift = 0,
@@ -817,7 +817,7 @@ command_meta_info CommandsMetaInfo[] =
   .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
-  .Description = {(u8 *)"Save to file", 12},
+  .Description = {(u8 *)"Save piece file", 15},
   
   .Key = PlatformKey_S,
   .Shift = 0,

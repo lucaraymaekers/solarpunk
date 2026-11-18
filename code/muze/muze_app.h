@@ -283,7 +283,11 @@ struct app_state
  f32 ListerScroll;
  b32 ListerOpened;
  b32 ListerReturnPressed;
+ b32 ListerTabPressed;
  lister_kind ListerKind;
+ str8 ListerInputText;
+ 
+ command_kind ListerInputCommand;
  
  u64 MaxListerTextSize;
  str8 ListerText;

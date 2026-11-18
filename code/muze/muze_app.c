@@ -1801,7 +1801,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   App->MaxDebugStringCount = 128;
  }
  
- // Frame Initialization
+ // App frame Initialization
  {
   // Init read-only variables
   {    
@@ -1815,33 +1815,33 @@ UPDATE_AND_RENDER(UpdateAndRender)
  {            
   for EachTextButton(Key, Id, Input)
   {
-   b32 Handled = false;
+   b32 Handled = true;
    
    s32 ModifiersWithoutShift = (Key->Modifiers & ~PlatformKeyModifier_Shift);
    
-   if(Key->Modifiers == PlatformKeyModifier_Control &&
-      !Key->IsSymbol &&
-      Key->Codepoint == 'u')
+   if(0) {}
+   else if(Key->Modifiers == PlatformKeyModifier_Control &&
+           !Key->IsSymbol &&
+           Key->Codepoint == 'u')
    {
     App->ListerText.Size = 0;
-    
-    Handled = true;
    }
-   
-   if(ModifiersWithoutShift == PlatformKeyModifier_None)
+   else if(Key->Modifiers == PlatformKeyModifier_Control &&
+           Key->IsSymbol &&
+           Key->Symbol == PlatformKey_BackSpace)
+   {
+    App->ListerText.Size = 0;
+   }
+   else if(ModifiersWithoutShift == PlatformKeyModifier_None)
    {
     if(!Key->IsSymbol)
     {
      App->ListerText.Data[App->ListerText.Size] = (u8)Key->Codepoint;
      App->ListerText.Size += 1;
      App->ListerCursorAnimTime = 0.f;
-     
-     Handled = true;
     }
     else
     {
-     Handled = true;
-     
      switch(Key->Symbol)
      {
       default: 
@@ -1859,6 +1859,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
        App->ListerReturnPressed = true;
       } break;
       
+      case PlatformKey_Tab:
+      {
+       App->ListerTabPressed = true;
+      } break;
+      
       case PlatformKey_BackSpace:
       {
        App->ListerText.Size -= !!(App->ListerText.Size > 0);
@@ -1866,6 +1871,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
       } break;
      }
     }
+   }
+   else
+   {
+    Handled = false;
    }
    
    if(Handled)
@@ -2238,15 +2247,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      }
     } break;
     
-    case ListerKind_Input:
-    {
-     Title = S8("Input");
-     
-    } break;
-    
     case ListerKind_Files:
     {
-     Title = S8("Files");
+     Title = ((App->ListerInputText.Size > 0) ? App->ListerInputText : S8("Files"));
      SelectedIdx = -1;
      
      os_dir *Dir = OS_WalkDirPush(FrameArena, ExeDirPath, 0);
@@ -2261,7 +2264,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
        EntryCount += 1;
        Entry->Icon = UI_Icons[UI_IconKind_File];
        Entry->Text = DirEntry->Name;
-       Entry->Command = Command_PieceReadFile;
+       Entry->Command = App->ListerInputCommand;
       }
      }
      
@@ -2341,7 +2344,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Entry->Tag = S8("New");
      Entry->Icon = UI_Icons[UI_IconKind_File];
      Entry->Text = App->ListerText;
-     Entry->Command = Command_PieceReadFile;
+     Entry->Command = App->ListerInputCommand;
      
      Entries[EntryCount] = *Entry;
      EntryCount += 1;
@@ -2521,6 +2524,15 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
               ItemSelected = (ItemBox->WasClicked[PlatformMouseButton_Left] || 
                               (App->ListerReturnPressed && IsFirstItem));
               
+              if(IsFirstItem && App->ListerTabPressed)
+              {
+               for EachIndex(CharIdx, Entry->Text.Size)
+               {
+                App->ListerText.Data[CharIdx] = Entry->Text.Data[CharIdx];
+               }
+               App->ListerText.Size = Entry->Text.Size;
+              }
+              
               if(Entry->Max > 0.f)
               {         
                b32 IsToggle = (Entry->Min == 0.f &&
@@ -2586,14 +2598,15 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                Command->F32 = Entry->F32;
                Command->Text = Entry->Text;
               }
+              
+              App->ListerInputText = Nil(str8);
+              App->ListerInputCommand = Command_None;
              }
              
             }
            }
           }
          }
-         
-         App->ListerReturnPressed = false;
          
          FilteredEntryCount = Max(FilteredEntryCount, 1);
          f32 TotalElementSize = (f32)(FilteredEntryCount - 1)*ItemHeight;
@@ -2607,6 +2620,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     }
     
    }
+   
+   App->ListerReturnPressed = false;
+   App->ListerTabPressed = false;
    
    App->ListerCursorAnimTime += Input->dtForFrame;
   }
@@ -2797,20 +2813,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {
                  if(M_IconButton(UI_IconKind_File, S8("Open")))
                  {
-#if 0
-                  // Clear piece
-                  MS_Serialize(Serializer, FrameArena, MS_Reading, PieceFilePath)
-                   MS_Piece(&Serializer, Piece);
-                  PushCommand(App, Command_PieceStop);
-#else
                   PushCommand(App, Command_OpenLister)->S32 = ListerKind_Files;
-#endif
+                  App->ListerInputText = S8("Open");
+                  App->ListerInputCommand = Command_PieceReadFile;
                  }
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
                  {
-                  MS_Serialize(Serializer, FrameArena, MS_Writing, PieceFilePath)
-                   MS_Piece(&Serializer, Piece);
+                  PushCommand(App, Command_OpenLister)->S32 = ListerKind_Files;
+                  App->ListerInputText = S8("Save");
+                  App->ListerInputCommand = Command_PieceSaveFile;
                  }
                  
                  if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
@@ -3440,6 +3452,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     {
      App->ListerOpened = false;
     } break;
+    
     case Command_OpenLister:
     {
      App->ListerOpened = true;

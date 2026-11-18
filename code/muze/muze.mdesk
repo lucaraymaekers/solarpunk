@@ -44,8 +44,8 @@ CommandsTable:
  { PieceAddStaff,                      false, "Piece",  "Add bass staff",                    None   0 0 0    0.f 0.f   1.f "" }
  { PieceTrimAtFirstNote,               false, "Piece",  "Trim from start to first note",     None   0 0 0    0.f 0.f   1.f "" }
  { PieceSetPracticeRangeFromSelection, false, "Piece",  "Set practice range from selection", None   0 0 0    0.f 0.f   1.f "" }
- { PieceReadFile,                      false, "Piece",  "Read from file", O      1 0 0    0.f 0.f   1.f "" }
- { PieceSaveFile,                      false, "Piece",  "Save to file", S      1 0 0    0.f 0.f   1.f "" }
+ { PieceReadFile,                      false, "Piece",  "Open piece file", O      1 0 0    0.f 0.f   1.f "" }
+ { PieceSaveFile,                      false, "Piece",  "Save piece file", S      1 0 0    0.f 0.f   1.f "" }
  //- Lister
  { CloseLister,                        true,  "Lister", "Close",                             None   0 0 0    0.f 0.f   1.f "" }
  { OpenLister,                         true,  "Lister", "Open",                              None   0 0 0    0.f 0.f   1.f "" }  
