@@ -437,8 +437,8 @@ UI_BeginLayout(ui_box *Root, v2s32 Dim, f32 HeightPx)
   app_input *Input = UI_State->Input;
   v2 MouseP = MousePosFromInput(Input);
   
-  for EachElement(ButtonType, UI_State->Hot)
-  {  
+  for EachIndex(ButtonType, (platform_mouse_button_type)PlatformMouseClickableButtonCount)
+  {
    app_button_state Button = Input->Mouse.Buttons[ButtonType];
    b32 MouseUp = (!Button.EndedDown);
    

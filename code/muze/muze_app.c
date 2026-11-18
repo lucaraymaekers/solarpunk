@@ -2268,6 +2268,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
      }
      
+     OS_WalkDirPop(Dir);
+     
     };
     
    }
@@ -3157,9 +3159,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                            PanelTypeStrings[App->SelectedPanel->Kind],
                            App->SelectedPanel);
                   
-                  M_Labelf("Selection note count: %llu###SelNoteCount",
-                           Piece->SelCount);
+                  M_Labelf("Selection note count: %llu###SelNoteCount", Piece->SelCount);
                   
+                  M_Labelf("Piece file path: %S###PieceFilePath", Piece->FilePath);
                   
                   for EachIndex(Idx, App->DebugStringCount)
                   {
@@ -3833,7 +3835,11 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceReadFile:
     case Command_PieceSaveFile:
     {
-     Piece->FilePath = Command->Text;
+     Command->Text.Size = Min(Command->Text.Size, (ArrayCount(Piece->FilePathBuffer) - 1));
+     Piece->FilePath.Data = Piece->FilePathBuffer;
+     MemoryCopy(Piece->FilePath.Data, Command->Text.Data, Command->Text.Size);
+     Piece->FilePath.Size = Command->Text.Size;
+     
      ms_mode Mode = MS_Reading + !!(Command->Kind == Command_PieceSaveFile);
      MS_Serialize(Serializer, FrameArena, Mode, Piece->FilePath)
       MS_Piece(&Serializer, Piece);

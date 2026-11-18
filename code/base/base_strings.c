@@ -240,7 +240,7 @@ S8DupCString(arena *Arena, char *String)
  str8 Result = {0};
  
  Result.Size = StringLength(String);
- Result.Data = PushArray(Arena, u8, Result.Size);
+ Result.Data = PushArray(Arena, u8, Result.Size + 1);
  MemoryCopy(Result.Data, String, Result.Size);
  
  return Result;

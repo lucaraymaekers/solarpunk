@@ -22,7 +22,7 @@
 #include <dlfcn.h>
 #include <link.h>
 
-#include "base_arenas.h"
+#include "base_arena.h"
 #include "base_os_linux_errno_to_str8.c"
 
 #define ERRNO_FMT "Errno[%d]: %S"
@@ -232,12 +232,11 @@ OS_WalkDirPush(arena *Arena, str8 Path, os_dir *Current)
  }
  
  Result->Opaque = PushArrayZero(Arena, os_dir_opaque, 1);
- 
- Result->Opaque->Dir = opendir((char *)Path.Data);
- AssertErrno(Result->Opaque->Dir != 0);
+ Result->Opaque->Dir = opendir(CSS8(Path));
  Result->Path = Path;
- 
  Result->Parent = Current;
+ 
+ AssertErrno(Result->Opaque->Dir != 0);
  
  return Result;
 }

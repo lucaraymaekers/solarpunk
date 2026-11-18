@@ -293,7 +293,7 @@ BASE_ENTRY_POINT()
   {
    str8 FileName = S8FromCString(Params->Args[0]);
    u64 OnePastLastSlash = S8FindChar(FileName, OS_SlashChar, false, true);
-   ExeDirPath = S8To(FileName, OnePastLastSlash);
+   ExeDirPath = Str8Fmt("%S", S8To(FileName, OnePastLastSlash));
   }
   
   app_memory AppMemory = {0};

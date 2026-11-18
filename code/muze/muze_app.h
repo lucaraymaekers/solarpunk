@@ -115,6 +115,7 @@ struct piece
  f32 TailHeight;
  f32 SetNoteLength;
  
+ u8 FilePathBuffer[256];
  str8 FilePath;
 };
 
