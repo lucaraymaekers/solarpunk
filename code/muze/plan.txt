@@ -1,6 +1,11 @@
-Muze:
-
-Piano custom draw for visualizing note played
+Demo:
+- Use showkey on Linux
+- Enqueue/Dequeue Commands
+x Select notes in sheet music view 
+x Scrolling in sheet music view
+ x With scrollbar
+ x Auto scrolling when recording/playing
+x Top control for changing panel kind
 
 # Now
 - ClosePanel bug
@@ -12,6 +17,7 @@ Piano custom draw for visualizing note played
 Piece Visualizer:
 - Better Markers
 - Key signature and accidentals
+- Piano custom draw for visualizing note played
 
 Recording features:
 - Wait on first note played before recording
@@ -42,6 +48,8 @@ Lister improvements:
   - https://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
   - https://algorithm.tamnd.com/smith-waterman/
 - Visualize match
+- close by clicking next to it
+  - proper pop-up?
 
 Metronome improvements:
 - When recording wait for two ticks before recording
@@ -55,6 +63,8 @@ Metronome improvements:
 X Serialization
   - Implement Undo for commands.
     - Serialize state along commands.
+  - Read up on StarfreakClone article
+
 - Reimplement Autoscroll
 - Do icons everywhere
 - Implement key sharps and steps accordingly
@@ -65,6 +75,9 @@ UX:
 - Better colors 
 
 Bugs:
+- rl:
+  - when double clicking to resize window it can be that the second click goes throuhg to the
+    buttons
 - muze: 
   - ClosePanel refreshes layout.
 - bug: when doing sliders and toggles at different sizes they end up looking wrong.
@@ -73,15 +86,6 @@ Bugs:
 - bug: win32?: When clicking it only focuses the window and does not click the elements
        maybe there is a frame of delay?
 - bug: ui: When changing the BPM too fast it can skip over the ending of the note and never stop playing the note.
-
-Demo:
-- Use showkey on Linux
-- Enqueue/Dequeue Commands
-x Select notes in sheet music view 
-x Scrolling in sheet music view
- x With scrollbar
- x Auto scrolling when recording/playing
-x Top control for changing panel kind
 
 Piece:
 - Visualizer for which note is getting played and is about to get played.
@@ -113,8 +117,6 @@ SDF rects:
  - Uniform roundness on borders
 
 Notes:
-x Use Voice Arena for note nodes, selection being per voice ? ,
-x Use only one DrawNote function in CustomDraws 
 - Change recording starting pos
 
 Text Input:
@@ -122,13 +124,6 @@ Text Input:
 
 Slider:
 - Allow dragging, but when released snap.
-
-Lister:
-- optional title
-- close by clicking next to it
-  - proper pop-up?
-x strong border around box
-x close by pressing escape
 
 Icons (i/o devices):
 - keyboard, midi device, synth
@@ -157,8 +152,6 @@ Metaprogram command enums etc.
 - MSCZ converter to our format
 
 Muze:
-- 
-
 - Elongate & Shrink notes to their nearest musical length
   - When unsure, multiple possibilites make the user decide.
   - Snap timestamp to be on beat
@@ -184,14 +177,11 @@ Muze:
 - Harmony visualizer/picker 
   // Show a possible next chord progression (based on previous chords from the selected chord)
 
-- Command tree with undo&redo.
-  - Read up on StarfreakClone article
-
-- Lists of patterns you can choose from
+- Lists of patterns you can choose from    / Exercises
   e.g., for accompaniments. arpeggio's etc.
 
 # UI
-- Show only selected notes.
+- Show only selected notes / Zoom on range
 
 - Save / Load records
   - UI lister to select one
@@ -204,7 +194,6 @@ Muze:
 - MIDI from input struct so that hot reload works.
 
 # Other
-- Get all note timestamps in record time. 
 - Nickname for MIDI devices.
 
 # Archived
@@ -271,3 +260,5 @@ x Display multiple staffs
 x Visualize note played when practicing
 x Multi-Staff
 x Command lister
+x Use Voice Arena for note nodes, selection being per voice ? ,
+x Use only one DrawNote function in CustomDraws 

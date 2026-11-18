@@ -114,6 +114,8 @@ struct piece
  f32 StaffLineWidth;
  f32 TailHeight;
  f32 SetNoteLength;
+ 
+ str8 FilePath;
 };
 
 //- Panels
@@ -195,6 +197,7 @@ struct lister_entry
  f32 Max;
  f32 Step;
  command_kind Command;
+ os_dir_entry_kind DirEntryKind;
  
  // If not set, that uses the Command aboves as default.
  command_kind ButtonCommand;
@@ -211,7 +214,8 @@ enum lister_kind
  ListerKind_DebugInfo,
  ListerKind_PanelTypes,
  ListerKind_Commands,
- ListerKind_Everything,
+ ListerKind_Input,
+ ListerKind_Files,
  ListerKind_Count,
 };
 typedef enum lister_kind lister_kind;
@@ -225,11 +229,12 @@ struct command
  panel *Panel;
  piece *Piece;
  platform_midi_device *Device;
+ str8 Text;
  axis2 Axis;
+ note *Note;
  
  s32 S32;
  f32 F32; 
- u64 U64;
  
  // TODO(luca): For undo and redo
  ms_serializer Serializer;
@@ -280,9 +285,9 @@ struct app_state
  b32 ListerReturnPressed;
  lister_kind ListerKind;
  
- u64 MaxTextSize;
- str8 Text;
- f32 CursorAnimTime;
+ u64 MaxListerTextSize;
+ str8 ListerText;
+ f32 ListerCursorAnimTime;
  
  platform_midi_device In;
  platform_midi_device Out;
@@ -347,6 +352,10 @@ global_variable f32 *dtForFrame;
 
 //~ Macros
 #define EachNote(Node, First) EachNodeNil(Node, note, First, NilNote)
+#define EachNoteSafe(Node, First) EachNodeSafeNil(Node, note, First, NilNote)
+
+#define AppendNote(Node, First, Last) DLLAppendNil(Node, First, Last, NilNote)
+#define RemoveNote(Node, First, Last) DLLRemoveNil(Node, First, Last, NilNote)
 
 #define IsNilPiece(Piece) CheckNil(Piece, NilPiece)
 #define IsNilPanel(Panel) CheckNil(Panel, NilPanel)

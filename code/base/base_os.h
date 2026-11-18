@@ -14,9 +14,9 @@ struct cmd_line_entry
 
 enum os_kind
 {
-    OSKind_Unknown,
-    OSKind_Linux,
-    OSKind_Windows,
+ OSKind_Unknown,
+ OSKind_Linux,
+ OSKind_Windows,
 };
 typedef enum os_kind os_kind;
 
@@ -119,9 +119,9 @@ internal b32     OS_WriteEntireFile(char *FileName, str8 File);
 internal b32     OS_FileExists(char *FileName);
 internal void    OS_ChangeDirectory(char *Path);
 internal void    OS_MakeDirectory(char *Path);
-internal os_dir *OS_WalkDirPush(str8 Path, os_dir *Current);
+internal os_dir *OS_WalkDirPush(arena *Arena, str8 Path, os_dir *Current);
 internal os_dir *OS_WalkDirPop(os_dir *Dir);
-internal os_dir_entry *OS_WalkDirGetNext(os_dir *Dir);
+internal os_dir_entry *OS_WalkDirGetNext(arena *Arena, os_dir *Dir);
 
 //- OS agnostic, implemented in `base_os.c`.
 internal f64  OS_SecondsElapsed(f64 Start, f64 End);

@@ -3,7 +3,7 @@
 #if !defined(LANES_H)
 #define LANES_H
 
-#include "base_arenas.h"
+#include "base_arena.h"
 
 typedef u64 barrier;
 
@@ -12,15 +12,15 @@ typedef u64  thread_handle;
 typedef struct thread_context thread_context;
 struct thread_context
 {
-    s64 LaneCount;
-    s64 LaneIndex;
-    
-    thread_handle Handle;
-    
-    u64 *SharedStorage;
-    barrier Barrier;
-    
-    arena *Arena;
+ s64 LaneCount;
+ s64 LaneIndex;
+ 
+ thread_handle Handle;
+ 
+ u64 *SharedStorage;
+ barrier Barrier;
+ 
+ arena *Arena;
 };
 
 thread_static thread_context *ThreadContext;

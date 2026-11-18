@@ -22,7 +22,7 @@ Command_None,
  Command_PieceStopPlaying,
  Command_PieceTogglePracticing,
  Command_PieceStop,
- Command_PieceClear,
+ Command_PieceNew,
  Command_PieceToggleMetronome,
  Command_PieceToggleBarWrapping,
  Command_PieceToggleStrictTiming,
@@ -31,12 +31,16 @@ Command_None,
  Command_PieceSelectNote,
  Command_PieceDeselectAllNotes,
  Command_PieceDeselectNote,
+ Command_PieceSelectNextNote,
+ Command_PieceSelectPrevNote,
  Command_PieceDeleteNote,
  Command_PieceSetNoteLength,
  Command_PieceSelectInstrument,
  Command_PieceAddStaff,
  Command_PieceTrimAtFirstNote,
  Command_PieceSetPracticeRangeFromSelection,
+ Command_PieceReadFile,
+ Command_PieceSaveFile,
  Command_CloseLister,
  Command_OpenLister,
  Command_SelectCommand,
@@ -467,11 +471,11 @@ command_meta_info CommandsMetaInfo[] =
  },
  
  {
-  .Command = Command_PieceClear,
+  .Command = Command_PieceNew,
   .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
-  .Description = {(u8 *)"Clear", 5},
+  .Description = {(u8 *)"New blank piece", 15},
   
   .Key = PlatformKey_None,
   .Shift = 0,
@@ -638,6 +642,44 @@ command_meta_info CommandsMetaInfo[] =
  },
  
  {
+  .Command = Command_PieceSelectNextNote,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Select next note", 16},
+  
+  .Key = PlatformKey_Right,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceSelectPrevNote,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Select previous note", 20},
+  
+  .Key = PlatformKey_Left,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
   .Command = Command_PieceDeleteNote,
   .NeedsParam = false,
   
@@ -683,7 +725,7 @@ command_meta_info CommandsMetaInfo[] =
   .Description = {(u8 *)"Select synth instrument", 23},
   
   .Key = PlatformKey_S,
-  .Shift = 0,
+  .Shift = 1,
   .Control = 1,
   .Alt = 0,
   
@@ -742,6 +784,44 @@ command_meta_info CommandsMetaInfo[] =
   .Key = PlatformKey_None,
   .Shift = 0,
   .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceReadFile,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Read from file", 14},
+  
+  .Key = PlatformKey_O,
+  .Shift = 0,
+  .Control = 1,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceSaveFile,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Save to file", 12},
+  
+  .Key = PlatformKey_S,
+  .Shift = 0,
+  .Control = 1,
   .Alt = 0,
   
   .Min = 0.f,

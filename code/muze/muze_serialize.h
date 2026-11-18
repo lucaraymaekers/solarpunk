@@ -34,6 +34,7 @@ enum ms_version
  MSV_StaffClefKind,
  MSV_PieceNoteVelocity,
  MSV_PieceDLL,
+ MSV_MagicNumber,
  MSV_Count,
 };
 typedef enum ms_serializer_version ms_serializer_version;
@@ -64,5 +65,7 @@ MS_Ser(Serializer, &Dummy); \
 for(ms_serializer Serializer = MS_SerializeBegin(Arena, Path, Mode), *_Counter = 0; \
 _Counter == 0; \
 MS_SerializeEnd(&Serializer), _Counter += 1)
+
+#define MS_Magic "rlMuze"
 
 #endif //MUZE_SERIALIZE_H

@@ -50,4 +50,6 @@ Idx += 1, (EndScratch(Arena, BackPos)))
 #define PushArray(Arena, t, Count) (t *)ArenaPush((Arena), (Count)*(sizeof(t)), AlignOf(t), false)
 #define PushArrayZero(Arena, t, Count) (t *)ArenaPush((Arena), (Count)*(sizeof(t)), AlignOf(t), true)
 
+#define ArenaClear(Arena) ArenaSetPos(Arena, 0);
+
 #endif //ARENAS_H

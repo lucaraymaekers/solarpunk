@@ -1,0 +1,80 @@
+# x13pixels:
+
++ Seems like Length should be displayed as the note length (quarter,eigth,sixteenth,etc.) rather than a fraction of measure.
++ Rests no longer render if the font size is 36 or larger
++ Accidentals are not positioned properly with larger fonts; the size of the notes themselves do not change.
++ (Minor) Contents do not render when sizing the window.
++ Somehow set start and end to first note in the piece and was unable to change them back without restarting Muze.
++ The metronome and the replay of notes does not always line up. Easier to hear if you set BPM to 40 and play. However, I was not able to reproduce this a second time.
++ When there are two or more MIDI inputs, Muze always selects the last one upon restart, not the one that was previously selected.
++ Delete note should probably add rests to pad out a measure when necessary.
++ Del key on keyboard should delete a note.
++ The Length slider doesn't seem to do anything
+
+- How does another piece get opened? Does the open operation always open "song.muze_piece"?
+- The start/end markers are a bit hard to see. Maybe a "S"/"E" above the staff or some other symbol?
+
+# mixer:
+
+App:
++ I was expecting to be able to move to other notes using the arrow keys. Like I delete a note, then press right to go to the next note...
++ Setting BPM to 0, I can add several notes a the same location. Pressing delete crashes the program.
+
+- The virtual keyboard you wrote above doesn't correspond to what I'm seeing in the application. For example the S key doesn't give a D note, R is the key for the D note.
+- It would be nice to have the virtual keyboard use scancodes instead of virtual keycodes so I don't have to change layout.
+
+- I was also expecting to be able to edit notes without "recording", meaning I select the location in the bar, the note length and then press the key to add the note, and advance note by note.
+
+- It's impossible to set the BPM exactly. A single pixel on the slider moves the BPM by 3.
+
+- Like other said, the several cursor aren't clear. I was confused why there was a "end cursor" (the one on the C). It seems that it's there because when you enable recording, you can only append at the end. But I think most audio program only have a single play head, and start recording there (either replacing existing things or adding ?). So my guess is that you want a single play cursor, and have either a selection range (like a background rectangle) or two mark. And sharing them between modes (recording or practice). Or at least only display the ones from the selected mode, with different colors for the modes. I also think that they should be more visible. A single 1*30 or something pixel isn't visible enough for me. The playhead usually is a line that spans the full height of the staff.
+
+- I'm guessing it's for later but having the metrics, clef and key signature would be nice.
+
+UI:
+- The view doesn't scroll by itself when reaching the bottom while recording.
+Scrollbar aren't great. The rectangle inside doesn't represent the proportion of a page inside the view, which means that when you drag it, it doesn't scroll fast enough. And the mouse wheel doesn't scroll.
+
+- Your circles (in switches and sliders) aren't round. They look like square with rounded corners, but not rounded enough.  I think the switches and slider "background" have the same issue but it's less obvious to me.
+
+- I took me some time to notice the "Clear" button to start a new document. I think I didn't expected to be at that location, and the "load" icon (first icon in the line) looks like what I expect a "new file" button would look like.
+
+- I don't like the cursor interpolation between bars (no particular reason, it just looks strange to have that for me).
+
+- The window position at startup is a bit weird. I'd expect the window to be centered or start maximized.
+
+- What is the clock icon between "Start" and "End" ?
+
+
+- Setting the tempo using text is fine for me.
+
+- I think my issue with the cursor animation is that it makes it look like there is something special happening between bars, but bar separations are just there to help read, there isn't any difference than between two notes in the middle of a bar. So I think it would be positive not to have the animation for me.
+
+- I play both acoustic and electric guitar. Pitch to midi might be nice if it works reliably (I've played Rocksmith and they recognize what you play but sometimes it misses notes. But that might be my guitar / setup). But just being able to edit, with the mouse and keyboard
+ might be more useful for more people. I use Guitar Pro for that at the moment (if you want an example).
+
+# qtipps:
+
+So I've played around with a good bit and I think that aside from the scancodes thing, which is complicating matters a good deal, those quality of life things mixer brought up are definitely worth addressing.
+
+- The thing that's worth noting is that I do think this program could be really good for some people if you really figure out how to make this an easy, intuitive automatic transcription or practice tool. Either way there are some shared priorities that need to be handled first, and I'd break it down like this:
+- The program needs to be able to handle time signatures. You could also keep the present free time feel, but if that's the case the user needs to be able to put a bar wherever they feel like to communicate phrasing. I've done a lot of work in the sacred music space and it's a real pain if the notation software forces me to a grid for chant.
+The program needs to be able to handle Key signatures. This isn't useful to people who don't read music, and people who read music need key signatures for basic sanity.
+- Since this works only with midi instruments at the moment this is pretty keyboard focused but there are electric sax/wind instruments out there that might be useful. Some guitar players might have a midi output on their rig, but we can pretty much ignore everything but keys for now. That means you probably need to be able to handle chords, multiple voicings, and at least a bass and treble clef. I don't know if it's worth considering the possibility of organ pedals, but don't box yourself in.
+
+A the composition route:
+Double check and make sure this has options to edit any note manually after it's transcribed.
+
+- I really like the idea of this being able to transcribe what I'm playing in real time, but that does require that it be able to interpret separate hands and (probably) have an auto-pause feature. Finale was always terrible at this and I don't know that I had much luck with muse score either.
+   a. To clarify the auto-pause thing, stop adding more empty lines if we've already added one full measure of rests
+
+- If you get that auto-transcription thing down pat, you've got yourself a customer base, say $40 or so. It'd be more but Tantacrul is good at what he does and what he does is make MuseScore free. Make sure this can export to more fully-featured programs until most people don't have a reason to want to edit a file in MuseScore or Sibelius. I have pages of notes scribbled for tunes that I leave unfinished in museScore because I get distracted trying to input notes I'd rather just play.
+
+B. The practice route:
+- If you get it so this shows sheet music in a way the user can read it, you've already got a decent idea for a tool, but from a musician's standpoint, rhythm is king. It's nice if someone hits a right note, especially the bass player. If someone hits a note off beat everyone is screwed. This is especially true of the bass player. The way this currently works encourages players to focus on notes over rhythm. For classical stuff you can sometimes get away with that on a busy piece, but try it on Mozart and you'll be hanged.
+- The same way that the composition side needs a transcription engine to be able to save the composer time, the practice side needs to be able to interpret rhythmic interpretation as such and also know when someone needs to have a cymbal thrown at their head. If someone is consistent in where the downbeats and upbeats come and they keep a steady tempo, they're correct as far as the machine can tell. If you can do that I'll be your first customer. Maybe let the user set tolerances on this with a slider.
+  a. this gets tricky if the eighths/quavers are swung.
+
+- For Practice mode, I should be able to set a target tempo and a current tempo. Start the user where they want, and then any time they screw up, slow them down by half until they get to 60bpm, at which point you can take off 10bpm. If they dip below 40bpm I don't know what to do aside from issuing Hail Marys and Our Fathers. If they play it right X times in a row (user determined), give them another 10 bpm on the metronome until they hit their target. This is basically how I was taught to practice, and you've written the first bit of tooling that I think could help with it.
+
+- Sorry for the rant, but I'd drop $20 today for something to automatically adjust my metronome settings when I'm doing exercises, scales, and arpeggios. For those you don't even need all of the notation stuff worked out. I know that's not exactly a princely sum but if you get enough of the transcription stuff right as well and you only need to worry about pricing to keep people from finding out a way to do it in muse score.

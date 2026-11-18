@@ -253,9 +253,8 @@ OS_MakeDirectory(char *Path)
 }
 
 internal os_dir *
-OS_WalkDirPush(str8 Path, os_dir *Current)
+OS_WalkDirPush(arena *Arena, str8 Path, os_dir *Current)
 {
- arena *Arena = GetScratch();
  os_dir *Result = 0;
  
  if(Current)
@@ -291,7 +290,7 @@ OS_WalkDirPush(str8 Path, os_dir *Current)
 }
 
 internal os_dir_entry *
-OS_WalkDirGetNext(os_dir *Dir)
+OS_WalkDirGetNext(arena *Arena, os_dir *Dir)
 {
  os_dir_entry *Result = 0;
  
@@ -300,7 +299,6 @@ OS_WalkDirGetNext(os_dir *Dir)
  
  if(Found)
  {
-  arena *Arena = GetScratch();
   Result = PushArrayZero(Arena, os_dir_entry, 1);
   
   Result->Name = S8DupCString(Arena, FindData.cFileName);

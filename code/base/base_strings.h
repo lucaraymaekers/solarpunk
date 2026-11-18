@@ -3,7 +3,7 @@
 #if !defined(BASE_STRINGS_H)
 #define BASE_STRINGS_H
 
-#include "base/base_arenas.h"
+#include "base/base_arena.h"
 #include <stdarg.h>
 
 //~ Types

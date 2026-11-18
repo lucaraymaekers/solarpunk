@@ -165,7 +165,7 @@ ReplayStepNext(platform_replay *Replay)
 internal void DebugSpacer(void) { UI_Spacer(UI_SizeEm(.2f, 1.f)); }
 
 internal ui_box *
-UI_Label(s32 Flags, str8 String)
+PUI_Label(s32 Flags, str8 String)
 {
  ui_box *Result = UI_AddBox(String, (UI_BoxFlag_Clip|
                                      UI_BoxFlag_DrawDisplayString|
@@ -176,7 +176,7 @@ UI_Label(s32 Flags, str8 String)
 }
 
 internal ui_box *
-UI_Labelf(s32 Flags, char *Format, ...)
+PUI_Labelf(s32 Flags, char *Format, ...)
 {
  ui_box *Result = UI_NilBox;
  str8 String = {0};
@@ -185,7 +185,7 @@ UI_Labelf(s32 Flags, char *Format, ...)
  va_start(Args, Format);
  String = Str8VFmt(Format, Args);
  
- Result = UI_Label(Flags, String);
+ Result = PUI_Label(Flags, String);
  
  return Result;
 }

@@ -1060,6 +1060,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     Color = Color_Orange;
     Start = Piece->PracticeEnd;
     MarkerHeightIdx = 3.f;
+    AlignMarkerToBarEnd = true;
    }
    else if(Kind == PieceMarkerKind_PracticePos)
    {
@@ -1174,6 +1175,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    {
     b32 IsHovered = false;
     b32 IsSelected = false;
+    b32 IsCurrentSelected = false;
     
     v2 NotePos = Pos;
     
@@ -1210,10 +1212,31 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
       if(Sel->V == Note)
       {
        IsSelected = true;
-       break;
+       IsCurrentSelected = (Sel == Piece->LastSel);
       }
      }
     }
+    
+    // Get basic color
+    {    
+     if(NoteIsPlaying || NoteIsRecording) NoteColor = Color_Yellow;
+     
+     if(IsHovered)
+     {
+      NoteColor = Color_Blue;
+     }
+     
+     if(IsSelected)
+     {
+      NoteColor = Color_Orange;
+     }
+     
+     if(IsCurrentSelected)
+     {
+      NoteColor = Color_Red;
+     }
+    }
+    
     
     if(0) {}
     else if(Note->Kind == NoteKind_Rest)
@@ -1234,18 +1257,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      {
       IsHovered = RectOverlap(SelRec, Instance->Dest);
      }
-     
-     if(IsHovered)
-     {
-      RenderRectSetColor(Instance, Color_Blue);
-     }
-     
-     
-     if(IsSelected)
-     {
-      RenderRectSetColor(Instance, Color_Orange);
-     }
-     
     }
     else if(Note->Kind == NoteKind_Note && !Note->Hidden)
     {
@@ -1306,18 +1317,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
         IsHovered = RectOverlap(SelRec, TailBounds);
        }
       }
-     }
-     
-     if(NoteIsPlaying || NoteIsRecording) NoteColor = Color_Yellow;
-     
-     if(IsHovered)
-     {
-      NoteColor = Color_Blue;
-     }
-     
-     if(IsSelected)
-     {
-      NoteColor = Color_Orange;
      }
      
      if(ArrayIdx == 1) NoteColor = Color_Yellow;
@@ -1431,7 +1430,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     {
      PushCommand(App, (Adding ? 
                        Command_PieceSelectNote :
-                       Command_PieceDeselectNote))->U64 = (u64)Note;
+                       Command_PieceDeselectNote))->Note = Note;
     }
     
    }
@@ -1636,9 +1635,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
   
   //- Init Muze 
   {
-   App->MaxTextSize = 256;
-   App->Text = PushS8(App->Arena, App->MaxTextSize);
-   App->Text.Size = 0;
+   App->MaxListerTextSize = 256;
+   App->ListerText = PushS8(App->Arena, App->MaxListerTextSize);
+   App->ListerText.Size = 0;
    
    App->MaxCommandCount = KB(4);
    App->Commands = PushArray(App->Arena, command, App->MaxCommandCount);
@@ -1824,7 +1823,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
       !Key->IsSymbol &&
       Key->Codepoint == 'u')
    {
-    App->Text.Size = 0;
+    App->ListerText.Size = 0;
     
     Handled = true;
    }
@@ -1833,9 +1832,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
    {
     if(!Key->IsSymbol)
     {
-     App->Text.Data[App->Text.Size] = (u8)Key->Codepoint;
-     App->Text.Size += 1;
-     App->CursorAnimTime = 0.f;
+     App->ListerText.Data[App->ListerText.Size] = (u8)Key->Codepoint;
+     App->ListerText.Size += 1;
+     App->ListerCursorAnimTime = 0.f;
      
      Handled = true;
     }
@@ -1862,8 +1861,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
       
       case PlatformKey_BackSpace:
       {
-       App->Text.Size -= !!(App->Text.Size > 0);
-       App->CursorAnimTime = 0.f;
+       App->ListerText.Size -= !!(App->ListerText.Size > 0);
+       App->ListerCursorAnimTime = 0.f;
       } break;
      }
     }
@@ -2239,6 +2238,34 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      }
     } break;
     
+    case ListerKind_Input:
+    {
+     Title = S8("Input");
+     
+    } break;
+    
+    case ListerKind_Files:
+    {
+     Title = S8("Files");
+     SelectedIdx = -1;
+     
+     os_dir *Dir = OS_WalkDirPush(FrameArena, ExeDirPath, 0);
+     
+     os_dir_entry *DirEntry;
+     
+     while((DirEntry = OS_WalkDirGetNext(FrameArena, Dir)) != 0)
+     {
+      if(DirEntry->Kind == OS_DirEntryKind_File)
+      {       
+       lister_entry *Entry = Entries + EntryCount; 
+       EntryCount += 1;
+       Entry->Icon = UI_Icons[UI_IconKind_File];
+       Entry->Text = DirEntry->Name;
+       Entry->Command = Command_PieceReadFile;
+      }
+     }
+     
+    };
     
    }
    
@@ -2257,7 +2284,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      {
       Matched = false;
      }
-     else if(App->Text.Size == 0)
+     else if(App->ListerText.Size == 0)
      {
       Matched = true;
      }
@@ -2267,7 +2294,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       for EachIndex(NameIdx, Name.Size)
       {
        if(ToLowercase(Name.Data[NameIdx]) == 
-          ToLowercase(App->Text.Data[TextIdx]))
+          ToLowercase(App->ListerText.Data[TextIdx]))
        {
         Matched = true;
        }
@@ -2281,7 +2308,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
        if(Matched)
        {
         TextIdx += 1;
-        if(TextIdx == App->Text.Size)
+        if(TextIdx == App->ListerText.Size)
         {
          break;
         }
@@ -2289,7 +2316,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
       
       // NOTE(luca): Whole text must have matched
-      if(TextIdx < App->Text.Size)
+      if(TextIdx < App->ListerText.Size)
       {
        Matched = false;
       }
@@ -2301,6 +2328,23 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Entry->Idx = Idx;
      FilteredEntries[FilteredEntryCount] = *Entry;
      FilteredEntryCount += 1;
+    }
+   }
+   
+   // If lister is for files and no file matched, suggest to create with input.
+   {   
+    if(App->ListerKind == ListerKind_Files && FilteredEntryCount == 0 &&
+       App->ListerText.Size)
+    {
+     lister_entry *Entry = FilteredEntries;
+     FilteredEntryCount += 1;
+     Entry->Tag = S8("New");
+     Entry->Icon = UI_Icons[UI_IconKind_File];
+     Entry->Text = App->ListerText;
+     Entry->Command = Command_PieceReadFile;
+     
+     Entries[EntryCount] = *Entry;
+     EntryCount += 1;
     }
    }
    
@@ -2355,8 +2399,8 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
          
          custom_draw__single_line_text_input_params *Params = PushArray(FrameArena, custom_draw__single_line_text_input_params, 1);
          Params->Box = InputBox;
-         Params->Text = App->Text;
-         Params->CursorAnimTime = App->CursorAnimTime;
+         Params->Text = App->ListerText;
+         Params->CursorAnimTime = App->ListerCursorAnimTime;
          InputBox->CustomDraw = CustomDrawSingleLineTextInput;
          InputBox->CustomDrawData = Params;
         }
@@ -2421,9 +2465,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                     Color_Night1 :
                                     Color_ButtonBackground));
              
-#define MUZE_WIP_LISTER 1
-#if MUZE_WIP_LISTER
-             
              ui_box *ItemBox;
              UI_BackgroundColor(BackgroundColor)
               UI_KeyFromParent()
@@ -2459,7 +2500,17 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                           UI_BoxFlag_CenterTextHorizontally);
                }
               }
-#endif
+              
+              if(Entry->Icon.Size)
+              {
+               UI_BackgroundColor(Color_Night0)
+                UI_SemanticWidth(UI_SizePx(30.f, 1.f))
+                UI_FontKind(FontKind_Icons)
+                UI_AddBox(Entry->Icon, 
+                          UI_BoxFlag_DrawDisplayString |
+                          UI_BoxFlag_CenterTextVertically |
+                          UI_BoxFlag_CenterTextHorizontally);
+              }
               
               UI_Row() UI_Padding(GlobalItemPadding)
                UI_FillWidth()
@@ -2481,8 +2532,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                if(IsToggle)
                {
                 b32 Toggled = false;
-                
-                DebugBrokeIf(0, Entry->Command == Command_PieceTogglePracticing);
                 
                 UI_SemanticWidth(UI_SizePx(50.f + 2.f*PaddingMinusOne.Value, 1.f))
                  UI_AddBox(Str8Fmt("CheckBoxParent##%d", Entry->Idx), 0);
@@ -2518,9 +2567,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                
               }
               
-#if MUZE_WIP_LISTER     
              }
-#endif
              
              if(ItemSelected)
              {
@@ -2537,6 +2584,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                
                Command->S32 = Entry->S32;
                Command->F32 = Entry->F32;
+               Command->Text = Entry->Text;
               }
              }
              
@@ -2560,7 +2608,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     
    }
    
-   App->CursorAnimTime += Input->dtForFrame;
+   App->ListerCursorAnimTime += Input->dtForFrame;
   }
   
   //- UI Top "Controls" 
@@ -2736,15 +2784,27 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                UI_SemanticHeight(UI_SizePx(ItemHeight,  1.f))
                 UI_Row()
                 UI_SemanticWidth(UI_SizePx(150.f, 1))
-               {               
+               { 
+                
+                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
+                 if(M_Button(S8("New")))
+                {
+                 PushCommand(App, Command_PieceNew);
+                }
+                
                 UI_FontKind(FontKind_Icons)
                  UI_SemanticWidth(UI_SizePx(30.f, 1.f))
                 {
                  if(M_IconButton(UI_IconKind_File, S8("Open")))
                  {
+#if 0
+                  // Clear piece
                   MS_Serialize(Serializer, FrameArena, MS_Reading, PieceFilePath)
                    MS_Piece(&Serializer, Piece);
                   PushCommand(App, Command_PieceStop);
+#else
+                  PushCommand(App, Command_OpenLister)->S32 = ListerKind_Files;
+#endif
                  }
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
@@ -2785,25 +2845,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 }
                 
                 // Synth
-                {                
-                 UI_SemanticWidth(UI_SizePx(120.f, 1.f))
-                 {
-                  ui_button_result Click = UI_Button(.Text = S8("Synth"), 
-                                                     .Padding = GlobalItemPadding, 
-                                                     .HasToggle = true,
-                                                     .ToggleToggled = !App->OutputSynthDisabled, 
-                                                     .ToggleToggledColor = Color_Yellow);
-                  if(Click.Pressed)
-                  {
-                   PushCommand(App, Command_PieceSelectInstrument);
-                  }
-                  if(Click.Toggled)
-                  {
-                   PushCommand(App, Command_ToggleOutputSynth);
-                  }
-                 }
-                }
-                
                 UI_SemanticWidth(UI_SizePx(200.f, 1))
                  
                 {
@@ -2818,10 +2859,19 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                  }
                 }
                 
-                UI_SemanticWidth(UI_SizeText(6.f, 1.f))
-                 if(M_Button(S8("New")))
-                {
-                 PushCommand(App, Command_PieceClear);
+                
+                UI_SemanticWidth(UI_SizePx(250.f, 1.f))
+                {                 
+                 m_slider_result Slider = M_Slider(S8("SetNoteLength"), S8(""), 
+                                                   Str8Fmt("Length 1/%-2.0f", Piece->SetNoteLength), 
+                                                   Piece->SetNoteLength, 
+                                                   1.f, 16.f, 1.f, true,
+                                                   .Align = false); 
+                 Piece->SetNoteLength = Slider.Value;
+                 if(Slider.Clicked)
+                 {
+                  PushCommand(App, Command_PieceSetNoteLength);
+                 }
                 }
                 
                 UI_FillWidth()
@@ -2843,25 +2893,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 UI_SemanticWidth(UI_SizeText(6.f, 1.f))
                  if(M_Button(S8("Range")))
                 {
-#if 1
                  PushCommand(App, Command_PieceSetPracticeRangeFromSelection);
-#else
-                 f32 Start = Piece->Notes[Piece->SelectedNoteIdx].Start;
-                 if(Start < Piece->PracticeEnd)
-                 {
-                  Piece->PracticeStart = Start;
-                  
-                  if(Start > Piece->PracticePos)
-                  {
-                   Piece->PracticePos = Piece->PracticeStart;
-                  }
-                  
-                  if(Start > Piece->PlayPos || Piece->PlayPos > Piece->PracticeEnd)
-                  {
-                   Piece->PlayPos = Piece->PracticeStart;
-                  }
-                 }
-#endif
                 }
                 
                 UI_FontKind(FontKind_Icons)
@@ -2869,21 +2901,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                  if(M_IconButton(UI_IconKind_Clock, S8("StrictTiming"), .TextColor = (Piece->PracticeStrictTiming ? Color_Yellow : Color_Black)))
                 {
                  PushCommand(App, Command_PieceToggleStrictTiming);
-                }
-                
-                UI_SemanticWidth(UI_SizePx(300.f, 1.f))
-                 
-                {                 
-                 m_slider_result Slider = M_Slider(S8("SetNoteLength"), S8(""), 
-                                                   Str8Fmt("Length 1/%-2.0f", Piece->SetNoteLength), 
-                                                   Piece->SetNoteLength, 
-                                                   1.f, 16.f, 1.f, true,
-                                                   .Align = false); 
-                 Piece->SetNoteLength = Slider.Value;
-                 if(Slider.Clicked)
-                 {
-                  PushCommand(App, Command_PieceSetNoteLength);
-                 }
                 }
                 
                 UI_FillWidth()
@@ -3428,7 +3445,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      App->ListerOpened = true;
      App->ListerKind = (lister_kind)Command->S32;
      App->ListerScroll = 0.f;
-     App->Text.Size = 0;
+     App->ListerText.Size = 0;
     } break;
     
     case Command_SelectCommand:
@@ -3542,17 +3559,16 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      {
       Piece->PlayPos = 0.f;
      }
-     
      // Free all practice notes
-     for EachNodeSafe(Note, note, Piece->FirstPracticeNote)
+     for EachNoteSafe(Note, Piece->FirstPracticeNote)
      {
-      DLLRemoveNil(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote, NilNote);
+      RemoveNote(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote);
       PieceNoteRelease(Piece, Note);
      }
      
     } break;
     
-    case Command_PieceClear:
+    case Command_PieceNew:
     {
      PieceStopPlaying(App, Piece);
      Piece->IsRecording = false;
@@ -3594,9 +3610,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceTogglePracticing:
     {
      // Free all practice notes
-     for EachNodeSafe(Note, note, Piece->FirstPracticeNote)
+     for EachNoteSafe(Note, Piece->FirstPracticeNote)
      {
-      DLLRemoveNil(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote, NilNote);
+      RemoveNote(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote);
       PieceNoteRelease(Piece, Note);
      }
      
@@ -3607,6 +3623,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      else
      {
       Piece->IsPracticing = true;
+      PushCommand(App, Command_PieceSetPracticeRangeFromSelection);
       
       tsf_channel_note_off_all(GlobalTSF, Piece->Channel);
       
@@ -3648,9 +3665,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Piece->FreeSel = 0;
     } break;
     
+    case Command_PieceSelectNote:
     case Command_PieceDeselectNote:
     {
-     note *Note = (note *)Command->U64;
+     note *Note = Command->Note;
+     
+     b32 DoSelect = (Command->Kind == Command_PieceSelectNote);
      
      note_node *Selected = 0;
      // Selected
@@ -3665,33 +3685,14 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
      }
      
-     if(Selected) 
+     if(0) {}
+     else if(Selected && !DoSelect) 
      {
       DLLRemove(Selected, Piece->FirstSel, Piece->LastSel);
       Selected->Next = Piece->FreeSel;
       Piece->FreeSel = Selected;
      }
-     
-    } break;
-    
-    case Command_PieceSelectNote:
-    {
-     note *Note = (note *)Command->U64;
-     
-     note_node *Selected = 0;
-     // Selected
-     {
-      for EachNode(Sel, note_node, Piece->FirstSel)
-      {
-       if(Sel->V == Note)
-       {
-        Selected = Sel;
-        break;
-       }
-      }
-     }
-     
-     if(!Selected)
+     else if(!Selected && DoSelect)
      {
       if(Piece->FreeSel)
       {
@@ -3713,6 +3714,30 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      
     } break;
     
+    case Command_PieceSelectNextNote:
+    {
+     if(Piece->LastSel)
+     {
+      if(!IsNilNote(Piece->LastSel->V->Next))
+      {
+       Piece->LastSel->V = Piece->LastSel->V->Next;
+      }
+     }
+     
+    } break;
+    
+    case Command_PieceSelectPrevNote:
+    {
+     if(Piece->LastSel)
+     {
+      if(!IsNilNote(Piece->LastSel->V->Prev))
+      {
+       Piece->LastSel->V = Piece->LastSel->V->Prev;
+      }
+     }
+     
+    } break;
+    
     case Command_PieceDeleteNote:
     {
      // Sort notes by idx in array.
@@ -3726,7 +3751,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       }
       else if(Note->Kind == NoteKind_Rest)
       {     
-       DLLRemoveNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
+       RemoveNote(Note, Piece->FirstNote, Piece->LastNote);
        PieceNoteRelease(Piece, Node->V);
        DLLRemove(Node, Piece->FirstSel, Piece->LastSel);
       }
@@ -3779,11 +3804,26 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       MaxEnd = Max(MaxEnd, End);
      }
      
+     if(Piece->FirstSel == 0)
+     {
+      MinStart = 0.f;
+      MaxEnd = Piece->RecordLength;
+     }
+     
      Piece->PracticeStart = MinStart;
      Piece->PracticeEnd = MaxEnd;
      PieceStopPlaying(App, Piece);
      Piece->PlayPos = Piece->PracticeStart;
      
+    } break;
+    
+    case Command_PieceReadFile:
+    case Command_PieceSaveFile:
+    {
+     Piece->FilePath = Command->Text;
+     ms_mode Mode = MS_Reading + !!(Command->Kind == Command_PieceSaveFile);
+     MS_Serialize(Serializer, FrameArena, Mode, Piece->FilePath)
+      MS_Piece(&Serializer, Piece);
     } break;
    }
   }
@@ -3983,7 +4023,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
        
        TSFPlayNoteU8(App, Piece->Channel, Note->Pitch, Note->Velocity);
        
-       DLLAppendNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
+       AppendNote(Note, Piece->FirstNote, Piece->LastNote);
        Piece->NoteCount += 1;
       }
      }
@@ -4083,8 +4123,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
        Note->Start = FirstNoteToPlay->Start;
 #endif
        Note->Hidden = false;
-       
-       DLLAppendNil(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote, NilNote);
+       AppendNote(Note, Piece->FirstPracticeNote, Piece->LastPracticeNote);
       }
      }
      else if(Type == MIDIEventType_NoteOff ||

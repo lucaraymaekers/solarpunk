@@ -285,10 +285,11 @@ for(int i = ((Begin), 0); !i; i += 1, (End))
 (t *Node = First; !CheckNil(Node, Nil); Node = Node->Next) 
 #define EachNode(Node, t, First) EachNodeNil(Node, t, First, 0)
 
-#define EachNodeSafe(Node, t, First) \
-(t *Node = (First), *_Next = (Node != 0 ? Node->Next : 0); \
-Node != 0; \
-Node = _Next, _Next = (Node != 0 ? Node->Next : 0))
+#define EachNodeSafeNil(Node, t, First, Nil) \
+(t *Node = (First), *_Next = (!CheckNil(Node, Nil) ? Node->Next : 0); \
+!CheckNil(Node, Nil); \
+Node = _Next, _Next = (!CheckNil(Node, Nil) ? Node->Next : 0))
+#define EachNodeSafe(Node, t, First) EachNodeSafeNil(Node, t, First, 0)
 
 #define EachNodeBack(Node, type, Last) (type *Node = Last; Node != 0; Node = Node->Prev)
 

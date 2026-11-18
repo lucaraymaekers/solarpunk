@@ -23,10 +23,23 @@ MS_SerializeBegin(arena *Arena, str8 Path, ms_mode Mode)
  Serializer.Version = MSV_Latest;
  MS_Ser(&Serializer, &Serializer.Version);
  
+ 
  if(Serializer.Version > MSV_Latest)
  {
   ErrorLog("Cannot read file from the future.\n");
   Serializer.At = Serializer.Buffer.Size;
+ }
+ else if(Serializer.Version >= MSV_MagicNumber)
+ {
+  str8 Magic = S8(MS_Magic);
+  
+  MS_Struct(&Serializer, Magic.Data, Magic.Size);
+  
+  if(!S8Match(Magic, S8(MS_Magic), 0))
+  {
+   ErrorLog("Magic number mismatch.\n");
+   Serializer.At = Serializer.Buffer.Size;
+  }
  }
  
  return Serializer;
@@ -112,6 +125,19 @@ MS_Note(ms_serializer *Serializer, note *Note)
 internal void
 MS_Piece(ms_serializer *Serializer, piece *Piece)
 {
+ ArenaClear(Piece->NotesArena);
+ ArenaClear(Piece->SelArena);
+ Piece->FirstNote = NilNote;
+ Piece->LastNote = NilNote;
+ Piece->FirstPracticeNote = NilNote;
+ Piece->LastPracticeNote = NilNote;
+ Piece->FreeNote = NilNote;
+ Piece->FirstSel = 0;
+ Piece->LastSel = 0;
+ Piece->FreeSel = 0;
+ Piece->NoteCount = 0;
+ Piece->SelCount = 0;
+ 
  MS_Add(MSV_Initial, &Piece->BPM);
  MS_Add(MSV_Initial, &Piece->TimeSigNum);
  MS_Add(MSV_Initial, &Piece->TimeSigDen);

@@ -222,9 +222,8 @@ OS_MakeDirectory(char *Path)
 }
 
 internal os_dir *
-OS_WalkDirPush(str8 Path, os_dir *Current)
+OS_WalkDirPush(arena *Arena, str8 Path, os_dir *Current)
 {
- arena *Arena = GetScratch();
  os_dir *Result = PushArrayZero(Arena, os_dir, 1);
  
  if(Current)
@@ -253,9 +252,8 @@ OS_WalkDirPop(os_dir *Dir)
 }
 
 internal os_dir_entry *
-OS_WalkDirGetNext(os_dir *Dir)
+OS_WalkDirGetNext(arena *Arena, os_dir *Dir)
 {
- arena *Arena = GetScratch();
  os_dir_entry *Result = 0;
  
  Dir->Opaque->Entry = readdir(Dir->Opaque->Dir);
