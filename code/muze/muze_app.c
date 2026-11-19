@@ -1029,12 +1029,12 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
  enum piece_marker_kind
  {
   PieceMarkerKind_Play,
-  PieceMarkerKind_PrevPlay,
+  //PieceMarkerKind_PrevPlay,
   PieceMarkerKind_Record,
   PieceMarkerKind_PracticeStart,
   PieceMarkerKind_PracticeEnd,
   PieceMarkerKind_PracticePos,
-  PieceMarkerKind_PrevPracticePos,
+  //PieceMarkerKind_PrevPracticePos,
   PieceMarkerKind_Count
  };
  
@@ -1055,6 +1055,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     Start = Piece->PlayPos;
     MarkerHeightIdx = 0.f;
    }
+#if 0
    else if(Kind == PieceMarkerKind_PrevPlay)
    {
     Color = Color_Yellow;
@@ -1062,6 +1063,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     FollowPos = &Piece->PrevPlayPos;
     MarkerHeightIdx = 0.f;
    }
+#endif
    else if(Kind == PieceMarkerKind_Record)
    {
     Color = Color_Red;
@@ -1088,6 +1090,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     Start = Piece->PracticePos;
     MarkerHeightIdx = 4.f;
    }
+#if 0
    else if(Kind == PieceMarkerKind_PrevPracticePos)
    {
     Color = Color_Green;
@@ -1095,6 +1098,7 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
     FollowPos = &Piece->PrevPracticePos;
     MarkerHeightIdx = 4.f;
    }
+#endif
    else
    {
     InvalidPath();
@@ -1128,7 +1132,9 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
      // The whole width is a bit much
      Width = Min(Width, 50.f);
      // This gets rid of the wobbly cursor when the width is near 0
+#if 0
      if(Kind == PieceMarkerKind_PrevPlay && Width <= 20.f) Width = 0.f;
+#endif
     }
     
     // Draw trail
@@ -3160,6 +3166,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                  // Piece Debug Info
                  {                 
                   piece *Piece = App->SelectedPanel->Piece;
+#if 0
                   M_Labelf("Pos: %.2f "
                            "PrevPos: (%.2f,%.2f)"
                            "###PlayPos", 
@@ -3170,6 +3177,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                            "###PracticePos", 
                            Piece->PracticePos, 
                            V2Arg(Piece->PrevPracticePos));
+#endif
                   
                   M_Labelf("Practice Start: %.2f "
                            "Practice End: %.2f)"
@@ -3925,17 +3933,37 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       PieceClear(Piece);
      }
      
-     // Copy command text into piece file path
-     {     
-      Command->Text.Size = Min(Command->Text.Size, (ArrayCount(Piece->FilePathBuffer) - 1));
-      Piece->FilePath.Data = Piece->FilePathBuffer;
-      MemoryCopy(Piece->FilePath.Data, Command->Text.Data, Command->Text.Size);
-      Piece->FilePath.Size = Command->Text.Size;
+     piece *OtherPieceWithSameFilePath = NilPiece;
+     if(Command->Text.Size)
+     {
+      for EachNode(OtherPiece, piece, App->FirstPiece)
+      {
+       if(S8Match(Command->Text, OtherPiece->FilePath, 0))
+       {
+        OtherPieceWithSameFilePath = OtherPiece;
+        break;
+       }
+      }
      }
      
-     {     
-      MS_SerializeFromFile(Serializer, FrameArena, Mode, Piece->FilePath)
-       MS_Piece(&Serializer, Piece);
+     if(Mode == MS_Read && !IsNilPiece(OtherPieceWithSameFilePath))
+     {
+      Panel->Piece = OtherPieceWithSameFilePath;
+     }
+     else
+     {      
+      // Copy command text into piece file path
+      {     
+       Command->Text.Size = Min(Command->Text.Size, (ArrayCount(Piece->FilePathBuffer) - 1));
+       Piece->FilePath.Data = Piece->FilePathBuffer;
+       MemoryCopy(Piece->FilePath.Data, Command->Text.Data, Command->Text.Size);
+       Piece->FilePath.Size = Command->Text.Size;
+      }
+      
+      {     
+       MS_SerializeFromFile(Serializer, FrameArena, Mode, Piece->FilePath)
+        MS_Piece(&Serializer, Piece);
+      }
      }
      
     } break;

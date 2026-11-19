@@ -120,8 +120,8 @@ struct piece
  b32 LoopingDisabled;
  
  // UI
- v2 PrevPlayPos; // For animating
- v2 PrevPracticePos; // For animating
+ //v2 PrevPlayPos; // For animating
+ //v2 PrevPracticePos; // For animating
  b32 BarWrapping;
  f32 BarPadding;
  f32 BeatWidth;
