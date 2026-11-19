@@ -128,22 +128,6 @@ MS_Note(ms_serializer *Serializer, note *Note)
 internal void
 MS_Piece(ms_serializer *Serializer, piece *Piece)
 {
- if(Serializer->Mode == MS_Reading)
- {
-  ArenaClear(Piece->NotesArena);
-  ArenaClear(Piece->SelArena);
-  Piece->FirstNote = NilNote;
-  Piece->LastNote = NilNote;
-  Piece->FirstPracticeNote = NilNote;
-  Piece->LastPracticeNote = NilNote;
-  Piece->FreeNote = NilNote;
-  Piece->FirstSel = 0;
-  Piece->LastSel = 0;
-  Piece->FreeSel = 0;
-  Piece->NoteCount = 0;
-  Piece->SelCount = 0;
- }
- 
  MS_Add(MSV_Initial, &Piece->BPM);
  MS_Add(MSV_Initial, &Piece->TimeSigNum);
  MS_Add(MSV_Initial, &Piece->TimeSigDen);

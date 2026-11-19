@@ -133,6 +133,10 @@ internal b32  OS_Is(os_kind Kind);
 
 #define Log(Format, ...)      OS_PrintFormat((char *)(Format), ##__VA_ARGS__)
 // NOTE(luca): Append '\n', because this macro might be redefined into a visual error log.
-#define ErrorLog(Format, ...) Log(ERROR_FMT Format, ERROR_ARG, ##__VA_ARGS__)
+#if BASE_INTERNAL
+# define ErrorLog(Format, ...) Log(ERROR_FMT Format, ERROR_ARG, ##__VA_ARGS__)
+#else
+# define ErrorLog(...)
+#endif
 
 #endif //OS_H

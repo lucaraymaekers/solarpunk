@@ -148,7 +148,30 @@ PieceStopPlaying(app_state *App, piece *Piece)
   
   MIDIOutputMutePiecePlayingNotes(App, Piece);
  }
+}
+
+internal void
+PieceClear(piece *Piece)
+{
+ ArenaClear(Piece->NotesArena);
+ ArenaClear(Piece->SelArena);
  
+ Piece->IsRecording = false;
+ Piece->RecordLength = 0.f;
+ Piece->PlayPos = 0.f;
+ Piece->PracticePos = 0.f;
+ Piece->PracticeEnd = 0.f;
+ Piece->PracticeStart = 0.f;
+ 
+ Piece->NoteCount = 0;
+ Piece->SelCount = 0;
+ Piece->FreeNote = NilNote;
+ Piece->FirstNote = NilNote;
+ Piece->LastNote = NilNote;
+ Piece->FirstSel = 0;
+ Piece->LastSel = 0;
+ Piece->FirstPracticeNote = NilNote;
+ Piece->LastPracticeNote = NilNote;
 }
 
 #if 0

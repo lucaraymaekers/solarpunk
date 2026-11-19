@@ -9,6 +9,9 @@
 // When none of these values are overridden that means that we are in release mode.
 
 //- Base 
+#if !defined(BASE_INTERNAL)
+# define BASE_INTERNAL 0
+#endif
 #if !defined(BASE_PROFILE)
 # define BASE_PROFILE 0
 #endif

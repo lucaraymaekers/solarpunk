@@ -3097,6 +3097,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                  PushCommand(App, Command_OpenLister)->S32 = ListerKind_DebugInfo;
                 }
                 
+#if MUZE_INTERNAL                
                 {                
                  f32 Speed = UI_State->AnimSpeedCoeff;
                  Speed = M_Slider(S8("SetAnimSpeed"), S8("Set animation speed"), 
@@ -3108,6 +3109,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 App->HeightPx = M_Slider(S8("SetFontSize"), S8("Set font size"), Str8Fmt("%.0f", App->HeightPx), App->HeightPx,
                                          11.f, 64.f, 1.f, false,
                                          .SliderSize = SliderSize).Value;
+#endif
                 
                 UI_BackgroundColor(Color_Night0)
                 {
@@ -3582,22 +3584,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceNew:
     {
      PieceStopPlaying(App, Piece);
-     Piece->IsRecording = false;
-     Piece->RecordLength = 0.f;
-     Piece->PlayPos = 0.f;
-     Piece->PracticePos = 0.f;
-     Piece->PracticeEnd = 0.f;
-     Piece->PracticeStart = 0.f;
-     
-     Piece->NoteCount = 0;
-     Piece->SelCount = 0;
-     Piece->FreeNote = NilNote;
-     Piece->FirstNote = NilNote;
-     Piece->LastNote = NilNote;
-     Piece->FirstSel = 0;
-     Piece->LastSel = 0;
-     Piece->FirstPracticeNote = NilNote;
-     Piece->LastPracticeNote = NilNote;
+     PieceClear(Piece);
     } break;
     
     case Command_PieceToggleMetronome:
@@ -3842,6 +3829,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceSaveFile:
     {
      ms_mode Mode = MS_Reading + !!(Command->Kind == Command_PieceSaveFile);
+     
+     if(Mode == MS_Reading)
+     {
+      PieceStopPlaying(App, Piece);
+      PieceClear(Piece);
+     }
      
      // Copy command text into piece file path
      {     
@@ -4247,6 +4240,13 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      Piece->LastPracticeNote = NilNote;
      
     }
+   }
+   
+   // Save piece
+   if(Piece->FilePath.Size)
+   {
+    MS_Serialize(Serializer, FrameArena, MS_Writing, Piece->FilePath)
+     MS_Piece(&Serializer, Piece);
    }
   }
  }
