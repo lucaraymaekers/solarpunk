@@ -267,11 +267,11 @@ BASE_ENTRY_POINT()
     table_hash_node *TableHashArray = PushArrayZero(Arena, table_hash_node, HashArraySize);
     field_hash_node *FieldHashArray = PushArrayZero(Arena, field_hash_node, HashArraySize);
     
-    for(os_dir *Dir = OS_WalkDirPush(S8("../code"), 0);
+    for(os_dir *Dir = OS_WalkDirPush(Arena, S8("../code"), 0);
         Dir != 0;
         )
     {
-     os_dir_entry *Entry = OS_WalkDirGetNext(Dir);
+     os_dir_entry *Entry = OS_WalkDirGetNext(Arena, Dir);
      
      if(Entry != 0)
      {
@@ -284,7 +284,7 @@ BASE_ENTRY_POINT()
        if(0) {}
        else if(Entry->Kind == OS_DirEntryKind_Directory)
        {
-        Dir = OS_WalkDirPush(Entry->Name, Dir);
+        Dir = OS_WalkDirPush(Arena, Entry->Name, Dir);
        }
        else if(Entry->Kind == OS_DirEntryKind_File)
        {
