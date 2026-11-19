@@ -172,6 +172,10 @@ PieceClear(piece *Piece)
  Piece->LastSel = 0;
  Piece->FirstPracticeNote = NilNote;
  Piece->LastPracticeNote = NilNote;
+ 
+ Piece->StaffCount = 1;
+ MemoryZero(&Piece->Staffs[0]);
+ Piece->Staffs[0].Octave = 5;
 }
 
 #if 0

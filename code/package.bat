@@ -23,7 +23,9 @@ mkdir %dir%
 cd %dir%
 
 copy /Y ..\..\build\muze.exe
+copy /Y ..\..\build\muze.pdb
 copy /Y ..\..\build\muze_app.dll
+copy /Y ..\..\build\muze_app.pdb
 copy /Y ..\..\data\font_text_regular.ttf
 copy /Y ..\..\data\font_icons.ttf
 copy /Y ..\..\data\font_music_text.otf

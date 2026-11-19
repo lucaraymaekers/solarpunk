@@ -298,8 +298,8 @@ Cng_Build__(str8 BuildName,
      
     }
     
-    if(Debug) Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
-    else      Cng_S8ArrayAppend(S8("-O2"));
+    Cng_S8ArrayAppend(S8("-g -ggdb -g3"));
+    if(!Debug) Cng_S8ArrayAppend(S8("-O2"));
     
     // Extra flags depending on build type
     {  
@@ -402,8 +402,9 @@ Cng_Build__(str8 BuildName,
     
     if(Options->Asan) Cng_S8ArrayAppend(S8("/fsanitize=address"));
     
-    if(Debug) Cng_S8ArrayAppend(S8("-Z7")); // Debug info
-    else      Cng_S8ArrayAppend(S8("-O2")); // Optimizations
+    Cng_S8ArrayAppend(S8("-Z7")); // Debug info
+    
+    if(!Debug) Cng_S8ArrayAppend(S8("-O2")); // Optimizations
     
     if(Options->CPP) Cng_S8ArrayAppend(S8("/std:c++20"));
     

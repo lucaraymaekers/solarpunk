@@ -34,7 +34,7 @@ MS_SerializeBegin(arena *Arena, str8 Path, ms_mode Mode)
  }
  else if(Serializer.Version >= MSV_MagicNumber)
  {
-  str8 Magic = S8(MS_Magic);
+  str8 Magic = S8DupCString(Arena, MS_Magic);
   
   MS_Struct(&Serializer, Magic.Data, Magic.Size);
   
@@ -62,18 +62,17 @@ MS_SerializeEnd(ms_serializer *Serializer)
   OS_WriteEntireFile(Serializer->FilePath, Out);
  }
 }
+
 internal void
 MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
 {
  u8 *Dest = Serializer->Buffer.Data + Serializer->At;
  
- if(Serializer->At < Serializer->Buffer.Size)
+ if(Serializer->At + Size <= Serializer->Buffer.Size)
  { 
   if(0) {}
   else if(Serializer->Mode == MS_Reading) MemoryCopy(Value, Dest, Size);
   else if(Serializer->Mode == MS_Writing) MemoryCopy(Dest, Value, Size);
-  
-  Assert(Serializer->At + Size <= Serializer->Buffer.Size);
   Serializer->At += Size;
  }
  else

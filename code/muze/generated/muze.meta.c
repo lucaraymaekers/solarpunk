@@ -773,7 +773,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 1.f,
-  .Step = 0.f,
+  .Step = 1.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },

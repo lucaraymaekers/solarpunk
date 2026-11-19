@@ -80,6 +80,7 @@ Bugs:
     buttons
 - muze: 
   - ClosePanel refreshes layout.
+  - Serialization should have magic number per type : config, piece, etc.
 - bug: when doing sliders and toggles at different sizes they end up looking wrong.
 - bug: When resizing mouse pointer can glitch between resizing and pointer
 - bug: win32: MIDI devices are not getting selected correctly

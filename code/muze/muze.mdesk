@@ -42,7 +42,7 @@ CommandsTable:
  { PieceSetNoteLength,                 false, "Piece",  "Set note length",                   None   0 0 0    0.f 0.f   0.f "" }
  { PieceIncrementNotePitch,            false, "Piece",  "Increment note pitch",  Up     0 0 0    0.f 0.f   0.f "" }
  { PieceDecrementNotePitch,            false, "Piece",  "Decrement note pitch",  Down   0 0 0    0.f 0.f   0.f "" }
- { PieceSelectInstrument,              false, "Piece",  "Select synth instrument",           None   0 0 0    0.f 1.f   0.f "" }
+ { PieceSelectInstrument,              false, "Piece",  "Select synth instrument",           None   0 0 0    0.f 1.f   1.f "" }
  { PieceAddStaff,                      false, "Piece",  "Add bass staff",                    None   0 0 0    0.f 0.f   0.f "" }
  { PieceTrimAtFirstNote,               false, "Piece",  "Trim from start to first note",     None   0 0 0    0.f 0.f   0.f "" }
  { PieceSetPracticeRangeFromSelection, false, "Piece",  "Set practice range from selection", None   0 0 0    0.f 0.f   0.f "" }

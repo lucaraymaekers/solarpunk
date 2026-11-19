@@ -301,7 +301,7 @@ Node = _Prev, _Prev = (Node != 0 ? Node->Prev : 0))
 #define EachCount(Count) EachIndex(Var(_i_), Count)
 
 #define MemoryCopy(Dest, Source, Count) memmove(Dest, Source, Count)
-#define MemorySet(Dest, Value, Count)  memset(Dest, Value, Count)
+#define MemorySet(Dest, Value, Count) memset(Dest, Value, Count)
 #define MemoryZero(Value) MemorySet((Value), 0, sizeof((*Value)));
 #define MemoryCopyArray(Dest, Source) MemoryCopy((Dest), (Source), sizeof((Dest)))
 #define MemoryCopyStruct(Dest, Source) MemoryCopy((Dest), (Source), sizeof(*(Dest)))
