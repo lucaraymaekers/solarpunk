@@ -2815,16 +2815,12 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                 {
                  if(M_IconButton(UI_IconKind_File, S8("Open")))
                  {
-                  PushCommand(App, Command_OpenLister)->S32 = ListerKind_Files;
-                  App->ListerInputText = S8("Open");
-                  App->ListerInputCommand = Command_PieceReadFile;
+                  PushCommand(App, Command_PieceOpenFile);
                  }
                  
                  if(M_IconButton(UI_IconKind_Save, S8("Save")))
                  {
-                  PushCommand(App, Command_OpenLister)->S32 = ListerKind_Files;
-                  App->ListerInputText = S8("Save");
-                  App->ListerInputCommand = Command_PieceSaveFile;
+                  PushCommand(App, Command_PieceSaveAsFile);
                  }
                  
                  if(M_IconButton(UI_IconKind_Record, S8("Record"), .TextColor = (Piece->IsRecording ? Color_Red : Color_ButtonText)))
@@ -3832,19 +3828,34 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      
     } break;
     
+    case Command_PieceOpenFile:
+    case Command_PieceSaveAsFile:
+    {
+     b32 Open = (Command->Kind == Command_PieceOpenFile);
+     
+     PushCommand(App, Command_OpenLister)->S32 = ListerKind_Files;
+     App->ListerInputText = (Open ? S8("Open") : S8("Save As"));
+     App->ListerInputCommand = (Open ? Command_PieceReadFile : Command_PieceSaveFile);
+    } break;
+    
     case Command_PieceReadFile:
     case Command_PieceSaveFile:
     {
-     Command->Text.Size = Min(Command->Text.Size, (ArrayCount(Piece->FilePathBuffer) - 1));
-     Piece->FilePath.Data = Piece->FilePathBuffer;
-     MemoryCopy(Piece->FilePath.Data, Command->Text.Data, Command->Text.Size);
-     Piece->FilePath.Size = Command->Text.Size;
-     
      ms_mode Mode = MS_Reading + !!(Command->Kind == Command_PieceSaveFile);
+     
+     // Copy command text into piece file path
+     {     
+      Command->Text.Size = Min(Command->Text.Size, (ArrayCount(Piece->FilePathBuffer) - 1));
+      Piece->FilePath.Data = Piece->FilePathBuffer;
+      MemoryCopy(Piece->FilePath.Data, Command->Text.Data, Command->Text.Size);
+      Piece->FilePath.Size = Command->Text.Size;
+     }
+     
      MS_Serialize(Serializer, FrameArena, Mode, Piece->FilePath)
       MS_Piece(&Serializer, Piece);
     } break;
    }
+   
   }
  }
  

@@ -40,6 +40,8 @@ Command_None,
  Command_PieceTrimAtFirstNote,
  Command_PieceSetPracticeRangeFromSelection,
  Command_PieceReadFile,
+ Command_PieceOpenFile,
+ Command_PieceSaveAsFile,
  Command_PieceSaveFile,
  Command_CloseLister,
  Command_OpenLister,
@@ -724,9 +726,9 @@ command_meta_info CommandsMetaInfo[] =
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Select synth instrument", 23},
   
-  .Key = PlatformKey_S,
-  .Shift = 1,
-  .Control = 1,
+  .Key = PlatformKey_None,
+  .Shift = 0,
+  .Control = 0,
   .Alt = 0,
   
   .Min = 0.f,
@@ -798,7 +800,26 @@ command_meta_info CommandsMetaInfo[] =
   .NeedsParam = false,
   
   .Tag = {(u8 *)"Piece", 5},
-  .Description = {(u8 *)"Open piece file", 15},
+  .Description = {(u8 *)"Read piece file", 15},
+  
+  .Key = PlatformKey_None,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceOpenFile,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Open new piece file", 19},
   
   .Key = PlatformKey_O,
   .Shift = 0,
@@ -813,15 +834,34 @@ command_meta_info CommandsMetaInfo[] =
  },
  
  {
-  .Command = Command_PieceSaveFile,
+  .Command = Command_PieceSaveAsFile,
   .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Save as new piece file", 22},
+  
+  .Key = PlatformKey_S,
+  .Shift = 1,
+  .Control = 1,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 1.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceSaveFile,
+  .NeedsParam = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Save piece file", 15},
   
-  .Key = PlatformKey_S,
+  .Key = PlatformKey_None,
   .Shift = 0,
-  .Control = 1,
+  .Control = 0,
   .Alt = 0,
   
   .Min = 0.f,

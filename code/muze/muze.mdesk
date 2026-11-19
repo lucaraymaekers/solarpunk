@@ -40,12 +40,14 @@ CommandsTable:
  { PieceSelectPrevNote,                false, "Piece",  "Select previous note",              Left   0 0 0    0.f 0.f   1.f "" }
  { PieceDeleteNote,                    false, "Piece",  "Delete note",                       Delete 0 0 0    0.f 0.f   1.f "" }
  { PieceSetNoteLength,                 false, "Piece",  "Set note length",                   None   0 0 0    0.f 0.f   1.f "" }
- { PieceSelectInstrument,              false, "Piece",  "Select synth instrument",           S      1 1 0    0.f 1.f   1.f "" }
+ { PieceSelectInstrument,              false, "Piece",  "Select synth instrument",           None   0 0 0    0.f 1.f   1.f "" }
  { PieceAddStaff,                      false, "Piece",  "Add bass staff",                    None   0 0 0    0.f 0.f   1.f "" }
  { PieceTrimAtFirstNote,               false, "Piece",  "Trim from start to first note",     None   0 0 0    0.f 0.f   1.f "" }
  { PieceSetPracticeRangeFromSelection, false, "Piece",  "Set practice range from selection", None   0 0 0    0.f 0.f   1.f "" }
- { PieceReadFile,                      false, "Piece",  "Open piece file", O      1 0 0    0.f 0.f   1.f "" }
- { PieceSaveFile,                      false, "Piece",  "Save piece file", S      1 0 0    0.f 0.f   1.f "" }
+ { PieceReadFile,                      false, "Piece",  "Read piece file", None   0 0 0    0.f 0.f   1.f "" }
+ { PieceOpenFile,                      false, "Piece",  "Open new piece file", O      1 0 0    0.f 0.f   1.f "" }
+ { PieceSaveAsFile,                    false, "Piece",  "Save as new piece file", S      1 1 0    0.f 0.f   1.f "" }
+ { PieceSaveFile,                      true, "Piece",  "Save piece file", None   0 0 0    0.f 0.f   1.f "" }
  //- Lister
  { CloseLister,                        true,  "Lister", "Close",                             None   0 0 0    0.f 0.f   1.f "" }
  { OpenLister,                         true,  "Lister", "Open",                              None   0 0 0    0.f 0.f   1.f "" }  
