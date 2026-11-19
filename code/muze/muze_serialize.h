@@ -6,9 +6,9 @@
 //~ Serialization
 enum ms_mode
 {
- MS_Reading,
- MS_Writing,
- MS_GenStructures
+ MS_Read,
+ MS_Write,
+ MS_GenText,
 };
 typedef enum ms_mode ms_mode;
 
@@ -21,8 +21,6 @@ struct ms_serializer
  
  u64 At;
  str8 Buffer;
- 
- char *FilePath;
 };
 
 enum ms_version
@@ -61,10 +59,10 @@ MS_Ser(Serializer, &Dummy); \
 } \
 } while(0)
 
-#define MS_Serialize(Serializer, Arena, Mode, Path) \
-for(ms_serializer Serializer = MS_SerializeBegin(Arena, Path, Mode), *_Counter = 0; \
+#define MS_SerializeFromFile(Serializer, Arena, Mode, FilePath) \
+for(ms_serializer Serializer = MS_SerializeFromFileBegin(Arena, Mode, FilePath), *_Counter = 0; \
 _Counter == 0; \
-MS_SerializeEnd(&Serializer), _Counter += 1)
+MS_SerializeFromFileEnd(&Serializer, Arena, FilePath), _Counter += 1)
 
 #define MS_Magic "rlMuze"
 

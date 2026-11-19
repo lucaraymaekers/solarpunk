@@ -10,8 +10,8 @@
 + Delete note should probably add rests to pad out a measure when necessary.
 + Del key on keyboard should delete a note.
 + The Length slider doesn't seem to do anything
++ How does another piece get opened? Does the open operation always open "song.muze_piece"?
 
-- How does another piece get opened? Does the open operation always open "song.muze_piece"?
 - The start/end markers are a bit hard to see. Maybe a "S"/"E" above the staff or some other symbol?
 
 # mixer:
@@ -30,21 +30,21 @@ App:
 - Like other said, the several cursor aren't clear. I was confused why there was a "end cursor" (the one on the C). It seems that it's there because when you enable recording, you can only append at the end. But I think most audio program only have a single play head, and start recording there (either replacing existing things or adding ?). So my guess is that you want a single play cursor, and have either a selection range (like a background rectangle) or two mark. And sharing them between modes (recording or practice). Or at least only display the ones from the selected mode, with different colors for the modes. I also think that they should be more visible. A single 1*30 or something pixel isn't visible enough for me. The playhead usually is a line that spans the full height of the staff.
 
 - I'm guessing it's for later but having the metrics, clef and key signature would be nice.
+- One thing I forgot to mentioned previously is that it would help to have the small line behind notes higher and lower than the staff (I don't know if that has a particular name).
 
 UI:
++ I took me some time to notice the "Clear" button to start a new document. I think I didn't expected to be at that location, and the "load" icon (first icon in the line) looks like what I expect a "new file" button would look like.
+
 - The view doesn't scroll by itself when reaching the bottom while recording.
 Scrollbar aren't great. The rectangle inside doesn't represent the proportion of a page inside the view, which means that when you drag it, it doesn't scroll fast enough. And the mouse wheel doesn't scroll.
 
 - Your circles (in switches and sliders) aren't round. They look like square with rounded corners, but not rounded enough.  I think the switches and slider "background" have the same issue but it's less obvious to me.
-
-- I took me some time to notice the "Clear" button to start a new document. I think I didn't expected to be at that location, and the "load" icon (first icon in the line) looks like what I expect a "new file" button would look like.
 
 - I don't like the cursor interpolation between bars (no particular reason, it just looks strange to have that for me).
 
 - The window position at startup is a bit weird. I'd expect the window to be centered or start maximized.
 
 - What is the clock icon between "Start" and "End" ?
-
 
 - Setting the tempo using text is fine for me.
 

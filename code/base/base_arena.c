@@ -39,25 +39,29 @@ PushArena(arena *Arena, u64 Size, b32 Zero)
 internal void *
 ArenaPush(arena *Arena, u64 Size, u64 Alignment, b32 Zero)
 {
+ void *Result = 0;
+ 
  u64 AlignedPos = AlignPow2(Arena->Pos, Alignment);
  u64 NewPos = AlignedPos + Size;
  
- if(NewPos > Arena->Size)
+ if(NewPos <= Arena->Size)
+ {
+  Result = (u8 *)Arena->Base + AlignedPos;
+  
+  AsanUnpoisonMemoryRegion(Result, Size);
+  
+  if(Zero)
+  {
+   MemorySet(Result, 0, Size);
+  }
+  
+  Arena->Pos = NewPos;
+ }
+ else
  {
   // NOTE(luca): Custom Assert since we cannot print here because it will use ArenaPush(). 
   DebugBreak();
  }
- 
- void *Result = (u8 *)Arena->Base + AlignedPos;
- 
- AsanUnpoisonMemoryRegion(Result, Size);
- 
- if(Zero)
- {
-  MemorySet(Result, 0, Size);
- }
- 
- Arena->Pos = NewPos;
  
  return Result;
 }

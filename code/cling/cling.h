@@ -361,7 +361,8 @@ Cng_Build__(str8 BuildName,
                          "-GR- "  // Disable RTTI (cpp)
                          "-EHa- " // Disable exceptions(cpp)
                          "-Oi "   // Enable intrinsics
-                         "-FC"    // Full path names
+                         "-FC "    // Full path names
+                         "-GF "    // String literals always read-only
                          ));
     
     Cng_S8ArrayAppend(S8("-I" CLING_CODE_PATH));
@@ -475,10 +476,10 @@ Cng_Build_((cng_build_params) { \
 .BuildName = (Name), \
 .Options = (BuildOptions), \
 .Type = CngBuildType_EXE, \
-.ExtraCompilerFlags = NilP(str8_array), \
-.ExtraLinkerFlags = NilP(str8_array), \
+.ExtraCompilerFlags = nilp(str8_array), \
+.ExtraLinkerFlags = nilp(str8_array), \
 .Sources = (Sources_), \
-.OutputName = Nil(str8), \
+.OutputName = nil(str8), \
 ##__VA_ARGS__})
 
 //~ Platform
@@ -630,7 +631,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
     // NOTE(luca): So that build artifacts end up in the right directory.
     OS_ChangeDirectory(CSS8(BuildDirPath));
     
-    Cng_Build(S8("Cling"), NilP(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)));
+    Cng_Build(S8("Cling"), nilp(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)));
    }
    
    RunPath = NewPath;
@@ -935,7 +936,7 @@ Cng_InitAndRebuildSelf(int ArgCount, char *Args[], char *Env[])
   str8 ClingBuildPath = Cng_PathFromExe(CommandName, S8(CLING_BUILD_PATH));
   OS_ChangeDirectory(CSS8(ClingBuildPath));
   
-  Cng_Build(S8("Cling"), NilP(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)));
+  Cng_Build(S8("Cling"), nilp(cng_build_options), S8ArrayLit(S8(CLING_SOURCE_PATH)));
   
   // NOTE(luca): LinuxRunCommand expects Args to have {Args[0], Arg1, Arg2, ..., 0} format
   char **Arguments = PushArray(Arena, char *, (u64)(ArgCount + 2));

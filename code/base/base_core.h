@@ -217,11 +217,11 @@ Swap(t& A, t& B) { t T = A; A = B; B = T; }
 # define ZeroStruct {}
 #endif
 
-#define Nil(type) (type){0}
+#define nil(type) (type){0}
 #if LANG_C
-# define NilP(type) &(Nil(type))
+# define nilp(type) &(nil(type))
 #else
-# define NilP(type) 0
+# define nilp(type) 0
 #endif
 
 #if OS_LINUX || OS_ANDROID

@@ -150,7 +150,7 @@ AppBuild(cng_build_options *BuildOptions,
                     S8("-DRL_LIBS_IMPLEMENTATION=0"));
  
  Cng_Build(Name, BuildOptions, 
-           S8ArrayLit(AppSource, (Slow ? Nil(str8) : LibFileName)),
+           S8ArrayLit(AppSource, (Slow ? nil(str8) : LibFileName)),
            .Type = CngBuildType_DLL,
            .ExtraCompilerFlags = S8ArrayLit(DefineLibs, ExtraFlags),
            .OutputName = AppDLLName);
@@ -164,7 +164,7 @@ AppBuild(cng_build_options *BuildOptions,
  
  Cng_Build(Name, BuildOptions, 
            S8ArrayLit(S8("../code/rl/rl_platform.c"),
-                      (Slow ? Nil(str8) : LibFileName)),
+                      (Slow ? nil(str8) : LibFileName)),
            .ExtraCompilerFlags = S8ArrayLit(DefineLibs, Defines, ExtraFlags),
            .ExtraLinkerFlags   = S8ArrayLit(LinkerFlags),
            .OutputName = ExeName,);
@@ -623,14 +623,14 @@ BASE_ENTRY_POINT()
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Editor"), S8("Target")))
   {
    DidWork = true;
-   AppBuild(&BuildOptions, S8("Editor"), S8("../code/editor/editor_app.c"), S8("editor_app"), S8("editor"), Nil(str8));
+   AppBuild(&BuildOptions, S8("Editor"), S8("../code/editor/editor_app.c"), S8("editor_app"), S8("editor"), nil(str8));
   }
   
   //~ Muze
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Muze"), S8("Target")))
   {
    DidWork = true;
-   AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"), Nil(str8));
+   AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"), nil(str8));
   }
   //~ Wordled
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Wordled"), S8("Target")))

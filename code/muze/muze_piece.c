@@ -1,3 +1,53 @@
+
+internal void
+PieceClear(piece *Piece)
+{
+ ArenaClear(Piece->NotesArena);
+ ArenaClear(Piece->SelArena);
+ 
+ if(Piece->IsPlaying)
+ {
+  Log("WARNING: Piece should not be playing when cleared.\n");
+ }
+ 
+ // Defaults
+ 
+ Piece->FilePath = nil(str8);
+ 
+ Piece->IsPlaying = false;
+ Piece->IsRecording = false;
+ Piece->RecordLength = 0.f;
+ Piece->PlayPos = 0.f;
+ Piece->PracticePos = 0.f;
+ Piece->PracticeEnd = 0.f;
+ Piece->PracticeStart = 0.f;
+ 
+ Piece->BPM = 60;
+ Piece->TimeSigNum = 2;
+ Piece->TimeSigDen = 4;
+ 
+ Piece->NoteCount = 0;
+ Piece->SelCount = 0;
+ Piece->FreeNote = NilNote;
+ Piece->FirstNote = NilNote;
+ Piece->LastNote = NilNote;
+ Piece->FirstSel = 0;
+ Piece->LastSel = 0;
+ Piece->FirstPracticeNote = NilNote;
+ Piece->LastPracticeNote = NilNote;
+ 
+ Piece->StaffCount = 1;
+ Piece->Staffs[0].Octave = 5;
+ Piece->SetNoteLength = 1.f;
+ 
+ Piece->BarPadding = 16.f;
+ Piece->BeatWidth = 64.f;
+ Piece->NoteSize = 11.f;
+ Piece->StaffLineWidth = 1.f;
+ Piece->TailHeight = 24.f;
+ 
+}
+
 internal b32
 PiecePosPassedTimestamp(piece *Piece, f32 Pos, f32 Timestamp)
 {
@@ -27,10 +77,10 @@ PieceAlloc(app_state *App)
  
  if(App->PieceCount < App->MaxPieceCount)
  { 
-  if(!IsNilPiece(App->NextFreePiece))
+  if(!IsNilPiece(App->FreePiece))
   {
-   Result = App->NextFreePiece;
-   App->NextFreePiece = Result->Next;
+   Result = App->FreePiece;
+   App->FreePiece = Result->Next;
   }
   else
   {
@@ -42,29 +92,16 @@ PieceAlloc(app_state *App)
     tsf_channel_set_presetindex(GlobalTSF, Result->Channel, Result->Preset);
     tsf_channel_set_volume(GlobalTSF, Result->Channel, .3f);
    }
+   
+   Result->NotesArena = PushArena(App->PieceArena, KB(1)*sizeof(note), false);
+   Result->SelArena = PushArena(App->PieceArena, KB(1)*sizeof(note_node), false);
+   Result->UndoArena = PushArena(App->PieceArena, MB(1), false);
   }
   
   // Defaults
   if(!IsNilPiece(Result))
   {
-   Result->BPM = 60;
-   Result->TimeSigNum = 2;
-   Result->TimeSigDen = 4;
-   Result->StaffCount = 1;
-   Result->Staffs[0].Octave = 5;
-   
-   // First note is nil
-   Result->SetNoteLength = 1.f;
-   
-   Result->BarPadding = 16.f;
-   Result->BeatWidth = 64.f;
-   Result->NoteSize = 11.f;
-   Result->StaffLineWidth = 1.f;
-   Result->TailHeight = 24.f;
-   
-   Result->NotesArena = PushArena(App->PieceArena, KB(1)*sizeof(note), false);
-   Result->SelArena = PushArena(App->PieceArena, KB(1)*sizeof(note_node), false);
-   
+   PieceClear(Result);
   }
   
   DLLAppend(Result, App->FirstPiece, App->LastPiece);
@@ -93,8 +130,13 @@ PieceNoteAlloc(piece *Piece)
  else
  {
   Result = PushArray(Piece->NotesArena, note, 1);
+  if(Result == 0)
+  {
+   Result = NilNote;
+  }
  }
  
+ // Zero
  if(!IsNilNote(Result))
  {
   *Result = (note){NilNote, NilNote};
@@ -148,34 +190,6 @@ PieceStopPlaying(app_state *App, piece *Piece)
   
   MIDIOutputMutePiecePlayingNotes(App, Piece);
  }
-}
-
-internal void
-PieceClear(piece *Piece)
-{
- ArenaClear(Piece->NotesArena);
- ArenaClear(Piece->SelArena);
- 
- Piece->IsRecording = false;
- Piece->RecordLength = 0.f;
- Piece->PlayPos = 0.f;
- Piece->PracticePos = 0.f;
- Piece->PracticeEnd = 0.f;
- Piece->PracticeStart = 0.f;
- 
- Piece->NoteCount = 0;
- Piece->SelCount = 0;
- Piece->FreeNote = NilNote;
- Piece->FirstNote = NilNote;
- Piece->LastNote = NilNote;
- Piece->FirstSel = 0;
- Piece->LastSel = 0;
- Piece->FirstPracticeNote = NilNote;
- Piece->LastPracticeNote = NilNote;
- 
- Piece->StaffCount = 1;
- MemoryZero(&Piece->Staffs[0]);
- Piece->Staffs[0].Octave = 5;
 }
 
 #if 0

@@ -57,11 +57,26 @@ struct note_node
  note_node *Prev;
 };
 
+typedef struct piece_undo piece_undo;
+struct piece_undo
+{
+ str8 Buffer;
+ 
+ u64 ArenaStartPos;
+ 
+ piece_undo *Prev;
+ piece_undo *Next;
+};
+
 typedef struct piece piece; 
 struct piece 
 {
  piece *Next;
  piece *Prev;
+ 
+ arena *UndoArena;
+ piece_undo *FirstUndo;
+ piece_undo *LastUndo;
  
  str8 Name;
  
@@ -307,7 +322,7 @@ struct app_state
  piece *LastPiece;
  u64 PieceCount;
  u64 MaxPieceCount;
- piece *NextFreePiece;
+ piece *FreePiece;
  
  // Application memory
  arena *Arena;

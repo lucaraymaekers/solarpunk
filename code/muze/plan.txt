@@ -1,10 +1,9 @@
 Demo:
 - Use showkey on Linux
-- Enqueue/Dequeue Commands
 x Select notes in sheet music view 
 x Scrolling in sheet music view
  x With scrollbar
- x Auto scrolling when recording/playing
+ - Auto scrolling when recording/playing
 x Top control for changing panel kind
 
 # Now
@@ -145,7 +144,8 @@ When assets are not loaded.
 Metaprogram assets path etc.
 Metaprogram command enums etc.
 
-# Future 
+# Future
+- Enqueue/Dequeue commands 
 - File picker
 
 - Sheet music format

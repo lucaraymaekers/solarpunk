@@ -389,13 +389,21 @@ PanelNextLeaf(panel *Start, b32 Backwards)
 
 // NOTE(luca): Returns the panel that absorbed the size of the closed panel
 internal panel *
-ClosePanel(app_state *App, panel *Panel)
+PanelClose(app_state *App, panel *Panel)
 {
- panel *Collapse = NilPanel;
+ panel *Absorb = Panel;
  panel *Parent = Panel->Parent;
+ panel *Collapse = NilPanel;
  
  if(!IsNilPanel(Panel->Next)) Collapse = Panel->Next;
  if(!IsNilPanel(Panel->Prev)) Collapse = Panel->Prev;
+ 
+ if(Panel->Kind == PanelKind_Piece)
+ {
+  Panel->Piece->Next = App->FreePiece;
+  App->FreePiece = Panel->Piece;
+  Panel->Piece = NilPiece;
+ }
  
  if(IsNilPanel(Collapse))
  {
@@ -405,11 +413,22 @@ ClosePanel(app_state *App, panel *Panel)
    Collapse = Panel;
   }
  }
- else if(IsLeafPanel(Collapse))
+ else 
  {
+  if(IsLeafPanel(Collapse))
+  {
+   Absorb = Collapse;
+  }
+  else
+  {
+   Absorb = PanelNextLeaf(Collapse, false);
+  }
   
   // Remove the panel from the tree.
   {        
+#if 0
+   DLLRemoveNil(Panel, Parent->First, Parent->Last, NilPanel);
+#else
    if(!IsNilPanel(Panel->Next)) Panel->Next->Prev = Panel->Prev;
    if(!IsNilPanel(Panel->Prev)) Panel->Prev->Next = Panel->Next;
    if(!IsNilPanel(Parent))
@@ -417,6 +436,7 @@ ClosePanel(app_state *App, panel *Panel)
     if(Parent->First == Panel) Parent->First = Parent->First->Next;
     if(Parent->Last  == Panel) Parent->Last  = Parent->Last->Prev;
    }
+#endif
   }
   
   // Absorb the size of the closed panel
@@ -435,12 +455,16 @@ ClosePanel(app_state *App, panel *Panel)
     // Copy panel fields
     {
      Collapse->Parent = Parent->Parent;
-     Collapse->First = NilPanel;
-     Collapse->Last = NilPanel;
      Collapse->Next = Parent->Next;
      Collapse->Prev = Parent->Prev;
      
-     Collapse->Axis = Parent->Axis;
+     if(IsLeafPanel(Collapse))
+     {
+      Collapse->Axis = Parent->Axis;
+      Collapse->First = NilPanel;
+      Collapse->Last = NilPanel;
+     }
+     
      Collapse->ParentPct = Parent->ParentPct;
      Collapse->Region = Parent->Region;
     }
@@ -469,14 +493,10 @@ ClosePanel(app_state *App, panel *Panel)
    Panel->Next = App->FreePanel;
    App->FreePanel = Panel;
   }
- }
- else
- {
-  // NOTE(luca): I don't know when this can even happen.
-  InvalidPath();
+  
  }
  
- return Collapse;
+ return Absorb;
 }
 
 internal panel_rec
@@ -907,8 +927,8 @@ PiecePosFromTime(piece *Piece, f32 Start, v2 StartPos, b32 AlignToEnd,
   Pos.Y += (f32)HeightIdx*SizeToNextBar;
  }
  
- f32 BarStart = 2.f*BarPadding + (f32)BarIdx*WholeBarWidth;
- Pos.X = BarStart + Remainder*BeatWidth;
+ f32 BarStart = BarPadding + (f32)BarIdx*WholeBarWidth;
+ Pos.X += BarStart + Remainder*BeatWidth;
  
  return Pos;
 }
@@ -1134,7 +1154,6 @@ UI_CUSTOM_DRAW(CustomDrawPiece)
    DrawFilledRect(MarkerPos, V2(StaffLineWidth, NoteDim.Y), Color);
   }
  }
- 
  
  b32 LeftInputIsOurs = (UI_IsHot(Box, PlatformMouseButton_Left) ||
                         UI_IsActive(Box, PlatformMouseButton_Left));
@@ -1565,7 +1584,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    App->TSFArena = PushArena(PermanentArena, MB(500), false);
    App->ReadOnlyArena = PushArray(PermanentArena, arena, 1);
    App->PanelArena = PushArena(PermanentArena, MB(64), false);
-   App->PieceArena = PushArena(PermanentArena, MB(16), false);
+   App->PieceArena = PushArena(PermanentArena, MB(64), false);
   }
   
   // Globals
@@ -1720,6 +1739,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
     PanelAxis(Axis2_X)
     {            
      App->FirstPanel = PanelAdd(1.f);
+#if MUZE_INTERNAL
      PanelChildren()
      {
       PanelAdd(.6f);
@@ -1730,6 +1750,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
        PanelAdd(.5f)->Kind = PanelKind_Debug;
       }
      }
+#endif
     }
     
     App->SelectedPanel = PanelNextLeaf(App->FirstPanel, false);
@@ -1738,9 +1759,12 @@ UPDATE_AND_RENDER(UpdateAndRender)
    }
   }
   
-  MS_Serialize(Serializer, FrameArena, MS_Reading, ConfigPath)
-  {
+  // Deserialize config if exists
+  {  
+   str8 File = OS_ReadEntireFileIntoMemory(PathFromExe(ConfigPath));
+   ms_serializer Serializer = MS_SerializeBegin(FrameArena, MS_Read, File);
    MS_Config(&Serializer, App);
+   OS_FreeFileMemory(File);
   }
   
   // MIDI: Select default input and output device, select's last device by default
@@ -2208,9 +2232,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       Entry->S32 = Idx;
      }
      
-     StartIdx = 1;
-#if MUZE_INTERNAL
      StartIdx = 2;
+#if MUZE_INTERNAL
+     StartIdx = 1;
 #endif
     } break;
     
@@ -2601,7 +2625,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                Command->Text = Entry->Text;
               }
               
-              App->ListerInputText = Nil(str8);
+              App->ListerInputText = nil(str8);
               App->ListerInputCommand = Command_None;
              }
              
@@ -2782,9 +2806,9 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
              if(IsNilPiece(Panel->Piece)) Panel->Piece = PieceAlloc(App);
              piece *Piece = Panel->Piece;
              
-             str8 PieceFilePath = S8("song.muze_piece");
              
 #if 0 && MUZE_INTERNAL     
+             str8 PieceFilePath = S8("song.muze_piece");
              if(!Memory->Initialized)
              {             
               M_SerializePiece(FrameArena, true, PieceFilePath, Piece); 
@@ -3369,14 +3393,45 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
  for EachIndex(Idx, App->CommandCount)
  {
   command *Command = App->Commands + Idx;
+  
   // NOTE(luca): Default to selected objects. 
   if(IsNilPanel(Command->Panel)) Command->Panel =  App->SelectedPanel;
   if(IsNilPiece(Command->Piece)) Command->Piece =  App->SelectedPanel->Piece;
   
   piece *Piece = Command->Piece;
-  if(IsNilPiece(Piece)) Piece = NilP(piece);
+  if(IsNilPiece(Piece)) 
+  {
+   Piece = nilp(piece);
+   Piece->NotesArena = nilp(arena);
+   Piece->SelArena = nilp(arena);
+   Piece->UndoArena = nilp(arena);
+  }
   
   panel *Panel = Command->Panel;
+  
+  if(Panel->Kind == PanelKind_Piece)
+  {
+   command_meta_info *Info = CommandsMetaInfo + Command->Kind;
+   if(Info->PieceUndoable)
+   {    
+    // Push an undo node
+    {
+     u64 StartPos = Piece->UndoArena->Pos;
+     piece_undo *Node = PushArray(Piece->UndoArena, piece_undo, 1);
+     Node->ArenaStartPos = StartPos;
+     
+     str8 SerializeBuffer = PushS8(Piece->UndoArena, KB(64));
+     ms_serializer Serializer = MS_SerializeBegin(Piece->UndoArena, MS_Write, SerializeBuffer);
+     MS_Piece(&Serializer, Piece);
+     
+     ArenaFree(Piece->UndoArena, (Serializer.Buffer.Size - Serializer.At));
+     Serializer.Buffer.Size = Serializer.At;
+     Node->Buffer = Serializer.Buffer;
+     
+     DLLAppend(Node, Piece->FirstUndo, Piece->LastUndo);
+    }
+   }
+  }
   
   switch(Command->Kind)
   {
@@ -3471,7 +3526,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    {
     case Command_ClosePanel:
     {
-     App->SelectedPanel = ClosePanel(App, Command->Panel);
+     App->SelectedPanel = PanelClose(App, Command->Panel);
     } break;
     
     case Command_SplitSelectedPanelY:
@@ -3759,6 +3814,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       else if(Note->Kind == NoteKind_Rest)
       {     
        RemoveNote(Note, Piece->FirstNote, Piece->LastNote);
+       Piece->NoteCount -= 1;
        PieceNoteRelease(Piece, Node->V);
        DLLRemove(Node, Piece->FirstSel, Piece->LastSel);
       }
@@ -3852,10 +3908,19 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
     case Command_PieceReadFile:
     case Command_PieceSaveFile:
     {
-     ms_mode Mode = MS_Reading + !!(Command->Kind == Command_PieceSaveFile);
+     ms_mode Mode = MS_Read + !!(Command->Kind == Command_PieceSaveFile);
      
-     if(Mode == MS_Reading)
+     if(Mode == MS_Read)
      {
+      // If the selected panel is not a piece one, make it so.
+      if(!IsNilPanel(Panel) && Panel->Kind != PanelKind_Piece)
+      {
+       Piece = PieceAlloc(App);
+       
+       App->SelectedPanel->Piece = Piece;
+       App->SelectedPanel->Kind = PanelKind_Piece;
+      }
+      
       PieceStopPlaying(App, Piece);
       PieceClear(Piece);
      }
@@ -3868,8 +3933,31 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       Piece->FilePath.Size = Command->Text.Size;
      }
      
-     MS_Serialize(Serializer, FrameArena, Mode, Piece->FilePath)
-      MS_Piece(&Serializer, Piece);
+     {     
+      MS_SerializeFromFile(Serializer, FrameArena, Mode, Piece->FilePath)
+       MS_Piece(&Serializer, Piece);
+     }
+     
+    } break;
+    
+    case Command_PieceUndo:
+    {
+     // Pop an undo node
+     {
+      piece_undo *Node = Piece->LastUndo;
+      if(Node)
+      {
+       PieceStopPlaying(App, Piece);
+       PieceClear(Piece);
+       
+       ms_serializer Serializer = MS_SerializeBegin(Piece->UndoArena, MS_Read, Node->Buffer);
+       MS_Piece(&Serializer, Piece);
+       
+       DLLRemove(Node, Piece->FirstUndo, Piece->LastUndo);
+       
+       Piece->UndoArena->Pos = Node->ArenaStartPos;
+      }
+     }
     } break;
    }
    
@@ -4269,7 +4357,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    // Save piece
    if(Piece->FilePath.Size)
    {
-    MS_Serialize(Serializer, FrameArena, MS_Writing, Piece->FilePath)
+    MS_SerializeFromFile(Serializer, FrameArena, MS_Write, Piece->FilePath)
      MS_Piece(&Serializer, Piece);
    }
   }
@@ -4277,7 +4365,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
  
  // Save config
  {
-  MS_Serialize(Serializer, FrameArena, MS_Writing, ConfigPath)
+  MS_SerializeFromFile(Serializer, FrameArena, MS_Write, ConfigPath)
    MS_Config(&Serializer, App);
  }
  

@@ -4,25 +4,15 @@
 
 //~ API
 internal ms_serializer 
-MS_SerializeBegin(arena *Arena, str8 Path, ms_mode Mode)
+MS_SerializeBegin(arena *Arena, ms_mode Mode, str8 Buffer)
 {
  ms_serializer Serializer = {0};
  
  // Init
  { 
-  Serializer.FilePath = PathFromExe(Path);
   Serializer.Mode = Mode;
   Serializer.Version = MSV_Latest;
-  
-  if(0) {}
-  else if(Serializer.Mode == MS_Reading)
-  {
-   Serializer.Buffer = OS_ReadEntireFileIntoMemory(Serializer.FilePath);
-  }
-  else if(Serializer.Mode == MS_Writing)
-  {
-   Serializer.Buffer = PushS8(Arena, KB(64));
-  }
+  Serializer.Buffer = Buffer;
   
   MS_Ser(&Serializer, &Serializer.Version);
  }
@@ -48,18 +38,48 @@ MS_SerializeBegin(arena *Arena, str8 Path, ms_mode Mode)
  return Serializer;
 }
 
-internal void 
-MS_SerializeEnd(ms_serializer *Serializer)
+internal ms_serializer
+MS_SerializeFromFileBegin(arena *Arena, ms_mode Mode, str8 FilePath)
+{
+ ms_serializer Serializer = {0};
+ 
+ str8 FileBuffer = {0};
+ if(0) {}
+ else if(Mode == MS_Read)
+ {
+  char *Path = PathFromExe(FilePath);
+  FileBuffer = OS_ReadEntireFileIntoMemory(Path);
+ }
+ else if(Mode == MS_Write)
+ {
+  FileBuffer = PushS8(Arena, KB(64));
+ }
+ 
+ Serializer = MS_SerializeBegin(Arena, Mode, FileBuffer);
+ 
+ return Serializer;
+}
+
+internal void
+MS_SerializeFromFileEnd(ms_serializer *Serializer, arena *Arena, str8 FilePath)
 {
  if(0) {}
- else if(Serializer->Mode == MS_Reading)
+ else if(Serializer->Mode == MS_Read)
  {
   OS_FreeFileMemory(Serializer->Buffer);
  }
- else if(Serializer->Mode == MS_Writing)
+ else if(Serializer->Mode == MS_Write)
  {
-  str8 Out = {.Data = Serializer->Buffer.Data, .Size = Serializer->At};
-  OS_WriteEntireFile(Serializer->FilePath, Out);
+  Serializer->Buffer.Size = Serializer->At;
+  
+  str8 Out = {0};
+  Out.Data = Serializer->Buffer.Data;
+  Out.Size = Serializer->At;
+  
+  char *Path = PathFromExe(FilePath);
+  OS_WriteEntireFile(Path, Out); 
+  
+  ArenaFree(Arena, Serializer->Buffer.Size);
  }
 }
 
@@ -71,8 +91,8 @@ MS_Struct(ms_serializer *Serializer, void *Value, u64 Size)
  if(Serializer->At + Size <= Serializer->Buffer.Size)
  { 
   if(0) {}
-  else if(Serializer->Mode == MS_Reading) MemoryCopy(Value, Dest, Size);
-  else if(Serializer->Mode == MS_Writing) MemoryCopy(Dest, Value, Size);
+  else if(Serializer->Mode == MS_Read) MemoryCopy(Value, Dest, Size);
+  else if(Serializer->Mode == MS_Write) MemoryCopy(Dest, Value, Size);
   Serializer->At += Size;
  }
  else
@@ -155,18 +175,21 @@ MS_Piece(ms_serializer *Serializer, piece *Piece)
  {
   u64 Count = 0;
   if(0) {}
-  else if(Serializer->Mode == MS_Reading)
+  else if(Serializer->Mode == MS_Read)
   {
    for EachIndex(Idx, Piece->NoteCount)
    {
     note *Note = PieceNoteAlloc(Piece);
-    MS_Note(Serializer, Note); 
-    DLLAppendNil(Note, Piece->FirstNote, Piece->LastNote, NilNote);
-    Count += 1;
+    if(!IsNilNote(Note))
+    {
+     MS_Note(Serializer, Note); 
+     AppendNote(Note, Piece->FirstNote, Piece->LastNote);
+     Count += 1;
+    }
    }
    
   }
-  else if(Serializer->Mode == MS_Writing)
+  else if(Serializer->Mode == MS_Write)
   {
    for EachNote(Note, Piece->FirstNote)
    {
