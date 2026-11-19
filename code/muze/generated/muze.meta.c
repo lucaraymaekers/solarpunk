@@ -35,6 +35,8 @@ Command_None,
  Command_PieceSelectPrevNote,
  Command_PieceDeleteNote,
  Command_PieceSetNoteLength,
+ Command_PieceIncrementNotePitch,
+ Command_PieceDecrementNotePitch,
  Command_PieceSelectInstrument,
  Command_PieceAddStaff,
  Command_PieceTrimAtFirstNote,
@@ -87,7 +89,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -106,7 +108,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -125,7 +127,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -144,7 +146,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -163,7 +165,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -258,7 +260,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -277,7 +279,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -296,7 +298,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -315,7 +317,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -334,7 +336,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -353,7 +355,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -600,7 +602,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -619,7 +621,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -638,7 +640,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -657,7 +659,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -676,7 +678,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -695,7 +697,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -714,7 +716,45 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceIncrementNotePitch,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Increment note pitch", 20},
+  
+  .Key = PlatformKey_Up,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 0.f,
+  
+  .SliderFmt = {(u8 *)"", 0},
+ },
+ 
+ {
+  .Command = Command_PieceDecrementNotePitch,
+  .NeedsParam = false,
+  
+  .Tag = {(u8 *)"Piece", 5},
+  .Description = {(u8 *)"Decrement note pitch", 20},
+  
+  .Key = PlatformKey_Down,
+  .Shift = 0,
+  .Control = 0,
+  .Alt = 0,
+  
+  .Min = 0.f,
+  .Max = 0.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -733,7 +773,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 1.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -752,7 +792,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -771,7 +811,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -790,7 +830,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -809,7 +849,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -828,7 +868,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -847,7 +887,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -866,7 +906,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -885,7 +925,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -904,7 +944,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },
@@ -923,7 +963,7 @@ command_meta_info CommandsMetaInfo[] =
   
   .Min = 0.f,
   .Max = 0.f,
-  .Step = 1.f,
+  .Step = 0.f,
   
   .SliderFmt = {(u8 *)"", 0},
  },

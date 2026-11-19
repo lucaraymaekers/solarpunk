@@ -3684,6 +3684,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      }
      
      if(0) {}
+     else if(IsNilNote(Note)); // do nothing
      else if(Selected && !DoSelect) 
      {
       DLLRemove(Selected, Piece->FirstSel, Piece->LastSel);
@@ -3721,6 +3722,10 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
        Piece->LastSel->V = Piece->LastSel->V->Next;
       }
      }
+     else
+     {
+      PushCommand(App, Command_PieceSelectNote)->Note = Piece->LastNote;
+     }
      
     } break;
     
@@ -3732,6 +3737,10 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
       {
        Piece->LastSel->V = Piece->LastSel->V->Prev;
       }
+     }
+     else
+     {
+      PushCommand(App, Command_PieceSelectNote)->Note = Piece->FirstNote;
      }
      
     } break;
@@ -3761,6 +3770,21 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      for EachNode(Node, note_node, Piece->FirstSel)
      {
       Node->V->Length = (Piece->TimeSigDen/Piece->SetNoteLength);
+     }
+    } break;
+    
+    case Command_PieceIncrementNotePitch:
+    case Command_PieceDecrementNotePitch:
+    {
+     s32 Increment = 0;
+     
+     if(0) {}
+     else if(Command->Kind == Command_PieceIncrementNotePitch) Increment = 1;
+     else if(Command->Kind == Command_PieceDecrementNotePitch) Increment = -1;
+     
+     for EachNode(Node, note_node, Piece->FirstSel)
+     {
+      Node->V->Pitch += (u8)Increment;
      }
     } break;
     
