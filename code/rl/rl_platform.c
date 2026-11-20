@@ -292,7 +292,8 @@ BASE_ENTRY_POINT()
   {
    str8 FileName = S8FromCString(Params->Args[0]);
    u64 OnePastLastSlash = S8FindChar(FileName, OS_SlashChar, false, true);
-   ExeDirPath = Str8Fmt("%S", S8To(FileName, OnePastLastSlash));
+   str8 ExeDir = S8To(FileName, OnePastLastSlash);
+   ExeDirPath = Str8Fmt("%S", ExeDir);
   }
   
   app_memory AppMemory = {0};
@@ -328,9 +329,13 @@ BASE_ENTRY_POINT()
   CurrentOSLinux = true;
 #endif
   
-  str8 LibraryPath = Str8Fmt(Stringify(RL_PLATFORM_APP_NAME) ".%s", (CurrentOSLinux ? "so" : "dll"));
-  StringsScratchTemp(PermanentArena)
-   Code.LibraryPath = PathFromExe(LibraryPath);
+  {  
+   char *LinuxExt = "so";
+   char *Win32Ext = "dll";
+   str8 LibraryPath = Str8Fmt(Stringify(RL_PLATFORM_APP_NAME) ".%s", (CurrentOSLinux ? LinuxExt : Win32Ext));
+   StringsScratchTemp(PermanentArena)
+    Code.LibraryPath = PathFromExe(LibraryPath);
+  }
   
   //- Debug UI 
   b32 ShowDebugUI = false;
