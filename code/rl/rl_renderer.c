@@ -200,7 +200,6 @@ RenderBeginFrame(arena *Arena, s32 X, s32 Y, s32 Width, s32 Height)
  
  GlobalRectsCount = 0;
  GlobalRectsInstances = PushArray(Arena, rect_instance, MaxRectsCount);
- GL_FrameArena = Arena;
  GlobalClipStackTop = 0;
  
  v4 Clip = RectV2(V2S32(X, Y), V2S32(Width, Height));

@@ -16,9 +16,6 @@ struct gl_render_state
  b32 ShadersCompiled;
 };
 
-//~ Globals
-global_variable arena *GL_FrameArena = 0;
-
 //~ Functions 
 internal void 
 FatalError(const char* message)
@@ -84,7 +81,6 @@ GL_CompileShaderFromFile(str8 FileNameAfterExe, u32 Type)
  gl_uint Shader = 0;
  
  str8 File = {0};
- StringsScratchTemp(GL_FrameArena)
  {
   char *FilePath = PathFromExe(FileNameAfterExe);
   File = OS_ReadEntireFileIntoMemory(FilePath);
