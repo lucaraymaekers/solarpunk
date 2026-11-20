@@ -1752,7 +1752,11 @@ UPDATE_AND_RENDER(UpdateAndRender)
       PanelAdd(.4f);
       PanelChildren()
       {
+#if 1
+       PanelAdd(.5f)->Kind = PanelKind_Piece;
+#else
        PanelAdd(.5f)->Kind = PanelKind_Controls;
+#endif
        PanelAdd(.5f)->Kind = PanelKind_Debug;
       }
      }
@@ -1996,12 +2000,6 @@ UPDATE_AND_RENDER(UpdateAndRender)
  
  if(App->PreviousHeightPx != App->HeightPx)
  {
-#if MUZE_INTERNAL && 0
-  gl_render_state *Render = &App->Render;
-  glDeleteTextures(ArrayCount(Render->Textures), &Render->Textures[0]);
-  glGenTextures(ArrayCount(Render->Textures), &Render->Textures[0]);
-#endif
-  
   App->PreviousHeightPx = App->HeightPx;
   
   font *Fonts[] = {&App->TextFont, &App->IconsFont, &App->MusicFont};
@@ -3394,7 +3392,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
   {
    UI_EndLayout(App->ListerBox);
   }
-  
  }
  
  for EachIndex(Idx, App->CommandCount)
@@ -3438,6 +3435,42 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      DLLAppend(Node, Piece->FirstUndo, Piece->LastUndo);
     }
    }
+  }
+  
+  // Detect if there is a cycle.
+  {
+   piece *Start = App->FirstPiece;
+   piece *Tortoise = Start->Next;
+   piece *Hare = Start->Next->Next;
+   
+   while(Tortoise != Hare)
+   {
+    Tortoise = Tortoise->Next;
+    Hare = Hare->Next->Next;
+   }
+   
+   Tortoise = Start;
+   while(Tortoise != Hare)
+   {
+    Tortoise = Tortoise->Next;
+    Hare = Hare->Next;
+   }
+   piece *CycleStart = Tortoise;
+   
+   s32 LoopLength = 1;
+   Hare = Tortoise->Next;
+   while(Tortoise != Hare)
+   {
+    Hare = Hare->Next;
+    LoopLength += 1;
+   }
+   
+   if(!IsNilPiece(CycleStart))
+   {
+    DebugBreak();
+    // Cycle detected.
+   }
+   
   }
   
   switch(Command->Kind)

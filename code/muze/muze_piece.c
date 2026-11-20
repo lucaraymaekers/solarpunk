@@ -11,7 +11,6 @@ PieceClear(piece *Piece)
  }
  
  // Defaults
- 
  Piece->FilePath = nil(str8);
  
  Piece->IsPlaying = false;
@@ -102,6 +101,9 @@ PieceAlloc(app_state *App)
   if(!IsNilPiece(Result))
   {
    PieceClear(Result);
+   
+   Result->Prev = NilPiece;
+   Result->Next = NilPiece;
   }
   
   DLLAppend(Result, App->FirstPiece, App->LastPiece);
