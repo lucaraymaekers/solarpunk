@@ -4,7 +4,6 @@
 
 //~ Libraries 
 #define BASE_EXTERNAL_LIBS 1
-
 #define BASE_CONSOLE_APPLICATION RL_PLATFORM_INTERNAL
 #include "base/base.h"
 #include "base/base.c"

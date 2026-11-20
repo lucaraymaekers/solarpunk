@@ -24,7 +24,11 @@ internal void
 UI_PushContainer(axis2 Axis)
 {
  UI_LayoutAxis(Axis)
-  UI_AddBox((Axis == Axis2_X ? S8("Row") : S8("Column")), UI_BoxFlag_Clip);
+#if 1
+ UI_AddBox((Axis == Axis2_X ? S8("Row") : S8("Column")), UI_BoxFlag_Clip);
+#else
+ UI_AddBox(S8(""), UI_BoxFlag_Clip);
+#endif
  UI_PushBox();
 }
 

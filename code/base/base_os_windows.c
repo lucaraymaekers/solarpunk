@@ -408,33 +408,48 @@ WinMain(HINSTANCE Instance,
  Args[1] = CommandLine;
 #endif
  
- for EachIndex(Idx, ThreadsCount)
+ if(ThreadsCount > 1)
  {
-  entry_point_params *Params = &Threads[Idx].Params;
-  Params->Context.LaneIndex = Idx;
-  Params->Context.LaneCount = ThreadsCount;
+  for EachIndex(Idx, ThreadsCount)
+  {
+   entry_point_params *Params = &Threads[Idx].Params;
+   Params->Context.LaneIndex = Idx;
+   Params->Context.LaneCount = ThreadsCount;
+   Params->Context.Barrier = (barrier)&Barrier;
+   Params->Context.SharedStorage = &SharedStorage;
+   Params->Args = Args;
+   Params->ArgCount = ArgCount;
+   
+   Params->Context.Handle = (thread_handle)CreateThread(0, 0, ThreadInitEntryPoint, Params, 0, 0);
+   
+   if(!Params->Context.Handle)
+   {
+    Win32Log();
+   }
+  }
+  
+  for EachIndex(Idx, ThreadsCount)
+  {
+   entry_point_params *Params = &Threads[Idx].Params;
+   
+   WaitForSingleObject((HANDLE)Params->Context.Handle, INFINITE);
+   
+   CloseHandle((HANDLE)Params->Context.Handle);
+  }
+ }
+ else
+ {
+  // Run single threaded
+  entry_point_params *Params = &Threads[0].Params;
+  Params->Context.LaneIndex = 0;
+  Params->Context.LaneCount = 1;
   Params->Context.Barrier = (barrier)&Barrier;
   Params->Context.SharedStorage = &SharedStorage;
   Params->Args = Args;
   Params->ArgCount = ArgCount;
   
-  Params->Context.Handle = (thread_handle)CreateThread(0, 0, ThreadInitEntryPoint, Params, 0, 0);
-  
-  if(!Params->Context.Handle)
-  {
-   Win32Log();
-  }
+  ThreadInitEntryPoint(Params);
  }
- 
- for EachIndex(Idx, ThreadsCount)
- {
-  entry_point_params *Params = &Threads[Idx].Params;
-  
-  WaitForSingleObject((HANDLE)Params->Context.Handle, INFINITE);
-  
-  CloseHandle((HANDLE)Params->Context.Handle);
- }
- 
  
  return 0;
 }

@@ -2511,7 +2511,6 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
                                   UI_BoxFlag_DrawHotEffects|
                                   UI_BoxFlag_DrawActiveEffects);
              
-             
              UI_PaddingAround(UI_SizePx(1.f, 1.f))
               UI_Row()
              {

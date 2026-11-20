@@ -203,14 +203,13 @@ UI_AddBox(str8 String, s32 Flags)
   }
   
   ui_box *Search = UI_State->Current;
-  
-  if(UI_State->KeyFromParent)
-  {
-   Search = UI_State->Current->Parent;
-  }
-  
   // Find youngest parent with non-zero key
   {
+   if(UI_State->KeyFromParent)
+   {
+    Search = UI_State->Current->Parent;
+   }
+   
    for(; 
        UI_KeyMatch(Search->Key, UI_KeyNull());
        Search = Search->Parent);
