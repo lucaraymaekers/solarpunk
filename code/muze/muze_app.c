@@ -3968,7 +3968,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
      piece *OtherPieceWithSameFilePath = NilPiece;
      if(Command->Text.Size)
      {
-      for EachNode(OtherPiece, piece, App->FirstPiece)
+      for EachPiece(OtherPiece, App->FirstPiece)
       {
        if(S8Match(Command->Text, OtherPiece->FilePath, 0))
        {

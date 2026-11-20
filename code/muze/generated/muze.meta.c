@@ -525,7 +525,7 @@ command_meta_info CommandsMetaInfo[] =
   .Command = Command_PieceNew,
   .NeedsParam = false,
   
-  .PieceUndoable = false,
+  .PieceUndoable = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"New blank piece", 15},
@@ -567,7 +567,7 @@ command_meta_info CommandsMetaInfo[] =
   .Command = Command_PieceToggleBarWrapping,
   .NeedsParam = false,
   
-  .PieceUndoable = false,
+  .PieceUndoable = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Toggle bar wrapping", 19},
@@ -630,7 +630,7 @@ command_meta_info CommandsMetaInfo[] =
   .Command = Command_PieceSetBPM,
   .NeedsParam = false,
   
-  .PieceUndoable = false,
+  .PieceUndoable = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Set BPM", 7},
@@ -777,7 +777,7 @@ command_meta_info CommandsMetaInfo[] =
   .Command = Command_PieceSetNoteLength,
   .NeedsParam = false,
   
-  .PieceUndoable = false,
+  .PieceUndoable = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Set note length", 15},
@@ -798,7 +798,7 @@ command_meta_info CommandsMetaInfo[] =
   .Command = Command_PieceIncrementNotePitch,
   .NeedsParam = false,
   
-  .PieceUndoable = false,
+  .PieceUndoable = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Increment note pitch", 20},
@@ -819,7 +819,7 @@ command_meta_info CommandsMetaInfo[] =
   .Command = Command_PieceDecrementNotePitch,
   .NeedsParam = false,
   
-  .PieceUndoable = false,
+  .PieceUndoable = true,
   
   .Tag = {(u8 *)"Piece", 5},
   .Description = {(u8 *)"Decrement note pitch", 20},

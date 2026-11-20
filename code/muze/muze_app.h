@@ -373,6 +373,7 @@ global_variable f32 *dtForFrame;
 //~ Macros
 #define EachNote(Node, First) EachNodeNil(Node, note, First, NilNote)
 #define EachNoteSafe(Node, First) EachNodeSafeNil(Node, note, First, NilNote)
+#define EachPiece(Node, First) EachNodeNil(Node, piece, First, NilPiece)
 
 #define AppendNote(Node, First, Last) DLLAppendNil(Node, First, Last, NilNote)
 #define RemoveNote(Node, First, Last) DLLRemoveNil(Node, First, Last, NilNote)
