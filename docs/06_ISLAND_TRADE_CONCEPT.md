@@ -241,7 +241,22 @@ docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src debian:trixie sh -
 ```
 
 Notes:
-- **Do not trust the exit code of `build.sh` / `cling` on its own.** As of commit `a309147`, cling prints `Done.` and exits 0 even when a target fails to compile (seen with 11 errors on Debian 12). That is why the command above checks that the output binaries exist. Only `BUILD_OK` counts as passing.
+- **Exit codes.** Up to commit `a309147`, cling printed `Done.` and exited 0 even when a target failed (seen with 11 errors on Debian 12).
+  - Commit `3582a48` fixes this: cling now prints `Build FAILED.` and exits 1.
+  - **Delete `build/cling` once after pulling.** `build.sh` only rebuilds cling when that file is missing, so an old copy keeps the old behaviour.
+  - The command above also checks that the output binaries exist. Only `BUILD_OK` counts as passing.
+- **Platform matrix** (all x86-64, as of `3582a48`):
+
+  | Platform | Status |
+  |---|---|
+  | Debian 13 (clang) | builds |
+  | Ubuntu 24.04 (clang, gcc) | builds; was broken by four newer X11 keysyms, fixed in `3582a48` |
+  | Arch (clang, gcc) | builds |
+  | Debian 12 | fails: ALSA too old |
+  | Windows/MSVC | **untested from here** |
+  | macOS | unsupported; would need a new platform layer |
+
+- **Windows is stricter than Linux.** The Windows build treats warnings as errors (`-WX -W4`), so code that only warns under clang or gcc can still break Windows. Proposed: a GitHub Actions CI job on `ubuntu-latest` and `windows-latest` (Q3).
 - This writes `build/` into your checkout; `build` is git-ignored.
 - It runs under x86-64 emulation, so it is slow but works.
 - It proves the **Linux/clang** build only. The team's main target is Windows/MSVC, so someone must also check `code\build.bat -SolarPunk` on Windows before a demo (Q3).
