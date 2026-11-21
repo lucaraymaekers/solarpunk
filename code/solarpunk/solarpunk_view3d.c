@@ -961,11 +961,13 @@ global_variable char *V3HelpKeys[] =
 {
  "Click",        "Right drag",   "Middle drag", "Mouse wheel",
  "Up / Down",    "Right",        "Left",        "Ctrl + / Ctrl -",
+ "F11 / Alt+Enter",
 };
 global_variable char *V3HelpActions[] =
 {
  "open an island", "move the map", "turn the map", "zoom",
  "faster / slower",             "next round",   "restart",      "text size",
+ "fullscreen",
 };
 StaticAssert(ArrayCount(V3HelpKeys) == ArrayCount(V3HelpActions), V3HelpKeysMatch);
 
