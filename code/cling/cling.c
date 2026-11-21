@@ -632,6 +632,14 @@ BASE_ENTRY_POINT()
    DidWork = true;
    AppBuild(&BuildOptions, S8("Muze"), S8("../code/muze/muze_app.c"), S8("muze_app"), S8("muze"), nil(str8));
   }
+  
+  //~ SolarPunk
+  if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("SolarPunk"), S8("Target")))
+  {
+   DidWork = true;
+   AppBuild(&BuildOptions, S8("SolarPunk"), S8("../code/solarpunk/solarpunk.c"), S8("solarpunk_app"), S8("solarpunk"), nil(str8));
+  }
+  
   //~ Wordled
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Wordled"), S8("Target")))
   {

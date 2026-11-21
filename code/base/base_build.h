@@ -105,4 +105,9 @@
 # define LSD_INTERNAL 0
 #endif
 
+//- SolarPunk 
+#if !defined(SOLARPUNK_INTERNAL)
+# define SOLARPUNK_INTERNAL 0
+#endif
+
 #endif // BASE_BUILD_H

@@ -37,7 +37,8 @@ paths =
  { .path = "code/cling/",  .recursive = true,  .relative = true, },
  
  //- Targets
- { .path = "code/muze/",          .recursive = true,  .relative = true, },
+ { .path = "code/solarpunk/",          .recursive = true,  .relative = true, },
+ //{ .path = "code/muze/",          .recursive = true,  .relative = true, },
  //{ .path = "code/wordled/",       .recursive = true,  .relative = true, },
  //{ .path = "code/editor/",        .recursive = true,  .relative = true, },
  //{ .path = "code/compenhance/",   .recursive = true,  .relative = true, },
@@ -78,6 +79,15 @@ commands =
   .out = "*compilation*", 
   .linux = "./code/build.sh -Muze",
   .win = ".\\code\\build.bat -Muze",
+  .save_dirty_files = true,
+  .footer_panel = false,
+  .cursor_at_end = false,
+ },
+ .build_solarpunk = 
+ {
+  .out = "*compilation*", 
+  .linux = "./code/build.sh -SolarPunk",
+  .win = ".\\code\\build.bat -SolarPunk",
   .save_dirty_files = true,
   .footer_panel = false,
   .cursor_at_end = false,
@@ -194,7 +204,7 @@ commands =
 
 fkey_command =
 {
- .F1 = "build_muze",
+ .F1 = "build_solarpunk",
  .F2 = "run",
  .F3 = "cling",
  .F5 = "raddbg_kill",
