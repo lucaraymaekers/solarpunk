@@ -88,12 +88,16 @@ BroadcastRound(app_state *App)
  Broadcast->IslandCount = IslandCount;
  Broadcast->Round += 1;
 
+ //- Food: spoil, produce, eat (solarpunk_food.c). Before the ads, so they carry this round's food.
+ FoodRoundFromApp(App, Broadcast->Round);
+
  //- Every island refreshes its own announcement.
  {
   u32 Idx = 0;
   for(island *Island = App->FirstIsland; Island && Idx < IslandCount; Island = Island->Next)
   {
    Broadcast->Known[Idx][Idx] = BroadcastMakeOwnAd(Island, Broadcast->Round);
+   FoodFillAd(&App->Food, Idx, &Broadcast->Known[Idx][Idx], Broadcast->Round);
    Idx += 1;
   }
  }
@@ -162,6 +166,7 @@ BroadcastRestart(app_state *App)
  MemorySet(Broadcast->Known, 0, sizeof(Broadcast->Known));
  MemorySet(Broadcast->Snapshot, 0, sizeof(Broadcast->Snapshot));
  MemorySet(Broadcast->Flash, 0, sizeof(Broadcast->Flash));
+ FoodReset(&App->Food);
 }
 
 // NOTE: Rounds are deterministic (same world, same rules), so going back in time is

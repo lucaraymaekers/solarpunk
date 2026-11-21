@@ -29,11 +29,14 @@
 #include "rl/rl_widgets.c"
 
 #include "solarpunk/solarpunk_broadcast.h"
+#include "solarpunk/solarpunk_food.h"
 #include "solarpunk/solarpunk_render3d.h"
 #include "solarpunk/solarpunk_panel.h"
 #include "solarpunk/solarpunk.h"
+#include "solarpunk/solarpunk_food.c"
 #include "solarpunk/solarpunk_world.c"
 #include "solarpunk/solarpunk_world_gen.c"
+#include "solarpunk/solarpunk_food_app.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
 #include "solarpunk/solarpunk_ui.c"
@@ -111,7 +114,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  //- Update
  {
   // TODO: Replace with real island generation/loading.
-  // NOTE: BuildHardcodedWorld(App) builds the small 5-island world instead.
+  // NOTE: BuildHardcodedWorld(App) builds the small 5-island world instead (2D view only:
+  // it sets no MapPos, so the 3D view would stack its islands).
   BuildGeneratedWorld(App, WorldGen_IslandCount);
   BroadcastUpdate(App, Input);
  }

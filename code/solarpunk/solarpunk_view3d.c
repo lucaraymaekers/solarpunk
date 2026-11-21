@@ -526,9 +526,9 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
  u32 ShortCount = 0;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  if(R3->TotalNeeded[Kind] > R3->TotalProduced[Kind])
+  if(W3IsShort(R3, Kind))
   {
-   s64 Missing = (s64)R3->TotalNeeded[Kind] - (s64)R3->TotalProduced[Kind];
+   s64 Missing = W3ShortBy(R3, Kind);
    str8 Name = ProductNames[Kind];
    Width += 2.f*V3D_ChipPadding + Dot + 6.f + UiMeasure(App, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing)) + Ui_Gap;
    ShortCount += 1;
@@ -557,14 +557,14 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
  Cursor.X += UiMeasure(App, Label) + Ui_Gap;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  if(R3->TotalNeeded[Kind] > R3->TotalProduced[Kind])
+  if(W3IsShort(R3, Kind))
   {
-   s64 Missing = (s64)R3->TotalNeeded[Kind] - (s64)R3->TotalProduced[Kind];
+   s64 Missing = W3ShortBy(R3, Kind);
    str8 Name = ProductNames[Kind];
    s32 Which = R3_SummaryProductBase + (s32)Kind;
    v2 ChipPos = Cursor;
    if(V3Chip(App, Input, &Cursor, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing), W3ProductColors[Kind], true,
-             Ui_ColorShortText, (R3->SummaryOpen == Which), "More is needed than made. Click to see who needs and makes it"))
+             Ui_ColorShortText, (R3->SummaryOpen == Which), "More is needed than made (food gone bad does not count). Click to see who needs and makes it"))
    {
     V3ToggleSummary(R3, Which, V2(ChipPos.X, Box.Max.Y + Ui_Gap));
    }
@@ -853,11 +853,22 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  //- Title and layout
  str8 Title = {0};
+ str8 FoodLine = {0};   // what really happened to this food so far (solarpunk_food_app.c)
  str8 Hint = S8("Click an island to open it");
  if(IsProduct)
  {
   str8 Name = ProductNames[Kind];
-  Title = Str8Fmt("%.*s: %llu needed, %llu made", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+  if(R3->TotalSpoiled[Kind] > 0)
+  {
+   Title = Str8Fmt("%.*s: %llu needed, %llu made, %llu go bad", (s32)Name.Size, Name.Data,
+                   R3->TotalNeeded[Kind], R3->TotalProduced[Kind], Min(R3->TotalSpoiled[Kind], R3->TotalProduced[Kind]));
+  }
+  else
+  {
+   Title = Str8Fmt("%.*s: %llu needed, %llu made", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+  }
+  food_counts Food = FoodKindTotals(App, Kind);
+  FoodLine = Str8Fmt("So far: %llu gone bad, %llu missing", Food.Wasted, Food.Shortage);
  }
  else
  {
@@ -870,9 +881,9 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
   Title = S8FromCString(Titles[Status]);
  }
 
- u32 SectionRows = (IsProduct ? 2u : 0u);
+ u32 SectionRows = (IsProduct ? 3u : 0u);   // "Need it:", "Make it:" and the food line
  v2 Min = R3->PopupRect.Min;
- f32 Width = Max(V3D_PopupWidth*UiScale(App), UiMeasure(App, Title) + 2.f*Pad);
+ f32 Width = Max(V3D_PopupWidth*UiScale(App), Max(UiMeasure(App, Title), UiMeasure(App, FoodLine)) + 2.f*Pad);
  f32 MaxHeight = BufferDim.Y - Min.Y - V3D_Margin;
  u32 MaxRows = (u32)Max(1.f, (MaxHeight - 2.f*Pad)/LineHeight - 3.f - (f32)SectionRows);
  u32 ShownRows = Min(RowCount, MaxRows);
@@ -886,6 +897,11 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
  f32 Inner = Width - 2.f*Pad;
  UiText(App, Line, Title, Ui_ColorTitle);
  Line.Y += LineHeight;
+ if(FoodLine.Size)
+ {
+  UiText(App, Line, FoodLine, Ui_ColorShortText);
+  Line.Y += LineHeight;
+ }
  UiText(App, Line, Hint, Ui_ColorTextDim);
  Line.Y += LineHeight + 4.f;
 
@@ -924,7 +940,7 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
    for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
    {
     b32 Show = (Status == IslandStatus_Waiting) ? !W3KnowsSupplier(App, IslandIdx, Req->Kind)
-     : (R3->TotalNeeded[Req->Kind] > R3->TotalProduced[Req->Kind]);
+     : W3IsShort(R3, Req->Kind);
     if(Show)
     {
      X -= LineHeight;

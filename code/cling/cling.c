@@ -666,6 +666,9 @@ BASE_ENTRY_POINT()
   
   //~ Linux Serial Downloader
   AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("LSD"), S8("../code/lsd/lsd.c"));
+
+  //~ SolarSim (headless food tests + tuning)
+  AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("SolarSim"), S8("../code/solarpunk/sim/solar_sim.c"));
   
   //~ Samples: ADuC 832
   if(CmdLineHasEntryAndAddHelp(CmdLine, &Help, S8("Aduc"), S8("Target")))

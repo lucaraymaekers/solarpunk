@@ -76,16 +76,17 @@ GraphLayoutIslandsInCircle(app_state *App, v2 BufferDim)
   IslandCount += 1;
  }
  
- v2 Center = V2(.5f*BufferDim.X, .5f*BufferDim.Y);
- f32 Radius = .33f*Min(BufferDim.X, BufferDim.Y);
+ // NOTE: An ellipse that uses the whole window, so wide island boxes do not overlap.
+ v2 Center = V2(.5f*BufferDim.X, .5f*BufferDim.Y + 50.f);
+ v2 Radius = V2(Max(.5f*BufferDim.X - 260.f, 100.f), Max(.5f*BufferDim.Y - 180.f, 100.f));
  
  s32 Idx = 0;
  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
  {
   // Start at the top and go clockwise.
   f64 Angle = 2.0*(f64)Pi32*(f64)Idx/(f64)Max(IslandCount, 1) - .5*(f64)Pi32;
-  Island->Pos = V2(Center.X + Radius*(f32)CosF64(Angle),
-                   Center.Y + Radius*(f32)SinF64(Angle));
+  Island->Pos = V2(Center.X + Radius.X*(f32)CosF64(Angle),
+                   Center.Y + Radius.Y*(f32)SinF64(Angle));
   Idx += 1;
  }
 }
@@ -186,6 +187,13 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
    LineCount += 1;
   }
   
+  if(!Compact)
+  {
+   // Food per kind, with its batches and when they go bad (solarpunk_food_app.c).
+   FoodAppendLines(App, Island, Lines, Colors, &LineCount, (s32)ArrayCount(Lines),
+                   V4FromU32(Graph_ColorKnows), V4FromU32(Graph_ColorRequirement));
+  }
+  
   f32 MaxWidth = 0.f;
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)
   {
@@ -208,4 +216,7 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
    Cur.Y += LineHeight;
   }
  }
+ 
+ //- Food rules, in plain words, at the bottom of the screen (solarpunk_food_app.c)
+ GraphDrawText(Atlas, Font, V2(16.f, BufferDim.Y - 1.5f*LineHeight), FoodLegendLine(), V4FromU32(Graph_ColorKnows));
 }

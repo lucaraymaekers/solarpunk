@@ -72,6 +72,9 @@ struct app_state
  
  // Islands panel on the right
  island_panel_state Panel;
+ 
+ // Food lots and their expiry rounds, per island and product (solarpunk_food.h)
+ food_state Food;
 };
 
 global_variable product *AllProducts;
