@@ -406,15 +406,35 @@ R3CameraEye(r3_camera *Camera)
 }
 
 //~ GL
-#define R3_MaxSkyVertices         12
+#define R3_MaxSkyVertices         1024
 #define R3_MaxOpaqueVertices      (256*1024)
 #define R3_MaxTranslucentVertices (128*1024)
 
-#define R3_ColorSkyTop     0xFF6FB3D9
-#define R3_ColorSkyHorizon 0xFFF4DEC4
-#define R3_ColorFog        0xFFD9E6EA
+// NOTE: Golden hour: gold at the horizon, coral in the middle, soft violet at the top.
+#define R3_ColorSkyTop     0xFF5C4D8C
+#define R3_ColorSkyMiddle  0xFFE3906C
+#define R3_ColorSkyHorizon 0xFFF7C97E
+#define R3_ColorFog        0xFFF0BC8E
 #define R3_FogStart        90.f
 #define R3_FogEnd          320.f
+
+// NOTE: Warm, low sun from the left; violet-tinted ambient light in the shadows.
+#define R3_SunDirX  -.85f
+#define R3_SunDirY   .42f
+#define R3_SunDirZ   .32f
+#define R3_SunColorR 1.f
+#define R3_SunColorG .8f
+#define R3_SunColorB .58f
+#define R3_AmbientR  .66f
+#define R3_AmbientG  .6f
+#define R3_AmbientB  .68f
+
+// NOTE: The sun in the sky (screen space, -1..1), in the open sky between the controls.
+#define R3_SunScreenX  .14f
+#define R3_SunScreenY  .78f
+#define R3_SunRadius   .075f
+#define R3_ColorSunCore 0xFFFFF6DC
+#define R3_ColorSunGlow 0xFFFFD58A
 
 global_variable char *R3VertexShaderSource =
 "#version 330 core\n"
@@ -439,6 +459,8 @@ global_variable char *R3FragmentShaderSource =
 "in vec4 V_Color;\n"
 "in vec3 V_WorldPos;\n"
 "uniform vec3 U_LightDir;\n"
+"uniform vec3 U_SunColor;\n"
+"uniform vec3 U_AmbientColor;\n"
 "uniform vec3 U_CameraPos;\n"
 "uniform vec3 U_FogColor;\n"
 "uniform float U_FogStart;\n"
@@ -452,7 +474,7 @@ global_variable char *R3FragmentShaderSource =
 "    vec3 N = normalize(V_Normal);\n"
 "    float Diffuse = max(dot(N, -U_LightDir), 0.0);\n"
 "    float SkyLight = 0.5 + 0.5*N.y;\n"
-"    Color = Color*(0.38 + 0.22*SkyLight + 0.62*Diffuse);\n"
+"    Color = Color*(U_AmbientColor*(0.6 + 0.4*SkyLight) + U_SunColor*0.9*Diffuse);\n"
 "  }\n"
 "  float Distance = length(V_WorldPos - U_CameraPos);\n"
 "  float Fog = clamp((Distance - U_FogStart)/(U_FogEnd - U_FogStart), 0.0, 1.0);\n"
@@ -502,16 +524,49 @@ R3BeginFrame(r3_state *R3, arena *Arena, v2 ViewportDim)
 
  // Sky: a screen-filling gradient, drawn with an identity matrix (positions are in clip space).
  {
-  v4 Top = R3Color(R3_ColorSkyTop);
-  v4 Horizon = R3Color(R3_ColorSkyHorizon);
+  // Two bands: horizon -> middle (bottom 60% of the screen), middle -> top.
+  v4 Colors[3];
+  Colors[0] = R3Color(R3_ColorSkyHorizon);
+  Colors[1] = R3Color(R3_ColorSkyMiddle);
+  Colors[2] = R3Color(R3_ColorSkyTop);
+  f32 Ys[3] = {-1.f, .2f, 1.f};
   v3 Zero = V3(0.f, 0.f, 0.f);
   r3_mesh *Sky = &R3->Sky;
-  R3PushVertex(Sky, V3(-1.f, -1.f, 0.f), Zero, Horizon);
-  R3PushVertex(Sky, V3( 1.f, -1.f, 0.f), Zero, Horizon);
-  R3PushVertex(Sky, V3( 1.f,  1.f, 0.f), Zero, Top);
-  R3PushVertex(Sky, V3(-1.f, -1.f, 0.f), Zero, Horizon);
-  R3PushVertex(Sky, V3( 1.f,  1.f, 0.f), Zero, Top);
-  R3PushVertex(Sky, V3(-1.f,  1.f, 0.f), Zero, Top);
+  for(u32 Band = 0; Band < 2; Band += 1)
+  {
+   f32 Y0 = Ys[Band];
+   f32 Y1 = Ys[Band + 1];
+   R3PushVertex(Sky, V3(-1.f, Y0, 0.f), Zero, Colors[Band]);
+   R3PushVertex(Sky, V3( 1.f, Y0, 0.f), Zero, Colors[Band]);
+   R3PushVertex(Sky, V3( 1.f, Y1, 0.f), Zero, Colors[Band + 1]);
+   R3PushVertex(Sky, V3(-1.f, Y0, 0.f), Zero, Colors[Band]);
+   R3PushVertex(Sky, V3( 1.f, Y1, 0.f), Zero, Colors[Band + 1]);
+   R3PushVertex(Sky, V3(-1.f, Y1, 0.f), Zero, Colors[Band + 1]);
+  }
+
+  // Sun: a bright disc with soft glow rings around it (round on screen, so the
+  // horizontal radius is divided by the aspect ratio).
+  {
+   f32 Radii[4] = {4.f, 2.4f, 1.5f, 1.f};
+   f32 Alphas[4] = {.08f, .16f, .32f, 1.f};
+   u32 SunSides = 40;
+   v3 SunCenter = V3(R3_SunScreenX, R3_SunScreenY, 0.f);
+   for(u32 Layer = 0; Layer < 4; Layer += 1)
+   {
+    v4 Color = (Layer == 3) ? R3Color(R3_ColorSunCore) : R3WithAlpha(R3Color(R3_ColorSunGlow), Alphas[Layer]);
+    f32 RadiusY = R3_SunRadius*Radii[Layer];
+    f32 RadiusX = RadiusY/Aspect;
+    for(u32 Side = 0; Side < SunSides; Side += 1)
+    {
+     f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)SunSides;
+     f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)SunSides;
+     R3PushTriUnlit(Sky, SunCenter,
+                    V3(SunCenter.X + RadiusX*R3Cos(Angle0), SunCenter.Y + RadiusY*R3Sin(Angle0), 0.f),
+                    V3(SunCenter.X + RadiusX*R3Cos(Angle1), SunCenter.Y + RadiusY*R3Sin(Angle1), 0.f),
+                    Color);
+    }
+   }
+  }
  }
 }
 
@@ -550,9 +605,11 @@ R3EndFrame(r3_state *R3, gl_render_state *RectRender)
 
  // Uniforms
  {
-  v3 LightDir = R3Normalize(V3(-.45f, -1.f, -.35f));
+  v3 LightDir = R3Scale(R3Normalize(V3(R3_SunDirX, R3_SunDirY, R3_SunDirZ)), -1.f);
   v4 Fog = R3Color(R3_ColorFog);
   glUniform3f(glGetUniformLocation(R3->Program, "U_LightDir"), LightDir.X, LightDir.Y, LightDir.Z);
+  glUniform3f(glGetUniformLocation(R3->Program, "U_SunColor"), R3_SunColorR, R3_SunColorG, R3_SunColorB);
+  glUniform3f(glGetUniformLocation(R3->Program, "U_AmbientColor"), R3_AmbientR, R3_AmbientG, R3_AmbientB);
   glUniform3f(glGetUniformLocation(R3->Program, "U_CameraPos"), R3->Eye.X, R3->Eye.Y, R3->Eye.Z);
   glUniform3f(glGetUniformLocation(R3->Program, "U_FogColor"), Fog.X, Fog.Y, Fog.Z);
   glUniform1f(glGetUniformLocation(R3->Program, "U_FogStart"), R3_FogStart);
