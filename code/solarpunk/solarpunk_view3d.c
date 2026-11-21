@@ -960,12 +960,12 @@ StaticAssert(ArrayCount(V3HelpMapNotes) == ArrayCount(V3HelpMapColors), V3HelpMa
 global_variable char *V3HelpKeys[] =
 {
  "Click",        "Right drag",   "Middle drag", "Mouse wheel",
- "Up / Down",    "Right",        "Left",
+ "Up / Down",    "Right",        "Left",        "Ctrl + / Ctrl -",
 };
 global_variable char *V3HelpActions[] =
 {
  "open an island", "move the map", "turn the map", "zoom",
- "faster / slower",             "next round",   "restart",
+ "faster / slower",             "next round",   "restart",      "text size",
 };
 StaticAssert(ArrayCount(V3HelpKeys) == ArrayCount(V3HelpActions), V3HelpKeysMatch);
 
@@ -1116,6 +1116,7 @@ internal void
 DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
+ UiTextSizeKeys(App, Input);
  UiUpdateTextSize(App);   // before any text this frame
 
  // NOTE: Over the panel the wheel scrolls the panel instead of zooming.

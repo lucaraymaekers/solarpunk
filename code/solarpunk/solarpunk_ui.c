@@ -55,6 +55,28 @@ UiTextSizeIdx(r3_state *R3)
  return Result;
 }
 
+internal void
+UiChangeTextSize(r3_state *R3, s32 Delta)
+{
+ R3->TextSizeIdxPlusOne = 1 + Clamp(0, UiTextSizeIdx(R3) + Delta, (s32)ArrayCount(UiTextSizes) - 1);
+}
+
+// NOTE: Ctrl + / Ctrl - make the text bigger / smaller (Ctrl = also counts, for keyboards
+// where + needs Shift).
+internal void
+UiTextSizeKeys(app_state *App, app_input *Input)
+{
+ for(app_key_idx Idx = Input->Text.First; Idx; Idx = Input->Text.Buffer[Idx].Next)
+ {
+  app_key *Key = Input->Text.Buffer + Idx;
+  if(!Key->IsSymbol && (Key->Modifiers & PlatformKeyModifier_Control))
+  {
+   if(Key->Codepoint == '+' || Key->Codepoint == '=') UiChangeTextSize(&App->R3, 1);
+   if(Key->Codepoint == '-')                          UiChangeTextSize(&App->R3, -1);
+  }
+ }
+}
+
 // NOTE: Call at the start of the frame, before any text is drawn or measured.
 internal void
 UiUpdateTextSize(app_state *App)
