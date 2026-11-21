@@ -40,6 +40,7 @@
 #define W3_ColorCrystalLow  0xFF8892A0
 #define W3_ColorCrystalHigh 0xFF7FE3F0
 #define W3_ColorHover       0xFFFFE08A
+#define W3_ColorSelected    0xFF88E0FF
 #define W3_ColorCloud       0xFFF7FAFC
 
 // NOTE: One colour per product kind, used for crates and in the legend.
@@ -95,7 +96,7 @@ W3Shade(v4 Color, random_series *Series)
 
 //~ Island pieces
 internal void
-W3PushIslandBody(r3_mesh *Mesh, v3 Top, f32 Radius, u32 Index, b32 Hovered)
+W3PushIslandBody(r3_mesh *Mesh, v3 Top, f32 Radius, u32 Index, b32 Highlight, u32 HighlightColor)
 {
  random_series Series = {0};
  RandomSeed(&Series, W3_Seed*7 + 101*(u64)Index);
@@ -147,10 +148,10 @@ W3PushIslandBody(r3_mesh *Mesh, v3 Top, f32 Radius, u32 Index, b32 Hovered)
             W3Shade(R3Color(W3_ColorRockBottom), &Series));
  }
 
- // Hovered: a glowing ring around the rim.
- if(Hovered)
+ // Hovered or selected: a glowing ring around the rim.
+ if(Highlight)
  {
-  v4 Glow = R3Color(W3_ColorHover);
+  v4 Glow = R3Color(HighlightColor);
   for(u32 Side = 0; Side < W3_IslandSides; Side += 1)
   {
    u32 Next = (Side + 1) % W3_IslandSides;
@@ -326,8 +327,14 @@ W3PrepareIslands(app_state *App, app_input *Input)
  }
  R3->IslandCount = Index;
 
- //- Hovered island: closest label anchor or island top to the mouse
+ //- Hovered island: closest label anchor or island top to the mouse.
+ // Over the islands panel, the row under the mouse (last frame) is the hovered island.
  R3->HoveredIdx = -1;
+ if(IsInsideRectV2(V2V2S32(Input->Mouse.Pos), App->Panel.LastRect))
+ {
+  R3->HoveredIdx = App->Panel.RowHoverPlusOne - 1;
+ }
+ else
  {
   v2 MousePos = V2V2S32(Input->Mouse.Pos);
   f32 BestDistanceSq = 60.f*60.f;
@@ -368,7 +375,10 @@ W3BuildWorld(app_state *App)
   v3 Top = R3->IslandTop[Index];
   f32 Radius = R3->IslandRadius[Index];
 
-  W3PushIslandBody(&R3->Opaque, Top, Radius, Index, (R3->HoveredIdx == (s32)Index));
+  b32 Hovered = (R3->HoveredIdx == (s32)Index);
+  b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
+  W3PushIslandBody(&R3->Opaque, Top, Radius, Index, Hovered || Selected,
+                   Hovered ? W3_ColorHover : W3_ColorSelected);
   W3PushDecorations(&R3->Opaque, Top, Radius, Index);
   W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
 

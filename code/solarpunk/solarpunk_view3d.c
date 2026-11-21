@@ -54,6 +54,10 @@ V3DrawIslandLabels(app_state *App)
     f32 Key = R3Length(R3Sub(R3->IslandTop[Index], R3->Eye));
     if(R3->HoveredIdx == (s32)Index)
     {
+     Key = -2.f;
+    }
+    else if(App->Panel.SelectedPlusOne == (s32)Index + 1)
+    {
      Key = -1.f;
     }
 
@@ -74,11 +78,12 @@ V3DrawIslandLabels(app_state *App)
  }
 
  //- Place and draw. The UI areas count as already placed, so labels avoid them.
- v4 Placed[R3_MaxIslands + 3];
+ v4 Placed[R3_MaxIslands + 4];
  u32 PlacedCount = 0;
  Placed[PlacedCount++] = RectFromSize(V2(0.f, 0.f), V2(V3D_ControlsAreaWidth, V3D_ControlsAreaHeight));
  Placed[PlacedCount++] = RectFromSize(V2(R3->ViewportDim.X - V3D_CameraAreaWidth, 0.f), V2(V3D_CameraAreaWidth, V3D_CameraAreaHeight));
  Placed[PlacedCount++] = V3LegendRect(App, R3->ViewportDim);
+ Placed[PlacedCount++] = App->Panel.LastRect;
  for(u32 OrderIdx = 0; OrderIdx < Count; OrderIdx += 1)
  {
   u32 Index = Order[OrderIdx];
