@@ -257,6 +257,7 @@ WorldInit(world *World, const engine_config *Config)
    f32 Tau = RandomBetween(&World->Rng, C->K.TauTrueMin, C->K.TauTrueMax);
    World->DemandTauTrue[I][R] = Tau;
    World->DemandNextAt[I][R] = Tau*RandomUnilateral(&World->Rng);
+   World->DemandLastAt[I][R] = -1.0f;
   }
  }
 }
@@ -351,11 +352,359 @@ WorldDispatchChaos(world *World, const chaos_action *Action)
  }
 }
 
+//~ Pipeline helpers
+// NOTE(L4): What a node may perceive about its direct neighbours (spec 4.2 neighbor_obs). Awake
+// is visible (beacon); the reserve estimate needs a radio/optical link, so not in sneakernet.
+internal s32
+WorldBuildObs(const world *World, island_id Id, neighbor_obs *Obs)
+{
+ const island_node *Node = &World->Islands[Id];
+ b32 Radio = (World->Config.SyncMode != SyncMode_Sneakernet);
+ for(s32 N = 0; N < Node->NeighborCount; N += 1)
+ {
+  const neighbor_link *Link = &Node->Neighbors[N];
+  const island_node *Other = &World->Islands[Link->TargetId];
+  neighbor_obs *O = &Obs[N];
+  MemorySet(O, 0, sizeof(*O));
+  O->NeighborId = Link->TargetId;
+  O->IsReachable = EnergyIsAwake(Other);
+  O->ObservedPowerState = Other->PowerState;
+  O->HasReserveEstimate = (Radio && O->IsReachable && EnergyIsAwake(Node));
+  O->EstimatedReserve = O->HasReserveEstimate ? Other->Energy : 0.0f;
+  O->Distance = Link->Distance;
+  O->WrapsGlobe = Link->WrapsGlobe;
+ }
+ return Node->NeighborCount;
+}
+
+internal s32
+WorldNeighborIndex(const island_node *Node, island_id Other)
+{
+ s32 Result = -1;
+ for(s32 N = 0; N < Node->NeighborCount; N += 1)
+ {
+  if(Node->Neighbors[N].TargetId == Other)
+  {
+   Result = N;
+   break;
+  }
+ }
+ return Result;
+}
+
+internal pod_id
+WorldAllocPod(world *World)
+{
+ pod_id Result = -1;
+ for EachIndex(P, MAX_PODS)
+ {
+  if(World->Pods[P].Status == PodStatus_Free)
+  {
+   Result = P;
+   MemorySet(&World->Pods[P], 0, sizeof(pod));
+   break;
+  }
+ }
+ return Result;
+}
+
+internal b32
+WorldQueueHasRoom(const world *World, island_id At)
+{
+ b32 Result = (World->Islands[At].QueueCount < World->Config.MaxQueueCapacity);
+ return Result;
+}
+
+// NOTE(L4): Custody moves to At. Caller checks WorldQueueHasRoom first.
+internal void
+WorldQueuePush(world *World, island_id At, pod_id Id)
+{
+ island_node *Node = &World->Islands[At];
+ Assert(Node->QueueCount < MAX_QUEUE);
+ Node->Queue[Node->QueueCount++] = Id;
+ pod *Pod = &World->Pods[Id];
+ Pod->Status = PodStatus_Queued;
+ Pod->CustodianId = At;
+ Pod->ToId = -1;
+ Pod->Progress = 0.0f;
+}
+
+internal void
+WorldQueueRemove(world *World, island_id At, pod_id Id)
+{
+ island_node *Node = &World->Islands[At];
+ s32 Write = 0;
+ for(s32 Read = 0; Read < Node->QueueCount; Read += 1)
+ {
+  if(Node->Queue[Read] != Id)
+  {
+   Node->Queue[Write++] = Node->Queue[Read];
+  }
+ }
+ Node->QueueCount = Write;
+}
+
+// NOTE(L4): Shared by step 3 and WorldSpawnPod. The units already left the shed.
+internal void
+WorldFinishNewPod(world *World, island_id Origin, pod_id Id)
+{
+ pod *Pod = &World->Pods[Id];
+ Pod->OriginId = Origin;
+ Pod->FromId = Origin;
+ Pod->InitialReservedQty = Pod->ReservedQty;
+ Pod->InitialFluidQty = Pod->FluidQty;
+ Pod->CreatedAt = World->SimTime;
+ Pod->ExpiresAt = World->SimTime + World->Config.PodMaxTtlSeconds;
+ Pod->HoldReason = HoldReason_None;
+ Pod->Visited[0] = Origin;
+ Pod->VisitedCount = 1;
+ WorldQueuePush(World, Origin, Id);
+
+ sim_event Event = WorldEvent(SimEvent_PodCreated, Origin, Pod->DestId, Id);
+ Event.Resource = Pod->Resource;
+ Event.Qty = Pod->ReservedQty;
+ Event.Qty2 = Pod->FluidQty;
+ WorldPushEvent(World, Event);
+}
+
+// NOTE(L4): Stats and events only when the reason changes, not every tick a pod waits.
+internal void
+WorldMarkHeld(world *World, pod_id Id, hold_reason Reason)
+{
+ pod *Pod = &World->Pods[Id];
+ if(Reason == HoldReason_NeighborsAsleep || Reason == HoldReason_Storm)
+ {
+  Pod->SawOutage = true;
+ }
+ if(Pod->HoldReason != Reason)
+ {
+  if(Pod->HoldReason == HoldReason_None)
+  {
+   World->Stats.PodsHeldDtn += 1;
+  }
+  Pod->HoldReason = Reason;
+  sim_event Event = WorldEvent(SimEvent_PodHeldDtn, Pod->CustodianId, Pod->DestId, Id);
+  Event.Resource = Pod->Resource;
+  Event.Reason = Reason;
+  WorldPushEvent(World, Event);
+ }
+}
+
+// NOTE(L4): D18. The hop was chosen elsewhere; this checks the link and the receiver, then runs
+// the energy guard (EnergyTryLaunch deducts). Returns HoldReason_None when the pod is airborne.
+internal hold_reason
+WorldLaunch(world *World, island_id At, pod_id Id, island_id To)
+{
+ hold_reason Result = HoldReason_None;
+ island_node *Node = &World->Islands[At];
+ pod *Pod = &World->Pods[Id];
+ s32 N = WorldIsValidIsland(World, To) ? WorldNeighborIndex(Node, To) : -1;
+
+ if(N < 0)
+ {
+  Result = HoldReason_NeighborsAsleep; // NOTE(L4): not a neighbour, so nowhere to go
+ }
+ else if(!EnergyIsAwake(&World->Islands[To]))
+ {
+  Result = ((World->Islands[To].PowerState == PowerState_StormOutage) ?
+            HoldReason_Storm : HoldReason_NeighborsAsleep);
+ }
+ else
+ {
+  f32 Distance = Node->Neighbors[N].Distance;
+  f32 Cost = EnergyLaunchCost(Node, &World->Config, Distance);
+  b32 AtNight = (Node->PowerState == PowerState_NightReserve);
+  if(!EnergyTryLaunch(Node, &World->Config, Distance))
+  {
+   Result = HoldReason_LowEnergy;
+  }
+  else
+  {
+   World->Stats.EnergySpentTotal += Cost;
+   WorldQueueRemove(World, At, Id);
+   Pod->Status = PodStatus_InTransit;
+   Pod->CustodianId = At;                    // custody stays with the sender until landing
+   Pod->FromId = At;
+   Pod->ToId = To;
+   Pod->Distance = Distance;
+   Pod->WrapsGlobe = Node->Neighbors[N].WrapsGlobe;
+   Pod->Progress = 0.0f;
+   Pod->HoldReason = HoldReason_None;
+   if(Pod->LaunchedAt <= 0.0f)
+   {
+    Pod->LaunchedAt = World->SimTime;
+   }
+   if(AtNight && At != Pod->OriginId)
+   {
+    Pod->UsedNightRelay = true;
+   }
+   MemoryCopy(Pod->Carried, Node->Knowledge, sizeof(Pod->Carried));
+
+   sim_event Event = WorldEvent(SimEvent_PodLaunched, At, To, Id);
+   Event.Resource = Pod->Resource;
+   Event.Qty = Pod->ReservedQty;
+   Event.Qty2 = Pod->FluidQty;
+   WorldPushEvent(World, Event);
+  }
+ }
+ return Result;
+}
+
+internal void
+WorldExpirePod(world *World, pod_id Id)
+{
+ pod *Pod = &World->Pods[Id];
+ if(Pod->Status == PodStatus_Queued)
+ {
+  WorldQueueRemove(World, Pod->CustodianId, Id);
+ }
+ World->Stats.UnitsExpired += Pod->ReservedQty + Pod->FluidQty;
+ Pod->Status = PodStatus_Expired;
+ sim_event Event = WorldEvent(SimEvent_PodExpired, Pod->CustodianId, Pod->DestId, Id);
+ Event.Resource = Pod->Resource;
+ Event.Qty = Pod->ReservedQty;
+ Event.Qty2 = Pod->FluidQty;
+ WorldPushEvent(World, Event);
+}
+
+// NOTE(L4): Spec 5.1 step 5, Arrival Resolution. If the target queue is full the pod hovers at
+// Progress 1 and retries next tick: it never vanishes (7.1).
+internal void
+WorldArrive(world *World, pod_id Id)
+{
+ engine_config *Config = &World->Config;
+ pod *Pod = &World->Pods[Id];
+ island_id To = Pod->ToId;
+ island_node *ToNode = &World->Islands[To];
+
+ if(!EnergyIsAwake(ToNode))
+ {
+  //- Receiver went offline mid-flight (D3)
+  Pod->SawOutage = true;
+  b32 Passive = (Config->MidFlightPolicy == MidFlight_PassiveMechanicalLanding);
+  island_id Target = Passive ? To : Pod->FromId;
+  if(WorldQueueHasRoom(World, Target))
+  {
+   if(Passive && Pod->VisitedCount < MAX_POD_PATH)
+   {
+    Pod->Visited[Pod->VisitedCount++] = To;
+   }
+   WorldQueuePush(World, Target, Id);
+   if(!Passive)
+   {
+    sim_event Event = WorldEvent(SimEvent_PodReturned, Pod->FromId, To, Id);
+    Event.Resource = Pod->Resource;
+    WorldPushEvent(World, Event);
+   }
+  }
+ }
+ else if(Pod->DestId != To && !WorldQueueHasRoom(World, To))
+ {
+  // Hover: wait for room at the relay.
+ }
+ else
+ {
+  //- Hand the pod to the node (L1)
+  s32 ReservedBefore = Pod->ReservedQty;
+  s32 FluidBefore = Pod->FluidQty;
+  if(Pod->VisitedCount < MAX_POD_PATH)
+  {
+   Pod->Visited[Pod->VisitedCount++] = To;
+  }
+  Pod->CustodianId = To;
+  arrival_result Arrival = NodeOnPodArrived(ToNode, Config, Pod, World->SimTime);
+
+  // Invariant 3: intermediates never touch Reserved. The Fluid change must match the report.
+  Assert(Pod->ReservedQty == ReservedBefore);
+  s32 Claimed = FluidBefore - Pod->FluidQty;
+  Assert(Claimed >= 0 && Claimed == Arrival.FluidClaimedQty);
+  if(Claimed > 0)
+  {
+   World->Stats.UnitsClaimedEnRoute += Claimed;
+   World->Stats.FluidFlightsSaved += Claimed;
+   sim_event Event = WorldEvent(SimEvent_FluidClaimed, To, Pod->DestId, Id);
+   Event.Resource = Pod->Resource;
+   Event.Qty = Claimed;
+   WorldPushEvent(World, Event);
+  }
+
+  if(Arrival.IsFinal)
+  {
+   world_stats *S = &World->Stats;
+   S->UnitsDelivered += Pod->ReservedQty + Pod->FluidQty;
+   S->DeliveriesCompleted += 1;
+   S->DeliveriesCompletedDuringOutage += Pod->SawOutage ? 1 : 0;
+   S->DeliveriesViaNightRelay += Pod->UsedNightRelay ? 1 : 0;
+   S->TotalDeliverySeconds += World->SimTime - Pod->CreatedAt;
+   S->EnergyPerUnitDelivered = ((S->UnitsDelivered > 0) ?
+                                S->EnergySpentTotal/(f32)S->UnitsDelivered : 0.0f);
+   Pod->Status = PodStatus_Delivered;
+   Pod->ToId = -1;
+
+   sim_event Event = WorldEvent(SimEvent_PodDelivered, Pod->OriginId, To, Id);
+   Event.Resource = Pod->Resource;
+   Event.Qty = Pod->ReservedQty;
+   Event.Qty2 = Pod->FluidQty;
+   WorldPushEvent(World, Event);
+  }
+  else
+  {
+   WorldQueuePush(World, To, Id);
+  }
+ }
+}
+
+//~ Scenario / test helpers
+internal pod_id
+WorldSpawnPod(world *World, island_id Origin, island_id Dest, resource_id R, s32 Reserved, s32 Fluid)
+{
+ pod_id Result = -1;
+ if(WorldIsValidIsland(World, Origin) && WorldIsValidIsland(World, Dest) && Origin != Dest &&
+    R >= 0 && R < World->Config.ResourceCount && Reserved >= 0 && Fluid >= 0 &&
+    World->Islands[Origin].Shed[R] >= Reserved + Fluid && WorldQueueHasRoom(World, Origin))
+ {
+  Result = WorldAllocPod(World);
+  if(Result >= 0)
+  {
+   pod *Pod = &World->Pods[Result];
+   Pod->Kind = PodKind_Targeted;
+   Pod->Resource = R;
+   Pod->DestId = Dest;
+   Pod->ReservedQty = Reserved;
+   Pod->FluidQty = Fluid;
+   World->Islands[Origin].Shed[R] -= Reserved + Fluid;
+   WorldFinishNewPod(World, Origin, Result);
+  }
+ }
+ return Result;
+}
+
+internal b32
+WorldTestLaunch(world *World, pod_id Id, island_id To)
+{
+ b32 Result = false;
+ if(Id >= 0 && Id < MAX_PODS && World->Pods[Id].Status == PodStatus_Queued)
+ {
+  island_id At = World->Pods[Id].CustodianId;
+  if(EnergyIsAwake(&World->Islands[At]))
+  {
+   hold_reason Hold = WorldLaunch(World, At, Id, To);
+   if(Hold != HoldReason_None)
+   {
+    WorldMarkHeld(World, Id, Hold);
+   }
+   Result = (Hold == HoldReason_None);
+  }
+ }
+ return Result;
+}
+
 //~ Step
 internal void
 WorldStep(world *World, f32 Dt)
 {
  engine_config *Config = &World->Config;
+ neighbor_obs Obs[MAX_NEIGHBORS];
 
  //- 0. Recycle pods delivered/expired during the previous tick (they stayed one tick for the UI).
  for EachIndex(P, MAX_PODS)
@@ -398,13 +747,172 @@ WorldStep(world *World, f32 Dt)
    WorldPushEvent(World, Event);
   }
 
-  // TODO(L4): NeedTick, hidden demand events, NodeStep, drain surplus to shed (task b/c).
+  NeedTick(Node, Config, Dt, World->SimTime);
+
+  // Hidden household demand clock (Option A ground truth, spec 3.3). World-owned.
+  if(Config->NeedModel == NeedModel_AbstractCadence)
+  {
+   for(s32 R = 0; R < Config->ResourceCount; R += 1)
+   {
+    if(World->SimTime >= World->DemandNextAt[I][R])
+    {
+     f32 Last = World->DemandLastAt[I][R];
+     f32 Interval = (Last >= 0.0f) ? World->SimTime - Last : -1.0f;
+     NeedOnDemandEvent(Node, Config, R, Interval, World->SimTime);
+     f32 Gap = World->DemandTauTrue[I][R]*(1.0f + Config->K.DemandJitter*RandomBilateral(&World->Rng));
+     World->DemandLastAt[I][R] = World->SimTime;
+     World->DemandNextAt[I][R] = World->SimTime + Max(Gap, Dt);
+    }
+   }
+  }
+
+  if(EnergyIsAwake(Node))
+  {
+   s32 ObsCount = WorldBuildObs(World, I, Obs);
+   NodeStep(Node, Config, Obs, ObsCount, World->SimTime);
+   for(s32 R = 0; R < Config->ResourceCount; R += 1)
+   {
+    World->Stats.UnitsProduced += NeedDrainToShed(Node, Config, R);
+   }
+  }
  }
 
- //- 3. Pod creation. TODO(L4): task (c).
- //- 4. Sync.         TODO(L4): task (c).
- //- 5. Transport.    TODO(L4): task (c).
- //- 6. Departures.   TODO(L4): task (c).
+ //- 3. Pod creation (spec 6.1): a local decision of each awake island.
+ for(s32 I = 0; I < World->IslandCount; I += 1)
+ {
+  island_node *Node = &World->Islands[I];
+  if(EnergyIsAwake(Node))
+  {
+   s32 ObsCount = WorldBuildObs(World, I, Obs);
+   b32 WantsPod = false;
+   for(s32 R = 0; R < Config->ResourceCount; R += 1)
+   {
+    if(Node->Shed[R] >= Config->BatchSize)
+    {
+     WantsPod = true;
+     if(!WorldQueueHasRoom(World, I))
+     {
+      break; // 7.1: full queue, the surplus stays in the shed
+     }
+     pod_id Id = WorldAllocPod(World);
+     if(Id < 0)
+     {
+      break; // 7.7: pool exhausted, the surplus stays in the shed
+     }
+     pod *Pod = &World->Pods[Id];
+     s32 ShedBefore = Node->Shed[R];
+     if(NodeTryBuildPod(Node, Config, R, Obs, ObsCount, Pod, World->SimTime))
+     {
+      Pod->Resource = R;
+      Assert(ShedBefore - Node->Shed[R] == Pod->ReservedQty + Pod->FluidQty);
+      WorldFinishNewPod(World, I, Id);
+     }
+     else
+     {
+      MemorySet(Pod, 0, sizeof(*Pod));
+     }
+    }
+   }
+
+   b32 Backpressure = (WantsPod && !WorldQueueHasRoom(World, I));
+   if(Backpressure && !World->Backpressured[I])
+   {
+    sim_event Event = WorldEvent(SimEvent_QueueBackpressure, I, -1, -1);
+    Event.Qty = Node->QueueCount;
+    WorldPushEvent(World, Event);
+   }
+   World->Backpressured[I] = Backpressure;
+  }
+ }
+
+ //- 4. Sync: gossip between awake, storm-free neighbours (spec 5.1 step 4).
+ if(Config->SyncMode != SyncMode_Sneakernet && World->SimTime >= World->NextGossipAt)
+ {
+  while(World->NextGossipAt <= World->SimTime)
+  {
+   World->NextGossipAt += Max(Config->GossipIntervalSeconds, Dt);
+  }
+  for(s32 L = 0; L < World->LinkCount; L += 1)
+  {
+   world_link *Link = &World->Links[L];
+   island_node *A = &World->Islands[Link->A];
+   island_node *B = &World->Islands[Link->B];
+   if(Link->Active && EnergyIsAwake(A) && EnergyIsAwake(B))
+   {
+    // NOTE(L4): By-value snapshots, so both sides merge what the other knew before this ping.
+    knowledge_entry FromA[MAX_ISLANDS];
+    knowledge_entry FromB[MAX_ISLANDS];
+    MemoryCopy(FromA, A->Knowledge, sizeof(FromA));
+    MemoryCopy(FromB, B->Knowledge, sizeof(FromB));
+    NodeMergeKnowledge(B, Config, FromA, World->SimTime);
+    NodeMergeKnowledge(A, Config, FromB, World->SimTime);
+    WorldPushEvent(World, WorldEvent(SimEvent_GossipPing, Link->A, Link->B, -1));
+   }
+  }
+ }
+
+ //- 5. Transport: TTL, flight progress, arrival resolution.
+ for EachIndex(P, MAX_PODS)
+ {
+  pod *Pod = &World->Pods[P];
+  if((Pod->Status == PodStatus_Queued || Pod->Status == PodStatus_InTransit) &&
+     World->SimTime >= Pod->ExpiresAt)
+  {
+   WorldExpirePod(World, P);
+  }
+  else if(Pod->Status == PodStatus_InTransit)
+  {
+   // TODO(L4): spoilage when Config->EnableSpoilage (D10).
+   Pod->Progress += Config->PodSpeed/Max(Pod->Distance, 0.001f)*Dt;
+   if(Pod->Progress >= 1.0f)
+   {
+    Pod->Progress = 1.0f;
+    WorldArrive(World, P);
+   }
+  }
+ }
+
+ //- 6. Departures: each awake island asks its node for a next hop, FIFO.
+ // NOTE(L4): "urgent first" ordering is L1's call: the node may reorder Self->Queue in NodeStep.
+ for(s32 I = 0; I < World->IslandCount; I += 1)
+ {
+  island_node *Node = &World->Islands[I];
+  if(EnergyIsAwake(Node) && Node->QueueCount > 0)
+  {
+   s32 ObsCount = WorldBuildObs(World, I, Obs);
+   s32 Q = 0;
+   while(Q < Node->QueueCount)
+   {
+    pod_id Id = Node->Queue[Q];
+    pod *Pod = &World->Pods[Id];
+    hop_decision Hop = NodeDecideNextHop(Node, Config, Pod, Obs, ObsCount, World->SimTime);
+    hold_reason Hold = (Hop.HoldReason != HoldReason_None) ? Hop.HoldReason : HoldReason_NeighborsAsleep;
+    if(Hop.NextHop >= 0)
+    {
+     Hold = WorldLaunch(World, I, Id, Hop.NextHop);
+    }
+
+    if(Hold == HoldReason_None)
+    {
+     if(Hop.IsReroute)
+     {
+      Pod->RerouteCount += 1;
+      World->Stats.Reroutes += 1;
+      sim_event Event = WorldEvent(SimEvent_PodRerouted, I, Hop.NextHop, Id);
+      Event.Resource = Pod->Resource;
+      Event.Reason = Hop.RerouteReason;
+      WorldPushEvent(World, Event);
+     }
+     // The pod left the queue, so the next one moved into slot Q.
+    }
+    else
+    {
+     WorldMarkHeld(World, Id, Hold);
+     Q += 1;
+    }
+   }
+  }
+ }
 
  //- 7. Conservation check
  Assert(WorldCheckConservation(World));

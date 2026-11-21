@@ -25,6 +25,13 @@ internal void WorldDispatchChaos(world *World, const chaos_action *Action);
 internal b32  WorldPopEvent(world *World, sim_event *Event);         // false when empty
 internal void MockWorld(world *World);                               // fake but contract-correct state for UI work
 
+//- Scenario / test helpers (not for the UI: villagers never pick destinations or routes)
+// Takes Reserved+Fluid units from Origin's shed and queues a pod there. -1 if not possible.
+internal pod_id WorldSpawnPod(world *World, island_id Origin, island_id Dest, resource_id R, s32 Reserved, s32 Fluid);
+// Launches a queued pod to neighbour To through the same code as step 6 (energy guard, deduction,
+// knowledge copy), bypassing NodeDecideNextHop. False if To is not a reachable neighbour or energy fails.
+internal b32 WorldTestLaunch(world *World, pod_id Pod, island_id To);
+
 //- Read-only helpers for the UI and tests
 internal b32 WorldIsAwake(const world *World, island_id Island);
 internal f32 WorldAvgKnowledgeAge(const world *World, island_id Island);

@@ -182,8 +182,15 @@ TestDeterminism(void)
    {
     villager_action Drop = {0};
     Drop.Kind = VillagerAction_DropSurplus;
-    Drop.IslandId = 0; Drop.Resource = 0; Drop.Qty = 10;
+    Drop.IslandId = 0; Drop.Resource = 0; Drop.Qty = 40;
     WorldDispatchVillager(World, &Drop);
+   }
+   if(Tick >= 900 && (Tick % 60) == 0)
+   {
+    // Pods in flight, relays and holds, so the replay covers the transport path too.
+    island_id To = World->Islands[0].Neighbors[(Tick/60) % World->Islands[0].NeighborCount].TargetId;
+    pod_id Id = WorldSpawnPod(World, 0, To, 0, 3, 1);
+    if(Id >= 0) WorldTestLaunch(World, Id, To);
    }
    WorldStep(World, ENGINE_TICK_SECONDS);
   }
@@ -377,6 +384,314 @@ TestWorldPower(void)
        "storm expires after its duration");
 }
 
+//- Transport (spec 5.1 steps 3-7). Uses WorldSpawnPod/WorldTestLaunch, so no L1 routing needed.
+
+// NOTE(L4): Every live pod is in exactly one place: Queued in its custodian's queue, or InTransit.
+internal b32
+SimPodsAccounted(world *World)
+{
+ b32 Result = true;
+ s32 SeenInQueues[MAX_PODS] = {0};
+ for(s32 I = 0; I < World->IslandCount; I += 1)
+ {
+  island_node *Node = &World->Islands[I];
+  for(s32 Q = 0; Q < Node->QueueCount; Q += 1)
+  {
+   pod_id Id = Node->Queue[Q];
+   Result = Result && (Id >= 0 && Id < MAX_PODS);
+   if(Result)
+   {
+    SeenInQueues[Id] += 1;
+    Result = Result && World->Pods[Id].Status == PodStatus_Queued && World->Pods[Id].CustodianId == I;
+   }
+  }
+ }
+ for(s32 P = 0; P < MAX_PODS; P += 1)
+ {
+  pod *Pod = &World->Pods[P];
+  if(Pod->Status == PodStatus_Queued)
+  {
+   Result = Result && SeenInQueues[P] == 1;
+  }
+  else
+  {
+   Result = Result && SeenInQueues[P] == 0;
+  }
+  if(Pod->Status == PodStatus_InTransit)
+  {
+   Result = Result && Pod->ToId >= 0 && Pod->ToId < World->IslandCount;
+  }
+  if(Pod->Status != PodStatus_Free)
+  {
+   Result = Result && Pod->ReservedQty == Pod->InitialReservedQty; // invariant 3
+  }
+ }
+ return Result;
+}
+
+// A world where island A and its neighbour B are both in daylight with plenty of energy.
+typedef struct sim_pair sim_pair;
+struct sim_pair
+{
+ island_id A, B, C;   // C = another neighbour of B (not A), for relay tests
+};
+
+internal sim_pair
+SimSetupPair(world *World, engine_config *Config)
+{
+ sim_pair Result = { -1, -1, -1 };
+ Config->K.EInitial = 90.0f;
+ WorldInit(World, Config);
+ for(s32 I = 0; I < World->IslandCount && Result.A < 0; I += 1)
+ {
+  island_node *Node = &World->Islands[I];
+  if(Node->PowerState != PowerState_SolarHarvesting) continue;
+  for(s32 N = 0; N < Node->NeighborCount; N += 1)
+  {
+   island_id B = Node->Neighbors[N].TargetId;
+   if(World->Islands[B].PowerState == PowerState_SolarHarvesting)
+   {
+    island_node *NodeB = &World->Islands[B];
+    for(s32 M = 0; M < NodeB->NeighborCount; M += 1)
+    {
+     if(NodeB->Neighbors[M].TargetId != I)
+     {
+      Result.A = I; Result.B = B; Result.C = NodeB->Neighbors[M].TargetId;
+      break;
+     }
+    }
+    if(Result.A >= 0) break;
+   }
+  }
+ }
+ Assert(Result.A >= 0);
+
+ // Give A a shed full of resource 0 through the real villager gesture.
+ villager_action Drop = {0};
+ Drop.Kind = VillagerAction_DropSurplus;
+ Drop.IslandId = Result.A;
+ Drop.Resource = 0;
+ Drop.Qty = 60;
+ WorldDispatchVillager(World, &Drop);
+ return Result;
+}
+
+// Steps until Pod reaches one of the given statuses (or MaxSeconds); checks invariants each tick.
+internal b32
+SimStepUntil(world *World, pod_id Pod, pod_status Want, f32 MaxSeconds, b32 *InvariantsOk)
+{
+ b32 Result = false;
+ s32 Ticks = (s32)(MaxSeconds/ENGINE_TICK_SECONDS);
+ for(s32 T = 0; T < Ticks && !Result; T += 1)
+ {
+  WorldStep(World, ENGINE_TICK_SECONDS);
+  *InvariantsOk = *InvariantsOk && WorldCheckConservation(World) && SimPodsAccounted(World);
+  Result = (World->Pods[Pod].Status == Want);
+ }
+ return Result;
+}
+
+internal void
+TestTransport(void)
+{
+ world *World = SimAllocWorld();
+ engine_config Config = DefaultConfig();
+ sim_pair Pair = SimSetupPair(World, &Config);
+ b32 Ok = true;
+
+ //- Direct delivery A -> B
+ {
+  pod_id Id = WorldSpawnPod(World, Pair.A, Pair.B, 0, 8, 2);
+  Check(Id >= 0, "spawn pod");
+  Check(World->Islands[Pair.A].Shed[0] == 50, "spawn takes units from the shed");
+  f32 EnergyBefore = World->Islands[Pair.A].Energy;
+  f32 Cost = EnergyLaunchCost(&World->Islands[Pair.A], &World->Config,
+                              World->Islands[Pair.A].Neighbors[WorldNeighborIndex(&World->Islands[Pair.A], Pair.B)].Distance);
+  Check(WorldTestLaunch(World, Id, Pair.B), "launch to an awake neighbour");
+  Check(fabsf(EnergyBefore - Cost - World->Islands[Pair.A].Energy) < 0.001f, "launch deducts its energy cost");
+  Check(World->Pods[Id].Status == PodStatus_InTransit && World->Pods[Id].CustodianId == Pair.A,
+        "in flight, custody stays with the sender");
+  Check(SimStepUntil(World, Id, PodStatus_Delivered, 60.0f, &Ok), "pod is delivered at its destination");
+  Check(World->Stats.UnitsDelivered == 10 && World->Stats.DeliveriesCompleted == 1, "delivery stats");
+  Check(World->Pods[Id].ReservedQty == 8 && World->Pods[Id].FluidQty == 2, "cargo intact on delivery");
+  WorldStep(World, ENGINE_TICK_SECONDS);
+  Check(World->Pods[Id].Status == PodStatus_Free, "delivered pod is recycled after one tick");
+ }
+
+ //- Relay: A -> B with destination C. B is not final, so the pod waits in B's queue.
+ {
+  pod_id Id = WorldSpawnPod(World, Pair.A, Pair.C, 0, 8, 2);
+  Check(WorldTestLaunch(World, Id, Pair.B), "launch toward a relay");
+  Check(SimStepUntil(World, Id, PodStatus_Queued, 60.0f, &Ok), "pod lands at the relay");
+  pod *Pod = &World->Pods[Id];
+  Check(Pod->CustodianId == Pair.B && Pod->VisitedCount == 2 && Pod->Visited[1] == Pair.B,
+        "relay takes custody and is recorded as visited");
+  Check(Pod->HoldReason != HoldReason_None, "relay holds it (L1 placeholder router holds everything)");
+ }
+
+ //- Low energy: the guard holds the pod with HoldReason_LowEnergy.
+ {
+  pod_id Id = WorldSpawnPod(World, Pair.A, Pair.B, 0, 8, 2);
+  World->Islands[Pair.A].Energy = 0.5f;
+  s32 HeldBefore = World->Stats.PodsHeldDtn;
+  Check(!WorldTestLaunch(World, Id, Pair.B), "launch refused on low energy");
+  Check(World->Pods[Id].HoldReason == HoldReason_LowEnergy, "hold reason LowEnergy");
+  Check(World->Stats.PodsHeldDtn == HeldBefore + 1, "PodsHeldDtn counts the hold once");
+  WorldTestLaunch(World, Id, Pair.B);
+  Check(World->Stats.PodsHeldDtn == HeldBefore + 1, "same hold reason is not counted twice");
+  World->Islands[Pair.A].Energy = 90.0f;
+ }
+
+ //- Stormed receiver: hold with HoldReason_Storm.
+ {
+  pod_id Id = WorldSpawnPod(World, Pair.A, Pair.B, 0, 8, 2);
+  chaos_action Storm = {0};
+  Storm.Kind = ChaosAction_Storm;
+  Storm.Islands[0] = Pair.B;
+  Storm.IslandCount = 1;
+  Storm.DurationSec = 5.0f;
+  WorldDispatchChaos(World, &Storm);
+  WorldStep(World, ENGINE_TICK_SECONDS);
+  Check(!WorldTestLaunch(World, Id, Pair.B), "no launch into a storm");
+  Check(World->Pods[Id].HoldReason == HoldReason_Storm && World->Pods[Id].SawOutage, "hold reason Storm");
+  for(s32 T = 0; T < (s32)(6.0f/ENGINE_TICK_SECONDS); T += 1) WorldStep(World, ENGINE_TICK_SECONDS);
+  Check(WorldTestLaunch(World, Id, Pair.B), "launches once the storm is over");
+  Check(SimStepUntil(World, Id, PodStatus_Delivered, 60.0f, &Ok), "and is delivered");
+  Check(World->Stats.DeliveriesCompletedDuringOutage >= 1, "counted as delivered during an outage");
+ }
+
+ Check(Ok, "conservation + every pod accounted for, every tick");
+}
+
+// D3: what happens when the receiver goes down while the pod is in the air.
+internal void
+TestMidFlight(mid_flight_policy Policy)
+{
+ world *World = SimAllocWorld();
+ engine_config Config = DefaultConfig();
+ Config.MidFlightPolicy = Policy;
+ sim_pair Pair = SimSetupPair(World, &Config);
+ b32 Ok = true;
+
+ pod_id Id = WorldSpawnPod(World, Pair.A, Pair.C, 0, 8, 2);
+ Check(WorldTestLaunch(World, Id, Pair.B), "launch");
+ chaos_action Storm = {0};
+ Storm.Kind = ChaosAction_Storm;
+ Storm.Islands[0] = Pair.B;
+ Storm.IslandCount = 1;
+ Storm.DurationSec = 200.0f;
+ WorldDispatchChaos(World, &Storm);
+ Check(SimStepUntil(World, Id, PodStatus_Queued, 60.0f, &Ok), "pod is caught, not lost");
+
+ pod *Pod = &World->Pods[Id];
+ if(Policy == MidFlight_PassiveMechanicalLanding)
+ {
+  Check(Pod->CustodianId == Pair.B, "passive landing: waits at the stormed island");
+ }
+ else
+ {
+  Check(Pod->CustodianId == Pair.A, "prelaunch policy: returned to the sender");
+  b32 SawReturned = false;
+  sim_event Event;
+  while(WorldPopEvent(World, &Event)) SawReturned = SawReturned || Event.Kind == SimEvent_PodReturned;
+  Check(SawReturned, "PodReturned event");
+ }
+ Check(Pod->SawOutage, "outage recorded on the pod");
+ Check(Ok, "conservation + every pod accounted for, every tick");
+}
+
+internal void
+TestExpiryAndQueue(void)
+{
+ world *World = SimAllocWorld();
+ engine_config Config = DefaultConfig();
+ Config.PodMaxTtlSeconds = 5.0f;
+ Config.MaxQueueCapacity = 3;
+ sim_pair Pair = SimSetupPair(World, &Config);
+ b32 Ok = true;
+
+ pod_id Ids[3];
+ for(s32 I = 0; I < 3; I += 1) Ids[I] = WorldSpawnPod(World, Pair.A, Pair.B, 0, 5, 5);
+ Check(Ids[2] >= 0, "three pods fit a queue of three");
+ Check(WorldSpawnPod(World, Pair.A, Pair.B, 0, 5, 5) < 0, "a full queue refuses new pods (7.1)");
+ Check(SimStepUntil(World, Ids[0], PodStatus_Expired, 10.0f, &Ok), "queued pod expires on TTL");
+ Check(World->Islands[Pair.A].QueueCount == 0, "expired pods leave the queue");
+ Check(World->Stats.UnitsExpired == 30, "expired units counted");
+ Check(Ok, "conservation holds through expiry");
+}
+
+internal void
+TestGossipTimer(void)
+{
+ world *World = SimAllocWorld();
+ engine_config Config = DefaultConfig();
+ for(s32 Mode = 0; Mode < 2; Mode += 1)
+ {
+  Config.SyncMode = (Mode == 0) ? SyncMode_MeshGossip : SyncMode_Sneakernet;
+  WorldInit(World, &Config);
+  s32 Pings = 0;
+  for(s32 T = 0; T < (s32)(20.0f/ENGINE_TICK_SECONDS); T += 1)
+  {
+   WorldStep(World, ENGINE_TICK_SECONDS);
+   sim_event Event;
+   while(WorldPopEvent(World, &Event)) Pings += (Event.Kind == SimEvent_GossipPing) ? 1 : 0;
+  }
+  if(Mode == 0) Check(Pings > 0, "gossip pings between awake neighbours");
+  else          Check(Pings == 0, "no radio in sneakernet mode");
+ }
+}
+
+// Test 8: randomized stress with drops, spawns, launches to random neighbours and storms.
+internal void
+TestConservationStress(void)
+{
+ world *World = SimAllocWorld();
+ engine_config Config = DefaultConfig();
+ WorldInit(World, &Config);
+ random_series Rng;
+ RandomSeed(&Rng, 1234);
+ b32 Ok = true;
+ s32 Launches = 0;
+
+ for(s32 Tick = 0; Tick < 6000; Tick += 1)
+ {
+  island_id I = (island_id)(RandomNext(&Rng) % (u32)World->IslandCount);
+  if((Tick % 20) == 0)
+  {
+   villager_action Drop = {0};
+   Drop.Kind = VillagerAction_DropSurplus;
+   Drop.IslandId = I;
+   Drop.Resource = (resource_id)(RandomNext(&Rng) % (u32)Config.ResourceCount);
+   Drop.Qty = 1 + (s32)(RandomNext(&Rng) % 12);
+   WorldDispatchVillager(World, &Drop);
+   island_id Dest = (island_id)(RandomNext(&Rng) % (u32)World->IslandCount);
+   s32 Fluid = (s32)(RandomNext(&Rng) % 3);
+   WorldSpawnPod(World, I, Dest, Drop.Resource, Drop.Qty - Fluid, Fluid);
+  }
+  if((Tick % 7) == 0 && World->Islands[I].QueueCount > 0)
+  {
+   island_node *Node = &World->Islands[I];
+   island_id To = Node->Neighbors[RandomNext(&Rng) % (u32)Node->NeighborCount].TargetId;
+   Launches += WorldTestLaunch(World, Node->Queue[0], To) ? 1 : 0;
+  }
+  if((Tick % 400) == 0)
+  {
+   chaos_action Storm = {0};
+   Storm.Kind = ChaosAction_Storm;
+   Storm.Islands[0] = I;
+   Storm.IslandCount = 1;
+   Storm.DurationSec = 15.0f;
+   WorldDispatchChaos(World, &Storm);
+  }
+  WorldStep(World, ENGINE_TICK_SECONDS);
+  Ok = Ok && WorldCheckConservation(World) && SimPodsAccounted(World);
+ }
+ Log("  stress: %d launches, %d delivered, %d expired units, %d held\n", Launches,
+     World->Stats.DeliveriesCompleted, World->Stats.UnitsExpired, World->Stats.PodsHeldDtn);
+ Check(Launches > 50 && World->Stats.DeliveriesCompleted > 0, "stress actually moves pods");
+ Check(Ok, "conservation + every pod accounted for at every tick under stress");
+}
+
 internal s32
 RunTests(cmd_line *CmdLine)
 {
@@ -385,7 +700,13 @@ RunTests(cmd_line *CmdLine)
   {"1 isolation (static)", 1}, {"9 biconnectivity", 9}, {"contract: MockWorld", 100},
   {"sun cycle", 101}, {"energy: node state machine + launch guard", 102},
   {"energy: world day/night + storms", 103},
-  {"8 conservation (skeleton)", 8}, {"7 determinism (skeleton)", 7},
+  {"transport: launch, flight, relay, delivery, holds", 104},
+  {"transport: mid-flight passive landing (D3 option 2)", 105},
+  {"transport: mid-flight return to sender (D3 option 1)", 106},
+  {"transport: TTL expiry + queue capacity", 107},
+  {"sync: gossip timer vs sneakernet", 108},
+  {"8 conservation (drops)", 8}, {"8 conservation (stress with pods)", 109},
+  {"7 determinism (storms + pods)", 7},
  };
 
  for EachIndex(T, ArrayCount(Tests))
@@ -399,6 +720,12 @@ RunTests(cmd_line *CmdLine)
    case 101: TestSunCycle(); break;
    case 102: TestEnergy(); break;
    case 103: TestWorldPower(); break;
+   case 104: TestTransport(); break;
+   case 105: TestMidFlight(MidFlight_PassiveMechanicalLanding); break;
+   case 106: TestMidFlight(MidFlight_PrelaunchEnergyCheck); break;
+   case 107: TestExpiryAndQueue(); break;
+   case 108: TestGossipTimer(); break;
+   case 109: TestConservationStress(); break;
    case 8:   TestConservation(); break;
    case 7:   TestDeterminism(); break;
   }

@@ -223,7 +223,8 @@ struct pod
  s32 RerouteCount;
  fluid_claim FluidClaims[MAX_CLAIMS]; s32 FluidClaimCount;
  knowledge_entry Carried[MAX_ISLANDS];          // sneakernet/hybrid ledger: a COPY made at launch
- f32 LaunchedAt;                                // for delivery-time stats
+ hold_reason HoldReason;                        // why it is waiting in a queue now (None = not held), for UI + stats
+ f32 LaunchedAt;                                // first launch, for delivery-time stats
  b32 SawOutage;                                 // path crossed an asleep/stormed island (stats)
  b32 UsedNightRelay;
 };
@@ -399,7 +400,9 @@ struct world
  // hidden ground truth, never shown to nodes
  f32 DemandNextAt[MAX_ISLANDS][MAX_RESOURCES];  // Option A: next household demand event
  f32 DemandTauTrue[MAX_ISLANDS][MAX_RESOURCES]; // Option A: true cadence
+ f32 DemandLastAt[MAX_ISLANDS][MAX_RESOURCES];  // Option A: last event time, -1 = none yet
  f32 NextGossipAt;
+ b32 Backpressured[MAX_ISLANDS];                // queue full while the shed has a batch (event only on change)
  world_stats Stats;
  sim_event Events[MAX_EVENTS]; u32 EventHead, EventTail;   // ring buffer, Head = next write
 };

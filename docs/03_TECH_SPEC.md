@@ -498,6 +498,15 @@ The UI calls `WorldStep` with a **fixed** `Dt = 0.05f` as many times as needed p
 
 Delivered/Expired pods are recycled (set to `Free`) at the **start** of the next `WorldStep` (step 0), so the UI sees them for exactly one tick.
 
+**As implemented (L4, 2026-11-21), details the steps above leave open:**
+- **Step 2 order per island:** storm expiry, sun, `EnergyTick` (+ `IslandState` event), `NeedTick`, hidden demand events (Option A only; world RNG), then, if awake, `NodeStep` and `NeedDrainToShed` (adds to `Stats.UnitsProduced`). `NeedOnDemandEvent` gets `Interval = -1` for the first event of each `(island, r)`.
+- **Step 3:** per awake island, per resource with `Shed >= BatchSize`: stop if the queue is full or the pool is empty (surplus stays in the shed). `SimEvent_QueueBackpressure` fires once when an island becomes backpressured, not every tick (`world.Backpressured`).
+- **Step 4:** both ends of a link must be awake; each side merges a by-value snapshot of the other's table. Links are processed in `Links[]` order.
+- **Step 5:** TTL expiry applies to Queued and InTransit pods (an expired queued pod leaves its queue). A pod arriving at a relay whose queue is full **hovers** at `Progress = 1` and retries every tick; the same applies when the mid-flight target queue is full. It is never dropped. On arrival the world asserts `ReservedQty` unchanged and that the Fluid decrease equals `arrival_result.FluidClaimedQty`.
+- **Step 6:** FIFO over the queue (L1 may reorder `Self->Queue` in `NodeStep` for "urgent first"). A hold is counted in `Stats.PodsHeldDtn` and emitted as `PodHeldDtn` only when the pod's `HoldReason` changes, not every tick. `UsedNightRelay` is set when a non-origin island launches the pod while in `NightReserve`. `SawOutage` is set by a NeighborsAsleep/Storm hold or a mid-flight outage.
+- New fields: `pod.HoldReason`, `world.Backpressured[]`, `world.DemandLastAt[][]`.
+- **Test/scenario helpers** (not for the UI): `WorldSpawnPod` (takes units from the origin shed, queues a pod) and `WorldTestLaunch` (launches a queued pod to a given neighbour through the same code as step 6, bypassing `NodeDecideNextHop`). The transport tests use these, so they do not depend on L1 routing. Spec test 4 (DTN) and tests 2, 3, 5, 6 still need L1's router.
+
 ### 5.2 Island power state machine
 ```
 SolarHarvesting --sunset (I<=0.05)--> NightReserve --E==0--> Sleeping
