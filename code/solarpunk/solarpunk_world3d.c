@@ -840,18 +840,43 @@ W3PushClouds(r3_mesh *Mesh)
 }
 
 //~ World
+// NOTE: The hand-built hero island lives in solarpunk_hero_island.c.
+#define Hero_Radius 3.f   // used for cables, hovering and the camera
+internal void W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+
 // NOTE: Positions, screen projections and the hovered island, before building geometry.
 internal void
 W3PrepareIslands(app_state *App, app_input *Input)
 {
  r3_state *R3 = &App->R3;
 
+ R3->AnimTime += Input->dtForFrame;
+ if(R3->AnimTime > 3600.f) R3->AnimTime -= 3600.f;
+
+ //- The hero island: the one nearest the map centre
+ R3->HeroIdx = -1;
+ {
+  f32 BestDistanceSq = 1e9f;
+  u32 Idx = 0;
+  for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+  {
+   f32 DX = Island->MapPos.X - .5f;
+   f32 DY = Island->MapPos.Y - .5f;
+   if(DX*DX + DY*DY < BestDistanceSq)
+   {
+    BestDistanceSq = DX*DX + DY*DY;
+    R3->HeroIdx = (s32)Idx;
+   }
+   Idx += 1;
+  }
+ }
+
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3_MaxIslands; Island = Island->Next)
  {
   v3 Top = W3IslandTopFromMap(Island->MapPos, Index);
   R3->IslandTop[Index] = Top;
-  R3->IslandRadius[Index] = W3_IslandRadius;
+  R3->IslandRadius[Index] = (R3->HeroIdx == (s32)Index) ? Hero_Radius : W3_IslandRadius;
 
   v2 Screen = V2(-1000.f, -1000.f);
   R3->IslandVisible[Index] = R3ProjectToScreen(R3, R3Add(Top, W3_LabelOffset), &Screen);
@@ -922,18 +947,27 @@ W3BuildWorld(app_state *App)
 
   b32 Hovered = (R3->HoveredIdx == (s32)Index);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
-  w3_theme *Theme = W3ThemeFor(App, Index, R3->IslandCount);
-  W3PushIslandBody(&R3->Opaque, &R3->Translucent, Theme, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
-                   Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected);
-  W3PushDecorations(&R3->Opaque, &R3->Translucent, Theme, Island, Top, Radius, Index);
-  W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
-
   f32 KnownFraction = 0.f;
   if(Broadcast->IslandCount > 1)
   {
    KnownFraction = ((f32)BroadcastKnownCount(App, Island) - 1.f)/((f32)Broadcast->IslandCount - 1.f);
   }
-  W3PushKnowledgeCrystal(&R3->Opaque, Top, Clamp(0.f, KnownFraction, 1.f));
+  KnownFraction = Clamp(0.f, KnownFraction, 1.f);
+
+  if(R3->HeroIdx == (s32)Index)
+  {
+   W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                    Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else
+  {
+   w3_theme *Theme = W3ThemeFor(App, Index, R3->IslandCount);
+   W3PushIslandBody(&R3->Opaque, &R3->Translucent, Theme, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
+                    Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected);
+   W3PushDecorations(&R3->Opaque, &R3->Translucent, Theme, Island, Top, Radius, Index);
+   W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
+   W3PushKnowledgeCrystal(&R3->Opaque, Top, KnownFraction);
+  }
 
   Index += 1;
  }

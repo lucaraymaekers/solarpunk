@@ -40,6 +40,7 @@
 #include "solarpunk/solarpunk_broadcast_view.c"
 #include "solarpunk/solarpunk_render3d.c"
 #include "solarpunk/solarpunk_world3d.c"
+#include "solarpunk/solarpunk_hero_island.c"
 #include "solarpunk/solarpunk_view3d.c"
 #include "solarpunk/solarpunk_panel.c"
 

@@ -90,6 +90,11 @@ struct r3_state
  // Island under the mouse, found by its projected position. -1 = none.
  s32 HoveredIdx;
 
+ // The hand-built hero island (the one nearest the map centre). -1 = none.
+ s32 HeroIdx;
+ // Seconds, for windmills, water wheels, boats and the campfire.
+ f32 AnimTime;
+
  // Island status (island_status) and world totals, computed every frame.
  u32 IslandStatus[R3_MaxIslands];
  u64 TotalProduced[ProductKind_Count];
