@@ -19,7 +19,7 @@
 // NOTE: Above this many islands, nodes only show their name; hover one for details.
 #define Graph_MaxDetailedIslands 8
 #define Graph_MapMarginX       90.f
-#define Graph_MapMarginTop     240.f
+#define Graph_MapMarginTop     290.f
 #define Graph_MapMarginBottom  50.f
 
 //~ Text

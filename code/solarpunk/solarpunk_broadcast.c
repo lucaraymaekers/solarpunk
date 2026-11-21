@@ -150,16 +150,48 @@ BroadcastSpeed(broadcast_state *Broadcast)
  return Result;
 }
 
+// NOTE: Resets the simulation only; speed and UI state are kept.
 internal void
 BroadcastRestart(app_state *App)
 {
  broadcast_state *Broadcast = &App->Broadcast;
 
- s32 SpeedOffset = Broadcast->SpeedOffset;
- s32 SpeedOffsetBeforePause = Broadcast->SpeedOffsetBeforePause;
- MemoryZero(Broadcast);
- Broadcast->SpeedOffset = SpeedOffset;
- Broadcast->SpeedOffsetBeforePause = SpeedOffsetBeforePause;
+ Broadcast->Round = 0;
+ Broadcast->Timer = 0.f;
+ Broadcast->IslandCount = 0;
+ MemorySet(Broadcast->Known, 0, sizeof(Broadcast->Known));
+ MemorySet(Broadcast->Snapshot, 0, sizeof(Broadcast->Snapshot));
+ MemorySet(Broadcast->Flash, 0, sizeof(Broadcast->Flash));
+}
+
+// NOTE: Rounds are deterministic (same world, same rules), so going back in time is
+// done by restarting and replaying up to the target round. Round 1 is the first round.
+internal void
+BroadcastJumpToRound(app_state *App, u64 TargetRound)
+{
+ broadcast_state *Broadcast = &App->Broadcast;
+
+ TargetRound = Clamp(1, TargetRound, (u64)Broadcast_MaxJumpRound);
+ if(TargetRound < Broadcast->Round)
+ {
+  BroadcastRestart(App);
+ }
+
+ while(Broadcast->Round < TargetRound)
+ {
+  BroadcastRound(App);
+ }
+
+ // A jump should not light up every link it passed through.
+ Broadcast->Timer = 0.f;
+ MemorySet(Broadcast->Flash, 0, sizeof(Broadcast->Flash));
+}
+
+internal void
+BroadcastJumpBy(app_state *App, s64 Delta)
+{
+ s64 Target = (s64)App->Broadcast.Round + Delta;
+ BroadcastJumpToRound(App, (u64)Max(Target, 1));
 }
 
 //~ Actions (used by both the keyboard and the on-screen buttons)

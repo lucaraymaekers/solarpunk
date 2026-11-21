@@ -7,6 +7,8 @@
 #define Broadcast_MaxIslands    64
 #define Broadcast_RoundSeconds  1.5f
 #define Broadcast_FlashSeconds  1.0f
+#define Broadcast_TimelineRounds 30   // length of the timeline slider
+#define Broadcast_MaxJumpRound  1000  // jumps further than this are clamped
 
 // NOTE: Simulation speeds, chosen with the Up/Down arrow keys. 0 = paused.
 global_variable f32 BroadcastSpeeds[] = {0.f, .25f, .5f, 1.f, 2.f, 4.f, 8.f};
@@ -34,6 +36,8 @@ struct broadcast_state
  s32 SpeedOffset;
  // Speed to go back to when the Play button is pressed.
  s32 SpeedOffsetBeforePause;
+ // True while the mouse is dragging the timeline slider.
+ b32 TimelineDragging;
  u32 IslandCount;
 
  // Known[Receiver][Origin]: what Receiver believes Origin produces and needs.

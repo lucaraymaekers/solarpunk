@@ -126,6 +126,67 @@ DrawIslandTooltip(app_state *App, app_input *Input)
  }
 }
 
+//~ Timeline
+#define BroadcastView_TimelineWidth 320.f
+#define BroadcastView_KnobSize      14.f
+
+#define BroadcastView_ColorTrack     0xFF434C5E
+#define BroadcastView_ColorTrackFill 0xFF5E81AC
+
+// NOTE: Click or drag on the track to jump to that round (forward or back).
+internal void
+DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Height)
+{
+ broadcast_state *Broadcast = &App->Broadcast;
+ font_atlas *Atlas = &App->FontAtlas;
+ font *Font = &App->Font;
+ 
+ f32 Width = BroadcastView_TimelineWidth;
+ f32 LastRound = (f32)Broadcast_TimelineRounds;
+ v4 Track = RectFromSize(*Cursor, V2(Width, Height));
+ 
+ //- Input
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
+ if(IsInsideRectV2(MousePos, Track) && WasPressed(MouseLeft))
+ {
+  Broadcast->TimelineDragging = true;
+ }
+ if(!MouseLeft.EndedDown)
+ {
+  Broadcast->TimelineDragging = false;
+ }
+ if(Broadcast->TimelineDragging)
+ {
+  f32 t = Clamp(0.f, (MousePos.X - Track.Min.X)/Width, 1.f);
+  u64 Target = 1 + (u64)(t*(LastRound - 1.f) + .5f);
+  if(Target != Broadcast->Round)
+  {
+   BroadcastJumpToRound(App, Target);
+  }
+ }
+ 
+ //- Drawing
+ f32 Done = Clamp(0.f, ((f32)Broadcast->Round - 1.f)/(LastRound - 1.f), 1.f);
+ f32 TrackY = Track.Min.Y + .5f*Height;
+ v4 Bar = RectFromSize(V2(Track.Min.X, TrackY - 3.f), V2(Width, 6.f));
+ v4 Fill = RectFromSize(V2(Track.Min.X, TrackY - 3.f), V2(Max(Done*Width, 1.f), 6.f));
+ DrawRect(Bar, V4FromU32(BroadcastView_ColorTrack), 3.f, 0.f, 0.f);
+ DrawRect(Fill, V4FromU32(BroadcastView_ColorTrackFill), 3.f, 0.f, 0.f);
+ 
+ v2 KnobCenter = V2(Track.Min.X + Done*Width, TrackY);
+ f32 Knob = BroadcastView_KnobSize;
+ b32 KnobHot = (IsInsideRectV2(MousePos, Track) || Broadcast->TimelineDragging);
+ DrawRect(RectFromSize(V2(KnobCenter.X - .5f*Knob, KnobCenter.Y - .5f*Knob), V2(Knob, Knob)),
+          V4FromU32(KnobHot ? Graph_ColorCost : Graph_ColorTitle), .5f*Knob, 0.f, 0.f);
+ 
+ str8 Label = Str8Fmt("round %llu / %u", Broadcast->Round, (u32)Broadcast_TimelineRounds);
+ GraphDrawText(Atlas, Font, V2(Track.Max.X + 12.f, Track.Min.Y + .5f*BroadcastView_ButtonPadding),
+               Label, V4FromU32(Graph_ColorKnows));
+ 
+ Cursor->X = Track.Max.X + BroadcastView_ButtonGap;
+}
+
 //~ Controls
 internal void
 DrawBroadcastControls(app_state *App, app_input *Input)
@@ -154,6 +215,17 @@ DrawBroadcastControls(app_state *App, app_input *Input)
  if(BroadcastButton(App, Input, &Cursor, S8("Next round"))) BroadcastStep(App);
  if(BroadcastButton(App, Input, &Cursor, S8("Restart")))    BroadcastRestart(App);
  
+ //- Time travel: step buttons and a timeline slider
+ f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
+ Cursor = V2(Pos.X, Cursor.Y + ButtonHeight + BroadcastView_ButtonGap);
+ 
+ if(BroadcastButton(App, Input, &Cursor, S8("Back 5")))    BroadcastJumpBy(App, -5);
+ if(BroadcastButton(App, Input, &Cursor, S8("Back 1")))    BroadcastJumpBy(App, -1);
+ if(BroadcastButton(App, Input, &Cursor, S8("Forward 1"))) BroadcastJumpBy(App, 1);
+ if(BroadcastButton(App, Input, &Cursor, S8("Forward 5"))) BroadcastJumpBy(App, 5);
+ 
+ DrawBroadcastTimeline(App, Input, &Cursor, ButtonHeight);
+ 
  //- Keyboard legend
  {
   str8 Keys[] =
@@ -166,7 +238,6 @@ DrawBroadcastControls(app_state *App, app_input *Input)
   };
   StaticAssert(ArrayCount(Keys) == ArrayCount(Actions), BroadcastLegendMatch);
   
-  f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
   v2 LegendPos = V2(Pos.X, Cursor.Y + ButtonHeight + 2.f*BroadcastView_ButtonGap);
   
   f32 KeyColumnWidth = 0.f;
