@@ -67,6 +67,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
   App->FontAtlas.Arena = PushArena(PermanentArena, MB(100), false);
   FrameArena = PushArena(PermanentArena, MB(64), true);
   SetStringsScratch(FrameArena);
+  
+  App->LinksArena = PushArena(PermanentArena, MB(16), false);
+  App->IslandsArena = PushArena(PermanentArena, MB(16), false);
+  App->ProductsArena = PushArena(PermanentArena, MB(16), false);
  }
  
  if(Memory->Reloaded)
@@ -89,6 +93,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  RenderBeginFrame(FrameArena, 0, 0, V2Arg(Buffer->Dim));
  
  //- Update 
+ 
+ 
  
  //- Rendering 
  { 
