@@ -11,7 +11,8 @@
 
 #define W3_RailSegments     20
 #define W3_RailArch         .045f  // upward arch as a fraction of the rail length
-#define W3_RailRingEvery    5      // a floating light ring every this many segments
+#define W3_RailFrameSpacing 9.f    // world units between the portal frames that hold a rail
+#define W3_RailTrackOffset  .62f   // each link has two tracks, one per direction, this far from the middle
 
 #define W3_CrateHalf        .24f
 #define W3_CrateUnitsPerBox 70     // one stacked crate per this many units produced
@@ -32,13 +33,19 @@
 #define W3_ColorPost        0xFFB0B7C3
 #define W3_ColorProducePad  0xFF8FD18C
 #define W3_ColorNeedPad     0xFFF2A65A
-#define W3_ColorRailBeam    0xFFEEF1F6
-#define W3_ColorRailSkirt   0xFF55607A
-#define W3_ColorRailGlow    0xFF45D4F0   // the strip on top of a rail
+#define W3_ColorRailBeam    0xFF4A5672   // steel blue box beam
+#define W3_ColorRailBeamHover 0xFF6A7FB0
+#define W3_ColorRailCap     0xFFDCE1E8   // pale cap on top of the beam
+#define W3_ColorRailSlot    0xFF1E2433   // the dark running slot under it
+#define W3_ColorRailFrame   0xFFE6E3DC   // concrete portal frames and stations
+#define W3_ColorRailGlow    0xFF45D4F0   // the glowing lines along a rail
 #define W3_ColorRailLit     0xFFD8FFFF   // ... while news rides it
 #define W3_ColorRailHover   0xFFFFC857   // ... on the hovered island's rails
 #define W3_ColorTrainBody   0xFFF7F9FC
 #define W3_ColorTrainWindow 0xFF27344F
+#define W3_ColorTrainSkirt  0xFF2F4FA0   // blue lower body
+#define W3_ColorTrainWindscreen 0xFF3A4E6E
+#define W3_ColorTrainLight  0xFFFFF2C2
 #define W3_ColorTrainGlow   0xFF7FF0FF
 #define W3_ColorCrystalLow  0xFF8892A0
 #define W3_ColorCrystalHigh 0xFF7FE3F0
@@ -103,9 +110,9 @@ W3Shade(v4 Color, random_series *Series)
  return Result;
 }
 
-//~ Maglev rails and news trains
-// NOTE: Every link is a maglev monorail: a pale beam with a glowing strip on top, a dark
-// skirt under it and floating light rings along it. News rides it as a little train.
+//~ Suspended monorails and news trains
+// NOTE: Every link is a suspended monorail; news rides it as a little train hanging
+// under the beam.
 
 // NOTE: Frame along the rail at t: Dir = forward, Side = to the right, Up = the beam's top.
 internal void
@@ -127,15 +134,21 @@ W3PushGlowQuad(r3_mesh *Mesh, v3 P0, v3 P1, v3 P2, v3 P3, v4 Color)
  R3PushTriUnlit(Mesh, P0, P2, P3, Color);
 }
 
+// NOTE: A suspended monorail, like the Chiba monorail: two box beams side by side (one
+// track per direction) held from above by portal frames (two pillars and a crossbeam),
+// with the trains hanging under the beams. The pillars float on anti-gravity pads.
 internal void
 W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b32 Highlight)
 {
- f32 HalfWidth = Highlight ? .3f : .25f;
- f32 HalfHeight = .11f;
- f32 GlowHalf = Highlight ? .12f : .08f;
- v4 Beam = R3Color(W3_ColorRailBeam);
- v4 Skirt = R3Color(W3_ColorRailSkirt);
+ f32 HalfWidth = .3f;
+ f32 HalfHeight = .26f;
+ v4 Beam = R3Color(Highlight ? W3_ColorRailBeamHover : W3_ColorRailBeam);
+ v4 Cap = R3Color(W3_ColorRailCap);
+ v4 Slot = R3Color(W3_ColorRailSlot);
+ v4 Frame = R3Color(W3_ColorRailFrame);
  
+ //- The beam: steel box, a pale cap on top, the dark running slot under it and a
+ // glowing line along both lower edges.
  for(u32 Segment = 0; Segment < W3_RailSegments; Segment += 1)
  {
   f32 T0 = (f32)Segment/(f32)W3_RailSegments;
@@ -144,88 +157,151 @@ W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b3
   v3 B = W3CablePoint(TopA, RadiusA, TopB, RadiusB, T1);
   v3 Dir, Side, Up;
   W3RailFrame(TopA, RadiusA, TopB, RadiusB, .5f*(T0 + T1), &Dir, &Side, &Up);
+  v3 MidA = A, MidB = B;
+  for(u32 Track = 0; Track < 2; Track += 1)
+  {
+  v3 TrackOffset = R3Scale(Side, ((Track == 0) ? -1.f : 1.f)*W3_RailTrackOffset);
+  A = R3Add(MidA, TrackOffset);
+  B = R3Add(MidB, TrackOffset);
   v3 Center = R3Scale(R3Add(A, B), .5f);
   v3 Half = R3Scale(R3Sub(B, A), .5f);
   
-  // The beam, and the darker skirt under it.
   R3PushOrientedBox(&R3->Opaque, Center, Half, R3Scale(Up, HalfHeight), R3Scale(Side, HalfWidth), Beam);
-  R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, -1.6f*HalfHeight)), Half, R3Scale(Up, .6f*HalfHeight),
-                    R3Scale(Side, .55f*HalfWidth), Skirt);
-  
-  // The glowing strip on top (just above the beam, so it is never hidden by it).
-  v3 TopA0 = R3Add(A, R3Scale(Up, HalfHeight + .01f));
-  v3 TopB0 = R3Add(B, R3Scale(Up, HalfHeight + .01f));
-  W3PushGlowQuad(&R3->Opaque, R3Add(TopA0, R3Scale(Side, -GlowHalf)), R3Add(TopB0, R3Scale(Side, -GlowHalf)),
-                 R3Add(TopB0, R3Scale(Side, GlowHalf)), R3Add(TopA0, R3Scale(Side, GlowHalf)), Glow);
-  
-  // A floating light ring every few segments.
-  if(Segment % W3_RailRingEvery == W3_RailRingEvery/2)
+  R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, HalfHeight + .03f)), Half, R3Scale(Up, .03f), R3Scale(Side, HalfWidth - .08f), Cap);
+  R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, -HalfHeight - .02f)), Half, R3Scale(Up, .02f), R3Scale(Side, .4f*HalfWidth), Slot);
+  for(u32 Edge = 0; Edge < 2; Edge += 1)
   {
-   R3PushCylinder(&R3->Translucent, R3Add(A, R3Scale(Dir, -.04f)), R3Add(A, R3Scale(Dir, .04f)), .55f, 10,
-                  R3WithAlpha(Glow, .35f));
+   f32 S = (Edge == 0) ? -1.f : 1.f;
+   v3 Offset = R3Add(R3Scale(Side, S*(HalfWidth + .005f)), R3Scale(Up, -.6f*HalfHeight));
+   v3 A0 = R3Add(A, Offset);
+   v3 B0 = R3Add(B, Offset);
+   W3PushGlowQuad(&R3->Opaque, R3Add(A0, R3Scale(Up, -.035f)), R3Add(B0, R3Scale(Up, -.035f)),
+                  R3Add(B0, R3Scale(Up, .035f)), R3Add(A0, R3Scale(Up, .035f)), Glow);
+  }
   }
  }
  
- // A docking pad where the rail meets each island.
+ //- Portal frames along the rail
+ f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, 0.f)));
+ u32 FrameCount = (u32)Max(1.f, Length/W3_RailFrameSpacing);
+ for(u32 Idx = 0; Idx < FrameCount; Idx += 1)
+ {
+  f32 t = ((f32)Idx + .5f)/(f32)FrameCount;
+  v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, t);
+  v3 Dir, Side, Up;
+  W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+  v3 Vertical = V3(0.f, 1.f, 0.f);
+  f32 PillarOut = W3_RailTrackOffset + 1.f;
+  f32 CrossY = P.Y + HalfHeight + .9f;
+  f32 FootY = P.Y - 2.6f;
+  
+  for(u32 Pillar = 0; Pillar < 2; Pillar += 1)
+  {
+   f32 S = (Pillar == 0) ? -1.f : 1.f;
+   v3 Base = R3Add(P, R3Scale(Side, S*PillarOut));
+   v3 Foot = V3(Base.X, FootY, Base.Z);
+   v3 Head = V3(Base.X, CrossY + .15f, Base.Z);
+   R3PushCylinder(&R3->Opaque, Foot, Head, .16f, 8, Frame);
+   R3PushEllipsoid(&R3->Opaque, Head, V3(.2f, .14f, .2f), 3, 8, Frame, false);
+   // Anti-gravity pad under the pillar.
+   R3PushCylinder(&R3->Opaque, R3Add(Foot, V3(0.f, -.08f, 0.f)), Foot, .26f, 8, R3Color(W3_ColorRailSlot));
+   R3PushEllipsoid(&R3->Translucent, R3Add(Foot, V3(0.f, -.22f, 0.f)), V3(.34f, .1f, .34f), 3, 8, R3WithAlpha(Glow, .5f), true);
+  }
+  
+  // Crossbeam over the rail, a lower brace, and the hanger that holds the beam.
+  v3 CrossCenter = V3(P.X, CrossY, P.Z);
+  R3PushOrientedBox(&R3->Opaque, CrossCenter, R3Scale(Side, PillarOut + .1f), R3Scale(Vertical, .14f), R3Scale(Dir, .2f), Frame);
+  R3PushOrientedBox(&R3->Opaque, R3Add(CrossCenter, V3(0.f, -.42f, 0.f)), R3Scale(Side, PillarOut), R3Scale(Vertical, .05f), R3Scale(Dir, .12f), Frame);
+  for(u32 Track = 0; Track < 2; Track += 1)
+  {
+   v3 BeamTop = R3Add(R3Add(P, R3Scale(Side, ((Track == 0) ? -1.f : 1.f)*W3_RailTrackOffset)), R3Scale(Up, HalfHeight + .06f));
+   v3 HangTop = V3(BeamTop.X, CrossCenter.Y, BeamTop.Z);
+   R3PushOrientedBox(&R3->Opaque, R3Scale(R3Add(BeamTop, HangTop), .5f), R3Scale(Side, .2f),
+                     R3Scale(Vertical, .5f*(HangTop.Y - BeamTop.Y)), R3Scale(Dir, .16f), Frame);
+  }
+ }
+ 
+ //- A station block where the rail meets each island, with a glowing edge.
  for(u32 End = 0; End < 2; End += 1)
  {
   f32 t = (End == 0) ? 0.f : 1.f;
   v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, t);
   v3 Dir, Side, Up;
   W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
-  R3PushOrientedBox(&R3->Opaque, R3Add(P, R3Scale(Up, -.05f)), R3Scale(Dir, .35f), R3Scale(Up, .16f), R3Scale(Side, .42f), Skirt);
-  v3 Top = R3Add(P, R3Scale(Up, .12f));
-  W3PushGlowQuad(&R3->Opaque, R3Add(R3Add(Top, R3Scale(Dir, -.3f)), R3Scale(Side, -.38f)), R3Add(R3Add(Top, R3Scale(Dir, .3f)), R3Scale(Side, -.38f)),
-                 R3Add(R3Add(Top, R3Scale(Dir, .3f)), R3Scale(Side, .38f)), R3Add(R3Add(Top, R3Scale(Dir, -.3f)), R3Scale(Side, .38f)), Glow);
+  f32 StationHalf = W3_RailTrackOffset + .5f;
+  R3PushOrientedBox(&R3->Opaque, R3Add(P, R3Scale(Up, .05f)), R3Scale(Dir, .4f), R3Scale(Up, .36f), R3Scale(Side, StationHalf), Frame);
+  v3 Top = R3Add(P, R3Scale(Up, .42f));
+  f32 GlowHalf = StationHalf - .05f;
+  W3PushGlowQuad(&R3->Opaque, R3Add(R3Add(Top, R3Scale(Dir, -.35f)), R3Scale(Side, -GlowHalf)), R3Add(R3Add(Top, R3Scale(Dir, .35f)), R3Scale(Side, -GlowHalf)),
+                 R3Add(R3Add(Top, R3Scale(Dir, .35f)), R3Scale(Side, GlowHalf)), R3Add(R3Add(Top, R3Scale(Dir, -.35f)), R3Scale(Side, GlowHalf)), Glow);
  }
 }
 
-// NOTE: One train car hovering over the rail at t; Nose/Tail add the pointed ends.
+// NOTE: One car hanging under the beam at t, held by an arm through the running slot.
+// Front adds the big windowed cab with headlights.
 internal void
-W3PushTrainCar(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, b32 Nose, b32 Tail, f32 NoseSign)
+W3PushTrainCar(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, b32 Front, f32 NoseSign)
 {
  v3 Dir, Side, Up;
  W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+ // Trains running towards t = 1 use the +Side track, the others the -Side track,
+ // so trains in opposite directions pass each other.
+ v3 RailP = R3Add(W3CablePoint(TopA, RadiusA, TopB, RadiusB, t), R3Scale(Side, NoseSign*W3_RailTrackOffset));
  Dir = R3Scale(Dir, NoseSign);
  Side = R3Scale(Side, NoseSign);
- v3 Center = R3Add(W3CablePoint(TopA, RadiusA, TopB, RadiusB, t), R3Scale(Up, .11f + .1f + .22f));
- f32 HalfLength = .55f, HalfWidth = .24f, HalfHeight = .22f;
+ f32 HalfLength = .62f, HalfWidth = .27f, HalfHeight = .3f;
+ v3 Center = R3Add(RailP, R3Scale(Up, -(.26f + .2f + HalfHeight)));
  
+ // Arm from the beam's slot down to the roof.
+ R3PushOrientedBox(&R3->Opaque, R3Add(RailP, R3Scale(Up, -.36f)), R3Scale(Dir, .18f), R3Scale(Up, .14f), R3Scale(Side, .06f), R3Color(W3_ColorRailSlot));
+ // Body: pale top, blue skirt, dark window band, a glowing stripe.
  R3PushOrientedBox(&R3->Opaque, Center, R3Scale(Dir, HalfLength), R3Scale(Up, HalfHeight), R3Scale(Side, HalfWidth), R3Color(W3_ColorTrainBody));
- // Window band, and a glowing line along each side.
- R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, .06f)), R3Scale(Dir, .9f*HalfLength), R3Scale(Up, .07f),
+ R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, -.17f)), R3Scale(Dir, HalfLength + .005f), R3Scale(Up, .14f),
+                   R3Scale(Side, HalfWidth + .006f), R3Color(W3_ColorTrainSkirt));
+ R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, .08f)), R3Scale(Dir, .92f*HalfLength), R3Scale(Up, .09f),
                    R3Scale(Side, HalfWidth + .01f), R3Color(W3_ColorTrainWindow));
- R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, -.1f)), R3Scale(Dir, HalfLength), R3Scale(Up, .02f),
-                   R3Scale(Side, HalfWidth + .012f), R3Color(W3_ColorTrainGlow));
- if(Nose)
  {
-  v3 Front = R3Add(Center, R3Scale(Dir, HalfLength));
-  R3PushCone(&R3->Opaque, Front, R3Add(Front, R3Scale(Dir, .45f)), .26f, 10, R3Color(W3_ColorTrainBody));
+  v3 Stripe = R3Add(Center, R3Scale(Up, -.03f));
+  for(u32 Edge = 0; Edge < 2; Edge += 1)
+  {
+   v3 S = R3Scale(Side, ((Edge == 0) ? -1.f : 1.f)*(HalfWidth + .012f));
+   v3 A0 = R3Add(R3Add(Stripe, S), R3Scale(Dir, -HalfLength));
+   v3 B0 = R3Add(R3Add(Stripe, S), R3Scale(Dir, HalfLength));
+   W3PushGlowQuad(&R3->Opaque, R3Add(A0, R3Scale(Up, -.02f)), R3Add(B0, R3Scale(Up, -.02f)), R3Add(B0, R3Scale(Up, .02f)), R3Add(A0, R3Scale(Up, .02f)),
+                  R3Color(W3_ColorTrainGlow));
+  }
  }
- if(Tail)
+ if(Front)
  {
-  v3 Back = R3Add(Center, R3Scale(Dir, -HalfLength));
-  R3PushCone(&R3->Opaque, Back, R3Add(Back, R3Scale(Dir, -.25f)), .26f, 10, R3Color(W3_ColorTrainBody));
+  // The cab: a big dark windscreen, slightly leaning out, and two headlights.
+  v3 Face = R3Add(Center, R3Scale(Dir, HalfLength + .02f));
+  v3 W0 = R3Add(R3Add(Face, R3Scale(Side, -.22f)), R3Scale(Up, -.02f));
+  v3 W1 = R3Add(R3Add(Face, R3Scale(Side, .22f)), R3Scale(Up, -.02f));
+  v3 W2 = R3Add(R3Add(R3Add(Face, R3Scale(Side, .22f)), R3Scale(Up, .25f)), R3Scale(Dir, -.06f));
+  v3 W3 = R3Add(R3Add(R3Add(Face, R3Scale(Side, -.22f)), R3Scale(Up, .25f)), R3Scale(Dir, -.06f));
+  W3PushGlowQuad(&R3->Opaque, W0, W1, W2, W3, R3Color(W3_ColorTrainWindscreen));
+  for(u32 Light = 0; Light < 2; Light += 1)
+  {
+   v3 L = R3Add(R3Add(Face, R3Scale(Side, (Light == 0) ? -.16f : .16f)), R3Scale(Up, -.18f));
+   R3PushEllipsoid(&R3->Opaque, L, V3(.05f, .05f, .05f), 3, 5, R3Color(W3_ColorTrainLight), true);
+   R3PushEllipsoid(&R3->Translucent, R3Add(L, R3Scale(Dir, .08f)), V3(.16f, .16f, .16f), 3, 6, R3WithAlpha(R3Color(W3_ColorTrainLight), .35f), true);
+  }
  }
- // The maglev glow between the car and the rail.
- R3PushEllipsoid(&R3->Translucent, R3Add(Center, R3Scale(Up, -.3f)), V3(.6f, .06f, .6f), 3, 8, R3WithAlpha(R3Color(W3_ColorTrainGlow), .45f), true);
 }
 
 // NOTE: A two-car train going from island A (t = 0) to island B (t = 1); Progress is
-// where its nose is. Direction = +1 when it runs A to B along t, -1 the other way.
+// where its front is. Direction = +1 when it runs A to B along t, -1 the other way.
 internal void
 W3PushTrain(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Progress, f32 Direction)
 {
  f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, 0.f)));
- f32 CarStep = 1.25f/Max(Length, 1.f);
+ f32 CarStep = 1.36f/Max(Length, 1.f);
  f32 Lead = (Direction > 0.f) ? Progress : 1.f - Progress;
- f32 Second = Lead - Direction*CarStep;
+ f32 Second = Clamp(0.f, Lead - Direction*CarStep, 1.f);
  Lead = Clamp(0.f, Lead, 1.f);
- Second = Clamp(0.f, Second, 1.f);
- W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Lead, true, false, Direction);
- W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Second, false, true, Direction);
+ W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Lead, true, Direction);
+ W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Second, false, Direction);
 }
-
 
 //~ Island status
 internal u32
