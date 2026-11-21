@@ -189,29 +189,86 @@ DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Height)
  Cursor->X = Track.Max.X + BroadcastView_ButtonGap;
 }
 
+//~ Controls help (opened with the "Controls" button)
+// NOTE: Plain C strings: MSVC warns (C4204) about arrays initialized with S8(...).
+global_variable char *ControlsHelpKeys[] =
+{
+ "Up",     "Down",                    "Right",      "Left",
+ "Wheel",  "Right drag",              "Middle drag", "Click",
+};
+global_variable char *ControlsHelpActions[] =
+{
+ "faster", "slower (lowest = pause)", "next round", "restart",
+ "zoom",   "move the map",            "rotate",      "open an island",
+};
+StaticAssert(ArrayCount(ControlsHelpKeys) == ArrayCount(ControlsHelpActions), ControlsHelpMatch);
+
+internal f32
+ControlsHelpKeyColumn(app_state *App)
+{
+ f32 Result = 0.f;
+ for EachElement(Idx, ControlsHelpKeys)
+ {
+  Result = Max(Result, GraphMeasureText(&App->FontAtlas, &App->Font, S8FromCString(ControlsHelpKeys[Idx])));
+ }
+ Result += 2.f*BroadcastView_ButtonPadding;
+ return Result;
+}
+
+// NOTE: The box sits with its bottom-left corner at BottomLeft.
+internal v4
+ControlsHelpRect(app_state *App, v2 BottomLeft)
+{
+ font *Font = &App->Font;
+ f32 ActionColumn = 0.f;
+ for EachElement(Idx, ControlsHelpActions)
+ {
+  ActionColumn = Max(ActionColumn, GraphMeasureText(&App->FontAtlas, Font, S8FromCString(ControlsHelpActions[Idx])));
+ }
+ f32 Width = ControlsHelpKeyColumn(App) + ActionColumn + 2.f*BroadcastView_ButtonPadding;
+ f32 Height = (f32)(ArrayCount(ControlsHelpKeys) + 1)*Font->HeightPx + 2.f*BroadcastView_ButtonPadding;
+ v4 Result = RectFromSize(V2(BottomLeft.X, BottomLeft.Y - Height), V2(Width, Height));
+ return Result;
+}
+
+internal void
+DrawControlsHelp(app_state *App, v2 BottomLeft)
+{
+ font_atlas *Atlas = &App->FontAtlas;
+ font *Font = &App->Font;
+ f32 LineHeight = Font->HeightPx;
+ v4 Box = ControlsHelpRect(App, BottomLeft);
+ f32 KeyColumn = ControlsHelpKeyColumn(App);
+
+ DrawRect(Box, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
+ DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 6.f, 1.f, 0.f);
+
+ v2 Line = V2(Box.Min.X + BroadcastView_ButtonPadding, Box.Min.Y + BroadcastView_ButtonPadding);
+ GraphDrawText(Atlas, Font, Line, S8("Controls"), V4FromU32(Graph_ColorTitle));
+ Line.Y += LineHeight;
+ for EachElement(Idx, ControlsHelpKeys)
+ {
+  GraphDrawText(Atlas, Font, Line, S8FromCString(ControlsHelpKeys[Idx]), V4FromU32(Graph_ColorCost));
+  GraphDrawText(Atlas, Font, V2(Line.X + KeyColumn, Line.Y), S8FromCString(ControlsHelpActions[Idx]), V4FromU32(Graph_ColorKnows));
+  Line.Y += LineHeight;
+ }
+}
+
 //~ Controls
+// NOTE: Two rows of time controls at the top left. The row above them is the summary
+// bar (round, speed, island status), drawn by the 3D view.
 internal void
 DrawBroadcastControls(app_state *App, app_input *Input)
 {
  broadcast_state *Broadcast = &App->Broadcast;
- font_atlas *Atlas = &App->FontAtlas;
  font *Font = &App->Font;
  f32 LineHeight = Font->HeightPx;
+ f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
 
  v2 Pos = V2(BroadcastView_Margin, BroadcastView_Margin);
 
- //- Status
- str8 Status = Str8Fmt("Round %llu   Speed %s", Broadcast->Round,
-                       BroadcastSpeedLabels[BroadcastSpeedIdx(Broadcast)]);
- {
-  f32 StatusWidth = GraphMeasureText(Atlas, Font, Status);
-  DrawRect(RectFromSize(V2(Pos.X - 6.f, Pos.Y - 3.f), V2(StatusWidth + 12.f, LineHeight + 6.f)),
-           V4FromU32(Graph_ColorNodeBg), 5.f, 0.f, 0.f);
- }
- GraphDrawText(Atlas, Font, Pos, Status, V4FromU32(Graph_ColorTitle));
-
- //- Buttons
- v2 Cursor = V2(Pos.X, Pos.Y + LineHeight + BroadcastView_ButtonGap);
+ //- Speed and stepping
+ v2 Cursor = V2(Pos.X, Pos.Y + ButtonHeight + 2.f*BroadcastView_ButtonGap);
 
  if(BroadcastButton(App, Input, &Cursor, S8("Slower"))) BroadcastSlower(Broadcast);
  if(BroadcastButton(App, Input, &Cursor, S8("Faster"))) BroadcastFaster(Broadcast);
@@ -223,7 +280,6 @@ DrawBroadcastControls(app_state *App, app_input *Input)
  if(BroadcastButton(App, Input, &Cursor, S8("Restart")))    BroadcastRestart(App);
 
  //- Time travel: step buttons and a timeline slider
- f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
  Cursor = V2(Pos.X, Cursor.Y + ButtonHeight + BroadcastView_ButtonGap);
 
  if(BroadcastButton(App, Input, &Cursor, S8("Back 5")))    BroadcastJumpBy(App, -5);
@@ -232,51 +288,6 @@ DrawBroadcastControls(app_state *App, app_input *Input)
  if(BroadcastButton(App, Input, &Cursor, S8("Forward 5"))) BroadcastJumpBy(App, 5);
 
  DrawBroadcastTimeline(App, Input, &Cursor, ButtonHeight);
-
- //- Keyboard legend
- {
-  // NOTE: Plain C strings: MSVC warns (C4204) about arrays initialized with S8(...).
-  char *Keys[] =
-  {
-   "Up",     "Down",                    "Right",      "Left",
-   "Wheel",  "Right drag",              "Middle drag", "Click",
-  };
-  char *Actions[] =
-  {
-   "faster", "slower (lowest = pause)", "next round", "restart",
-   "zoom",   "move the map",            "rotate",      "open an island",
-  };
-  StaticAssert(ArrayCount(Keys) == ArrayCount(Actions), BroadcastLegendMatch);
-
-  v2 LegendPos = V2(Pos.X, Cursor.Y + ButtonHeight + 2.f*BroadcastView_ButtonGap);
-
-  f32 KeyColumnWidth = 0.f;
-  f32 ActionColumnWidth = 0.f;
-  for EachElement(Idx, Keys)
-  {
-   KeyColumnWidth = Max(KeyColumnWidth, GraphMeasureText(Atlas, Font, S8FromCString(Keys[Idx])));
-   ActionColumnWidth = Max(ActionColumnWidth, GraphMeasureText(Atlas, Font, S8FromCString(Actions[Idx])));
-  }
-  KeyColumnWidth += 2.f*BroadcastView_ButtonPadding;
-
-  str8 Title = S8("Controls");
-  f32 BoxWidth = Max(GraphMeasureText(Atlas, Font, Title), KeyColumnWidth + ActionColumnWidth) + 2.f*BroadcastView_ButtonPadding;
-  f32 BoxHeight = (f32)(ArrayCount(Keys) + 1)*LineHeight + 2.f*BroadcastView_ButtonPadding;
-  v4 Box = RectFromSize(LegendPos, V2(BoxWidth, BoxHeight));
-  DrawRect(Box, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
-  DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 6.f, 1.f, 0.f);
-
-  v2 Line = V2(LegendPos.X + BroadcastView_ButtonPadding, LegendPos.Y + BroadcastView_ButtonPadding);
-  GraphDrawText(Atlas, Font, Line, Title, V4FromU32(Graph_ColorTitle));
-  Line.Y += LineHeight;
-
-  for EachElement(Idx, Keys)
-  {
-   GraphDrawText(Atlas, Font, Line, S8FromCString(Keys[Idx]), V4FromU32(Graph_ColorCost));
-   GraphDrawText(Atlas, Font, V2(Line.X + KeyColumnWidth, Line.Y), S8FromCString(Actions[Idx]), V4FromU32(Graph_ColorKnows));
-   Line.Y += LineHeight;
-  }
- }
 
  DrawIslandTooltip(App, Input);
 }

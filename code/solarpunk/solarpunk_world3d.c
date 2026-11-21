@@ -48,6 +48,11 @@
 #define W3_ColorCrystalHigh 0xFF7FE3F0
 #define W3_ColorHover       0xFFFFE08A
 #define W3_ColorSelected    0xFF88E0FF
+
+//- Island status colours (ring around the island and dot in its label)
+#define W3_ColorStatusOk      0xFF7BD389
+#define W3_ColorStatusWaiting 0xFFF5A65B
+#define W3_ColorStatusShort   0xFFE0606A
 #define W3_ColorCloud       0xFFFFE6D2
 
 // NOTE: One colour per product kind, used for crates and in the legend.
@@ -101,6 +106,79 @@ W3Shade(v4 Color, random_series *Series)
  return Result;
 }
 
+//~ Island status
+internal u32
+W3StatusColor(u32 Status)
+{
+ u32 Result = W3_ColorStatusOk;
+ if(Status == IslandStatus_Waiting) Result = W3_ColorStatusWaiting;
+ if(Status == IslandStatus_Short)   Result = W3_ColorStatusShort;
+ return Result;
+}
+
+// NOTE: True when the island has heard (through the announcements) of another island
+// that produces Kind.
+internal b32
+W3KnowsSupplier(app_state *App, u32 IslandIdx, product_kind Kind)
+{
+ broadcast_state *Broadcast = &App->Broadcast;
+ b32 Result = false;
+ if(IslandIdx < Broadcast->IslandCount)
+ {
+  for(u32 Origin = 0; Origin < Broadcast->IslandCount && !Result; Origin += 1)
+  {
+   island_ad *Ad = &Broadcast->Known[IslandIdx][Origin];
+   Result = (Origin != IslandIdx && Ad->Valid && Ad->Produces[Kind] > 0);
+  }
+ }
+ return Result;
+}
+
+// NOTE: World totals per product, and each island's status:
+//   Waiting : it has not heard of a supplier for one of its needs yet
+//   Short   : it knows its suppliers, but needs a product the whole world does not
+//             make enough of
+//   Ok      : otherwise
+// Waiting comes first, so islands go orange -> green/red as the news spreads.
+internal void
+W3ComputeStatus(app_state *App)
+{
+ r3_state *R3 = &App->R3;
+ MemorySet(R3->TotalProduced, 0, sizeof(R3->TotalProduced));
+ MemorySet(R3->TotalNeeded, 0, sizeof(R3->TotalNeeded));
+ for(island *Island = App->FirstIsland; Island; Island = Island->Next)
+ {
+  for(product *Product = Island->FirstProduct; Product; Product = Product->Next) R3->TotalProduced[Product->Kind] += Product->Amount;
+  for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) R3->TotalNeeded[Req->Kind] += Req->Amount;
+ }
+
+ u32 Index = 0;
+ for(island *Island = App->FirstIsland; Island && Index < R3_MaxIslands; Island = Island->Next)
+ {
+  b32 AnyShort = false;
+  b32 AnyWaiting = false;
+  for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
+  {
+   if(R3->TotalNeeded[Req->Kind] > R3->TotalProduced[Req->Kind]) AnyShort = true;
+   if(!W3KnowsSupplier(App, Index, Req->Kind)) AnyWaiting = true;
+  }
+  R3->IslandStatus[Index] = (AnyWaiting ? IslandStatus_Waiting : (AnyShort ? IslandStatus_Short : IslandStatus_Ok));
+  Index += 1;
+ }
+}
+
+// NOTE: True when P is on one of the 2D UI areas recorded last frame (R3->UIRects).
+internal b32
+W3PointOnUI(r3_state *R3, v2 P)
+{
+ b32 Result = false;
+ for(u32 Idx = 0; Idx < R3->UIRectCount && !Result; Idx += 1)
+ {
+  Result = IsInsideRectV2(P, R3->UIRects[Idx]);
+ }
+ return Result;
+}
+
 //~ Island pieces
 // NOTE: A terraced garden island: a pale stone base, three garden terraces (the lowest
 // holds the crates, the middle one crop rows, the top one a glass greenhouse dome)
@@ -133,8 +211,26 @@ W3PushTerrace(r3_mesh *Mesh, v3 Center, f32 Radius, f32 Height, u32 Sides, v4 To
  }
 }
 
+// NOTE: A flat glowing ring just above the island's top, between two radii.
 internal void
-W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 Index, b32 Highlight, u32 HighlightColor)
+W3PushRing(r3_mesh *Mesh, v3 Top, f32 Inner, f32 Outer, v4 Color)
+{
+ f32 Y = Top.Y + .05f;
+ for(u32 Side = 0; Side < W3_IslandSides; Side += 1)
+ {
+  f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)W3_IslandSides;
+  f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)W3_IslandSides;
+  v3 P0 = V3(Top.X + Inner*R3Cos(Angle0), Y, Top.Z + Inner*R3Sin(Angle0));
+  v3 P1 = V3(Top.X + Outer*R3Cos(Angle0), Y, Top.Z + Outer*R3Sin(Angle0));
+  v3 P2 = V3(Top.X + Outer*R3Cos(Angle1), Y, Top.Z + Outer*R3Sin(Angle1));
+  v3 P3 = V3(Top.X + Inner*R3Cos(Angle1), Y, Top.Z + Inner*R3Sin(Angle1));
+  R3PushTriUnlit(Mesh, P0, P1, P2, Color);
+  R3PushTriUnlit(Mesh, P0, P2, P3, Color);
+ }
+}
+
+internal void
+W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor)
 {
  random_series Series = {0};
  RandomSeed(&Series, W3_Seed*7 + 101*(u64)Index);
@@ -223,24 +319,11 @@ W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 
   R3PushEllipsoid(Translucent, FallBottom, V3(.55f, .3f, .55f), 4, 8, R3WithAlpha(R3Color(W3_ColorMist), .35f), true);
  }
 
- //- Hovered or selected: a glowing ring around the rim
+ //- Rings around the rim: status (always) and hovered/selected (outside it)
+ W3PushRing(Opaque, Top, 1.03f*Radius, 1.22f*Radius, R3Color(StatusColor));
  if(Highlight)
  {
-  v4 Glow = R3Color(HighlightColor);
-  for(u32 Side = 0; Side < W3_IslandSides; Side += 1)
-  {
-   f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)W3_IslandSides;
-   f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)W3_IslandSides;
-   f32 Inner = 1.05f*Radius;
-   f32 Outer = 1.2f*Radius;
-   f32 Y = Top.Y + .05f;
-   v3 P0 = V3(Top.X + Inner*R3Cos(Angle0), Y, Top.Z + Inner*R3Sin(Angle0));
-   v3 P1 = V3(Top.X + Outer*R3Cos(Angle0), Y, Top.Z + Outer*R3Sin(Angle0));
-   v3 P2 = V3(Top.X + Outer*R3Cos(Angle1), Y, Top.Z + Outer*R3Sin(Angle1));
-   v3 P3 = V3(Top.X + Inner*R3Cos(Angle1), Y, Top.Z + Inner*R3Sin(Angle1));
-   R3PushTriUnlit(Opaque, P0, P1, P2, Glow);
-   R3PushTriUnlit(Opaque, P0, P2, P3, Glow);
-  }
+  W3PushRing(Opaque, Top, 1.27f*Radius, 1.4f*Radius, R3Color(HighlightColor));
  }
 }
 
@@ -412,6 +495,10 @@ W3PrepareIslands(app_state *App, app_input *Input)
  {
   R3->HoveredIdx = App->Panel.RowHoverPlusOne - 1;
  }
+ else if(W3PointOnUI(R3, V2V2S32(Input->Mouse.Pos)))
+ {
+  // Over buttons, the legend, ...: no island is hovered.
+ }
  else
  {
   v2 MousePos = V2V2S32(Input->Mouse.Pos);
@@ -455,8 +542,8 @@ W3BuildWorld(app_state *App)
 
   b32 Hovered = (R3->HoveredIdx == (s32)Index);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
-  W3PushIslandBody(&R3->Opaque, &R3->Translucent, Top, Radius, Index, Hovered || Selected,
-                   Hovered ? W3_ColorHover : W3_ColorSelected);
+  W3PushIslandBody(&R3->Opaque, &R3->Translucent, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
+                   Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected);
   W3PushDecorations(&R3->Opaque, Top, Radius, Index);
   W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
 

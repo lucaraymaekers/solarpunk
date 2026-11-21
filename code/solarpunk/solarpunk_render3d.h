@@ -5,6 +5,17 @@
 
 //~ Constants
 #define R3_MaxIslands 64
+#define R3_MaxUIRects 12
+
+// NOTE: How an island is doing, shown as the colour of its ring and label dot.
+enum island_status
+{
+ IslandStatus_Ok,       // knows a supplier for everything it needs
+ IslandStatus_Waiting,  // has not heard of a supplier for some need yet
+ IslandStatus_Short,    // knows its suppliers, but needs a product that is short worldwide
+ IslandStatus_Count
+};
+typedef enum island_status island_status;
 
 //~ Types
 // NOTE: Column-major 4x4 matrix, e[Column][Row], the layout OpenGL expects.
@@ -72,6 +83,18 @@ struct r3_state
 
  // Island under the mouse, found by its projected position. -1 = none.
  s32 HoveredIdx;
+
+ // Island status (island_status) and world totals, computed every frame.
+ u32 IslandStatus[R3_MaxIslands];
+ u64 TotalProduced[ProductKind_Count];
+ u64 TotalNeeded[ProductKind_Count];
+
+ // 2D overlay: optional boxes, and the screen areas covered by UI this frame
+ // (labels avoid them; clicks and hovers there do not reach the 3D view).
+ b32 ShowLegend;
+ b32 ShowControls;
+ v4 UIRects[R3_MaxUIRects];
+ u32 UIRectCount;
 };
 
 #endif //SOLARPUNK_RENDER3D_H

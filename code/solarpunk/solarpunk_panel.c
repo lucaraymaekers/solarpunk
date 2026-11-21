@@ -619,10 +619,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
  }
 
  //- Clicking an island in the 3D view selects it (not when clicking on the UI)
- b32 OverUI = (IsInsideRectV2(MousePos, Panel->LastRect) ||
-               IsInsideRectV2(MousePos, RectFromSize(V2(0.f, 0.f), V2(V3D_ControlsAreaWidth, V3D_ControlsAreaHeight))) ||
-               IsInsideRectV2(MousePos, RectFromSize(V2(BufferDim.X - V3D_CameraAreaWidth, 0.f), V2(V3D_CameraAreaWidth, V3D_CameraAreaHeight))) ||
-               IsInsideRectV2(MousePos, V3LegendRect(App, BufferDim)));
+ b32 OverUI = (IsInsideRectV2(MousePos, Panel->LastRect) || W3PointOnUI(R3, MousePos));
  if(!OverUI && WasPressed(MouseLeft) && R3->HoveredIdx >= 0)
  {
   PanelSelect(App, R3->HoveredIdx);
