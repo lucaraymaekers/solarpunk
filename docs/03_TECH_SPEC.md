@@ -644,6 +644,12 @@ State-machine details (5.2) as implemented: a `Sleeping` island stays asleep unt
 - A test must **actually verify** biconnectivity (remove each vertex, check connectivity with a small DFS). "Every degree >= 2" is necessary but not sufficient.
 - Provide a hand-tuned preset layout for the demo and a generator for N islands.
 
+**As implemented (L4, 2026-11-21, `engine_topology.c`):**
+- `TopologyConnect`: (1) each island links to its `TOPOLOGY_K_NEAREST` (3) nearest by wrap distance (skipping full sides); (2) greedily adds the shortest missing link that lowers `TopologyDefect` (islands missed by the reachability check and by each remove-one-island check; 0 means biconnected) until biconnected; (3) adds the shortest seam-crossing links until `TOPOLOGY_MIN_WRAP_EDGES` (2). Pairs are sorted by distance with index tie-break, so the result is deterministic.
+- `TopologyGenerate(N)`: x evenly spread plus `XJitter`, y cycles through three bands of `[YMin, YMax]` so islands next to each other in x do not stack. Seeded from `world.Rng`.
+- `TopologyBuildDefault`: if `IslandCount == 12`, uses the hand-tuned demo positions (`TopologyDemoLayout`, positions only; links come from `TopologyConnect`); otherwise it uses the generator. D13 is still open.
+- Measured: demo layout has 21 links (avg degree 3.5) and 2 wrap edges. Generated N = 3..16 x 8 seeds: all biconnected, avg degree 3.53 (min 2, max 6), >= 2 wrap edges from N = 5 (N = 3 and 4 have too few seam-crossing pairs).
+
 ---
 
 ## 11. Rendering and UI notes (for lanes L2/L3)

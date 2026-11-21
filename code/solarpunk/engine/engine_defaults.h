@@ -104,6 +104,8 @@
 #define DEFAULT_Y_MIN               0.15f
 #define DEFAULT_Y_MAX               0.85f
 #define DEFAULT_X_JITTER            0.02f
+#define TOPOLOGY_K_NEAREST          3       // spec 10: links to the k nearest by wrap distance
+#define TOPOLOGY_MIN_WRAP_EDGES     2       // spec 10: East-West links across the seam
 
 //~ Resource names: placeholders until D5 is decided. Index = resource_id.
 // NOTE(L4): Colours and shapes are UI concerns (L2/L3), not engine data.

@@ -86,20 +86,49 @@ TestBiconnectivity(void)
  Check(TopologyIsBiconnected(World), "default topology is biconnected");
  Check(TopologyWrapEdgeCount(World) >= 2, "default topology has >= 2 wrap edges");
 
- for(s32 Count = 5; Count <= MAX_ISLANDS; Count += 1)
  {
-  for(u64 Seed = 1; Seed <= 4; Seed += 1)
+  s32 DegreeSum = 0;
+  for(s32 I = 0; I < World->IslandCount; I += 1) DegreeSum += World->Islands[I].NeighborCount;
+  Log("  demo layout: %d islands, %d links (avg degree %.2f), %d wrap edges\n", World->IslandCount,
+      World->LinkCount, (f32)DegreeSum/(f32)World->IslandCount, TopologyWrapEdgeCount(World));
+ }
+
+ // NOTE(L4): N = 3 and 4 cannot always have 2 wrap edges (too few pairs cross the seam), so the
+ // wrap requirement is checked from 5 islands up.
+ s32 DegreeSum = 0, IslandSum = 0, MinDegree = MAX_NEIGHBORS, MaxDegree = 0;
+ for(s32 Count = 3; Count <= MAX_ISLANDS; Count += 1)
+ {
+  for(u64 Seed = 1; Seed <= 8; Seed += 1)
   {
    RandomSeed(&World->Rng, Seed);
    TopologyGenerate(World, Count);
    Check(TopologyIsBiconnected(World), "generated topology is biconnected");
-   Check(TopologyWrapEdgeCount(World) >= 2, "generated topology has >= 2 wrap edges");
+   if(Count >= 5)
+   {
+    Check(TopologyWrapEdgeCount(World) >= 2, "generated topology has >= 2 wrap edges");
+   }
+   s32 Ends = 0;
    for(s32 I = 0; I < World->IslandCount; I += 1)
    {
-    Check(World->Islands[I].NeighborCount <= MAX_NEIGHBORS, "neighbour cap");
+    island_node *Node = &World->Islands[I];
+    Check(Node->NeighborCount >= 2 && Node->NeighborCount <= MAX_NEIGHBORS, "2 <= degree <= MAX_NEIGHBORS");
+    Ends += Node->NeighborCount;
+    DegreeSum += Node->NeighborCount;
+    IslandSum += 1;
+    MinDegree = Min(MinDegree, Node->NeighborCount);
+    MaxDegree = Max(MaxDegree, Node->NeighborCount);
+    for(s32 N = 0; N < Node->NeighborCount; N += 1)
+    {
+     island_id Other = Node->Neighbors[N].TargetId;
+     Check(TopologyHasLink(World, I, Other) && WorldNeighborIndex(&World->Islands[Other], I) >= 0,
+           "neighbour lists are symmetric and match the link table");
+    }
    }
+   Check(Ends == 2*World->LinkCount, "every link appears once on each side");
   }
  }
+ Log("  generated (N=3..16, 8 seeds): avg degree %.2f, min %d, max %d\n",
+     (f32)DegreeSum/(f32)IslandSum, MinDegree, MaxDegree);
 
  // The check must actually catch a cut vertex: a plain ring with one chord removed is fine,
  // but a "bowtie" (two triangles sharing island 2) is not biconnected.
@@ -930,6 +959,18 @@ RunSim(u64 Seed, s32 Days, scenario_kind Scenario)
 
  Log("SolarSim sim: seed %llu, %d days, scenario %s, %d islands, %d links\n",
      World->Config.Seed, Days, ScenarioNames[Scenario], World->IslandCount, World->LinkCount);
+
+ Log("topology: biconnected %d, wrap edges %d\n", TopologyIsBiconnected(World), TopologyWrapEdgeCount(World));
+ for(s32 I = 0; I < World->IslandCount; I += 1)
+ {
+  island_node *Node = &World->Islands[I];
+  Log("   %2d (%.2f, %.2f) ->", I, Node->X, Node->Y);
+  for(s32 N = 0; N < Node->NeighborCount; N += 1)
+  {
+   Log(" %d%s(%.2f)", Node->Neighbors[N].TargetId, Node->Neighbors[N].WrapsGlobe ? "~" : "", Node->Neighbors[N].Distance);
+  }
+  Log("\n");
+ }
 
  char *StateNames[] = { "day", "night", "ASLEEP", "STORM" };
  s32 TicksPerDay = (s32)(World->Config.DayLengthSeconds/ENGINE_TICK_SECONDS + 0.5f);
