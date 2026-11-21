@@ -3437,6 +3437,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    }
   }
   
+#if 0  
   // Detect if there is a cycle.
   {
    piece *Start = App->FirstPiece;
@@ -3472,6 +3473,7 @@ case Command_##CommandName: Entry->F32 = (f32)Value; break;
    }
    
   }
+#endif
   
   switch(Command->Kind)
   {

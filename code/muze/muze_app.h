@@ -77,6 +77,7 @@ struct piece
  arena *UndoArena;
  piece_undo *FirstUndo;
  piece_undo *LastUndo;
+ piece_undo *SelectedUndo;
  
  str8 Name;
  
