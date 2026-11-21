@@ -90,6 +90,29 @@ enum hero_ground
  HeroGround_Pool,
 };
 
+// NOTE: The shape of one island's top: an optional harbour pool cut into the front,
+// a terraced hill, optional raised plateaus, a stream and dirt paths.
+typedef struct hero_layout hero_layout;
+struct hero_layout
+{
+ b32 Pool;
+ f32 PoolX0;
+ f32 PoolX1;
+ f32 PoolZ0;
+ f32 HillX;
+ f32 HillZ;
+ f32 HillStretch;   // > 1 = wider along X
+ f32 HillPeak;      // raw height at the hill centre
+ b32 PlateauRight;
+ b32 PlateauLeft;
+ u32 StreamCount;
+ f32 Stream[4][2];
+ u32 PathCount;
+ f32 Path[4][2];
+ u32 Path2Count;
+ f32 Path2[4][2];
+};
+
 typedef struct hero_ctx hero_ctx;
 struct hero_ctx
 {
@@ -98,6 +121,8 @@ struct hero_ctx
  v3 Top;
  f32 Time;
  random_series Series;
+ hero_layout *Layout;
+ u8 Taken[Hero_Cells][Hero_Cells];   // terrain cells used by something (themed islands)
 };
 
 //~ Helpers
@@ -151,13 +176,13 @@ HeroPolylineDistance(f32 PX, f32 PZ, f32 (*Points)[2], u32 Count)
 // NOTE: The height of the ground at (X, Z) and what covers it. Heights come in
 // terraces: the front harbour sits low, the hill at the back rises in Hero_Step steps.
 internal f32
-HeroTerrain(f32 X, f32 Z, u32 *Type)
+HeroTerrain(hero_layout *L, f32 X, f32 Z, u32 *Type)
 {
  f32 Result = 0.f;
  *Type = HeroGround_Grass;
- if(Z > Hero_PoolZ0)
+ if(L->Pool && Z > L->PoolZ0)
  {
-  if(X > Hero_PoolX0 && X < Hero_PoolX1)
+  if(X > L->PoolX0 && X < L->PoolX1)
   {
    *Type = HeroGround_Pool;
    Result = Hero_PoolFloor;
@@ -165,24 +190,24 @@ HeroTerrain(f32 X, f32 Z, u32 *Type)
   else
   {
    Result = Hero_FrontLevel;
-   *Type = (X < Hero_PoolX0) ? HeroGround_Path : HeroGround_Grass;
+   *Type = (X < L->PoolX0) ? HeroGround_Path : HeroGround_Grass;
   }
  }
  else
  {
-  f32 DX = (X + .15f)/1.3f;
-  f32 DZ = Z + 1.45f;
-  f32 Raw = 2.f - .8f*R3Sqrt(DX*DX + DZ*DZ);
+  f32 DX = (X - L->HillX)/L->HillStretch;
+  f32 DZ = Z - L->HillZ;
+  f32 Raw = L->HillPeak - .8f*R3Sqrt(DX*DX + DZ*DZ);
   Result = (Raw > 0.f) ? Hero_Step*floorf(Raw/Hero_Step) : 0.f;
-  if(X > .95f && Z < .75f)  Result = Max(Result, Hero_Step);
-  if(X < -1.15f && Z < .2f) Result = Max(Result, Hero_Step);
+  if(L->PlateauRight && X > .95f && Z < .75f)  Result = Max(Result, Hero_Step);
+  if(L->PlateauLeft && X < -1.15f && Z < .2f)  Result = Max(Result, Hero_Step);
 
-  if(HeroPolylineDistance(X, Z, HeroStreamPoints, ArrayCount(HeroStreamPoints)) < .15f)
+  if(L->StreamCount && HeroPolylineDistance(X, Z, L->Stream, L->StreamCount) < .15f)
   {
    *Type = HeroGround_Stream;
   }
-  else if(HeroPolylineDistance(X, Z, HeroPathPoints, ArrayCount(HeroPathPoints)) < .09f ||
-          HeroPolylineDistance(X, Z, HeroPath2Points, ArrayCount(HeroPath2Points)) < .08f)
+  else if((L->PathCount && HeroPolylineDistance(X, Z, L->Path, L->PathCount) < .09f) ||
+          (L->Path2Count && HeroPolylineDistance(X, Z, L->Path2, L->Path2Count) < .08f))
   {
    *Type = HeroGround_Path;
   }
@@ -198,15 +223,24 @@ HeroCellSize(void)
 }
 
 // NOTE: Ground height of the terrain cell under (X, Z), so objects sit exactly on it.
-internal f32
-HeroGroundY(f32 X, f32 Z, u32 *Type)
+internal s32
+HeroCellIndex(f32 V)
 {
- f32 Cell = HeroCellSize();
- s32 I = Clamp(0, (s32)floorf((X + Hero_Half)/Cell), Hero_Cells - 1);
- s32 J = Clamp(0, (s32)floorf((Z + Hero_Half)/Cell), Hero_Cells - 1);
- f32 CX = -Hero_Half + ((f32)I + .5f)*Cell;
- f32 CZ = -Hero_Half + ((f32)J + .5f)*Cell;
- f32 Result = HeroTerrain(CX, CZ, Type);
+ s32 Result = Clamp(0, (s32)floorf((V + Hero_Half)/HeroCellSize()), Hero_Cells - 1);
+ return Result;
+}
+
+internal f32
+HeroCellCenter(s32 I)
+{
+ f32 Result = -Hero_Half + ((f32)I + .5f)*HeroCellSize();
+ return Result;
+}
+
+internal f32
+HeroGroundY(hero_layout *L, f32 X, f32 Z, u32 *Type)
+{
+ f32 Result = HeroTerrain(L, HeroCellCenter(HeroCellIndex(X)), HeroCellCenter(HeroCellIndex(Z)), Type);
  return Result;
 }
 
@@ -214,7 +248,7 @@ internal v3
 HeroOn(hero_ctx *H, f32 X, f32 Z)
 {
  u32 Type;
- v3 Result = HeroP(H, X, HeroGroundY(X, Z, &Type), Z);
+ v3 Result = HeroP(H, X, HeroGroundY(H->Layout, X, Z, &Type), Z);
  return Result;
 }
 
@@ -269,7 +303,7 @@ HeroPushTerrain(hero_ctx *H)
    f32 X1 = X0 + Cell;
    f32 Z1 = Z0 + Cell;
    u32 Type;
-   f32 Level = HeroTerrain(X0 + .5f*Cell, Z0 + .5f*Cell, &Type);
+   f32 Level = HeroTerrain(H->Layout, X0 + .5f*Cell, Z0 + .5f*Cell, &Type);
 
    //- Top
    v4 TopColor;
@@ -294,7 +328,7 @@ HeroPushTerrain(hero_ctx *H)
     if(NI >= 0 && NI < Hero_Cells && NJ >= 0 && NJ < Hero_Cells)
     {
      u32 NeighbourType;
-     f32 NeighbourLevel = HeroTerrain(-Hero_Half + ((f32)NI + .5f)*Cell, -Hero_Half + ((f32)NJ + .5f)*Cell, &NeighbourType);
+     f32 NeighbourLevel = HeroTerrain(H->Layout, -Hero_Half + ((f32)NI + .5f)*Cell, -Hero_Half + ((f32)NJ + .5f)*Cell, &NeighbourType);
      if(NeighbourLevel < Level - .001f)
      {
       HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, NeighbourLevel, Level, 0.f, HeroShade(H, Hero_ColorWall));
@@ -319,18 +353,22 @@ HeroPushTerrain(hero_ctx *H)
  }
 
  //- Harbour water: the surface and the see-through cut at the front of the slab
- v4 Water = R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
- v4 Deep = R3WithAlpha(R3Color(Hero_ColorPoolDeep), .7f);
- v3 W0 = HeroP(H, Hero_PoolX0, Hero_WaterLevel, Hero_PoolZ0);
- v3 W1 = HeroP(H, Hero_PoolX1, Hero_WaterLevel, Hero_PoolZ0);
- v3 W2 = HeroP(H, Hero_PoolX1, Hero_WaterLevel, Hero_Half);
- v3 W3 = HeroP(H, Hero_PoolX0, Hero_WaterLevel, Hero_Half);
- R3PushTriUnlit(H->Translucent, W0, W1, W2, Water);
- R3PushTriUnlit(H->Translucent, W0, W2, W3, Water);
- v3 F0 = HeroP(H, Hero_PoolX0, Hero_PoolFloor, Hero_Half);
- v3 F1 = HeroP(H, Hero_PoolX1, Hero_PoolFloor, Hero_Half);
- R3PushTriUnlit(H->Translucent, W3, W2, F1, Deep);
- R3PushTriUnlit(H->Translucent, W3, F1, F0, Deep);
+ hero_layout *L = H->Layout;
+ if(L->Pool)
+ {
+  v4 Water = R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
+  v4 Deep = R3WithAlpha(R3Color(Hero_ColorPoolDeep), .7f);
+  v3 W0 = HeroP(H, L->PoolX0, Hero_WaterLevel, L->PoolZ0);
+  v3 W1 = HeroP(H, L->PoolX1, Hero_WaterLevel, L->PoolZ0);
+  v3 W2 = HeroP(H, L->PoolX1, Hero_WaterLevel, Hero_Half);
+  v3 W3 = HeroP(H, L->PoolX0, Hero_WaterLevel, Hero_Half);
+  R3PushTriUnlit(H->Translucent, W0, W1, W2, Water);
+  R3PushTriUnlit(H->Translucent, W0, W2, W3, Water);
+  v3 F0 = HeroP(H, L->PoolX0, Hero_PoolFloor, Hero_Half);
+  v3 F1 = HeroP(H, L->PoolX1, Hero_PoolFloor, Hero_Half);
+  R3PushTriUnlit(H->Translucent, W3, W2, F1, Deep);
+  R3PushTriUnlit(H->Translucent, W3, F1, F0, Deep);
+ }
 }
 
 //~ Cliff: dirt band, stacked stone and the rugged underside
@@ -338,20 +376,34 @@ internal void
 HeroPushCliff(hero_ctx *H)
 {
  r3_mesh *O = H->Opaque;
+ hero_layout *L = H->Layout;
  f32 In = Hero_Half - .02f;
  v4 Core = R3Color(Hero_ColorCore);
 
- //- Core, so there are no holes between the stones. The front part leaves room for
- // the harbour's water cut.
+ //- Core, so there are no holes between the stones. With a harbour, the front part
+ // leaves room for the water cut.
  f32 MidY = .5f*(Hero_DirtBottom + Hero_StoneBottom);
  f32 HalfY = .5f*(Hero_DirtBottom - Hero_StoneBottom);
- R3PushBox(O, HeroP(H, 0.f, MidY, .5f*(-In + Hero_PoolZ0)), V3(In, HalfY, .5f*(Hero_PoolZ0 + In)), Core);
- R3PushBox(O, HeroP(H, 0.f, .5f*(Hero_PoolFloor + Hero_StoneBottom), .5f*(Hero_PoolZ0 + In)),
-           V3(In, .5f*(Hero_PoolFloor - Hero_StoneBottom), .5f*(In - Hero_PoolZ0)), Core);
- R3PushBox(O, HeroP(H, .5f*(-In + Hero_PoolX0), .5f*(Hero_DirtBottom + Hero_PoolFloor), .5f*(Hero_PoolZ0 + In)),
-           V3(.5f*(Hero_PoolX0 + In), .5f*(Hero_DirtBottom - Hero_PoolFloor), .5f*(In - Hero_PoolZ0)), Core);
- R3PushBox(O, HeroP(H, .5f*(In + Hero_PoolX1), .5f*(Hero_DirtBottom + Hero_PoolFloor), .5f*(Hero_PoolZ0 + In)),
-           V3(.5f*(In - Hero_PoolX1), .5f*(Hero_DirtBottom - Hero_PoolFloor), .5f*(In - Hero_PoolZ0)), Core);
+ if(L->Pool)
+ {
+  R3PushBox(O, HeroP(H, 0.f, MidY, .5f*(-In + L->PoolZ0)), V3(In, HalfY, .5f*(L->PoolZ0 + In)), Core);
+  R3PushBox(O, HeroP(H, 0.f, .5f*(Hero_PoolFloor + Hero_StoneBottom), .5f*(L->PoolZ0 + In)),
+            V3(In, .5f*(Hero_PoolFloor - Hero_StoneBottom), .5f*(In - L->PoolZ0)), Core);
+  if(L->PoolX0 > -In)
+  {
+   R3PushBox(O, HeroP(H, .5f*(-In + L->PoolX0), .5f*(Hero_DirtBottom + Hero_PoolFloor), .5f*(L->PoolZ0 + In)),
+             V3(.5f*(L->PoolX0 + In), .5f*(Hero_DirtBottom - Hero_PoolFloor), .5f*(In - L->PoolZ0)), Core);
+  }
+  if(L->PoolX1 < In)
+  {
+   R3PushBox(O, HeroP(H, .5f*(In + L->PoolX1), .5f*(Hero_DirtBottom + Hero_PoolFloor), .5f*(L->PoolZ0 + In)),
+             V3(.5f*(In - L->PoolX1), .5f*(Hero_DirtBottom - Hero_PoolFloor), .5f*(In - L->PoolZ0)), Core);
+  }
+ }
+ else
+ {
+  R3PushBox(O, HeroP(H, 0.f, MidY, 0.f), V3(In, HalfY, In), Core);
+ }
 
  //- Stacked stone blocks in staggered rows on all four sides
  f32 RowHeight = (Hero_DirtBottom - Hero_StoneBottom)/(f32)Hero_StoneRows;
@@ -370,7 +422,7 @@ HeroPushCliff(hero_ctx *H)
     S += Length;
     f32 Out = .03f + .08f*RandomUnilateral(&H->Series);
     b32 Skip = (S1 - S0 < .08f);
-    if(Side == 0 && S1 > Hero_PoolX0 && S0 < Hero_PoolX1 && YTop > Hero_PoolFloor + .01f) Skip = true;
+    if(L->Pool && Side == 0 && S1 > L->PoolX0 && S0 < L->PoolX1 && YTop > Hero_PoolFloor + .01f) Skip = true;
     if(!Skip)
     {
      f32 Along = .5f*(S0 + S1);
@@ -458,11 +510,11 @@ HeroPushCliff(hero_ctx *H)
  {
   for(f32 S = -Hero_Half + .08f; S < Hero_Half; S += .17f)
   {
-   if(Side == 0 && S > Hero_PoolX0 - .05f && S < Hero_PoolX1 + .05f) continue;
+   if(L->Pool && Side == 0 && S > L->PoolX0 - .05f && S < L->PoolX1 + .05f) continue;
    f32 X = (Side == 0 || Side == 1) ? S : ((Side == 2) ? Hero_Half : -Hero_Half);
    f32 Z = (Side == 0) ? Hero_Half : ((Side == 1) ? -Hero_Half : S);
    u32 Type;
-   f32 Level = HeroGroundY(X*.995f, Z*.995f, &Type);
+   f32 Level = HeroGroundY(L, X*.995f, Z*.995f, &Type);
    f32 Roll = RandomUnilateral(&H->Series);
    if(Roll < .55f)
    {
@@ -529,6 +581,7 @@ HeroPushHouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, u32 Floors, u32 Variant
  f32 WallH = FloorH*(f32)Floors;
  u32 Wood = HeroWoodColors[Variant % ArrayCount(HeroWoodColors)];
  u32 Roof = HeroRoofColors[(Variant/2) % ArrayCount(HeroRoofColors)];
+ if(Variant & 8) Wood = 0xFFB5523B;   // a red barn
 
  //- Stone plinth (reaches down so houses on terrace edges do not float)
  R3PushBox(O, R3Add(B, V3(0.f, .5f*Plinth - .25f, 0.f)), V3(HX + .035f, .5f*Plinth + .25f, HZ + .035f), HeroShade(H, Hero_ColorStone));
@@ -777,8 +830,9 @@ HeroPushPine(hero_ctx *H, f32 X, f32 Z, f32 Height)
  }
 }
 
+// NOTE: A raised garden bed. Produce = colour of what grows in it (0 = mixed).
 internal void
-HeroPushBed(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
+HeroPushBed(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, u32 Produce)
 {
  r3_mesh *O = H->Opaque;
  v3 B = HeroOn(H, X, Z);
@@ -793,7 +847,11 @@ HeroPushBed(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
    v3 P = V3(PX, B.Y + .13f, B.Z + ((Row == 0) ? -.45f : .45f)*HZ);
    R3PushEllipsoid(O, P, V3(.04f, .045f, .04f), 3, 5, HeroShade(H, Hero_ColorLeaf), false);
    f32 Roll = RandomUnilateral(&H->Series);
-   if(Roll < .2f)      R3PushEllipsoid(O, R3Add(P, V3(0.f, -.01f, .03f)), V3(.03f, .028f, .03f), 3, 5, R3Color(0xFFF08A2C), false);
+   if(Produce)
+   {
+    if(Roll < .6f) R3PushEllipsoid(O, R3Add(P, V3(0.f, -.01f, .03f)), V3(.032f, .03f, .032f), 3, 5, R3Color(Produce), false);
+   }
+   else if(Roll < .2f)  R3PushEllipsoid(O, R3Add(P, V3(0.f, -.01f, .03f)), V3(.03f, .028f, .03f), 3, 5, R3Color(0xFFF08A2C), false);
    else if(Roll < .35f) R3PushEllipsoid(O, R3Add(P, V3(.02f, .01f, .02f)), V3(.016f, .016f, .016f), 3, 4, R3Color(0xFFE0453A), false);
   }
  }
@@ -1084,17 +1142,6 @@ HeroPushBoulder(hero_ctx *H, v3 P, f32 Size)
  R3PushEllipsoid(H->Opaque, P, V3(Size*1.2f, Size*.85f, Size), 4, 7, HeroShade(H, HeroPick(H, HeroStoneColors, ArrayCount(HeroStoneColors))), false);
 }
 
-internal b32
-HeroSpotTaken(f32 X, f32 Z)
-{
- b32 Result = false;
- for(u32 Idx = 0; Idx < ArrayCount(HeroTakenRects) && !Result; Idx += 1)
- {
-  Result = (X > HeroTakenRects[Idx][0] && X < HeroTakenRects[Idx][2] && Z > HeroTakenRects[Idx][1] && Z < HeroTakenRects[Idx][3]);
- }
- return Result;
-}
-
 // NOTE: A square glowing ring around the slab at the island's top height.
 internal void
 HeroPushSquareRing(hero_ctx *H, f32 Inner, f32 Outer, v4 Color)
@@ -1119,7 +1166,7 @@ HeroPushSquareRing(hero_ctx *H, f32 Inner, f32 Outer, v4 Color)
 // stacked solid crates (produced) beside the market, crate frames (needed) on the
 // right harbour terrace.
 internal void
-HeroPushCrates(hero_ctx *H, island *Island)
+HeroPushCrates(hero_ctx *H, island *Island, f32 ProduceX, f32 ProduceZ, f32 NeedX, f32 NeedZ)
 {
  r3_mesh *O = H->Opaque;
  f32 Half = .1f;
@@ -1127,7 +1174,7 @@ HeroPushCrates(hero_ctx *H, island *Island)
  u32 Slot = 0;
  for(product *Product = Island->FirstProduct; Product && Slot < 3; Product = Product->Next)
  {
-  v3 B = HeroOn(H, -.78f, 1.2f + .26f*(f32)Slot);
+  v3 B = HeroOn(H, ProduceX, ProduceZ + .26f*(f32)Slot);
   u32 Stack = Clamp(1, (u32)(Product->Amount/W3_CrateUnitsPerBox) + 1, W3_MaxCrateStack);
   for(u32 Level = 0; Level < Stack; Level += 1)
   {
@@ -1139,7 +1186,7 @@ HeroPushCrates(hero_ctx *H, island *Island)
  Slot = 0;
  for(product *Req = Island->FirstRequirement; Req && Slot < 3; Req = Req->Next)
  {
-  v3 Center = R3Add(HeroOn(H, 1.62f + .26f*(f32)Slot, 2.02f), V3(0.f, Half, 0.f));
+  v3 Center = R3Add(HeroOn(H, NeedX + .26f*(f32)Slot, NeedZ), V3(0.f, Half, 0.f));
   v4 Color = R3Color(W3ProductColors[Req->Kind]);
   R3PushBox(H->Translucent, Center, V3(Half, Half, Half), R3WithAlpha(Color, .38f));
   f32 Edge = .014f;
@@ -1161,18 +1208,377 @@ HeroPushCrates(hero_ctx *H, island *Island)
  }
 }
 
-//~ The whole island
+//~ Free ground (themed islands place things at random on flat, unused cells)
 internal void
-W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction)
+HeroMarkRect(hero_ctx *H, f32 X0, f32 Z0, f32 X1, f32 Z1)
+{
+ for(s32 J = HeroCellIndex(Z0); J <= HeroCellIndex(Z1); J += 1)
+ {
+  for(s32 I = HeroCellIndex(X0); I <= HeroCellIndex(X1); I += 1)
+  {
+   H->Taken[J][I] = 1;
+  }
+ }
+}
+
+internal b32
+HeroCellTaken(hero_ctx *H, f32 X, f32 Z)
+{
+ b32 Result = (H->Taken[HeroCellIndex(Z)][HeroCellIndex(X)] != 0);
+ return Result;
+}
+
+// NOTE: Claims a flat, free rectangle of grass or path (half sizes HX, HZ) at X, Z.
+internal b32
+HeroClaim(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
+{
+ b32 Result = (X - HX > -Hero_Half + .12f && X + HX < Hero_Half - .12f &&
+               Z - HZ > -Hero_Half + .12f && Z + HZ < Hero_Half - .12f);
+ u32 CenterType;
+ f32 Level = HeroGroundY(H->Layout, X, Z, &CenterType);
+ s32 I0 = HeroCellIndex(X - HX);
+ s32 I1 = HeroCellIndex(X + HX);
+ s32 J0 = HeroCellIndex(Z - HZ);
+ s32 J1 = HeroCellIndex(Z + HZ);
+ for(s32 J = J0; J <= J1 && Result; J += 1)
+ {
+  for(s32 I = I0; I <= I1 && Result; I += 1)
+  {
+   u32 Type;
+   f32 CellLevel = HeroTerrain(H->Layout, HeroCellCenter(I), HeroCellCenter(J), &Type);
+   Result = (!H->Taken[J][I] && (Type == HeroGround_Grass || Type == HeroGround_Path) && AbsF32(CellLevel - Level) < .01f);
+  }
+ }
+ if(Result)
+ {
+  HeroMarkRect(H, X - HX, Z - HZ, X + HX, Z + HZ);
+ }
+ return Result;
+}
+
+// NOTE: Finds a free spot for a rectangle somewhere between ZMin and ZMax.
+internal b32
+HeroPlace(hero_ctx *H, f32 HX, f32 HZ, f32 ZMin, f32 ZMax, f32 *X, f32 *Z)
+{
+ b32 Result = false;
+ for(u32 Try = 0; Try < 90 && !Result; Try += 1)
+ {
+  f32 PX = (Hero_Half - HX - .15f)*RandomBilateral(&H->Series);
+  f32 PZ = ZMin + (ZMax - ZMin)*RandomUnilateral(&H->Series);
+  if(HeroClaim(H, PX, PZ, HX, HZ))
+  {
+   *X = PX;
+   *Z = PZ;
+   Result = true;
+  }
+ }
+ return Result;
+}
+
+//~ Farm pieces for the themed islands
+internal void
+HeroPushFence(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
+{
+ r3_mesh *O = H->Opaque;
+ v3 C = HeroOn(H, X, Z);
+ f32 CX[4] = {-1.f, 1.f, 1.f, -1.f};
+ f32 CZ[4] = {1.f, 1.f, -1.f, -1.f};
+ v4 Wood = R3Color(Hero_ColorWoodLight);
+ for(u32 Side = 0; Side < 4; Side += 1)
+ {
+  u32 Next = (Side + 1) % 4;
+  v3 A = R3Add(C, V3(CX[Side]*HX, 0.f, CZ[Side]*HZ));
+  v3 B = R3Add(C, V3(CX[Next]*HX, 0.f, CZ[Next]*HZ));
+  f32 Length = R3Length(R3Sub(B, A));
+  u32 Posts = Max(2, (u32)(Length/.14f) + 1);
+  for(u32 Post = 0; Post < Posts; Post += 1)
+  {
+   v3 P = R3Lerp(A, B, (f32)Post/(f32)(Posts - 1));
+   R3PushBox(O, R3Add(P, V3(0.f, .055f, 0.f)), V3(.01f, .055f, .01f), R3Color(Hero_ColorWoodDark));
+  }
+  for(u32 Rail = 0; Rail < 2; Rail += 1)
+  {
+   v3 Up = V3(0.f, (Rail == 0) ? .045f : .09f, 0.f);
+   if(Side == 0)
+   {
+    // A gate gap in the middle of the front.
+    v3 Mid = R3Lerp(A, B, .5f);
+    v3 Gap = R3Scale(R3Normalize(R3Sub(B, A)), .07f);
+    R3PushCylinder(O, R3Add(A, Up), R3Add(R3Sub(Mid, Gap), Up), .007f, 4, Wood);
+    R3PushCylinder(O, R3Add(R3Add(Mid, Gap), Up), R3Add(B, Up), .007f, 4, Wood);
+   }
+   else
+   {
+    R3PushCylinder(O, R3Add(A, Up), R3Add(B, Up), .007f, 4, Wood);
+   }
+  }
+ }
+}
+
+internal void
+HeroPushHen(hero_ctx *H, v3 B, f32 Facing)
+{
+ r3_mesh *O = H->Opaque;
+ u32 Body = (RandomUnilateral(&H->Series) < .3f) ? 0xFFB9783E : 0xFFFFFFFF;
+ R3PushEllipsoid(O, R3Add(B, V3(0.f, .035f, 0.f)), V3(.035f, .028f, .027f), 3, 6, R3Color(Body), false);
+ R3PushEllipsoid(O, R3Add(B, V3(.03f*Facing, .064f, 0.f)), V3(.017f, .017f, .017f), 3, 5, R3Color(Body), false);
+ R3PushBox(O, R3Add(B, V3(.03f*Facing, .083f, 0.f)), V3(.007f, .006f, .003f), R3Color(0xFFE0453A));
+ R3PushCone(O, R3Add(B, V3(.044f*Facing, .064f, 0.f)), R3Add(B, V3(.06f*Facing, .061f, 0.f)), .007f, 4, R3Color(0xFFF2B33D));
+}
+
+internal void
+HeroPushOrchard(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, product_kind Fruit)
+{
+ v3 C = HeroOn(H, X, Z);
+ u32 Leaves = (Fruit == ProductKind_Pears) ? 0xFF6FAE4A : 0xFF3F8E4A;
+ for(f32 DZ = -HZ + .15f; DZ <= HZ - .1f; DZ += .3f)
+ {
+  for(f32 DX = -HX + .15f; DX <= HX - .1f; DX += .3f)
+  {
+   W3PushFruitTree(H->Opaque, R3Add(C, V3(DX, 0.f, DZ)), .45f + .12f*RandomUnilateral(&H->Series), Leaves, Fruit, &H->Series);
+  }
+ }
+ // A basket of picked fruit
+ v3 Basket = R3Add(C, V3(HX - .08f, 0.f, HZ - .02f));
+ R3PushBox(H->Opaque, R3Add(Basket, V3(0.f, .03f, 0.f)), V3(.045f, .03f, .035f), R3Color(Hero_ColorWoodLight));
+ R3PushEllipsoid(H->Opaque, R3Add(Basket, V3(0.f, .065f, 0.f)), V3(.035f, .018f, .027f), 3, 5, R3Color(W3ProductColors[Fruit]), false);
+}
+
+internal void
+HeroPushWheatField(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
+{
+ r3_mesh *O = H->Opaque;
+ v3 C = HeroOn(H, X, Z);
+ R3PushBox(O, R3Add(C, V3(0.f, .008f, 0.f)), V3(HX, .01f, HZ), R3Color(W3_ColorFarmSoil));
+ for(f32 DZ = -HZ + .06f; DZ <= HZ - .04f; DZ += .11f)
+ {
+  R3PushBox(O, R3Add(C, V3(0.f, .055f, DZ)), V3(HX - .03f, .045f, .038f), HeroShade(H, W3ProductColors[ProductKind_Wheat]));
+ }
+ // Hay bales at the corner
+ v3 Bale = R3Add(C, V3(HX + .02f, .06f, HZ + .02f));
+ R3PushCylinder(O, R3Add(Bale, V3(-.06f, 0.f, 0.f)), R3Add(Bale, V3(.06f, 0.f, 0.f)), .06f, 8, R3Color(W3ProductColors[ProductKind_Wheat]));
+}
+
+// NOTE: A white tower mill with four cloth sails, turning with time.
+internal void
+HeroPushTowerMill(hero_ctx *H, f32 X, f32 Z, f32 Phase)
+{
+ r3_mesh *O = H->Opaque;
+ v3 B = HeroOn(H, X, Z);
+ R3PushCone(O, B, R3Add(B, V3(0.f, 1.3f, 0.f)), .22f, 10, R3Color(0xFFF4EBDD));
+ R3PushCone(O, R3Add(B, V3(0.f, .82f, 0.f)), R3Add(B, V3(0.f, 1.1f, 0.f)), .15f, 10, R3Color(0xFF6A4E3A));
+ R3PushBox(O, R3Add(B, V3(0.f, .1f, .2f)), V3(.05f, .1f, .012f), R3Color(Hero_ColorWoodDark));
+ HeroGlowRect(O, R3Add(B, V3(0.f, .45f, .155f)), V3(.03f, 0.f, 0.f), V3(0.f, .035f, 0.f), R3Color(Hero_ColorWindow));
+ v3 Hub = R3Add(B, V3(0.f, .92f, .17f));
+ R3PushEllipsoid(O, Hub, V3(.035f, .035f, .035f), 3, 6, R3Color(Hero_ColorWoodDark), false);
+ f32 Spin = 1.1f*H->Time + Phase;
+ for(u32 Sail = 0; Sail < 4; Sail += 1)
+ {
+  f32 Angle = Spin + .5f*Pi32*(f32)Sail;
+  v3 Dir = V3(R3Cos(Angle), R3Sin(Angle), 0.f);
+  v3 Side = V3(-Dir.Y, Dir.X, 0.f);
+  R3PushCylinder(O, Hub, R3Add(Hub, R3Scale(Dir, .5f)), .01f, 4, R3Color(Hero_ColorWoodDark));
+  R3PushOrientedBox(O, R3Add(R3Add(Hub, R3Scale(Dir, .3f)), R3Scale(Side, .045f)), R3Scale(Dir, .19f), R3Scale(Side, .045f), V3(0.f, 0.f, .004f), R3Color(Hero_ColorCloth));
+ }
+}
+
+// NOTE: One block of what an island makes. Big = the island's main food.
+internal void
+HeroPushThemeBlock(hero_ctx *H, product_kind Kind, b32 Big)
+{
+ f32 X, Z;
+ switch(Kind)
+ {
+  case ProductKind_Apples:
+  case ProductKind_Pears:
+  {
+   f32 HX = Big ? .62f : .36f;
+   f32 HZ = Big ? .46f : .3f;
+   if(HeroPlace(H, HX, HZ, -1.9f, 1.9f, &X, &Z)) HeroPushOrchard(H, X, Z, HX, HZ, Kind);
+   if(Big && HeroPlace(H, HX, HZ, -1.9f, 1.9f, &X, &Z)) HeroPushOrchard(H, X, Z, HX, HZ, Kind);
+  } break;
+
+  case ProductKind_Cabbage:
+  case ProductKind_Carrots:
+  {
+   u32 Beds = Big ? 5 : 2;
+   for(u32 Bed = 0; Bed < Beds; Bed += 1)
+   {
+    if(HeroPlace(H, .3f, .1f, -1.8f, 1.9f, &X, &Z)) HeroPushBed(H, X, Z, .27f, .085f, W3ProductColors[Kind]);
+   }
+   if(Big && HeroPlace(H, .27f, .23f, -1.8f, 1.9f, &X, &Z)) HeroPushGreenhouse(H, X, Z, .24f, .2f);
+  } break;
+
+  case ProductKind_Wheat:
+  {
+   f32 HX = Big ? .6f : .38f;
+   f32 HZ = Big ? .42f : .28f;
+   if(HeroPlace(H, HX + .1f, HZ + .1f, -1.8f, 1.9f, &X, &Z)) HeroPushWheatField(H, X, Z, HX, HZ);
+   if(Big && HeroPlace(H, HX + .1f, HZ + .1f, -1.8f, 1.9f, &X, &Z)) HeroPushWheatField(H, X, Z, HX, HZ);
+   if(Big && HeroPlace(H, .26f, .26f, -2.f, 1.f, &X, &Z)) HeroPushTowerMill(H, X, Z, 6.f*RandomUnilateral(&H->Series));
+  } break;
+
+  case ProductKind_Fish:
+  {
+   u32 Racks = Big ? 3 : 1;
+   for(u32 Rack = 0; Rack < Racks; Rack += 1)
+   {
+    if(HeroPlace(H, .34f, .08f, -1.5f, 2.f, &X, &Z))
+    {
+     W3PushSmallProduct(H->Opaque, 0, ProductKind_Fish, HeroOn(H, X, Z), &H->Series);
+    }
+   }
+  } break;
+
+  case ProductKind_Meat:
+  {
+   f32 HX = Big ? .62f : .42f;
+   f32 HZ = Big ? .46f : .32f;
+   if(HeroPlace(H, HX + .04f, HZ + .04f, -1.8f, 1.9f, &X, &Z))
+   {
+    HeroPushFence(H, X, Z, HX, HZ);
+    u32 Cows = Big ? 3 : 2;
+    for(u32 Cow = 0; Cow < Cows; Cow += 1)
+    {
+     f32 CX = X + (HX - .2f)*RandomBilateral(&H->Series);
+     f32 CZ = Z + (HZ - .12f)*RandomBilateral(&H->Series);
+     b32 Brown = (Cow & 1);
+     HeroPushAnimal(H, CX, CZ, .75f, Brown ? 0xFFB98A5E : 0xFFF4EFE6, Brown ? 0xFF5A3D26 : 0xFF4A3A30, (RandomUnilateral(&H->Series) < .5f) ? 1.f : -1.f);
+    }
+    v3 Trough = HeroOn(H, X - HX + .12f, Z - HZ + .08f);
+    R3PushBox(H->Opaque, R3Add(Trough, V3(0.f, .03f, 0.f)), V3(.08f, .03f, .03f), R3Color(Hero_ColorWoodDark));
+   }
+   if(Big && HeroPlace(H, .38f, .34f, -1.9f, 1.5f, &X, &Z)) HeroPushHouse(H, X, Z, .3f, .24f, 1, 8);
+  } break;
+
+  case ProductKind_Eggs:
+  {
+   f32 HX = Big ? .46f : .32f;
+   f32 HZ = Big ? .34f : .26f;
+   if(HeroPlace(H, HX + .04f, HZ + .04f, -1.8f, 1.9f, &X, &Z))
+   {
+    HeroPushFence(H, X, Z, HX, HZ);
+    W3PushHut(H->Opaque, HeroOn(H, X - .45f*HX, Z - .3f*HZ), V3(.14f, .1f, .11f), 0xFFE9C98F);
+    u32 Hens = Big ? 7 : 4;
+    for(u32 Hen = 0; Hen < Hens; Hen += 1)
+    {
+     f32 PX = X + (HX - .07f)*RandomBilateral(&H->Series);
+     f32 PZ = Z + .2f*HZ + (.7f*HZ)*RandomBilateral(&H->Series);
+     HeroPushHen(H, HeroOn(H, PX, PZ), (Hen & 1) ? 1.f : -1.f);
+    }
+   }
+  } break;
+
+  default:
+  {
+   for(u32 Bed = 0; Bed < 2; Bed += 1)
+   {
+    if(HeroPlace(H, .3f, .1f, -1.8f, 1.9f, &X, &Z)) HeroPushBed(H, X, Z, .27f, .085f, 0);
+   }
+  } break;
+ }
+}
+
+//~ Shared by all hand-built islands
+// NOTE: Rocky crest with the knowledge crystal on a mast (grey -> cyan as the island
+// learns about more islands).
+internal void
+HeroPushCrest(hero_ctx *H, f32 X, f32 Z, f32 KnownFraction)
+{
+ v3 Crest = HeroOn(H, X, Z);
+ HeroPushBoulder(H, R3Add(Crest, V3(0.f, .2f, 0.f)), .32f);
+ HeroPushBoulder(H, R3Add(Crest, V3(-.28f, .12f, .1f)), .2f);
+ HeroPushBoulder(H, R3Add(Crest, V3(.22f, .1f, -.15f)), .22f);
+ HeroPushBoulder(H, R3Add(Crest, V3(.05f, .4f, -.05f)), .18f);
+ HeroMarkRect(H, X - .4f, Z - .35f, X + .35f, Z + .3f);
+ v3 MastBase = R3Add(Crest, V3(.05f, .5f, -.05f));
+ v3 Crystal = R3Add(MastBase, V3(0.f, .65f, 0.f));
+ R3PushCylinder(H->Opaque, MastBase, Crystal, .025f, 5, R3Color(W3_ColorPost));
+ v4 Color = R3LerpColor(R3Color(W3_ColorCrystalLow), R3Color(W3_ColorCrystalHigh), KnownFraction);
+ f32 Size = .2f;
+ R3PushCone(H->Opaque, Crystal, R3Add(Crystal, V3(0.f, 1.3f*Size, 0.f)), Size, 4, Color);
+ R3PushCone(H->Opaque, Crystal, R3Add(Crystal, V3(0.f, -1.3f*Size, 0.f)), Size, 4, Color);
+}
+
+internal void
+HeroBegin(hero_ctx *H, app_state *App, hero_layout *Layout, v3 Top, u64 Seed)
 {
  r3_state *R3 = &App->R3;
- hero_ctx Ctx = {0};
- hero_ctx *H = &Ctx;
+ MemorySet(H, 0, sizeof(*H));
  H->Opaque = &R3->Opaque;
  H->Translucent = &R3->Translucent;
  H->Top = Top;
  H->Time = R3->AnimTime;
- RandomSeed(&H->Series, W3_Seed*17 + 389*(u64)Index);
+ H->Layout = Layout;
+ RandomSeed(&H->Series, Seed);
+}
+
+// NOTE: Bushes on free grass, clouds around the base and the status rings.
+internal void
+HeroFinish(hero_ctx *H, u32 StatusColor, b32 Highlight, u32 HighlightColor)
+{
+ for(u32 Bush = 0; Bush < 70; Bush += 1)
+ {
+  f32 X = (Hero_Half - .1f)*RandomBilateral(&H->Series);
+  f32 Z = (Hero_Half - .1f)*RandomBilateral(&H->Series);
+  u32 Type;
+  f32 Y = HeroGroundY(H->Layout, X, Z, &Type);
+  if(Type == HeroGround_Grass && !HeroCellTaken(H, X, Z))
+  {
+   f32 Size = .05f + .06f*RandomUnilateral(&H->Series);
+   R3PushEllipsoid(H->Opaque, HeroP(H, X, Y + .6f*Size, Z), V3(Size*1.2f, Size, Size*1.2f), 3, 6, HeroShade(H, (Bush & 1) ? Hero_ColorLeaf : Hero_ColorVine), false);
+   if((Bush % 5) == 0)
+   {
+    R3PushEllipsoid(H->Opaque, HeroP(H, X + .03f, Y + 1.3f*Size, Z + .02f), V3(.018f, .018f, .018f), 3, 4, R3Color((Bush & 2) ? 0xFFF2D04E : 0xFFE87FA6), false);
+   }
+  }
+ }
+
+ for(u32 Puff = 0; Puff < 9; Puff += 1)
+ {
+  f32 A = 2.f*Pi32*((f32)Puff + .5f*RandomUnilateral(&H->Series))/9.f;
+  f32 Out = Hero_Half*(.85f + .35f*RandomUnilateral(&H->Series));
+  v3 P = HeroP(H, Out*R3Cos(A), -2.3f - 1.f*RandomUnilateral(&H->Series), Out*R3Sin(A));
+  v3 Radii = V3(.8f + .6f*RandomUnilateral(&H->Series), .35f + .2f*RandomUnilateral(&H->Series), .7f + .5f*RandomUnilateral(&H->Series));
+  R3PushEllipsoid(H->Translucent, P, Radii, 5, 9, R3WithAlpha(R3Color(Hero_ColorCloud), .5f), true);
+ }
+
+ HeroPushSquareRing(H, Hero_Half + .12f, Hero_Half + .3f, R3Color(StatusColor));
+ if(Highlight)
+ {
+  HeroPushSquareRing(H, Hero_Half + .36f, Hero_Half + .48f, R3Color(HighlightColor));
+ }
+}
+
+//~ The hero island
+internal void
+W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction)
+{
+ hero_layout Layout = {0};
+ Layout.Pool = true;
+ Layout.PoolX0 = Hero_PoolX0;
+ Layout.PoolX1 = Hero_PoolX1;
+ Layout.PoolZ0 = Hero_PoolZ0;
+ Layout.HillX = -.15f;
+ Layout.HillZ = -1.45f;
+ Layout.HillStretch = 1.3f;
+ Layout.HillPeak = 2.f;
+ Layout.PlateauRight = true;
+ Layout.PlateauLeft = true;
+ Layout.StreamCount = ArrayCount(HeroStreamPoints);
+ for(u32 Idx = 0; Idx < ArrayCount(HeroStreamPoints); Idx += 1) { Layout.Stream[Idx][0] = HeroStreamPoints[Idx][0]; Layout.Stream[Idx][1] = HeroStreamPoints[Idx][1]; }
+ Layout.PathCount = ArrayCount(HeroPathPoints);
+ for(u32 Idx = 0; Idx < ArrayCount(HeroPathPoints); Idx += 1) { Layout.Path[Idx][0] = HeroPathPoints[Idx][0]; Layout.Path[Idx][1] = HeroPathPoints[Idx][1]; }
+ Layout.Path2Count = ArrayCount(HeroPath2Points);
+ for(u32 Idx = 0; Idx < ArrayCount(HeroPath2Points); Idx += 1) { Layout.Path2[Idx][0] = HeroPath2Points[Idx][0]; Layout.Path2[Idx][1] = HeroPath2Points[Idx][1]; }
+
+ hero_ctx Ctx;
+ hero_ctx *H = &Ctx;
+ HeroBegin(H, App, &Layout, Top, W3_Seed*17 + 389*(u64)Index);
+ for(u32 Idx = 0; Idx < ArrayCount(HeroTakenRects); Idx += 1)
+ {
+  HeroMarkRect(H, HeroTakenRects[Idx][0], HeroTakenRects[Idx][1], HeroTakenRects[Idx][2], HeroTakenRects[Idx][3]);
+ }
 
  HeroPushTerrain(H);
  HeroPushCliff(H);
@@ -1198,9 +1604,9 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
  //- Greenhouses, gardens, water tower
  HeroPushGreenhouse(H, -1.95f, .55f, .26f, .21f);
  HeroPushGreenhouse(H, 2.f, .45f, .22f, .25f);
- HeroPushBed(H, 1.38f, .08f, .27f, .085f);
- HeroPushBed(H, 1.38f, .34f, .27f, .085f);
- HeroPushBed(H, 1.38f, .6f, .27f, .085f);
+ HeroPushBed(H, 1.38f, .08f, .27f, .085f, 0);
+ HeroPushBed(H, 1.38f, .34f, .27f, .085f, 0);
+ HeroPushBed(H, 1.38f, .6f, .27f, .085f, 0);
  HeroPushWaterTower(H, 1.05f, -1.15f);
 
  //- Windmills along the back, pines on the sides
@@ -1213,21 +1619,8 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
  HeroPushPine(H, 2.12f, -.05f, 1.15f);
  HeroPushPine(H, -.95f, -1.95f, .8f);
 
- //- Rocky crest at the top of the hill, with the knowledge crystal on a mast
- {
-  v3 Crest = HeroOn(H, .3f, -1.9f);
-  HeroPushBoulder(H, R3Add(Crest, V3(0.f, .2f, 0.f)), .32f);
-  HeroPushBoulder(H, R3Add(Crest, V3(-.28f, .12f, .1f)), .2f);
-  HeroPushBoulder(H, R3Add(Crest, V3(.22f, .1f, -.15f)), .22f);
-  HeroPushBoulder(H, R3Add(Crest, V3(.05f, .4f, -.05f)), .18f);
-  v3 MastBase = R3Add(Crest, V3(.05f, .5f, -.05f));
-  v3 Crystal = R3Add(MastBase, V3(0.f, .65f, 0.f));
-  R3PushCylinder(H->Opaque, MastBase, Crystal, .025f, 5, R3Color(W3_ColorPost));
-  v4 Color = R3LerpColor(R3Color(W3_ColorCrystalLow), R3Color(W3_ColorCrystalHigh), KnownFraction);
-  f32 Size = .2f;
-  R3PushCone(H->Opaque, Crystal, R3Add(Crystal, V3(0.f, 1.3f*Size, 0.f)), Size, 4, Color);
-  R3PushCone(H->Opaque, Crystal, R3Add(Crystal, V3(0.f, -1.3f*Size, 0.f)), Size, 4, Color);
- }
+ //- Rocky crest at the top of the hill, with the knowledge crystal
+ HeroPushCrest(H, .3f, -1.9f, KnownFraction);
  HeroPushBoulder(H, R3Add(HeroOn(H, -.45f, .82f), V3(0.f, .05f, 0.f)), .12f);
  HeroPushBoulder(H, R3Add(HeroOn(H, 1.48f, .84f), V3(0.f, .05f, 0.f)), .1f);
  HeroPushBoulder(H, R3Add(HeroOn(H, .62f, -.62f), V3(0.f, .04f, 0.f)), .11f);
@@ -1257,7 +1650,7 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
  HeroPushStairs(H, R3Add(HeroOn(H, -.85f, .72f), V3(0.f, .01f, 0.f)), R3Add(HeroOn(H, -.85f, 1.1f), V3(0.f, .01f, 0.f)), .1f);
  HeroPushStairs(H, R3Add(HeroOn(H, 1.62f, .7f), V3(0.f, .01f, 0.f)), R3Add(HeroOn(H, 1.62f, 1.12f), V3(0.f, .01f, 0.f)), .09f);
  HeroPushStairs(H, R3Add(HeroOn(H, -.95f, -.98f), V3(0.f, .01f, 0.f)), R3Add(HeroOn(H, -.95f, -.62f), V3(0.f, .01f, 0.f)), .07f);
- HeroPushCrates(H, Island);
+ HeroPushCrates(H, Island, -.78f, 1.2f, 1.62f, 2.02f);
 
  //- Village life
  HeroPushCampfire(H, -.8f, .55f);
@@ -1284,38 +1677,187 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
   HeroPushPerson(H, HeroP(H, 1.f, Hero_WaterLevel + .105f, 1.45f), HeroShirtColors[4]);
  }
 
- //- Bushes and ferns on free grass
- for(u32 Bush = 0; Bush < 70; Bush += 1)
+ HeroFinish(H, StatusColor, Highlight, HighlightColor);
+}
+
+//~ Themed islands: the hero island's neighbours, built the same way, with contents
+// that follow what each island makes (orchards, market gardens, wheat fields and
+// mills, fishing harbours, pastures, hen yards) and a layout of their own.
+internal void
+W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction)
+{
+ hero_layout Layout = {0};
+ hero_ctx Ctx;
+ hero_ctx *H = &Ctx;
+ HeroBegin(H, App, &Layout, Top, W3_Seed*23 + 601*(u64)Index);
+ random_series *S = &H->Series;
+
+ //- Main and second product (main = the one it makes most of)
+ product_kind Main = ProductKind_None;
+ product_kind Second = ProductKind_None;
+ u64 MainAmount = 0;
+ for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
  {
-  f32 X = (Hero_Half - .1f)*RandomBilateral(&H->Series);
-  f32 Z = (Hero_Half - .1f)*RandomBilateral(&H->Series);
-  u32 Type;
-  f32 Y = HeroGroundY(X, Z, &Type);
-  if(Type == HeroGround_Grass && !HeroSpotTaken(X, Z))
+  if(Main == ProductKind_None || Product->Amount > MainAmount)
   {
-   f32 Size = .05f + .06f*RandomUnilateral(&H->Series);
-   R3PushEllipsoid(H->Opaque, HeroP(H, X, Y + .6f*Size, Z), V3(Size*1.2f, Size, Size*1.2f), 3, 6, HeroShade(H, (Bush & 1) ? Hero_ColorLeaf : Hero_ColorVine), false);
-   if((Bush % 5) == 0)
+   Second = Main;
+   Main = Product->Kind;
+   MainAmount = Product->Amount;
+  }
+  else if(Second == ProductKind_None)
+  {
+   Second = Product->Kind;
+  }
+ }
+
+ //- Layout
+ b32 FishMain = (Main == ProductKind_Fish);
+ Layout.Pool = FishMain || Second == ProductKind_Fish || RandomUnilateral(S) < .4f;
+ if(Layout.Pool)
+ {
+  f32 Width = FishMain ? 2.4f + .8f*RandomUnilateral(S) : 1.2f + .7f*RandomUnilateral(S);
+  f32 Center = (Hero_Half - .5f*Width - .25f)*RandomBilateral(S);
+  Layout.PoolX0 = Center - .5f*Width;
+  Layout.PoolX1 = Center + .5f*Width;
+  Layout.PoolZ0 = (FishMain ? .6f : .85f) + .4f*RandomUnilateral(S);
+ }
+ Layout.HillX = 1.1f*RandomBilateral(S);
+ Layout.HillZ = -1.75f + .6f*RandomUnilateral(S);
+ Layout.HillStretch = 1.f + .5f*RandomUnilateral(S);
+ Layout.HillPeak = 1.3f + .8f*RandomUnilateral(S);
+ Layout.PlateauRight = (RandomUnilateral(S) < .35f);
+ Layout.PlateauLeft = !Layout.PlateauRight && (RandomUnilateral(S) < .35f);
+
+ f32 StreamEndX = 0.f;
+ if(Layout.Pool && RandomUnilateral(S) < .7f)
+ {
+  StreamEndX = Clamp(Layout.PoolX0 + .25f, .5f*(Layout.PoolX0 + Layout.PoolX1) + .3f*RandomBilateral(S), Layout.PoolX1 - .45f);
+  f32 SX = Layout.HillX + .3f;
+  f32 SZ = Layout.HillZ - .05f;
+  f32 EZ = Layout.PoolZ0 + .1f;
+  Layout.Stream[0][0] = SX;
+  Layout.Stream[0][1] = SZ;
+  Layout.Stream[1][0] = SX + .35f*(StreamEndX - SX) + .2f*RandomBilateral(S);
+  Layout.Stream[1][1] = SZ + .35f*(EZ - SZ);
+  Layout.Stream[2][0] = SX + .7f*(StreamEndX - SX) + .2f*RandomBilateral(S);
+  Layout.Stream[2][1] = SZ + .7f*(EZ - SZ);
+  Layout.Stream[3][0] = StreamEndX;
+  Layout.Stream[3][1] = EZ;
+  Layout.StreamCount = 4;
+ }
+
+ // A dirt path from the front up towards the hill.
+ {
+  f32 PX = .8f*RandomBilateral(S);
+  if(Layout.Pool) PX = (Layout.PoolX0 > -1.5f) ? Layout.PoolX0 - .3f : Layout.PoolX1 + .3f;
+  Layout.Path[0][0] = PX;
+  Layout.Path[0][1] = Hero_Half - .05f;
+  Layout.Path[1][0] = .6f*PX;
+  Layout.Path[1][1] = .3f;
+  Layout.Path[2][0] = .5f*Layout.HillX;
+  Layout.Path[2][1] = -.5f;
+  Layout.PathCount = 3;
+ }
+
+ HeroPushTerrain(H);
+ HeroPushCliff(H);
+
+ //- Crest with the knowledge crystal on the hill
+ HeroPushCrest(H, Layout.HillX - .2f, Layout.HillZ, KnownFraction);
+
+ //- What it makes (these need the most room, so they go first)
+ HeroPushThemeBlock(H, Main, true);
+ if(Second != ProductKind_None) HeroPushThemeBlock(H, Second, false);
+
+ //- Houses
+ f32 X, Z;
+ u32 Houses = 3 + RandomNext(S) % 3;
+ for(u32 House = 0; House < Houses; House += 1)
+ {
+  f32 HX = .22f + .12f*RandomUnilateral(S);
+  f32 HZ = .18f + .08f*RandomUnilateral(S);
+  if(HeroPlace(H, HX + .08f, HZ + .14f, -2.f, 1.7f, &X, &Z))
+  {
+   HeroPushHouse(H, X, Z - .04f, HX, HZ, 1 + RandomNext(S) % 2, RandomNext(S) % 8);
+  }
+ }
+
+ //- Windmills along the back, a water tower, pines
+ u32 Mills = 2 + RandomNext(S) % 3;
+ for(u32 Mill = 0; Mill < Mills; Mill += 1)
+ {
+  if(HeroPlace(H, .17f, .17f, -2.1f, -1.f, &X, &Z)) HeroPushWindmill(H, X, Z, 1.2f + .5f*RandomUnilateral(S), 6.f*RandomUnilateral(S));
+ }
+ if(RandomUnilateral(S) < .5f && HeroPlace(H, .24f, .24f, -1.9f, .6f, &X, &Z)) HeroPushWaterTower(H, X, Z);
+ u32 Pines = 2 + RandomNext(S) % 3;
+ for(u32 Pine = 0; Pine < Pines; Pine += 1)
+ {
+  if(HeroPlace(H, .2f, .2f, -2.f, 2.f, &X, &Z)) HeroPushPine(H, X, Z, .9f + .5f*RandomUnilateral(S));
+ }
+
+ //- Harbour
+ if(Layout.Pool)
+ {
+  f32 PoolWidth = Layout.PoolX1 - Layout.PoolX0;
+  f32 DockZ = .5f*(Layout.PoolZ0 + Hero_Half) + .1f;
+  HeroPushDock(H, Layout.PoolX0, Layout.PoolX0 + Min(.8f, .4f*PoolWidth), DockZ, .11f);
+  if(PoolWidth > 1.6f) HeroPushDock(H, Layout.PoolX1, Layout.PoolX1 - Min(.8f, .35f*PoolWidth), DockZ - .3f, .11f);
+  u32 Boats = FishMain ? 4 : 2;
+  for(u32 Boat = 0; Boat < Boats; Boat += 1)
+  {
+   f32 BX = Layout.PoolX0 + .3f + (PoolWidth - .6f)*((f32)Boat + .5f)/(f32)Boats;
+   f32 BZ = Layout.PoolZ0 + .3f + (Hero_Half - Layout.PoolZ0 - .5f)*RandomUnilateral(S);
+   HeroPushBoat(H, BX, BZ, (Boat & 1) ? 1.f : -1.f, 6.f*RandomUnilateral(S), (Boat % 2) == 0);
+  }
+  if(Layout.StreamCount)
+  {
+   R3PushEllipsoid(H->Translucent, HeroP(H, StreamEndX, Hero_WaterLevel + .02f, Layout.PoolZ0 + .12f), V3(.3f, .08f, .18f), 4, 8, R3WithAlpha(R3Color(0xFFFFFFFF), .5f), true);
+   f32 WheelX = StreamEndX + .32f;
+   if(WheelX < Layout.PoolX1 - .1f)
    {
-    R3PushEllipsoid(H->Opaque, HeroP(H, X + .03f, Y + 1.3f*Size, Z + .02f), V3(.018f, .018f, .018f), 3, 4, R3Color((Bush & 2) ? 0xFFF2D04E : 0xFFE87FA6), false);
+    HeroPushWaterWheel(H, HeroP(H, WheelX, Hero_WaterLevel + .26f, Layout.PoolZ0 + .05f), .28f);
    }
   }
  }
 
- //- Clouds wrapping the base
- for(u32 Puff = 0; Puff < 9; Puff += 1)
+ //- Market stall, campfire, crates
+ u32 Goods[3];
+ u32 GoodsCount = 0;
+ for(product *Product = Island->FirstProduct; Product && GoodsCount < ArrayCount(Goods); Product = Product->Next)
  {
-  f32 A = 2.f*Pi32*((f32)Puff + .5f*RandomUnilateral(&H->Series))/9.f;
-  f32 Out = Hero_Half*(.85f + .35f*RandomUnilateral(&H->Series));
-  v3 P = HeroP(H, Out*R3Cos(A), -2.3f - 1.f*RandomUnilateral(&H->Series), Out*R3Sin(A));
-  v3 Radii = V3(.8f + .6f*RandomUnilateral(&H->Series), .35f + .2f*RandomUnilateral(&H->Series), .7f + .5f*RandomUnilateral(&H->Series));
-  R3PushEllipsoid(H->Translucent, P, Radii, 5, 9, R3WithAlpha(R3Color(Hero_ColorCloud), .5f), true);
+  Goods[GoodsCount++] = W3ProductColors[Product->Kind];
+ }
+ if(HeroPlace(H, .42f, .32f, -.2f, 2.f, &X, &Z)) HeroPushStall(H, X, Z - .02f, Goods, GoodsCount, RandomUnilateral(S) < .4f);
+ if(RandomUnilateral(S) < .6f && HeroPlace(H, .15f, .15f, -1.f, 1.8f, &X, &Z)) HeroPushCampfire(H, X, Z);
+ {
+  f32 PX = 0.f, PZ = 0.f, NX = 0.f, NZ = 0.f;
+  b32 HaveProduce = HeroPlace(H, .13f, .4f, -1.2f, 2.f, &PX, &PZ);
+  b32 HaveNeeds = HeroPlace(H, .4f, .13f, -1.2f, 2.f, &NX, &NZ);
+  if(HaveProduce && HaveNeeds) HeroPushCrates(H, Island, PX, PZ - .26f, NX - .26f, NZ);
  }
 
- //- Status ring (and hovered/selected ring) around the slab
- HeroPushSquareRing(H, Hero_Half + .12f, Hero_Half + .3f, R3Color(StatusColor));
- if(Highlight)
+ //- Barrels and villagers
+ for(u32 Barrel = 0; Barrel < 3; Barrel += 1)
  {
-  HeroPushSquareRing(H, Hero_Half + .36f, Hero_Half + .48f, R3Color(HighlightColor));
+  if(HeroPlace(H, .07f, .07f, -1.8f, 2.f, &X, &Z)) HeroPushBarrel(H, X, Z);
  }
+ u32 People = 6 + RandomNext(S) % 4;
+ for(u32 Person = 0; Person < People; Person += 1)
+ {
+  for(u32 Try = 0; Try < 20; Try += 1)
+  {
+   f32 PX = (Hero_Half - .2f)*RandomBilateral(S);
+   f32 PZ = (Hero_Half - .2f)*RandomBilateral(S);
+   u32 Type;
+   HeroGroundY(&Layout, PX, PZ, &Type);
+   if((Type == HeroGround_Grass || Type == HeroGround_Path) && !HeroCellTaken(H, PX, PZ))
+   {
+    HeroPushPerson(H, HeroOn(H, PX, PZ), HeroShirtColors[RandomNext(S) % ArrayCount(HeroShirtColors)]);
+    HeroMarkRect(H, PX, PZ, PX, PZ);
+    break;
+   }
+  }
+ }
+
+ HeroFinish(H, StatusColor, Highlight, HighlightColor);
 }

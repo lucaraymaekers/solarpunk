@@ -338,9 +338,9 @@ R3PushEllipsoid(r3_mesh *Mesh, v3 Center, v3 Radii, u32 Rings, u32 Segments, v4 
 //~ Camera
 #define R3_CameraDefaultYaw      .55f
 #define R3_CameraDefaultPitch    .72f
-#define R3_CameraDefaultDistance 100.f
-#define R3_CameraMinDistance     20.f
-#define R3_CameraMaxDistance     220.f
+#define R3_CameraDefaultDistance 150.f
+#define R3_CameraMinDistance     6.f
+#define R3_CameraMaxDistance     340.f
 #define R3_CameraMinPitch        .12f
 #define R3_CameraMaxPitch        1.45f
 #define R3_CameraDragYawSpeed    .008f
@@ -348,7 +348,7 @@ R3PushEllipsoid(r3_mesh *Mesh, v3 Center, v3 Radii, u32 Rings, u32 Segments, v4 
 #define R3_CameraZoomStep        1.2f
 #define R3_CameraWheelStep       1.12f
 #define R3_CameraPanSpeed        .0015f  // world units per pixel, times the distance
-#define R3_CameraMaxPan          70.f
+#define R3_CameraMaxPan          110.f
 #define R3_CameraFlySpeed        4.f     // higher = faster flight to a cluster
 
 internal void

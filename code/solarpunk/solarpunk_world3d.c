@@ -3,7 +3,7 @@
 //-
 
 //~ Constants
-#define W3_WorldSize        92.f   // map 0..1 is spread over this many world units
+#define W3_WorldSize        150.f   // map 0..1 is spread over this many world units
 #define W3_IslandRadius     2.5f
 #define W3_IslandHeightVary 1.4f   // islands float at slightly different heights
 #define W3_IslandSides      24
@@ -826,9 +826,9 @@ W3PushClouds(r3_mesh *Mesh)
  v4 Color = R3WithAlpha(R3Color(W3_ColorCloud), .42f);
  for(u32 Cloud = 0; Cloud < W3_CloudCount; Cloud += 1)
  {
-  v3 Center = V3(80.f*RandomBilateral(&Series),
+  v3 Center = V3(130.f*RandomBilateral(&Series),
                  -14.f - 3.f*RandomUnilateral(&Series),
-                 80.f*RandomBilateral(&Series));
+                 130.f*RandomBilateral(&Series));
   u32 Puffs = 3 + RandomNext(&Series) % 3;
   for(u32 Puff = 0; Puff < Puffs; Puff += 1)
   {
@@ -842,7 +842,12 @@ W3PushClouds(r3_mesh *Mesh)
 //~ World
 // NOTE: The hand-built hero island lives in solarpunk_hero_island.c.
 #define Hero_Radius 3.f   // used for cables, hovering and the camera
+#define W3_HeroNeighbours 8
+#define W3Style_Normal 0
+#define W3Style_Hero   1
+#define W3Style_Themed 2
 internal void W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 
 // NOTE: Positions, screen projections and the hovered island, before building geometry.
 internal void
@@ -871,12 +876,46 @@ W3PrepareIslands(app_state *App, app_input *Input)
   }
  }
 
+ //- Its nearest neighbours on the map are built the same way, each with its own contents
+ MemorySet(R3->IslandStyle, 0, sizeof(R3->IslandStyle));
+ if(R3->HeroIdx >= 0)
+ {
+  R3->IslandStyle[R3->HeroIdx] = W3Style_Hero;
+  v2 HeroPos = V2(.5f, .5f);
+  {
+   u32 Idx = 0;
+   for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+   {
+    if(Idx == (u32)R3->HeroIdx) HeroPos = Island->MapPos;
+    Idx += 1;
+   }
+  }
+  for(u32 Pick = 0; Pick < W3_HeroNeighbours; Pick += 1)
+  {
+   s32 Best = -1;
+   f32 BestDistanceSq = 1e9f;
+   u32 Idx = 0;
+   for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+   {
+    f32 DX = Island->MapPos.X - HeroPos.X;
+    f32 DY = Island->MapPos.Y - HeroPos.Y;
+    if(R3->IslandStyle[Idx] == W3Style_Normal && DX*DX + DY*DY < BestDistanceSq)
+    {
+     BestDistanceSq = DX*DX + DY*DY;
+     Best = (s32)Idx;
+    }
+    Idx += 1;
+   }
+   if(Best >= 0) R3->IslandStyle[Best] = W3Style_Themed;
+  }
+ }
+
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3_MaxIslands; Island = Island->Next)
  {
   v3 Top = W3IslandTopFromMap(Island->MapPos, Index);
   R3->IslandTop[Index] = Top;
-  R3->IslandRadius[Index] = (R3->HeroIdx == (s32)Index) ? Hero_Radius : W3_IslandRadius;
+  R3->IslandRadius[Index] = (R3->IslandStyle[Index] != W3Style_Normal) ? Hero_Radius : W3_IslandRadius;
 
   v2 Screen = V2(-1000.f, -1000.f);
   R3->IslandVisible[Index] = R3ProjectToScreen(R3, R3Add(Top, W3_LabelOffset), &Screen);
@@ -954,10 +993,15 @@ W3BuildWorld(app_state *App)
   }
   KnownFraction = Clamp(0.f, KnownFraction, 1.f);
 
-  if(R3->HeroIdx == (s32)Index)
+  if(R3->IslandStyle[Index] == W3Style_Hero)
   {
    W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Themed)
+  {
+   W3PushThemedIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                      Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
   }
   else
   {

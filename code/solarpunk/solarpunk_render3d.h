@@ -92,6 +92,9 @@ struct r3_state
 
  // The hand-built hero island (the one nearest the map centre). -1 = none.
  s32 HeroIdx;
+ // How each island is drawn: W3Style_Normal, W3Style_Hero or W3Style_Themed (the
+ // hero island's neighbours, built the same way with their own contents).
+ u8 IslandStyle[R3_MaxIslands];
  // Seconds, for windmills, water wheels, boats and the campfire.
  f32 AnimTime;
 
