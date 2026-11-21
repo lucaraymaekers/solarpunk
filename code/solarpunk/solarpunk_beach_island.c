@@ -161,7 +161,7 @@ W3PushBeachIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusC
  Layout.StreamCount = 4;
 
  HeroPushTerrain(H);
- FishingPushRim(H, true);
+ FishingPushRim(H, FishingRim_Beach);
 
  // Keep the waterline free (the beach ring closest to the water)
  {
