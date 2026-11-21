@@ -61,6 +61,9 @@ struct app_state
  arena *LinksArena;
  arena *IslandsArena;
  arena *ProductsArena;
+ 
+ // Announcements of production and needs between islands
+ broadcast_state Broadcast;
 };
 
 global_variable product *AllProducts;
