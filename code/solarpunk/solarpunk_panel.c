@@ -28,6 +28,8 @@
 #define Panel_ColorGood      0xFFA3BE8C
 #define Panel_ColorShortage  0xFFE0707A
 #define Panel_ColorSelected  0xFF88E0FF
+#define Panel_TintAlpha      0x38u    // status tint over a row
+#define Panel_DotSpace       16.f     // room for a status dot before a name
 
 //~ Helpers
 internal island *
@@ -94,6 +96,24 @@ PanelSwatch(panel_cursor *Cursor, f32 Column, product_kind Kind)
  f32 Size = Cursor->LineHeight - 6.f;
  DrawRect(RectFromSize(V2(Cursor->X + Column, Cursor->Y + 3.f), V2(Size, Size)),
           V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+}
+
+// NOTE: Status colours (green ok, orange waiting, red short): a dot, and a light tint
+// over a whole row.
+internal void
+PanelStatusDot(panel_cursor *Cursor, f32 Column, u32 Status)
+{
+ f32 Size = Cursor->LineHeight - 10.f;
+ DrawRect(RectFromSize(V2(Cursor->X + Column, Cursor->Y + .5f*(Cursor->LineHeight - Size)), V2(Size, Size)),
+          V4FromU32(W3StatusColor(Status)), .5f*Size, 0.f, 0.f);
+}
+
+internal void
+PanelTintRow(panel_cursor *Cursor, u32 Status)
+{
+ u32 Color = (Panel_TintAlpha << 24) | (W3StatusColor(Status) & 0x00FFFFFFu);
+ v4 Row = RectFromSize(V2(Cursor->X - 4.f, Cursor->Y), V2(Cursor->Width + 8.f, Cursor->LineHeight));
+ DrawRect(Row, V4FromU32(Color), 3.f, 0.f, 0.f);
 }
 
 internal void
@@ -268,6 +288,7 @@ PanelDrawShortages(panel_cursor *Cursor)
   u32 Kind = Order[Idx];
   b32 Hovered = false;
   PanelBeginRow(Cursor, false, &Hovered);
+  PanelTintRow(Cursor, (Balance[Kind] < 0) ? IslandStatus_Short : IslandStatus_Ok);
   PanelSwatch(Cursor, 0.f, (product_kind)Kind);
   PanelText(Cursor, Cursor->LineHeight, ProductNames[Kind], Panel_ColorText);
   PanelTextRight(Cursor, .64f*W, Str8Fmt("%llu", Produced[Kind]), Panel_ColorText);
@@ -321,7 +342,9 @@ PanelDrawShortages(panel_cursor *Cursor)
    if(Waiting)
    {
     PanelIslandRow(Cursor, Index);
-    PanelText(Cursor, 0.f, Island->Name, Panel_ColorText);
+    PanelTintRow(Cursor, IslandStatus_Waiting);
+    PanelStatusDot(Cursor, 0.f, IslandStatus_Waiting);
+    PanelText(Cursor, Panel_DotSpace, Island->Name, Panel_ColorText);
     f32 Column = .5f*W;
     for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
     {
@@ -358,15 +381,18 @@ PanelDrawIslands(panel_cursor *Cursor)
  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
  {
   PanelIslandRow(Cursor, Index);
+  u32 Status = App->R3.IslandStatus[Index];
+  PanelTintRow(Cursor, Status);
+  PanelStatusDot(Cursor, 0.f, Status);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
-  PanelText(Cursor, 0.f, Island->Name, Selected ? Panel_ColorSelected : Panel_ColorText);
+  PanelText(Cursor, Panel_DotSpace, Island->Name, Selected ? Panel_ColorSelected : Panel_ColorText);
 
   f32 Column = .42f*W;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
   {
    str8 Amount = Str8Fmt("%llu", Req->Amount);
    PanelSwatch(Cursor, Column, Req->Kind);
-   PanelText(Cursor, Column + Cursor->LineHeight - 2.f, Amount, Panel_ColorText);
+   PanelText(Cursor, Column + Cursor->LineHeight - 2.f, Amount, W3StatusColor(W3NeedStatus(App, Index, Req->Kind)));
    Column += Cursor->LineHeight + PanelMeasure(App, Amount) + 6.f;
   }
 
@@ -398,11 +424,25 @@ PanelDrawSelected(panel_cursor *Cursor)
   return;
  }
 
- //- Title
+ //- Title and status
+ u32 Status = App->R3.IslandStatus[SelectedIdx];
  Cursor->Y += 4.f;
- PanelText(Cursor, 0.f, Island->Name, Panel_ColorSelected);
+ PanelStatusDot(Cursor, 0.f, Status);
+ PanelText(Cursor, Panel_DotSpace, Island->Name, Panel_ColorSelected);
  PanelTextRight(Cursor, W, Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Graph_ColorKnows);
  PanelNewLine(Cursor);
+ {
+  char *StatusLines[IslandStatus_Count] =
+  {
+   "OK: has a supplier for every need",
+   "Waiting: no supplier known yet for a need",
+   "Short: a need is short worldwide",
+  };
+  Cursor->Y += 2.f;
+  PanelTintRow(Cursor, Status);
+  PanelText(Cursor, 4.f, S8FromCString(StatusLines[Status < IslandStatus_Count ? Status : 0]), W3StatusColor(Status));
+  PanelNewLine(Cursor);
+ }
 
  //- Produces
  PanelSection(Cursor, S8("Produces"));
@@ -415,6 +455,7 @@ PanelDrawSelected(panel_cursor *Cursor)
   {
    b32 Hovered = false;
    PanelBeginRow(Cursor, false, &Hovered);
+   PanelTintRow(Cursor, IslandStatus_Ok);
    PanelSwatch(Cursor, 0.f, Product->Kind);
    PanelText(Cursor, Cursor->LineHeight, ProductNames[Product->Kind], Panel_ColorText);
    PanelTextRight(Cursor, W, Str8Fmt("+%llu", Product->Amount), Panel_ColorGood);
@@ -447,21 +488,26 @@ PanelDrawSelected(panel_cursor *Cursor)
     PanelBeginRow(Cursor, false, &Hovered);
    }
 
+   u32 NeedStatus = W3NeedStatus(App, SelectedIdx, Req->Kind);
+   u32 NeedColor = W3StatusColor(NeedStatus);
+   PanelTintRow(Cursor, NeedStatus);
    PanelSwatch(Cursor, 0.f, Req->Kind);
    PanelText(Cursor, Cursor->LineHeight, ProductNames[Req->Kind], Panel_ColorText);
-   PanelTextRight(Cursor, .46f*W, Str8Fmt("-%llu", Req->Amount), W3_ColorNeedPad);
+   PanelTextRight(Cursor, .46f*W, Str8Fmt("-%llu", Req->Amount), NeedColor);
    if(Supplier)
    {
     island_ad *Ad = &App->Broadcast.Known[SelectedIdx][SupplierIdx];
-    PanelText(Cursor, .51f*W, Supplier->Name, Panel_ColorText);
-    PanelTextRight(Cursor, W, Str8Fmt("%u hop%s", Ad->HopCount, (Ad->HopCount == 1) ? "" : "s"), Panel_ColorDim);
+    PanelText(Cursor, .51f*W, Supplier->Name, NeedColor);
+    str8 Right = (NeedStatus == IslandStatus_Short) ? S8("short") : Str8Fmt("%u hop%s", Ad->HopCount, (Ad->HopCount == 1) ? "" : "s");
+    PanelTextRight(Cursor, W, Right, (NeedStatus == IslandStatus_Short) ? NeedColor : Panel_ColorDim);
    }
    else
    {
-    PanelText(Cursor, .51f*W, S8("none known yet"), Panel_ColorShortage);
+    PanelText(Cursor, .51f*W, S8("waiting for news"), NeedColor);
    }
    PanelNewLine(Cursor);
   }
+  PanelNote(Cursor, S8("green ok, orange waiting, red short"));
   PanelNote(Cursor, S8("Click a supplier to open it."));
  }
 
@@ -476,7 +522,10 @@ PanelDrawSelected(panel_cursor *Cursor)
   {
    u32 NeighbourIdx = BroadcastIslandIndex(App, Link->Dest);
    PanelIslandRow(Cursor, NeighbourIdx);
-   PanelText(Cursor, 0.f, Link->Dest->Name, Panel_ColorText);
+   u32 NeighbourStatus = (NeighbourIdx < R3_MaxIslands) ? App->R3.IslandStatus[NeighbourIdx] : IslandStatus_Ok;
+   PanelTintRow(Cursor, NeighbourStatus);
+   PanelStatusDot(Cursor, 0.f, NeighbourStatus);
+   PanelText(Cursor, Panel_DotSpace, Link->Dest->Name, Panel_ColorText);
    PanelTextRight(Cursor, W, Str8Fmt("%d", Link->Cost), Graph_ColorCost);
    PanelNewLine(Cursor);
   }

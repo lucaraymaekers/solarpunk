@@ -134,6 +134,19 @@ W3KnowsSupplier(app_state *App, u32 IslandIdx, product_kind Kind)
  return Result;
 }
 
+// NOTE: The state of one need of an island, in the same colours as the island status:
+//   Waiting : no supplier heard of yet
+//   Short   : the whole world does not make enough of it
+//   Ok      : a supplier is known and there is enough
+internal u32
+W3NeedStatus(app_state *App, u32 IslandIdx, product_kind Kind)
+{
+ u32 Result = IslandStatus_Ok;
+ if(!W3KnowsSupplier(App, IslandIdx, Kind))                          Result = IslandStatus_Waiting;
+ else if(App->R3.TotalNeeded[Kind] > App->R3.TotalProduced[Kind])   Result = IslandStatus_Short;
+ return Result;
+}
+
 // NOTE: World totals per product, and each island's status:
 //   Waiting : it has not heard of a supplier for one of its needs yet
 //   Short   : it knows its suppliers, but needs a product the whole world does not

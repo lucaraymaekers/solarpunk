@@ -46,6 +46,10 @@ BroadcastButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label)
  return Result;
 }
 
+// NOTE: Defined in solarpunk_world3d.c (included later): status colours.
+internal u32 W3StatusColor(u32 Status);
+internal u32 W3NeedStatus(app_state *App, u32 IslandIdx, product_kind Kind);
+
 //~ Tooltip
 #define BroadcastView_HoverRadius 40.f
 
@@ -80,8 +84,17 @@ DrawIslandTooltip(app_state *App, app_input *Input)
   v4 Colors[32];
   s32 LineCount = 0;
 
+  // NOTE: Border in the island's status colour; each need in the colour of its own state.
+  u32 HoveredIdx = BroadcastIslandIndex(App, Hovered);
+  u32 Status = (HoveredIdx < R3_MaxIslands) ? App->R3.IslandStatus[HoveredIdx] : IslandStatus_Ok;
+  char *StatusLines[IslandStatus_Count] = {"ok", "waiting for news", "short"};
+  
   Lines[LineCount] = Hovered->Name;
   Colors[LineCount] = V4FromU32(Graph_ColorTitle);
+  LineCount += 1;
+  
+  Lines[LineCount] = S8FromCString(StatusLines[Status < IslandStatus_Count ? Status : 0]);
+  Colors[LineCount] = V4FromU32(W3StatusColor(Status));
   LineCount += 1;
 
   for(product *Product = Hovered->FirstProduct; Product && LineCount < (s32)ArrayCount(Lines); Product = Product->Next)
@@ -94,7 +107,7 @@ DrawIslandTooltip(app_state *App, app_input *Input)
   for(product *Req = Hovered->FirstRequirement; Req && LineCount < (s32)ArrayCount(Lines); Req = Req->Next)
   {
    Lines[LineCount] = Str8Fmt("- %.*s %llu", (s32)ProductNames[Req->Kind].Size, ProductNames[Req->Kind].Data, Req->Amount);
-   Colors[LineCount] = V4FromU32(Graph_ColorRequirement);
+   Colors[LineCount] = V4FromU32(W3StatusColor(W3NeedStatus(App, HoveredIdx, Req->Kind)));
    LineCount += 1;
   }
 
@@ -116,7 +129,7 @@ DrawIslandTooltip(app_state *App, app_input *Input)
   v2 Min = V2(MousePos.X + 16.f, MousePos.Y + 16.f);
   v4 Box = RectFromSize(Min, Size);
   DrawRect(Box, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
-  DrawRect(Box, V4FromU32(Graph_ColorCost), 6.f, 2.f, 0.f);
+  DrawRect(Box, V4FromU32(W3StatusColor(Status)), 6.f, 2.f, 0.f);
 
   v2 Cursor = V2(Min.X + BroadcastView_ButtonPadding, Min.Y + BroadcastView_ButtonPadding);
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)
