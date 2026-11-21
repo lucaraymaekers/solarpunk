@@ -189,11 +189,14 @@ FoodKindTotals(app_state *App, product_kind Kind)
  return Result;
 }
 
-internal str8
-FoodWastedText(app_state *App)
+// NOTE(L4): Food of one kind that goes bad, as units PER DAY (the unit of product Amounts),
+// averaged since round 1: units thrown away so far * rounds per day / rounds so far.
+// The 3D view subtracts it from what is made, so spoiled food counts as a shortage.
+internal u64
+FoodSpoiledPerDay(app_state *App, product_kind Kind)
 {
- food_counts All = FoodTotals(&App->Food, App->Broadcast.IslandCount);
- str8 Result = Str8Fmt("%llu food gone bad", All.Wasted);
+ u64 Round = Max(App->Broadcast.Round, 1);
+ food_counts Totals = FoodKindTotals(App, Kind);
+ u64 Result = (Totals.Wasted*(u64)Food_RoundsPerDay + Round/2)/Round;
  return Result;
 }
-

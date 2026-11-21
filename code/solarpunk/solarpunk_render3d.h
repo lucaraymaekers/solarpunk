@@ -94,6 +94,7 @@ struct r3_state
  u32 IslandStatus[R3_MaxIslands];
  u64 TotalProduced[ProductKind_Count];
  u64 TotalNeeded[ProductKind_Count];
+ u64 TotalSpoiled[ProductKind_Count];  // per day, made but gone bad (solarpunk_food_app.c)
 
  // 2D overlay. The help card blocks the rest of the UI and the 3D view while open;
  // it opens by itself on the first start.

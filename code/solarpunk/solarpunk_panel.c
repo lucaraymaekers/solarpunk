@@ -269,7 +269,7 @@ PanelDrawShortages(panel_cursor *Cursor)
  u32 OrderCount = 0;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  s64 Value = (s64)Produced[Kind] - (s64)Needed[Kind];
+  s64 Value = (s64)Produced[Kind] - (s64)Min(App->R3.TotalSpoiled[Kind], Produced[Kind]) - (s64)Needed[Kind];  // food gone bad does not count
   u32 At = OrderCount;
   while(At > 0 && Balance[Order[At - 1]] > Value)
   {
@@ -302,6 +302,7 @@ PanelDrawShortages(panel_cursor *Cursor)
   PanelTextRight(Cursor, W, BalanceText, (Balance[Kind] < 0) ? Panel_ColorShortage : Panel_ColorGood);
   PanelNewLine(Cursor);
  }
+ PanelNote(Cursor, S8("Balance = made - gone bad - needed, per day."));
 
  //- Islands that do not know a supplier for some of their needs yet
  u32 IslandCount = 0;

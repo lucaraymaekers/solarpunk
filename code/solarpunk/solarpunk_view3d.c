@@ -526,9 +526,9 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
  u32 ShortCount = 0;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  if(R3->TotalNeeded[Kind] > R3->TotalProduced[Kind])
+  if(W3IsShort(R3, Kind))
   {
-   s64 Missing = (s64)R3->TotalNeeded[Kind] - (s64)R3->TotalProduced[Kind];
+   s64 Missing = W3ShortBy(R3, Kind);
    str8 Name = ProductNames[Kind];
    Width += 2.f*V3D_ChipPadding + Dot + 6.f + UiMeasure(App, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing)) + Ui_Gap;
    ShortCount += 1;
@@ -539,9 +539,6 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
   Label = S8("No product is short worldwide");
   Width = UiMeasure(App, Label) + 2.f*Ui_Pad + Dot + 6.f;
  }
- // Food that went bad so far (solarpunk_food_app.c), shown at the end of the strip.
- str8 Wasted = FoodWastedText(App);
- Width += Ui_Gap + UiMeasure(App, Wasted);
  Width += Ui_Pad - Ui_Gap;
 
  v4 Box = RectFromSize(Origin, V2(Width, ButtonHeight + 2.f*6.f));
@@ -553,7 +550,6 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
  {
   UiDot(V2(Cursor.X, Cursor.Y + .5f*(ButtonHeight - Dot)), Dot, W3_ColorStatusOk);
   UiText(App, V2(Cursor.X + Dot + 6.f, Cursor.Y + Ui_ButtonPadY), Label, Ui_ColorOkText);
-  UiText(App, V2(Box.Max.X - Ui_Pad - UiMeasure(App, Wasted), Cursor.Y + Ui_ButtonPadY), Wasted, Ui_ColorShortText);
   return;
  }
 
@@ -561,21 +557,19 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
  Cursor.X += UiMeasure(App, Label) + Ui_Gap;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  if(R3->TotalNeeded[Kind] > R3->TotalProduced[Kind])
+  if(W3IsShort(R3, Kind))
   {
-   s64 Missing = (s64)R3->TotalNeeded[Kind] - (s64)R3->TotalProduced[Kind];
+   s64 Missing = W3ShortBy(R3, Kind);
    str8 Name = ProductNames[Kind];
    s32 Which = R3_SummaryProductBase + (s32)Kind;
    v2 ChipPos = Cursor;
    if(V3Chip(App, Input, &Cursor, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing), W3ProductColors[Kind], true,
-             Ui_ColorShortText, (R3->SummaryOpen == Which), "More is needed than made. Click to see who needs and makes it"))
+             Ui_ColorShortText, (R3->SummaryOpen == Which), "More is needed than made (food gone bad does not count). Click to see who needs and makes it"))
    {
     V3ToggleSummary(R3, Which, V2(ChipPos.X, Box.Max.Y + Ui_Gap));
    }
   }
  }
- UiText(App, V2(Box.Max.X - Ui_Pad - UiMeasure(App, Wasted), Cursor.Y + Ui_ButtonPadY), Wasted, Ui_ColorShortText);
- 
  // The chips open dropdowns too, so clicks here must not close them.
  R3->SummaryBarRect.Max.Y = Box.Max.Y;
  R3->ShortStripRect = Box;
@@ -864,7 +858,15 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
  if(IsProduct)
  {
   str8 Name = ProductNames[Kind];
-  Title = Str8Fmt("%.*s: %llu needed, %llu made", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+  if(R3->TotalSpoiled[Kind] > 0)
+  {
+   Title = Str8Fmt("%.*s: %llu needed, %llu made, %llu go bad", (s32)Name.Size, Name.Data,
+                   R3->TotalNeeded[Kind], R3->TotalProduced[Kind], Min(R3->TotalSpoiled[Kind], R3->TotalProduced[Kind]));
+  }
+  else
+  {
+   Title = Str8Fmt("%.*s: %llu needed, %llu made", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+  }
   food_counts Food = FoodKindTotals(App, Kind);
   FoodLine = Str8Fmt("So far: %llu gone bad, %llu missing", Food.Wasted, Food.Shortage);
  }
@@ -938,7 +940,7 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
    for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
    {
     b32 Show = (Status == IslandStatus_Waiting) ? !W3KnowsSupplier(App, IslandIdx, Req->Kind)
-     : (R3->TotalNeeded[Req->Kind] > R3->TotalProduced[Req->Kind]);
+     : W3IsShort(R3, Req->Kind);
     if(Show)
     {
      X -= LineHeight;

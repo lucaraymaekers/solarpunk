@@ -126,16 +126,39 @@ W3KnowsSupplier(app_state *App, u32 IslandIdx, product_kind Kind)
  return Result;
 }
 
+// NOTE: Food that goes bad before anyone eats it does not count as made: what is left
+// is the usable amount, and a product is short worldwide when more is needed than that.
+internal u64
+W3UsableMade(r3_state *R3, u32 Kind)
+{
+ u64 Result = R3->TotalProduced[Kind] - Min(R3->TotalSpoiled[Kind], R3->TotalProduced[Kind]);
+ return Result;
+}
+
+internal b32
+W3IsShort(r3_state *R3, u32 Kind)
+{
+ b32 Result = (R3->TotalNeeded[Kind] > W3UsableMade(R3, Kind));
+ return Result;
+}
+
+internal s64
+W3ShortBy(r3_state *R3, u32 Kind)
+{
+ s64 Result = (s64)R3->TotalNeeded[Kind] - (s64)W3UsableMade(R3, Kind);
+ return Result;
+}
+
 // NOTE: The state of one need of an island, in the same colours as the island status:
 //   Waiting : no supplier heard of yet
-//   Short   : the whole world does not make enough of it
+//   Short   : the whole world does not make enough of it (food gone bad does not count)
 //   Ok      : a supplier is known and there is enough
 internal u32
 W3NeedStatus(app_state *App, u32 IslandIdx, product_kind Kind)
 {
  u32 Result = IslandStatus_Ok;
  if(!W3KnowsSupplier(App, IslandIdx, Kind))                          Result = IslandStatus_Waiting;
- else if(App->R3.TotalNeeded[Kind] > App->R3.TotalProduced[Kind])   Result = IslandStatus_Short;
+ else if(W3IsShort(&App->R3, Kind))                                 Result = IslandStatus_Short;
  return Result;
 }
 
@@ -156,6 +179,10 @@ W3ComputeStatus(app_state *App)
   for(product *Product = Island->FirstProduct; Product; Product = Product->Next) R3->TotalProduced[Product->Kind] += Product->Amount;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) R3->TotalNeeded[Req->Kind] += Req->Amount;
  }
+ for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
+ {
+  R3->TotalSpoiled[Kind] = FoodSpoiledPerDay(App, (product_kind)Kind);
+ }
 
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3_MaxIslands; Island = Island->Next)
@@ -164,7 +191,7 @@ W3ComputeStatus(app_state *App)
   b32 AnyWaiting = false;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
   {
-   if(R3->TotalNeeded[Req->Kind] > R3->TotalProduced[Req->Kind]) AnyShort = true;
+   if(W3IsShort(R3, Req->Kind)) AnyShort = true;
    if(!W3KnowsSupplier(App, Index, Req->Kind)) AnyWaiting = true;
   }
   R3->IslandStatus[Index] = (AnyWaiting ? IslandStatus_Waiting : (AnyShort ? IslandStatus_Short : IslandStatus_Ok));
