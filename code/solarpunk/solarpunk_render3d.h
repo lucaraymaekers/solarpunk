@@ -5,7 +5,7 @@
 
 //~ Constants
 #define R3_MaxIslands 64
-#define R3_MaxUIRects 12
+#define R3_MaxUIRects 20
 #define R3_SummaryProductBase 100
 
 // NOTE: How an island is doing, shown as the colour of its ring and label dot.
@@ -53,6 +53,9 @@ struct r3_camera
  v3 Target;
  b32 Rotating;   // middle mouse button held
  b32 Panning;    // right mouse button held
+ b32 Flying;     // moving smoothly to FlyTarget / FlyDistance
+ v3 FlyTarget;
+ f32 FlyDistance;
  v2 LastMousePos;
 };
 
@@ -95,6 +98,9 @@ struct r3_state
  b32 ShowLegend;
  b32 ShowControls;
 
+ // Cluster whose island names are shown (0 = none, only the cluster names).
+ s32 FocusedClusterPlusOne;
+ 
  // Summary bar dropdown: 0 = closed, 1 + island_status = islands with that status,
  // R3_SummaryProductBase + product kind = islands that need/produce that product.
  s32 SummaryOpen;

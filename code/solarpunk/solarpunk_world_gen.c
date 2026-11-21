@@ -26,6 +26,13 @@ global_variable v2 WorldGenClusterCenters[WorldGen_ClusterCount] =
  {.22f, .27f}, {.76f, .24f}, {.26f, .76f}, {.78f, .73f},
 };
 
+// NOTE: Cluster names, in the same order as the centres (top left, top right,
+// bottom left, bottom right).
+global_variable char *WorldGenClusterNames[WorldGen_ClusterCount] =
+{
+ "Verdant Reach", "Sunward Isles", "Driftwood Shoals", "Ember Archipelago",
+};
+
 // NOTE: Bridges between clusters, as pairs of cluster indices. They form a ring.
 global_variable u32 WorldGenBridges[][2] =
 {
@@ -45,6 +52,22 @@ global_variable char *WorldGenNames[] =
 };
 
 //~ Helpers
+// NOTE: Which cluster an island belongs to. Cluster C owns the islands with index in
+// [IslandCount*C/ClusterCount, IslandCount*(C + 1)/ClusterCount), as built below.
+internal u32
+WorldGenClusterOf(u32 IslandIdx, u32 IslandCount)
+{
+ u32 Result = 0;
+ for(u32 Cluster = 0; Cluster < WorldGen_ClusterCount; Cluster += 1)
+ {
+  if(IslandIdx >= (IslandCount*Cluster)/WorldGen_ClusterCount)
+  {
+   Result = Cluster;
+  }
+ }
+ return Result;
+}
+
 internal u32
 WorldGenRandomInt(random_series *Series, u32 Min, u32 Max)
 {

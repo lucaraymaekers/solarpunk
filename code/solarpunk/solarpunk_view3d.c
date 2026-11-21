@@ -19,6 +19,8 @@
 #define V3D_ColorLabelBg     0xE02E3440
 #define V3D_ColorLabelBorder 0xFF88C0D0
 #define V3D_ColorChip        0xE62E3440
+#define V3D_ColorChipHot     0xE64C566A
+#define V3D_ColorChipOpen    0xE65E81AC
 
 //~ UI areas
 internal void
@@ -52,6 +54,148 @@ V3StatusDot(v2 Pos, f32 Size, u32 Color)
  DrawRect(RectFromSize(Pos, V2(Size, Size)), V4FromU32(Color), .5f*Size, 0.f, 0.f);
 }
 
+//~ Clusters
+// NOTE: Generated worlds are made of clusters; the small hand-made world is not.
+internal u32
+V3ClusterCount(app_state *App)
+{
+ u32 Result = App->HasMapLayout ? WorldGen_ClusterCount : 0;
+ return Result;
+}
+
+#define V3D_ClusterFocusDistance 40.f
+#define V3D_ClusterLabelHeight   7.f
+
+// NOTE: Show one cluster's island names and fly the camera to it; again to go back.
+internal void
+V3FocusCluster(app_state *App, s32 ClusterPlusOne)
+{
+ r3_state *R3 = &App->R3;
+ if(ClusterPlusOne == 0 || R3->FocusedClusterPlusOne == ClusterPlusOne)
+ {
+  R3->FocusedClusterPlusOne = 0;
+  R3CameraFlyTo(&R3->Camera, V3(0.f, -2.f, 0.f), R3_CameraDefaultDistance);
+ }
+ else
+ {
+  R3->FocusedClusterPlusOne = ClusterPlusOne;
+
+  v3 Sum = V3(0.f, 0.f, 0.f);
+  u32 Count = 0;
+  for(u32 Idx = 0; Idx < R3->IslandCount; Idx += 1)
+  {
+   if(WorldGenClusterOf(Idx, R3->IslandCount) == (u32)(ClusterPlusOne - 1))
+   {
+    Sum = R3Add(Sum, R3->IslandTop[Idx]);
+    Count += 1;
+   }
+  }
+  if(Count)
+  {
+   v3 Center = R3Scale(Sum, 1.f/(f32)Count);
+   R3CameraFlyTo(&R3->Camera, V3(Center.X, Center.Y - 2.f, Center.Z), V3D_ClusterFocusDistance);
+  }
+ }
+}
+
+// NOTE: One clickable name per cluster, floating above it, with how many of its
+// islands are ok / waiting / short. Clicking it shows that cluster's island names.
+internal void
+V3DrawClusterLabels(app_state *App, app_input *Input)
+{
+ r3_state *R3 = &App->R3;
+ font_atlas *Atlas = &App->FontAtlas;
+ font *Font = &App->Font;
+ f32 LineHeight = Font->HeightPx;
+ f32 Dot = LineHeight - 10.f;
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ u32 ClusterCount = V3ClusterCount(App);
+ v4 Taken[R3_MaxUIRects];
+ u32 TakenCount = R3->UIRectCount;
+ for(u32 Idx = 0; Idx < TakenCount; Idx += 1) Taken[Idx] = R3->UIRects[Idx];
+
+ for(u32 Cluster = 0; Cluster < ClusterCount; Cluster += 1)
+ {
+  //- Where: above the middle of its islands
+  v3 Sum = V3(0.f, 0.f, 0.f);
+  f32 HighestTop = -1e30f;
+  u32 Counts[IslandStatus_Count] = {0};
+  u32 Count = 0;
+  for(u32 Idx = 0; Idx < R3->IslandCount; Idx += 1)
+  {
+   if(WorldGenClusterOf(Idx, R3->IslandCount) == Cluster)
+   {
+    Sum = R3Add(Sum, R3->IslandTop[Idx]);
+    HighestTop = Max(HighestTop, R3->IslandTop[Idx].Y);
+    if(R3->IslandStatus[Idx] < IslandStatus_Count) Counts[R3->IslandStatus[Idx]] += 1;
+    Count += 1;
+   }
+  }
+  if(Count == 0) continue;
+
+  v3 Center = R3Scale(Sum, 1.f/(f32)Count);
+  v2 Screen;
+  if(!R3ProjectToScreen(R3, V3(Center.X, HighestTop + V3D_ClusterLabelHeight, Center.Z), &Screen)) continue;
+
+  //- Size: name, then a dot and a number per status that has islands
+  str8 Name = S8FromCString(WorldGenClusterNames[Cluster]);
+  f32 Width = V3Measure(App, Name) + 2.f*V3D_ChipPadding;
+  for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
+  {
+   if(Counts[Status]) Width += 10.f + Dot + 4.f + V3Measure(App, Str8Fmt("%u", Counts[Status]));
+  }
+  f32 Height = LineHeight + BroadcastView_ButtonPadding + 4.f;
+  v4 Box = RectFromSize(V2(FloorF32(Screen.X - .5f*Width), FloorF32(Screen.Y - Height)), V2(Width, Height));
+
+  // Not on top of the panel or the controls: slide it left of what covers it (the
+  // panel is on the right), so every cluster stays clickable.
+  for(u32 Try = 0; Try < 3; Try += 1)
+  {
+   for(u32 Idx = 0; Idx < TakenCount; Idx += 1)
+   {
+    if(V3RectsOverlap(Box, Taken[Idx]))
+    {
+     f32 Shift = (Box.Max.X - Taken[Idx].Min.X) + 8.f;
+     Box.Min.X -= Shift;
+     Box.Max.X -= Shift;
+    }
+   }
+  }
+  b32 Covered = (Box.Min.X < 0.f);
+  for(u32 Idx = 0; Idx < TakenCount && !Covered; Idx += 1) Covered = V3RectsOverlap(Box, Taken[Idx]);
+  if(Covered) continue;
+
+  //- Draw and click
+  b32 Focused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
+  b32 Hot = IsInsideRectV2(MousePos, Box) && !IsInsideRectV2(MousePos, R3->PopupRect);
+  u32 Background = Focused ? V3D_ColorChipOpen : (Hot ? V3D_ColorChipHot : V3D_ColorChip);
+  DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, 0.f);
+  DrawRect(Box, V4FromU32(Focused ? W3_ColorSelected : V3D_ColorLabelBorder), .5f*Height, Focused ? 2.f : 1.f, 0.f);
+
+  f32 X = Box.Min.X + V3D_ChipPadding;
+  f32 TextY = Box.Min.Y + .5f*(Height - LineHeight);
+  GraphDrawText(Atlas, Font, V2(X, TextY), Name, V4FromU32(Graph_ColorTitle));
+  X += V3Measure(App, Name) + 10.f;
+  for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
+  {
+   if(Counts[Status])
+   {
+    V3StatusDot(V2(X, Box.Min.Y + .5f*(Height - Dot)), Dot, W3StatusColor(Status));
+    X += Dot + 4.f;
+    str8 Number = Str8Fmt("%u", Counts[Status]);
+    GraphDrawText(Atlas, Font, V2(X, TextY), Number, V4FromU32(Focused ? Graph_ColorTitle : W3StatusColor(Status)));
+    X += V3Measure(App, Number) + 10.f;
+   }
+  }
+
+  V3AddUIRect(R3, Box);
+  if(Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]))
+  {
+   V3FocusCluster(App, (s32)Cluster + 1);
+  }
+ }
+}
+
 //~ Labels
 // NOTE: One line per island: a status dot and the name. Placed nearest-island first
 // (hovered and selected islands first); a label that would overlap the UI or another
@@ -75,11 +219,20 @@ V3DrawIslandLabels(app_state *App)
   for(island *Island = App->FirstIsland; Island && Index < R3->IslandCount; Island = Island->Next)
   {
    Islands[Index] = Island;
-   if(R3->IslandVisible[Index])
+
+   // NOTE: With clusters, only the focused cluster shows its island names; any other
+   // island only gets a label while it is hovered (e.g. a supplier row) or opened.
+   b32 Hovered = (R3->HoveredIdx == (s32)Index);
+   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
+   b32 InFocus = (V3ClusterCount(App) == 0 ||
+                  (R3->FocusedClusterPlusOne > 0 &&
+                   WorldGenClusterOf(Index, R3->IslandCount) == (u32)(R3->FocusedClusterPlusOne - 1)));
+
+   if(R3->IslandVisible[Index] && (InFocus || Hovered || Selected))
    {
     f32 Key = R3Length(R3Sub(R3->IslandTop[Index], R3->Eye));
-    if(R3->HoveredIdx == (s32)Index)                        Key = -2.f;
-    else if(App->Panel.SelectedPlusOne == (s32)Index + 1)    Key = -1.f;
+    if(Hovered)       Key = -2.f;
+    else if(Selected) Key = -1.f;
 
     // Insertion sort, there are only a few dozen islands.
     u32 At = Count;
@@ -188,8 +341,6 @@ V3DrawHoveredCableCosts(app_state *App)
 internal void PanelSelect(app_state *App, s32 IslandIdx);
 
 #define V3D_PopupWidth     360.f
-#define V3D_ColorChipHot   0xE64C566A
-#define V3D_ColorChipOpen  0xE65E81AC
 #define V3D_ColorPopupBg   0xF02E3440
 #define V3D_ColorRowHover  0xFF4C566A
 #define V3D_ColorSection   0xFFEBCB8B
@@ -222,7 +373,7 @@ V3Chip(app_state *App, app_input *Input, v2 *Cursor, str8 Text, u32 DotColor, b3
  GraphDrawText(&App->FontAtlas, Font, V2(Box.Min.X + V3D_ChipPadding + DotSpace, Box.Min.Y + .5f*BroadcastView_ButtonPadding),
                Text, V4FromU32(Open ? Graph_ColorTitle : TextColor));
  Cursor->X += Width + BroadcastView_ButtonGap;
- 
+
  b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
  return Result;
 }
@@ -521,7 +672,24 @@ V3DrawCameraControls(app_state *App, app_input *Input, v2 BufferDim)
  V3AddUIRect(&App->R3, RectFromSize(Cursor, V2(TotalWidth, Height)));
  if(BroadcastButton(App, Input, &Cursor, Labels[0])) R3CameraZoom(Camera, 1.f/R3_CameraZoomStep);
  if(BroadcastButton(App, Input, &Cursor, Labels[1])) R3CameraZoom(Camera, R3_CameraZoomStep);
- if(BroadcastButton(App, Input, &Cursor, Labels[2])) R3CameraReset(Camera);
+ if(BroadcastButton(App, Input, &Cursor, Labels[2]))
+ {
+  R3CameraReset(Camera);
+  App->R3.FocusedClusterPlusOne = 0;
+ }
+
+ // While a cluster is open: a button to go back to all clusters, under the others.
+ if(App->R3.FocusedClusterPlusOne)
+ {
+  str8 Back = S8("All clusters");
+  f32 BackWidth = V3Measure(App, Back) + 2.f*BroadcastView_ButtonPadding;
+  v2 BackCursor = V2(BufferDim.X - V3D_Margin - BackWidth - BroadcastView_ButtonGap, V3D_Margin + Height + BroadcastView_ButtonGap);
+  V3AddUIRect(&App->R3, RectFromSize(BackCursor, V2(BackWidth, Height)));
+  if(BroadcastButton(App, Input, &BackCursor, Back))
+  {
+   V3FocusCluster(App, 0);
+  }
+ }
 }
 
 //~ Legend (opened with the "Legend" button)
@@ -678,5 +846,6 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
  V3DrawCameraControls(App, Input, BufferDim);
  V3DrawHelpButtons(App, Input, BufferDim);
 
+ V3DrawClusterLabels(App, Input);
  V3DrawIslandLabels(App);
 }
