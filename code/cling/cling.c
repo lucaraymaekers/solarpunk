@@ -13,6 +13,8 @@
 #include "base/base.h"
 #include "base/base.c"
 
+#include <stdlib.h> // exit()
+
 NO_WARNINGS_BEGIN
 #include "lib/metadesk/md.h"
 #include "lib/metadesk/md.c"
@@ -754,6 +756,14 @@ BASE_ENTRY_POINT()
    Log("Done.\n");
   }
  }
- 
+
+ if(Cng_AnyBuildFailed)
+ {
+  Log("Build FAILED.\n");
+  // NOTE: base's ThreadInitEntryPoint discards EntryPoint's return value, so exit
+  // explicitly to give build.sh / build.bat (and CI) a non-zero exit code.
+  exit(1);
+ }
+
  return 0;
 }
