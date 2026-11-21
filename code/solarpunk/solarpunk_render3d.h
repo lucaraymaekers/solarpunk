@@ -39,7 +39,8 @@ struct r3_camera
  f32 Pitch;      // radians above the horizon
  f32 Distance;   // from the target
  v3 Target;
- b32 Dragging;
+ b32 Rotating;   // middle mouse button held
+ b32 Panning;    // right mouse button held
  v2 LastMousePos;
 };
 
@@ -68,7 +69,7 @@ struct r3_state
  f32 IslandRadius[R3_MaxIslands];
  v2 IslandScreen[R3_MaxIslands];   // label anchor in window pixels
  b32 IslandVisible[R3_MaxIslands]; // false when behind the camera
- 
+
  // Island under the mouse, found by its projected position. -1 = none.
  s32 HoveredIdx;
 };

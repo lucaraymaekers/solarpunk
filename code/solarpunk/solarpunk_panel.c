@@ -1,19 +1,27 @@
 //-
-// SolarPunk islands panel (right side): totals per product, every island with its
-// needs, and the details of one selected island (production, needs with the suppliers
-// it knows about, network). Select an island by clicking it in 3D or in the list.
+// SolarPunk islands panel (right side), with three tabs:
+//   Shortages : products that are short overall, and islands that do not yet know
+//               a supplier for one of their needs
+//   Islands   : one table row per island (needs, knows N/M); click a row to open it
+//   Selected  : everything about one island (production, needs with the nearest
+//               known supplier, network)
+// Select an island by clicking it in 3D or a row in a table.
 //-
 
 //~ Constants
-#define Panel_Width        420.f
+#define Panel_Width        440.f
 #define Panel_Top          92.f
 #define Panel_Margin       12.f
 #define Panel_Pad          10.f
 #define Panel_ScrollStep   160.f
-#define Panel_MaxSuppliers 3
+#define Panel_WheelStep    60.f
 
 #define Panel_ColorBg        0xF02E3440
-#define Panel_ColorRowHover  0xFF434C5E
+#define Panel_ColorRowAlt    0xFF353C4A
+#define Panel_ColorRowHover  0xFF4C566A
+#define Panel_ColorTab       0xFF3B4252
+#define Panel_ColorTabActive 0xFF5E81AC
+#define Panel_ColorLine      0xFF4C566A
 #define Panel_ColorSection   0xFFEBCB8B
 #define Panel_ColorText      0xFFECEFF4
 #define Panel_ColorDim       0xFF9AA3B5
@@ -42,58 +50,9 @@ internal void
 PanelSelect(app_state *App, s32 IslandIdx)
 {
  App->Panel.SelectedPlusOne = IslandIdx + 1;
+ App->Panel.Tab = PanelTab_Selected;
  App->Panel.Scroll = 0.f;
  App->Panel.Hidden = false;
-}
-
-// NOTE: Text helpers; Y is the top of the line and is advanced by one line.
-typedef struct panel_cursor panel_cursor;
-struct panel_cursor
-{
- app_state *App;
- app_input *Input;
- v4 Content;     // visible content area (clipped)
- f32 X;
- f32 Y;
- f32 Width;
- f32 LineHeight;
-};
-
-internal void
-PanelText(panel_cursor *Cursor, f32 Indent, str8 Text, u32 Color)
-{
- GraphDrawText(&Cursor->App->FontAtlas, &Cursor->App->Font, V2(Cursor->X + Indent, Cursor->Y), Text, V4FromU32(Color));
-}
-
-internal void
-PanelSwatch(panel_cursor *Cursor, f32 Indent, product_kind Kind)
-{
- f32 Size = Cursor->LineHeight - 6.f;
- DrawRect(RectFromSize(V2(Cursor->X + Indent, Cursor->Y + 3.f), V2(Size, Size)),
-          V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
-}
-
-internal void
-PanelSection(panel_cursor *Cursor, str8 Title)
-{
- Cursor->Y += .4f*Cursor->LineHeight;
- PanelText(Cursor, 0.f, Title, Panel_ColorSection);
- Cursor->Y += Cursor->LineHeight;
-}
-
-// NOTE: A full-width row that highlights on hover; returns true when clicked.
-internal b32
-PanelRow(panel_cursor *Cursor, b32 *Hovered)
-{
- v4 Row = RectFromSize(V2(Cursor->X - 4.f, Cursor->Y), V2(Cursor->Width + 8.f, Cursor->LineHeight));
- v2 MousePos = V2V2S32(Cursor->Input->Mouse.Pos);
- *Hovered = (IsInsideRectV2(MousePos, Row) && IsInsideRectV2(MousePos, Cursor->Content));
- if(*Hovered)
- {
-  DrawRect(Row, V4FromU32(Panel_ColorRowHover), 4.f, 0.f, 0.f);
- }
- b32 Result = (*Hovered && WasPressed(Cursor->Input->Mouse.Buttons[PlatformMouseButton_Left]));
- return Result;
 }
 
 internal f32
@@ -103,184 +62,447 @@ PanelMeasure(app_state *App, str8 Text)
  return Result;
 }
 
-//~ Overview of all islands
+// NOTE: Draws rows top to bottom; Y is the top of the current line.
+typedef struct panel_cursor panel_cursor;
+struct panel_cursor
+{
+ app_state *App;
+ app_input *Input;
+ v4 Content;      // visible content area (clipped)
+ f32 X;
+ f32 Y;
+ f32 Width;
+ f32 LineHeight;
+ u32 RowIndex;    // for alternating row colours
+};
+
 internal void
-PanelDrawOverview(panel_cursor *Cursor)
+PanelText(panel_cursor *Cursor, f32 Column, str8 Text, u32 Color)
+{
+ GraphDrawText(&Cursor->App->FontAtlas, &Cursor->App->Font, V2(Cursor->X + Column, Cursor->Y), Text, V4FromU32(Color));
+}
+
+internal void
+PanelTextRight(panel_cursor *Cursor, f32 RightEdge, str8 Text, u32 Color)
+{
+ PanelText(Cursor, RightEdge - PanelMeasure(Cursor->App, Text), Text, Color);
+}
+
+internal void
+PanelSwatch(panel_cursor *Cursor, f32 Column, product_kind Kind)
+{
+ f32 Size = Cursor->LineHeight - 6.f;
+ DrawRect(RectFromSize(V2(Cursor->X + Column, Cursor->Y + 3.f), V2(Size, Size)),
+          V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+}
+
+internal void
+PanelNewLine(panel_cursor *Cursor)
+{
+ Cursor->Y += Cursor->LineHeight;
+}
+
+// NOTE: Section title with a thin line under it. Resets the alternating rows.
+internal void
+PanelSection(panel_cursor *Cursor, str8 Title)
+{
+ Cursor->Y += .5f*Cursor->LineHeight;
+ PanelText(Cursor, 0.f, Title, Panel_ColorSection);
+ PanelNewLine(Cursor);
+ DrawRect(RectFromSize(V2(Cursor->X, Cursor->Y), V2(Cursor->Width, 1.f)), V4FromU32(Panel_ColorLine), 0.f, 0.f, 0.f);
+ Cursor->Y += 3.f;
+ Cursor->RowIndex = 0;
+}
+
+internal void
+PanelNote(panel_cursor *Cursor, str8 Text)
+{
+ PanelText(Cursor, 0.f, Text, Panel_ColorDim);
+ PanelNewLine(Cursor);
+}
+
+// NOTE: Column titles of a table.
+typedef struct panel_column panel_column;
+struct panel_column
+{
+ char *Title;
+ f32 X;          // left edge, or right edge when RightAligned
+ b32 RightAligned;
+};
+
+// NOTE: Built with a function instead of an initializer list: MSVC warns (C4204)
+// about aggregate initializers that are not constants.
+internal panel_column
+PanelColumn(char *Title, f32 X, b32 RightAligned)
+{
+ panel_column Result = {0};
+ Result.Title = Title;
+ Result.X = X;
+ Result.RightAligned = RightAligned;
+ return Result;
+}
+
+internal void
+PanelTableHeader(panel_cursor *Cursor, panel_column *Columns, u32 ColumnCount)
+{
+ for(u32 Idx = 0; Idx < ColumnCount; Idx += 1)
+ {
+  str8 Title = S8FromCString(Columns[Idx].Title);
+  if(Columns[Idx].RightAligned) PanelTextRight(Cursor, Columns[Idx].X, Title, Panel_ColorDim);
+  else                          PanelText(Cursor, Columns[Idx].X, Title, Panel_ColorDim);
+ }
+ PanelNewLine(Cursor);
+ Cursor->RowIndex = 0;
+}
+
+// NOTE: Starts a table row: alternating background, hover highlight. Returns true
+// when the row is clicked. Pass Clickable = false for rows that do nothing.
+internal b32
+PanelBeginRow(panel_cursor *Cursor, b32 Clickable, b32 *Hovered)
+{
+ v4 Row = RectFromSize(V2(Cursor->X - 4.f, Cursor->Y), V2(Cursor->Width + 8.f, Cursor->LineHeight));
+ v2 MousePos = V2V2S32(Cursor->Input->Mouse.Pos);
+ *Hovered = (Clickable && IsInsideRectV2(MousePos, Row) && IsInsideRectV2(MousePos, Cursor->Content));
+
+ if(*Hovered)
+ {
+  DrawRect(Row, V4FromU32(Panel_ColorRowHover), 3.f, 0.f, 0.f);
+ }
+ else if(Cursor->RowIndex & 1)
+ {
+  DrawRect(Row, V4FromU32(Panel_ColorRowAlt), 3.f, 0.f, 0.f);
+ }
+ Cursor->RowIndex += 1;
+
+ b32 Result = (*Hovered && WasPressed(Cursor->Input->Mouse.Buttons[PlatformMouseButton_Left]));
+ return Result;
+}
+
+// NOTE: A clickable row that opens an island.
+internal void
+PanelIslandRow(panel_cursor *Cursor, u32 IslandIdx)
+{
+ b32 Hovered = false;
+ if(PanelBeginRow(Cursor, true, &Hovered))
+ {
+  PanelSelect(Cursor->App, (s32)IslandIdx);
+ }
+ if(Hovered)
+ {
+  Cursor->App->Panel.RowHoverPlusOne = (s32)IslandIdx + 1;
+ }
+}
+
+// NOTE: Index of the closest island this island has heard of that produces Kind.
+// Returns false when it knows of none yet.
+internal b32
+PanelNearestSupplier(app_state *App, u32 IslandIdx, product_kind Kind, u32 *SupplierIdx, u32 *SupplierCount)
+{
+ broadcast_state *Broadcast = &App->Broadcast;
+ b32 Result = false;
+ u32 Count = 0;
+ u32 BestHops = 0;
+ if(IslandIdx < Broadcast->IslandCount)
+ {
+  for(u32 Origin = 0; Origin < Broadcast->IslandCount; Origin += 1)
+  {
+   island_ad *Ad = &Broadcast->Known[IslandIdx][Origin];
+   if(Origin != IslandIdx && Ad->Valid && Ad->Produces[Kind] > 0)
+   {
+    if(!Result || Ad->HopCount < BestHops)
+    {
+     BestHops = Ad->HopCount;
+     *SupplierIdx = Origin;
+    }
+    Result = true;
+    Count += 1;
+   }
+  }
+ }
+ *SupplierCount = Count;
+ return Result;
+}
+
+//~ Tab: Shortages
+internal void
+PanelDrawShortages(panel_cursor *Cursor)
 {
  app_state *App = Cursor->App;
+ f32 W = Cursor->Width;
 
- //- Totals per product: produced vs needed over all islands
+ //- Products, most short first
  u64 Produced[ProductKind_Count] = {0};
  u64 Needed[ProductKind_Count] = {0};
- u32 IslandCount = 0;
  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
  {
   for(product *Product = Island->FirstProduct; Product; Product = Product->Next) Produced[Product->Kind] += Product->Amount;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) Needed[Req->Kind] += Req->Amount;
-  IslandCount += 1;
  }
 
- PanelSection(Cursor, S8("Totals: produced / needed"));
+ u32 Order[ProductKind_Count];
+ s64 Balance[ProductKind_Count];
+ u32 OrderCount = 0;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
+  s64 Value = (s64)Produced[Kind] - (s64)Needed[Kind];
+  u32 At = OrderCount;
+  while(At > 0 && Balance[Order[At - 1]] > Value)
+  {
+   Order[At] = Order[At - 1];
+   At -= 1;
+  }
+  Order[At] = Kind;
+  Balance[Kind] = Value;
+  OrderCount += 1;
+ }
+
+ PanelSection(Cursor, S8("Products, whole world"));
+ panel_column Columns[4];
+ Columns[0] = PanelColumn("Product", 0.f, false);
+ Columns[1] = PanelColumn("Produced", .64f*W, true);
+ Columns[2] = PanelColumn("Needed", .82f*W, true);
+ Columns[3] = PanelColumn("Balance", W, true);
+ PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
+ for(u32 Idx = 0; Idx < OrderCount; Idx += 1)
+ {
+  u32 Kind = Order[Idx];
+  b32 Hovered = false;
+  PanelBeginRow(Cursor, false, &Hovered);
   PanelSwatch(Cursor, 0.f, (product_kind)Kind);
   PanelText(Cursor, Cursor->LineHeight, ProductNames[Kind], Panel_ColorText);
-  str8 Numbers = Str8Fmt("%llu / %llu", Produced[Kind], Needed[Kind]);
-  u32 Color = (Needed[Kind] > Produced[Kind]) ? Panel_ColorShortage : Panel_ColorGood;
-  PanelText(Cursor, Cursor->Width - PanelMeasure(App, Numbers), Numbers, Color);
-  Cursor->Y += Cursor->LineHeight;
+  PanelTextRight(Cursor, .64f*W, Str8Fmt("%llu", Produced[Kind]), Panel_ColorText);
+  PanelTextRight(Cursor, .82f*W, Str8Fmt("%llu", Needed[Kind]), Panel_ColorText);
+  str8 BalanceText = (Balance[Kind] < 0) ? Str8Fmt("%lld", Balance[Kind]) : Str8Fmt("+%lld", Balance[Kind]);
+  PanelTextRight(Cursor, W, BalanceText, (Balance[Kind] < 0) ? Panel_ColorShortage : Panel_ColorGood);
+  PanelNewLine(Cursor);
  }
- PanelText(Cursor, 0.f, S8("red = more needed than produced"), Panel_ColorDim);
- Cursor->Y += Cursor->LineHeight;
 
- //- Every island with its needs
- PanelSection(Cursor, Str8Fmt("%u islands and their needs (click one)", IslandCount));
+ //- Islands that do not know a supplier for some of their needs yet
+ u32 IslandCount = 0;
+ u32 WaitingCount = 0;
+ {
+  u32 Index = 0;
+  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
+  {
+   b32 Waiting = false;
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
+   {
+    u32 Supplier, Count;
+    if(!PanelNearestSupplier(App, Index, Req->Kind, &Supplier, &Count)) Waiting = true;
+   }
+   if(Waiting) WaitingCount += 1;
+   IslandCount += 1;
+   Index += 1;
+  }
+ }
+
+ PanelSection(Cursor, Str8Fmt("Waiting for a supplier: %u of %u islands", WaitingCount, IslandCount));
+ if(WaitingCount == 0)
+ {
+  PanelNote(Cursor, S8("Every island knows where to get what it needs."));
+ }
+ else
+ {
+  panel_column WaitColumns[2];
+  WaitColumns[0] = PanelColumn("Island", 0.f, false);
+  WaitColumns[1] = PanelColumn("No supplier known for", .5f*W, false);
+  PanelTableHeader(Cursor, WaitColumns, (u32)ArrayCount(WaitColumns));
+
+  u32 Index = 0;
+  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
+  {
+   b32 Waiting = false;
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
+   {
+    u32 Supplier, Count;
+    if(!PanelNearestSupplier(App, Index, Req->Kind, &Supplier, &Count)) Waiting = true;
+   }
+
+   if(Waiting)
+   {
+    PanelIslandRow(Cursor, Index);
+    PanelText(Cursor, 0.f, Island->Name, Panel_ColorText);
+    f32 Column = .5f*W;
+    for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
+    {
+     u32 Supplier, Count;
+     if(!PanelNearestSupplier(App, Index, Req->Kind, &Supplier, &Count))
+     {
+      PanelSwatch(Cursor, Column, Req->Kind);
+      Column += Cursor->LineHeight;
+     }
+    }
+    PanelNewLine(Cursor);
+   }
+   Index += 1;
+  }
+  PanelNote(Cursor, S8("This shrinks as the announcements spread."));
+ }
+}
+
+//~ Tab: Islands
+internal void
+PanelDrawIslands(panel_cursor *Cursor)
+{
+ app_state *App = Cursor->App;
+ f32 W = Cursor->Width;
+
+ PanelSection(Cursor, S8("All islands (click a row to open it)"));
+ panel_column Columns[3];
+ Columns[0] = PanelColumn("Island", 0.f, false);
+ Columns[1] = PanelColumn("Needs", .42f*W, false);
+ Columns[2] = PanelColumn("Knows", W, true);
+ PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
+
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
  {
-  b32 Hovered = false;
-  if(PanelRow(Cursor, &Hovered))
-  {
-   PanelSelect(App, (s32)Index);
-  }
-  if(Hovered)
-  {
-   App->Panel.RowHoverPlusOne = (s32)Index + 1;
-  }
+  PanelIslandRow(Cursor, Index);
+  b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
+  PanelText(Cursor, 0.f, Island->Name, Selected ? Panel_ColorSelected : Panel_ColorText);
 
-  PanelText(Cursor, 0.f, Island->Name, Panel_ColorText);
-
-  // Needs, right-aligned: [swatch]amount ...
-  f32 Right = Cursor->Width;
+  f32 Column = .42f*W;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
   {
    str8 Amount = Str8Fmt("%llu", Req->Amount);
-   f32 ItemWidth = Cursor->LineHeight + PanelMeasure(App, Amount) + 8.f;
-   Right -= ItemWidth;
-   PanelSwatch(Cursor, Right, Req->Kind);
-   PanelText(Cursor, Right + Cursor->LineHeight - 2.f, Amount, Panel_ColorText);
+   PanelSwatch(Cursor, Column, Req->Kind);
+   PanelText(Cursor, Column + Cursor->LineHeight - 2.f, Amount, Panel_ColorText);
+   Column += Cursor->LineHeight + PanelMeasure(App, Amount) + 6.f;
   }
 
-  Cursor->Y += Cursor->LineHeight;
+  PanelTextRight(Cursor, W, Str8Fmt("%u/%u", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Graph_ColorKnows);
+  PanelNewLine(Cursor);
   Index += 1;
  }
 }
 
-//~ Details of one island
+//~ Tab: Selected island
 internal void
-PanelDrawIsland(panel_cursor *Cursor, u32 SelectedIdx)
+PanelDrawSelected(panel_cursor *Cursor)
 {
  app_state *App = Cursor->App;
- broadcast_state *Broadcast = &App->Broadcast;
- island *Island = PanelIslandAt(App, SelectedIdx);
+ f32 W = Cursor->Width;
 
- if(Island)
+ if(App->Panel.SelectedPlusOne == 0)
  {
-  //- Produces
-  PanelSection(Cursor, S8("Produces"));
+  PanelSection(Cursor, S8("No island selected"));
+  PanelNote(Cursor, S8("Click an island on the map,"));
+  PanelNote(Cursor, S8("or a row in the Islands tab."));
+  return;
+ }
+
+ u32 SelectedIdx = (u32)(App->Panel.SelectedPlusOne - 1);
+ island *Island = PanelIslandAt(App, SelectedIdx);
+ if(!Island)
+ {
+  return;
+ }
+
+ //- Title
+ Cursor->Y += 4.f;
+ PanelText(Cursor, 0.f, Island->Name, Panel_ColorSelected);
+ PanelTextRight(Cursor, W, Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Graph_ColorKnows);
+ PanelNewLine(Cursor);
+
+ //- Produces
+ PanelSection(Cursor, S8("Produces"));
+ {
+  panel_column Columns[2];
+  Columns[0] = PanelColumn("Product", 0.f, false);
+  Columns[1] = PanelColumn("Amount", W, true);
+  PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
   for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
   {
+   b32 Hovered = false;
+   PanelBeginRow(Cursor, false, &Hovered);
    PanelSwatch(Cursor, 0.f, Product->Kind);
    PanelText(Cursor, Cursor->LineHeight, ProductNames[Product->Kind], Panel_ColorText);
-   str8 Amount = Str8Fmt("+%llu", Product->Amount);
-   PanelText(Cursor, Cursor->Width - PanelMeasure(App, Amount), Amount, Panel_ColorGood);
-   Cursor->Y += Cursor->LineHeight;
+   PanelTextRight(Cursor, W, Str8Fmt("+%llu", Product->Amount), Panel_ColorGood);
+   PanelNewLine(Cursor);
   }
+ }
 
-  //- Needs, each with the suppliers this island has heard of
-  PanelSection(Cursor, S8("Needs, and suppliers it knows of"));
+ //- Needs, with the nearest supplier this island has heard of
+ PanelSection(Cursor, S8("Needs"));
+ {
+  panel_column Columns[3];
+  Columns[0] = PanelColumn("Product", 0.f, false);
+  Columns[1] = PanelColumn("Amount", .46f*W, true);
+  Columns[2] = PanelColumn("Nearest supplier", .51f*W, false);
+  PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
   {
+   u32 SupplierIdx = 0;
+   u32 SupplierCount = 0;
+   b32 Known = PanelNearestSupplier(App, SelectedIdx, Req->Kind, &SupplierIdx, &SupplierCount);
+   island *Supplier = Known ? PanelIslandAt(App, SupplierIdx) : 0;
+
+   b32 Hovered = false;
+   if(Supplier)
+   {
+    PanelIslandRow(Cursor, SupplierIdx);
+   }
+   else
+   {
+    PanelBeginRow(Cursor, false, &Hovered);
+   }
+
    PanelSwatch(Cursor, 0.f, Req->Kind);
    PanelText(Cursor, Cursor->LineHeight, ProductNames[Req->Kind], Panel_ColorText);
-   str8 Amount = Str8Fmt("-%llu", Req->Amount);
-   PanelText(Cursor, Cursor->Width - PanelMeasure(App, Amount), Amount, W3_ColorNeedPad);
-   Cursor->Y += Cursor->LineHeight;
-
-   // NOTE: Suppliers come from this island's own announcement table, so far-away
-   // producers only show up after their news has travelled here.
-   u32 SupplierIdx[Broadcast_MaxIslands];
-   u32 SupplierCount = 0;
-   if(SelectedIdx < Broadcast->IslandCount)
+   PanelTextRight(Cursor, .46f*W, Str8Fmt("-%llu", Req->Amount), W3_ColorNeedPad);
+   if(Supplier)
    {
-    for(u32 Origin = 0; Origin < Broadcast->IslandCount; Origin += 1)
-    {
-     island_ad *Ad = &Broadcast->Known[SelectedIdx][Origin];
-     if(Origin != SelectedIdx && Ad->Valid && Ad->Produces[Req->Kind] > 0)
-     {
-      // Insertion sort by hop count: closest first.
-      u32 At = SupplierCount;
-      while(At > 0 && Broadcast->Known[SelectedIdx][SupplierIdx[At - 1]].HopCount > Ad->HopCount)
-      {
-       SupplierIdx[At] = SupplierIdx[At - 1];
-       At -= 1;
-      }
-      SupplierIdx[At] = Origin;
-      SupplierCount += 1;
-     }
-    }
+    island_ad *Ad = &App->Broadcast.Known[SelectedIdx][SupplierIdx];
+    PanelText(Cursor, .51f*W, Supplier->Name, Panel_ColorText);
+    PanelTextRight(Cursor, W, Str8Fmt("%u hop%s", Ad->HopCount, (Ad->HopCount == 1) ? "" : "s"), Panel_ColorDim);
    }
-
-   if(SupplierCount == 0)
+   else
    {
-    PanelText(Cursor, Cursor->LineHeight, S8("no supplier known yet"), Panel_ColorDim);
-    Cursor->Y += Cursor->LineHeight;
+    PanelText(Cursor, .51f*W, S8("none known yet"), Panel_ColorShortage);
    }
-
-   for(u32 Shown = 0; Shown < SupplierCount && Shown < Panel_MaxSuppliers; Shown += 1)
-   {
-    u32 Origin = SupplierIdx[Shown];
-    island *Supplier = PanelIslandAt(App, Origin);
-    island_ad *Ad = &Broadcast->Known[SelectedIdx][Origin];
-    if(Supplier)
-    {
-     b32 Hovered = false;
-     if(PanelRow(Cursor, &Hovered))
-     {
-      PanelSelect(App, (s32)Origin);
-     }
-     if(Hovered)
-     {
-      App->Panel.RowHoverPlusOne = (s32)Origin + 1;
-     }
-     PanelText(Cursor, Cursor->LineHeight, Supplier->Name, Panel_ColorText);
-     str8 Info = Str8Fmt("%llu, %u hop%s", Ad->Produces[Req->Kind], Ad->HopCount, (Ad->HopCount == 1) ? "" : "s");
-     PanelText(Cursor, Cursor->Width - PanelMeasure(App, Info), Info, Panel_ColorDim);
-     Cursor->Y += Cursor->LineHeight;
-    }
-   }
-
-   if(SupplierCount > Panel_MaxSuppliers)
-   {
-    PanelText(Cursor, Cursor->LineHeight, Str8Fmt("+%u more", SupplierCount - Panel_MaxSuppliers), Panel_ColorDim);
-    Cursor->Y += Cursor->LineHeight;
-   }
+   PanelNewLine(Cursor);
   }
+  PanelNote(Cursor, S8("Click a supplier to open it."));
+ }
 
-  //- Network
-  PanelSection(Cursor, S8("Network"));
-  PanelText(Cursor, 0.f, Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), Broadcast->IslandCount), Panel_ColorText);
-  Cursor->Y += Cursor->LineHeight;
-  PanelText(Cursor, 0.f, S8("Neighbours (click to open):"), Panel_ColorDim);
-  Cursor->Y += Cursor->LineHeight;
+ //- Network
+ PanelSection(Cursor, S8("Neighbours"));
+ {
+  panel_column Columns[2];
+  Columns[0] = PanelColumn("Island", 0.f, false);
+  Columns[1] = PanelColumn("Cable cost", W, true);
+  PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
   for(link *Link = Island->FirstLink; Link; Link = Link->Next)
   {
    u32 NeighbourIdx = BroadcastIslandIndex(App, Link->Dest);
-   b32 Hovered = false;
-   if(PanelRow(Cursor, &Hovered))
-   {
-    PanelSelect(App, (s32)NeighbourIdx);
-   }
-   if(Hovered)
-   {
-    App->Panel.RowHoverPlusOne = (s32)NeighbourIdx + 1;
-   }
-   PanelText(Cursor, Cursor->LineHeight, Link->Dest->Name, Panel_ColorText);
-   str8 Cost = Str8Fmt("cable cost %d", Link->Cost);
-   PanelText(Cursor, Cursor->Width - PanelMeasure(App, Cost), Cost, Graph_ColorCost);
-   Cursor->Y += Cursor->LineHeight;
+   PanelIslandRow(Cursor, NeighbourIdx);
+   PanelText(Cursor, 0.f, Link->Dest->Name, Panel_ColorText);
+   PanelTextRight(Cursor, W, Str8Fmt("%d", Link->Cost), Graph_ColorCost);
+   PanelNewLine(Cursor);
   }
  }
+}
+
+//~ Tabs
+// NOTE: Tab button; the active tab is filled. Returns true when clicked.
+internal b32
+PanelTabButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label, f32 Width, b32 Active)
+{
+ font *Font = &App->Font;
+ f32 Height = Font->HeightPx + BroadcastView_ButtonPadding;
+ v4 Dest = RectFromSize(*Cursor, V2(Width, Height));
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ b32 Hot = IsInsideRectV2(MousePos, Dest);
+
+ u32 Color = Active ? Panel_ColorTabActive : (Hot ? Panel_ColorRowHover : Panel_ColorTab);
+ DrawRect(Dest, V4FromU32(Color), 5.f, 0.f, 0.f);
+ f32 TextWidth = PanelMeasure(App, Label);
+ GraphDrawText(&App->FontAtlas, Font, V2(Dest.Min.X + .5f*(Width - TextWidth), Dest.Min.Y + .5f*BroadcastView_ButtonPadding),
+               Label, V4FromU32(Panel_ColorText));
+
+ Cursor->X += Width + BroadcastView_ButtonGap;
+ b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
+ return Result;
 }
 
 //~ Panel
@@ -301,6 +523,10 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
  {
   Panel->SelectedPlusOne = 0;
  }
+ if((u32)Panel->Tab >= PanelTab_Count)
+ {
+  Panel->Tab = PanelTab_Shortages;
+ }
 
  if(Panel->Hidden)
  {
@@ -315,14 +541,17 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
  else
  {
   v4 Box = RectFromSize(V2(BufferDim.X - Panel_Margin - Panel_Width, Panel_Top),
-                        V2(Panel_Width, Max(BufferDim.Y - Panel_Top - Panel_Margin, 4.f*LineHeight)));
+                        V2(Panel_Width, Max(BufferDim.Y - Panel_Top - Panel_Margin, 6.f*LineHeight)));
   Panel->LastRect = Box;
   DrawRect(Box, V4FromU32(Panel_ColorBg), 8.f, 0.f, 0.f);
   DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 8.f, 1.f, 0.f);
 
-  //- Header: title and buttons
   f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
+
+  //- Header: title and Hide
   v2 HeaderPos = V2(Box.Min.X + Panel_Pad, Box.Min.Y + Panel_Pad);
+  GraphDrawText(&App->FontAtlas, Font, V2(HeaderPos.X, HeaderPos.Y + .5f*BroadcastView_ButtonPadding),
+                S8("Islands"), V4FromU32(Panel_ColorText));
   {
    str8 HideLabel = S8("Hide");
    v2 Cursor = V2(Box.Max.X - Panel_Pad - PanelMeasure(App, HideLabel) - 2.f*BroadcastView_ButtonPadding, HeaderPos.Y);
@@ -330,37 +559,28 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
    {
     Panel->Hidden = true;
    }
-
-   if(Panel->SelectedPlusOne)
-   {
-    v2 BackCursor = HeaderPos;
-    if(BroadcastButton(App, Input, &BackCursor, S8("< All islands")))
-    {
-     Panel->SelectedPlusOne = 0;
-     Panel->Scroll = 0.f;
-    }
-   }
-   else
-   {
-    GraphDrawText(&App->FontAtlas, Font, V2(HeaderPos.X, HeaderPos.Y + .5f*BroadcastView_ButtonPadding),
-                  S8("Islands overview"), V4FromU32(Panel_ColorText));
-   }
   }
 
-  f32 HeaderBottom = HeaderPos.Y + ButtonHeight + Panel_Pad;
-  if(Panel->SelectedPlusOne)
+  //- Tabs
   {
-   island *Selected = PanelIslandAt(App, (u32)(Panel->SelectedPlusOne - 1));
-   if(Selected)
+   char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected"};
+   f32 TabsWidth = Panel_Width - 2.f*Panel_Pad;
+   f32 TabWidth = (TabsWidth - 2.f*BroadcastView_ButtonGap)/(f32)PanelTab_Count;
+   v2 TabCursor = V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap);
+   for(u32 Tab = 0; Tab < PanelTab_Count; Tab += 1)
    {
-    GraphDrawText(&App->FontAtlas, Font, V2(HeaderPos.X, HeaderBottom), Selected->Name, V4FromU32(Panel_ColorSelected));
-    HeaderBottom += LineHeight + .5f*Panel_Pad;
+    if(PanelTabButton(App, Input, &TabCursor, S8FromCString(TabNames[Tab]), TabWidth, (Panel->Tab == (panel_tab)Tab)))
+    {
+     Panel->Tab = (panel_tab)Tab;
+     Panel->Scroll = 0.f;
+    }
    }
   }
 
   //- Content (clipped and scrollable)
+  f32 ContentTop = HeaderPos.Y + 2.f*ButtonHeight + BroadcastView_ButtonGap + .5f*Panel_Pad;
   f32 FooterHeight = ButtonHeight + 2.f*Panel_Pad;
-  v4 Content = V4(Box.Min.X + Panel_Pad, HeaderBottom, Box.Max.X - Panel_Pad, Box.Max.Y - FooterHeight);
+  v4 Content = V4(Box.Min.X + Panel_Pad, ContentTop, Box.Max.X - Panel_Pad, Box.Max.Y - FooterHeight);
 
   panel_cursor Cursor = {0};
   Cursor.App = App;
@@ -372,20 +592,23 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
   Cursor.LineHeight = LineHeight;
 
   RenderPushClip(Content);
-  if(Panel->SelectedPlusOne)
+  switch(Panel->Tab)
   {
-   PanelDrawIsland(&Cursor, (u32)(Panel->SelectedPlusOne - 1));
-  }
-  else
-  {
-   PanelDrawOverview(&Cursor);
+   case PanelTab_Shortages: PanelDrawShortages(&Cursor); break;
+   case PanelTab_Islands:   PanelDrawIslands(&Cursor); break;
+   case PanelTab_Selected:  PanelDrawSelected(&Cursor); break;
+   default: break;
   }
   RenderPopClip();
 
-  //- Scrolling, only when the content does not fit
+  //- Scrolling: mouse wheel over the panel, or the buttons when the content does not fit
   f32 ContentHeight = (Cursor.Y + Panel->Scroll) - Content.Min.Y;
   f32 VisibleHeight = Content.Max.Y - Content.Min.Y;
   f32 MaxScroll = Max(0.f, ContentHeight - VisibleHeight);
+  if(IsInsideRectV2(MousePos, Box))
+  {
+   Panel->Scroll -= (f32)R3WheelSteps(Input)*Panel_WheelStep;
+  }
   if(MaxScroll > 0.f)
   {
    v2 FooterCursor = V2(Box.Min.X + Panel_Pad, Box.Max.Y - Panel_Pad - ButtonHeight);

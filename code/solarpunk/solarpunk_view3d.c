@@ -10,7 +10,7 @@
 // NOTE: Screen areas covered by the 2D controls (top left) and camera buttons (top right).
 // Island labels are not placed there. Sizes match the 20px font.
 #define V3D_ControlsAreaWidth   840.f
-#define V3D_ControlsAreaHeight  235.f
+#define V3D_ControlsAreaHeight  315.f
 #define V3D_CameraAreaWidth     330.f
 #define V3D_CameraAreaHeight    80.f
 
@@ -181,12 +181,6 @@ V3DrawCameraControls(app_state *App, app_input *Input, v2 BufferDim)
  if(BroadcastButton(App, Input, &Cursor, Labels[0])) R3CameraZoom(Camera, 1.f/R3_CameraZoomStep);
  if(BroadcastButton(App, Input, &Cursor, Labels[1])) R3CameraZoom(Camera, R3_CameraZoomStep);
  if(BroadcastButton(App, Input, &Cursor, Labels[2])) R3CameraReset(Camera);
-
- str8 Hint = S8("Right-drag to rotate");
- f32 HintWidth = GraphMeasureText(Atlas, Font, Hint);
- GraphDrawText(Atlas, Font, V2(BufferDim.X - V3D_Margin - HintWidth - BroadcastView_ButtonGap,
-                               V3D_Margin + LineHeight + BroadcastView_ButtonPadding + BroadcastView_ButtonGap),
-               Hint, V4FromU32(Graph_ColorTitle));
 }
 
 //~ Legend (bottom left)
@@ -295,7 +289,9 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
 
- R3CameraUpdate(&R3->Camera, Input);
+ // NOTE: Over the panel the wheel scrolls the panel instead of zooming.
+ b32 MouseOverUI = IsInsideRectV2(V2V2S32(Input->Mouse.Pos), App->Panel.LastRect);
+ R3CameraUpdate(&R3->Camera, Input, MouseOverUI);
  R3BeginFrame(R3, FrameArena, BufferDim);
  W3PrepareIslands(App, Input);
  W3BuildWorld(App);

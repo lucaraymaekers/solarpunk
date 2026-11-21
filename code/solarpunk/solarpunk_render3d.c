@@ -346,6 +346,9 @@ R3PushEllipsoid(r3_mesh *Mesh, v3 Center, v3 Radii, u32 Rings, u32 Segments, v4 
 #define R3_CameraDragYawSpeed    .008f
 #define R3_CameraDragPitchSpeed  .006f
 #define R3_CameraZoomStep        1.2f
+#define R3_CameraWheelStep       1.12f
+#define R3_CameraPanSpeed        .0015f  // world units per pixel, times the distance
+#define R3_CameraMaxPan          70.f
 
 internal void
 R3CameraReset(r3_camera *Camera)
@@ -355,7 +358,8 @@ R3CameraReset(r3_camera *Camera)
  Camera->Pitch = R3_CameraDefaultPitch;
  Camera->Distance = R3_CameraDefaultDistance;
  Camera->Target = V3(0.f, -2.f, 0.f);
- Camera->Dragging = false;
+ Camera->Rotating = false;
+ Camera->Panning = false;
 }
 
 internal void
@@ -364,34 +368,66 @@ R3CameraZoom(r3_camera *Camera, f32 Factor)
  Camera->Distance = Clamp(R3_CameraMinDistance, Camera->Distance*Factor, R3_CameraMaxDistance);
 }
 
-// NOTE: Right mouse button drag rotates around the target.
+// NOTE: Mouse wheel notches this frame, positive = away from the user. Windows reports
+// the wheel as Mouse.Z; Linux reports it as the ScrollUp/ScrollDown buttons.
+internal s32
+R3WheelSteps(app_input *Input)
+{
+ s32 Result = Input->Mouse.Z;
+#if !OS_WINDOWS
+ if(WasPressed(Input->Mouse.Buttons[PlatformMouseButton_ScrollUp]))   Result += 1;
+ if(WasPressed(Input->Mouse.Buttons[PlatformMouseButton_ScrollDown])) Result -= 1;
+#endif
+ return Result;
+}
+
+// NOTE: Mouse controls
+//   wheel        : zoom (skipped when the mouse is over the UI, e.g. the panel scrolls instead)
+//   right drag   : move the camera over the map
+//   middle drag  : rotate around the target
 internal void
-R3CameraUpdate(r3_camera *Camera, app_input *Input)
+R3CameraUpdate(r3_camera *Camera, app_input *Input, b32 MouseOverUI)
 {
  if(!Camera->Initialized)
  {
   R3CameraReset(Camera);
  }
-
+ 
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
- app_button_state MouseRight = Input->Mouse.Buttons[PlatformMouseButton_Right];
-
- if(MouseRight.EndedDown)
+ f32 DX = MousePos.X - Camera->LastMousePos.X;
+ f32 DY = MousePos.Y - Camera->LastMousePos.Y;
+ 
+ //- Zoom
+ if(!MouseOverUI)
  {
-  if(Camera->Dragging)
-  {
-   f32 DX = MousePos.X - Camera->LastMousePos.X;
-   f32 DY = MousePos.Y - Camera->LastMousePos.Y;
-   Camera->Yaw -= DX*R3_CameraDragYawSpeed;
-   Camera->Pitch = Clamp(R3_CameraMinPitch, Camera->Pitch + DY*R3_CameraDragPitchSpeed, R3_CameraMaxPitch);
-  }
-  Camera->Dragging = true;
+  s32 Steps = R3WheelSteps(Input);
+  for(; Steps > 0; Steps -= 1) R3CameraZoom(Camera, 1.f/R3_CameraWheelStep);
+  for(; Steps < 0; Steps += 1) R3CameraZoom(Camera, R3_CameraWheelStep);
  }
- else
+ 
+ //- Rotate (middle drag)
+ b32 MiddleDown = Input->Mouse.Buttons[PlatformMouseButton_Middle].EndedDown;
+ if(MiddleDown && Camera->Rotating)
  {
-  Camera->Dragging = false;
+  Camera->Yaw -= DX*R3_CameraDragYawSpeed;
+  Camera->Pitch = Clamp(R3_CameraMinPitch, Camera->Pitch + DY*R3_CameraDragPitchSpeed, R3_CameraMaxPitch);
  }
-
+ Camera->Rotating = MiddleDown;
+ 
+ //- Move (right drag): the map follows the mouse
+ b32 RightDown = Input->Mouse.Buttons[PlatformMouseButton_Right].EndedDown;
+ if(RightDown && Camera->Panning)
+ {
+  v3 Forward = V3(-R3Sin(Camera->Yaw), 0.f, -R3Cos(Camera->Yaw));
+  v3 Right = V3(R3Cos(Camera->Yaw), 0.f, -R3Sin(Camera->Yaw));
+  f32 Scale = R3_CameraPanSpeed*Camera->Distance;
+  Camera->Target = R3Sub(Camera->Target, R3Scale(Right, DX*Scale));
+  Camera->Target = R3Add(Camera->Target, R3Scale(Forward, DY*Scale));
+  Camera->Target.X = Clamp(-R3_CameraMaxPan, Camera->Target.X, R3_CameraMaxPan);
+  Camera->Target.Z = Clamp(-R3_CameraMaxPan, Camera->Target.Z, R3_CameraMaxPan);
+ }
+ Camera->Panning = RightDown;
+ 
  Camera->LastMousePos = MousePos;
 }
 

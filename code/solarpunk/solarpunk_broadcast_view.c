@@ -239,10 +239,12 @@ DrawBroadcastControls(app_state *App, app_input *Input)
   char *Keys[] =
   {
    "Up",     "Down",                    "Right",      "Left",
+   "Wheel",  "Right drag",              "Middle drag", "Click",
   };
   char *Actions[] =
   {
    "faster", "slower (lowest = pause)", "next round", "restart",
+   "zoom",   "move the map",            "rotate",      "open an island",
   };
   StaticAssert(ArrayCount(Keys) == ArrayCount(Actions), BroadcastLegendMatch);
 
@@ -257,7 +259,7 @@ DrawBroadcastControls(app_state *App, app_input *Input)
   }
   KeyColumnWidth += 2.f*BroadcastView_ButtonPadding;
 
-  str8 Title = S8("Keyboard");
+  str8 Title = S8("Controls");
   f32 BoxWidth = Max(GraphMeasureText(Atlas, Font, Title), KeyColumnWidth + ActionColumnWidth) + 2.f*BroadcastView_ButtonPadding;
   f32 BoxHeight = (f32)(ArrayCount(Keys) + 1)*LineHeight + 2.f*BroadcastView_ButtonPadding;
   v4 Box = RectFromSize(LegendPos, V2(BoxWidth, BoxHeight));
