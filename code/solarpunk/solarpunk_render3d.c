@@ -349,6 +349,7 @@ R3PushEllipsoid(r3_mesh *Mesh, v3 Center, v3 Radii, u32 Rings, u32 Segments, v4 
 #define R3_CameraWheelStep       1.12f
 #define R3_CameraPanSpeed        .0015f  // world units per pixel, times the distance
 #define R3_CameraMaxPan          70.f
+#define R3_CameraFlySpeed        4.f     // higher = faster flight to a cluster
 
 internal void
 R3CameraReset(r3_camera *Camera)
@@ -360,6 +361,16 @@ R3CameraReset(r3_camera *Camera)
  Camera->Target = V3(0.f, -2.f, 0.f);
  Camera->Rotating = false;
  Camera->Panning = false;
+ Camera->Flying = false;
+}
+
+// NOTE: Start a smooth flight to look at Target from Distance (any mouse use stops it).
+internal void
+R3CameraFlyTo(r3_camera *Camera, v3 Target, f32 Distance)
+{
+ Camera->Flying = true;
+ Camera->FlyTarget = Target;
+ Camera->FlyDistance = Clamp(R3_CameraMinDistance, Distance, R3_CameraMaxDistance);
 }
 
 internal void
@@ -392,19 +403,20 @@ R3CameraUpdate(r3_camera *Camera, app_input *Input, b32 MouseOverUI)
  {
   R3CameraReset(Camera);
  }
- 
+
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  f32 DX = MousePos.X - Camera->LastMousePos.X;
  f32 DY = MousePos.Y - Camera->LastMousePos.Y;
- 
+
  //- Zoom
  if(!MouseOverUI)
  {
   s32 Steps = R3WheelSteps(Input);
+  if(Steps != 0) Camera->Flying = false;
   for(; Steps > 0; Steps -= 1) R3CameraZoom(Camera, 1.f/R3_CameraWheelStep);
   for(; Steps < 0; Steps += 1) R3CameraZoom(Camera, R3_CameraWheelStep);
  }
- 
+
  //- Rotate (middle drag)
  b32 MiddleDown = Input->Mouse.Buttons[PlatformMouseButton_Middle].EndedDown;
  if(MiddleDown && Camera->Rotating)
@@ -413,7 +425,7 @@ R3CameraUpdate(r3_camera *Camera, app_input *Input, b32 MouseOverUI)
   Camera->Pitch = Clamp(R3_CameraMinPitch, Camera->Pitch + DY*R3_CameraDragPitchSpeed, R3_CameraMaxPitch);
  }
  Camera->Rotating = MiddleDown;
- 
+
  //- Move (right drag): the map follows the mouse
  b32 RightDown = Input->Mouse.Buttons[PlatformMouseButton_Right].EndedDown;
  if(RightDown && Camera->Panning)
@@ -427,6 +439,23 @@ R3CameraUpdate(r3_camera *Camera, app_input *Input, b32 MouseOverUI)
   Camera->Target.Z = Clamp(-R3_CameraMaxPan, Camera->Target.Z, R3_CameraMaxPan);
  }
  Camera->Panning = RightDown;
+ 
+ //- Flight
+ if(MiddleDown || RightDown)
+ {
+  Camera->Flying = false;
+ }
+ if(Camera->Flying)
+ {
+  f32 t = 1.f - expf(-R3_CameraFlySpeed*Input->dtForFrame);
+  Camera->Target = R3Lerp(Camera->Target, Camera->FlyTarget, t);
+  Camera->Distance = Lerp(Camera->Distance, Camera->FlyDistance, t);
+  if(R3Length(R3Sub(Camera->Target, Camera->FlyTarget)) < .05f &&
+     (Camera->Distance - Camera->FlyDistance)*(Camera->Distance - Camera->FlyDistance) < .01f)
+  {
+   Camera->Flying = false;
+  }
+ }
  
  Camera->LastMousePos = MousePos;
 }
