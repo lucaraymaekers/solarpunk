@@ -98,6 +98,11 @@ struct r3_state
  r3_camera Camera;
  v2 LensShift;   // see R3BeginFrame; eased towards the free part of the window
 
+ // Time of day shown by the sky, 0..1 (0 = midnight, .5 = noon). Eased towards the
+ // current round's time of day, see R3UpdateDayPhase. Visual only.
+ f32 DayPhase;
+ b32 DayPhaseSet;
+
  // Per frame
  m4 ViewProj;
  v3 Eye;
