@@ -856,6 +856,9 @@ W3PushClouds(r3_mesh *Mesh)
 #define W3_RuinsCluster 3
 #define W3Style_Ice 7       // Saltglass Atolls (solarpunk_ice_island.c)
 #define W3_IceCluster 6
+#define W3Style_Crystal 8   // Mistral Keys (solarpunk_crystal_island.c)
+#define W3_CrystalCluster 5
+internal void W3PushCrystalIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushIceIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushRuinsIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushBeachIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
@@ -991,6 +994,11 @@ W3PrepareIslands(app_state *App, app_input *Input)
    {
     R3->IslandStyle[Idx] = W3Style_Ice;
    }
+   // Mistral Keys: crystals and shimmering water
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_CrystalCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Crystal;
+   }
   }
  }
 
@@ -1103,6 +1111,11 @@ W3BuildWorld(app_state *App)
   {
    W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Crystal)
+  {
+   W3PushCrystalIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                       Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
   }
   else if(R3->IslandStyle[Index] == W3Style_Ice)
   {

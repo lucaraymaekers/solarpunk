@@ -118,6 +118,7 @@ struct hero_layout
  f32 ChannelHalf;
  b32 SandyShore;    // the shore is a sand beach, sloping down to the water
  b32 Snowy;         // snow on the ground, ice on the water (Saltglass Atolls)
+ b32 Glowing;       // shimmering cyan water (Mistral Keys)
  b32 PlateauRight;
  b32 PlateauLeft;
  u32 StreamCount;
@@ -420,6 +421,7 @@ HeroPushTerrain(hero_ctx *H)
     else if(Type == HeroGround_Path)    TopColor = HeroShade(H, 0xFFC4CDD6);
     else if(Type == HeroGround_Stream)  TopColor = R3Color(0xFFCDEBF5);
    }
+   if(H->Layout->Glowing && Type == HeroGround_Stream) TopColor = R3Color(0xFFA6F4FF);
    R3PushQuad(H->Opaque, HeroP(H, CX[0], Level, CZ[0]), HeroP(H, CX[1], Level, CZ[1]), HeroP(H, CX[2], Level, CZ[2]), HeroP(H, CX[3], Level, CZ[3]),
               HeroP(H, X0 + .5f*Cell, Level - 1.f, Z0 + .5f*Cell), TopColor);
    if(H->Layout->Round && Type == HeroGround_Pool)
@@ -471,7 +473,7 @@ HeroPushTerrain(hero_ctx *H)
  hero_layout *L = H->Layout;
  if(L->Pool && !L->Round)
  {
-  v4 Water = L->Snowy ? R3WithAlpha(R3Color(0xFFD6EEF7), .88f) : R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
+  v4 Water = L->Snowy ? R3WithAlpha(R3Color(0xFFD6EEF7), .88f) : R3WithAlpha(R3Color(L->Glowing ? 0xFF8FEAF5 : Hero_ColorPoolWater), .62f);
   v4 Deep = L->Snowy ? R3WithAlpha(R3Color(0xFF9CCFE3), .82f) : R3WithAlpha(R3Color(Hero_ColorPoolDeep), .7f);
   v3 W0 = HeroP(H, L->PoolX0, Hero_WaterLevel, L->PoolZ0);
   v3 W1 = HeroP(H, L->PoolX1, Hero_WaterLevel, L->PoolZ0);
@@ -709,6 +711,7 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
  }
  if(Variant & 128) Roof = 0xFFC9A86A;  // thatch
  if(Variant & 256) Roof = 0xFFF2F6FA;  // snow
+ if(Variant & 512) Roof = 0xFFB9A6D6;  // lavender, under iridescent glass tiles
 
  //- Stone plinth (reaches down so houses on terrace edges do not float), or a
  // wooden floor on a deck
@@ -812,7 +815,23 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
  v3 SlopeNormal = R3Normalize(V3(0.f, HZ + Over, Rise));
  v3 SlopeMid = R3Lerp(V3(B.X, RY0, B.Z + HZ + Over), V3(B.X, RY1, B.Z), .45f);
  f32 PanelHalfL = .3f*(HZ + Over);
- if((Variant & 4) && HX > .26f)
+ if(Variant & 512)
+ {
+  // Iridescent glass tiles over the front slope (they make the power here)
+  u32 Tiles[5] = {0xFFE58AF0, 0xFF7FE3F0, 0xFFF2D06E, 0xFF9FF08A, 0xFF8AA8F5};
+  for(u32 Row = 0; Row < 2; Row += 1)
+  {
+   for(u32 Col = 0; Col < 4; Col += 1)
+   {
+    f32 U = ((f32)Col + .5f)/4.f;
+    f32 V = .25f + .4f*(f32)Row;
+    v3 P = R3Lerp(R3Lerp(F0, F1, U), R3Lerp(R0, R1, U), V);
+    P = R3Add(P, R3Scale(SlopeNormal, .015f));
+    R3PushOrientedBox(O, P, R3Scale(Right, .22f*HX), R3Scale(SlopeNormal, .006f), R3Scale(SlopeUp, .17f*(HZ + Over)), R3Color(Tiles[(Row*4 + Col + Variant) % 5]));
+   }
+  }
+ }
+ else if((Variant & 4) && HX > .26f)
  {
   HeroPushPanel(H, R3Add(SlopeMid, V3(-.45f*HX, 0.f, 0.f)), Right, SlopeUp, SlopeNormal, .38f*HX, PanelHalfL);
   HeroPushPanel(H, R3Add(SlopeMid, V3(.45f*HX, 0.f, 0.f)), Right, SlopeUp, SlopeNormal, .38f*HX, PanelHalfL);

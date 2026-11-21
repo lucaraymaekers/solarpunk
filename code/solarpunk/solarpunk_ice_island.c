@@ -258,8 +258,10 @@ IcePushAirship(hero_ctx *H, v3 Mast, v3 Out)
 }
 
 //~ Scaffolding, chains and the frozen waterfall round the slab
+// NOTE: Icy = snow, icicles and the frozen waterfall (Saltglass Atolls); without, just the
+// wooden scaffolding, ledges and chains (Mistral Keys).
 internal void
-IcePushSlabDressing(hero_ctx *H, hero_layout *L)
+IcePushSlabDressing(hero_ctx *H, hero_layout *L, b32 Icy)
 {
  r3_mesh *O = H->Opaque;
  f32 Out = Hero_Half + .07f;
@@ -290,13 +292,13 @@ IcePushSlabDressing(hero_ctx *H, hero_layout *L)
      v3 Beam0 = HeroP(H, X, -.3f, Z);
      v3 Beam1 = HeroP(H, X1, -.3f, Z1);
      R3PushCylinder(O, Beam0, Beam1, .018f, 4, Wood);
-     IcePushIcicles(H, R3Sub(Beam0, V3(0.f, .02f, 0.f)), R3Sub(Beam1, V3(0.f, .02f, 0.f)), 4, .18f);
-     IcePushIcicles(H, HeroP(H, X, 0.f, Z), HeroP(H, X1, 0.f, Z1), 5, .35f);
+     if(Icy) IcePushIcicles(H, R3Sub(Beam0, V3(0.f, .02f, 0.f)), R3Sub(Beam1, V3(0.f, .02f, 0.f)), 4, .18f);
+     if(Icy) IcePushIcicles(H, HeroP(H, X, 0.f, Z), HeroP(H, X1, 0.f, Z1), 5, .35f);
     }
    }
   }
   // Snow lip along the top edge
-  for(u32 Lump = 0; Lump < 10; Lump += 1)
+  for(u32 Lump = 0; Icy && Lump < 10; Lump += 1)
   {
    f32 S = -Hero_Half + 2.f*Hero_Half*((f32)Lump + .5f)/10.f;
    if(Side == 0 && L->Pool && S > L->PoolX0 - .1f && S < L->PoolX1 + .1f) continue;
@@ -315,12 +317,12 @@ IcePushSlabDressing(hero_ctx *H, hero_layout *L)
   f32 Along = (Ledge == 2) ? -1.2f : .9f;
   v3 C = HeroP(H, SideSign*(Hero_Half + .3f), -.08f, Along);
   R3PushBox(O, C, V3(.3f, .025f, .35f), HeroShade(H, Ice_ColorFrostWood));
-  R3PushBox(O, R3Add(C, V3(0.f, .03f, 0.f)), V3(.29f, .008f, .34f), R3Color(Ice_ColorSnow));
+  if(Icy) R3PushBox(O, R3Add(C, V3(0.f, .03f, 0.f)), V3(.29f, .008f, .34f), R3Color(Ice_ColorSnow));
   R3PushCylinder(O, R3Add(C, V3(SideSign*.28f, .14f, -.33f)), R3Add(C, V3(SideSign*.28f, .14f, .33f)), .008f, 4, R3Color(Hero_ColorWoodDark));
   R3PushCylinder(O, R3Add(C, V3(SideSign*.28f, 0.f, -.33f)), R3Add(C, V3(SideSign*.28f, .14f, -.33f)), .01f, 4, R3Color(Hero_ColorWoodDark));
   R3PushCylinder(O, R3Add(C, V3(SideSign*.28f, 0.f, .33f)), R3Add(C, V3(SideSign*.28f, .14f, .33f)), .01f, 4, R3Color(Hero_ColorWoodDark));
   R3PushCylinder(O, R3Add(C, V3(SideSign*.25f, -.02f, 0.f)), HeroP(H, SideSign*Hero_Half, -.7f, Along), .018f, 4, Wood);
-  IcePushIcicles(H, R3Add(C, V3(SideSign*.3f, -.03f, -.33f)), R3Add(C, V3(SideSign*.3f, -.03f, .33f)), 7, .3f);
+  if(Icy) IcePushIcicles(H, R3Add(C, V3(SideSign*.3f, -.03f, -.33f)), R3Add(C, V3(SideSign*.3f, -.03f, .33f)), 7, .3f);
   FishingPushFishCrate(H, R3Add(C, V3(-SideSign*.05f, .03f, .15f)));
   W3PushTerrace(O, R3Add(C, V3(SideSign*.1f, .155f, -.15f)), .055f, .13f, 8, R3Color(0xFF6E4A2C), HeroShade(H, Hero_ColorWood));
  }
@@ -343,7 +345,7 @@ IcePushSlabDressing(hero_ctx *H, hero_layout *L)
  }
 
  //- Frozen waterfall where the iced pool meets the front edge
- if(L->Pool)
+ if(L->Pool && Icy)
  {
   for(u32 Spike = 0; Spike < 34; Spike += 1)
   {
@@ -398,7 +400,7 @@ W3PushIceIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCol
 
  HeroPushTerrain(H);
  HeroPushCliff(H);
- IcePushSlabDressing(H, &Layout);
+ IcePushSlabDressing(H, &Layout, true);
 
  //- Knowledge crystal on the snowy hill
  HeroPushCrest(H, Layout.HillX, Layout.HillZ - .1f, KnownFraction);
