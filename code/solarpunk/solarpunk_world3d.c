@@ -162,7 +162,8 @@ W3NeedStatus(app_state *App, u32 IslandIdx, product_kind Kind)
  return Result;
 }
 
-// NOTE: World totals per product, and each island's status:
+// NOTE: World totals per product (what is made follows this round's harvest waves), and
+// each island's status:
 //   Waiting : it has not heard of a supplier for one of its needs yet
 //   Short   : it knows its suppliers, but needs a product the whole world does not
 //             make enough of
@@ -174,10 +175,17 @@ W3ComputeStatus(app_state *App)
  r3_state *R3 = &App->R3;
  MemorySet(R3->TotalProduced, 0, sizeof(R3->TotalProduced));
  MemorySet(R3->TotalNeeded, 0, sizeof(R3->TotalNeeded));
- for(island *Island = App->FirstIsland; Island; Island = Island->Next)
+ f32 Made[ProductKind_Count] = {0};
+ u32 IslandIdx = 0;
+ for(island *Island = App->FirstIsland; Island; Island = Island->Next, IslandIdx += 1)
  {
-  for(product *Product = Island->FirstProduct; Product; Product = Product->Next) R3->TotalProduced[Product->Kind] += Product->Amount;
+  f32 Harvest = WorldGenHarvestFactor(App, IslandIdx, App->Broadcast.IslandCount, App->Broadcast.Round);
+  for(product *Product = Island->FirstProduct; Product; Product = Product->Next) Made[Product->Kind] += Harvest*(f32)Product->Amount;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) R3->TotalNeeded[Req->Kind] += Req->Amount;
+ }
+ for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
+ {
+  R3->TotalProduced[Kind] = (u64)(Made[Kind] + .5f);
  }
  for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
  {
