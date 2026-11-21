@@ -511,6 +511,31 @@ PanelDrawSelected(panel_cursor *Cursor)
   PanelNote(Cursor, S8("Click a supplier to open it."));
  }
 
+ //- Food: what is in store and when it goes bad (solarpunk_food_app.c)
+ PanelSection(Cursor, S8("Food"));
+ {
+  str8 Lines[16];
+  v4 Colors[16];
+  s32 LineCount = 0;
+  FoodAppendLines(App, Island, Lines, Colors, &LineCount, (s32)ArrayCount(Lines),
+                  V4FromU32(Panel_ColorText), V4FromU32(Graph_ColorRequirement));
+  if(LineCount == 0)
+  {
+   PanelNote(Cursor, S8("No food in store, and none needed."));
+  }
+  for(s32 Idx = 0; Idx < LineCount; Idx += 1)
+  {
+   GraphDrawText(&App->FontAtlas, &App->Font, V2(Cursor->X, Cursor->Y), Lines[Idx], Colors[Idx]);
+   PanelNewLine(Cursor);
+  }
+  str8 Legend[3];
+  u32 LegendCount = FoodLegendShortLines(Legend, (u32)ArrayCount(Legend));
+  for(u32 Idx = 0; Idx < LegendCount; Idx += 1)
+  {
+   PanelNote(Cursor, Legend[Idx]);
+  }
+ }
+ 
  //- Network
  PanelSection(Cursor, S8("Neighbours"));
  {

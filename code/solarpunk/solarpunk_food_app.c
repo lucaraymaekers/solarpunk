@@ -123,3 +123,29 @@ FoodLegendLine(void)
  Result = Str8Fmt("%S rounds.  Oldest food is eaten first.  Orange = bad within %d rounds.", Result, Food_SoonRounds);
  return Result;
 }
+
+// NOTE(L4): The same rules in short lines, for the narrow islands panel.
+internal u32
+FoodLegendShortLines(str8 *Lines, u32 Cap)
+{
+ u32 Result = 0;
+ if(Cap >= 3)
+ {
+  str8 Keeps = S8("Keeps:");
+  b32 First = true;
+  for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
+  {
+   if(FoodIsPerishable((product_kind)Kind))
+   {
+    str8 Name = ProductNames[Kind];
+    Keeps = Str8Fmt("%S%s %.*s %llu", Keeps, First ? "" : ",", (s32)Name.Size, Name.Data,
+                    FoodShelfLifeRounds((product_kind)Kind));
+    First = false;
+   }
+  }
+  Lines[Result++] = Str8Fmt("%S rounds", Keeps);
+  Lines[Result++] = S8("Oldest food is eaten first.");
+  Lines[Result++] = Str8Fmt("Orange = goes bad within %d rounds.", Food_SoonRounds);
+ }
+ return Result;
+}
