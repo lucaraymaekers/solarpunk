@@ -63,6 +63,8 @@ struct cng_command_result
 
 //~ Globals
 global_variable str8_array *GlobalSelectedArray = 0;
+// NOTE: Set when any Cng_Build() fails so cling can exit non-zero (needed for CI / pre-push checks).
+global_variable b32 Cng_AnyBuildFailed = 0;
 
 //~ Platform API
 // NOTE(luca): Implement these when adding a new platform.
@@ -468,6 +470,7 @@ Cng_Build_(cng_build_params Params)
                                          Params.ExtraLinkerFlags,
                                          Params.Sources,
                                          Params.OutputName);
+ if(!Result.Succeeded) Cng_AnyBuildFailed = 1;
  return Result;
 }
 

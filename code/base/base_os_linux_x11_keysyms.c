@@ -243,10 +243,19 @@ LinuxReturnStringForSymbol(KeySym Symbol)
         case XK_dead_invertedbreve: return "dead_invertedbreve"; break;
         case XK_dead_belowcomma: return "dead_belowcomma"; break;
         case XK_dead_currency: return "dead_currency"; break;
+        // NOTE: These keysyms only exist in xorgproto >= 2024.1 (missing on e.g. Ubuntu 24.04).
+#if defined(XK_dead_lowline)
         case XK_dead_lowline: return "dead_lowline"; break;
+#endif
+#if defined(XK_dead_aboveverticalline)
         case XK_dead_aboveverticalline: return "dead_aboveverticalline"; break;
+#endif
+#if defined(XK_dead_belowverticalline)
         case XK_dead_belowverticalline: return "dead_belowverticalline"; break;
+#endif
+#if defined(XK_dead_longsolidusoverlay)
         case XK_dead_longsolidusoverlay: return "dead_longsolidusoverlay"; break;
+#endif
         case XK_dead_a: return "dead_a"; break;
         case XK_dead_A: return "dead_A"; break;
         case XK_dead_e: return "dead_e"; break;
