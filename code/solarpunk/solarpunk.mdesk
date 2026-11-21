@@ -3,14 +3,14 @@
 ProductsTable:
 {
  { None        "None"         }
- { Seeds       "Seeds"        }
- { FreshWater  "Fresh Water"  }
- { SolarPanels "Solar Panels" }
- { Batteries   "Batteries"    }
+ { Apples      "Apples"       }
+ { Pears       "Pears"        }
+ { Cabbage     "Cabbage"      }
+ { Carrots     "Carrots"      }
+ { Wheat       "Wheat"        }
  { Fish        "Fish"         }
- { Algae       "Algae"        }
- { Copper      "Copper"       }
- { Timber      "Timber"       }
+ { Meat        "Meat"         }
+ { Eggs        "Eggs"         }
 }
 
 @data_enum("product_kind")

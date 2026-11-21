@@ -62,31 +62,31 @@ BuildHardcodedWorld(app_state *App)
  island *Copper   = PushIsland(App, S8("Copperleaf"));
  island *Windward = PushIsland(App, S8("Windward Reach"));
  
- PushProduct(App, Verdant, ProductKind_Seeds, 120);
- PushProduct(App, Verdant, ProductKind_FreshWater, 300);
- PushRequirement(App, Verdant, ProductKind_SolarPanels, 10);
+ PushProduct(App, Verdant, ProductKind_Wheat, 120);
+ PushProduct(App, Verdant, ProductKind_Apples, 300);
+ PushRequirement(App, Verdant, ProductKind_Cabbage, 10);
  PushRequirement(App, Verdant, ProductKind_Fish, 40);
  
- PushProduct(App, Sunspire, ProductKind_SolarPanels, 50);
- PushProduct(App, Sunspire, ProductKind_Batteries, 25);
- PushRequirement(App, Sunspire, ProductKind_Copper, 60);
- PushRequirement(App, Sunspire, ProductKind_FreshWater, 80);
+ PushProduct(App, Sunspire, ProductKind_Cabbage, 50);
+ PushProduct(App, Sunspire, ProductKind_Eggs, 25);
+ PushRequirement(App, Sunspire, ProductKind_Meat, 60);
+ PushRequirement(App, Sunspire, ProductKind_Apples, 80);
  
  PushProduct(App, Kelp, ProductKind_Fish, 200);
- PushProduct(App, Kelp, ProductKind_Algae, 150);
- PushRequirement(App, Kelp, ProductKind_Batteries, 8);
- PushRequirement(App, Kelp, ProductKind_Seeds, 30);
+ PushProduct(App, Kelp, ProductKind_Carrots, 150);
+ PushRequirement(App, Kelp, ProductKind_Eggs, 8);
+ PushRequirement(App, Kelp, ProductKind_Wheat, 30);
  
- PushProduct(App, Copper, ProductKind_Copper, 90);
- PushProduct(App, Copper, ProductKind_Timber, 70);
- PushRequirement(App, Copper, ProductKind_Algae, 50);
- PushRequirement(App, Copper, ProductKind_SolarPanels, 15);
+ PushProduct(App, Copper, ProductKind_Meat, 90);
+ PushProduct(App, Copper, ProductKind_Pears, 70);
+ PushRequirement(App, Copper, ProductKind_Carrots, 50);
+ PushRequirement(App, Copper, ProductKind_Cabbage, 15);
  
- PushProduct(App, Windward, ProductKind_Timber, 40);
- PushProduct(App, Windward, ProductKind_Algae, 30);
+ PushProduct(App, Windward, ProductKind_Pears, 40);
+ PushProduct(App, Windward, ProductKind_Carrots, 30);
  PushRequirement(App, Windward, ProductKind_Fish, 25);
- PushRequirement(App, Windward, ProductKind_Batteries, 12);
- PushRequirement(App, Windward, ProductKind_Copper, 20);
+ PushRequirement(App, Windward, ProductKind_Eggs, 12);
+ PushRequirement(App, Windward, ProductKind_Meat, 20);
  
  PushLink(App, Verdant,  Sunspire, 3);
  PushLink(App, Verdant,  Kelp,     2);

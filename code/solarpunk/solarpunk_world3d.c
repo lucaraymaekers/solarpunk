@@ -3,7 +3,7 @@
 //-
 
 //~ Constants
-#define W3_WorldSize        80.f   // map 0..1 is spread over this many world units
+#define W3_WorldSize        92.f   // map 0..1 is spread over this many world units
 #define W3_IslandRadius     2.5f
 #define W3_IslandHeightVary 1.4f   // islands float at slightly different heights
 #define W3_IslandSides      24
@@ -20,11 +20,6 @@
 #define W3_CloudCount       40
 
 //- Colours
-#define W3_ColorLawn        0xFF96D36E
-#define W3_ColorStoneTop    0xFFF6E8CC
-#define W3_ColorStoneMid    0xFFEBD6B2
-#define W3_ColorStoneLow    0xFFDCC19A
-#define W3_ColorStoneBottom 0xFFC9A883
 #define W3_ColorTerraceWall 0xFFF2E2C4
 #define W3_ColorCropSoil    0xFF8A6A4A
 #define W3_ColorCropWheat   0xFFE8C66A
@@ -34,9 +29,6 @@
 #define W3_ColorWater       0xFF7FCBEA
 #define W3_ColorMist        0xFFFFFFFF
 #define W3_ColorTrunk       0xFF7A5230
-#define W3_ColorLeaves      0xFF4F9D5A
-#define W3_ColorFruit       0xFFF08A5D
-#define W3_ColorPanel       0xFF24406E
 #define W3_ColorPost        0xFFB0B7C3
 #define W3_ColorProducePad  0xFF8FD18C
 #define W3_ColorNeedPad     0xFFF2A65A
@@ -59,14 +51,14 @@
 global_variable u32 W3ProductColors[ProductKind_Count] =
 {
  0xFF808080, // None
- 0xFFD9B26F, // Seeds
- 0xFF5DADE2, // Fresh Water
- 0xFF34558F, // Solar Panels
- 0xFFE5C453, // Batteries
- 0xFFF08A5D, // Fish
- 0xFF3FB59B, // Algae
- 0xFFC46A3A, // Copper
- 0xFF8B5A2B, // Timber
+ 0xFFE0473A, // Apples
+ 0xFFC9D650, // Pears
+ 0xFF5FB55A, // Cabbage
+ 0xFFF08A2C, // Carrots
+ 0xFFE8C66A, // Wheat
+ 0xFF6FA8DC, // Fish
+ 0xFF9B3D33, // Meat
+ 0xFFB98A5E, // Eggs
 };
 
 //~ Helpers
@@ -184,7 +176,7 @@ W3ComputeStatus(app_state *App)
 internal b32
 W3PointOnUI(r3_state *R3, v2 P)
 {
- b32 Result = false;
+ b32 Result = R3->HelpOpen;
  for(u32 Idx = 0; Idx < R3->UIRectCount && !Result; Idx += 1)
  {
   Result = IsInsideRectV2(P, R3->UIRects[Idx]);
@@ -193,9 +185,9 @@ W3PointOnUI(r3_state *R3, v2 P)
 }
 
 //~ Island pieces
-// NOTE: A terraced garden island: a pale stone base, three garden terraces (the lowest
-// holds the crates, the middle one crop rows, the top one a glass greenhouse dome)
-// and a small waterfall spilling off one edge.
+// NOTE: A terraced garden island: a rock base in its cluster's colours, three garden
+// terraces (the lowest holds the crates, the middle one shows what the island makes,
+// the top one a glass greenhouse dome) and a small waterfall spilling off one edge.
 
 // NOTE: Layout of the terraces relative to the island top centre (the lowest terrace).
 #define W3_Terrace1Offset   V3(0.f, .6f, -1.f)
@@ -242,67 +234,140 @@ W3PushRing(r3_mesh *Mesh, v3 Top, f32 Inner, f32 Outer, v4 Color)
  }
 }
 
+//~ Cluster themes
+// NOTE: Every cluster has its own look: rock colours, lawn, trees, how deep and rough
+// the rock under the island is, and an extra (hanging vines or crystals).
+enum w3_theme_extra
+{
+ W3Extra_None,
+ W3Extra_Vines,
+ W3Extra_Crystals,
+};
+
+typedef struct w3_theme w3_theme;
+struct w3_theme
+{
+ u32 Stone[4];   // rock from top to bottom
+ u32 Lawn;
+ u32 Wall;       // terrace walls
+ u32 Leaves;
+ u32 Fruit;
+ f32 Depth;      // how deep the rock goes (1 = normal)
+ f32 Rough;      // how much the rock's outline varies (0 = round)
+ u32 Extra;      // w3_theme_extra
+};
+
+// NOTE: In the same order as WorldGenClusterNames.
+global_variable w3_theme W3ClusterThemes[] =
+{
+ // Verdant Reach: pale stone, lush lawn, hanging vines
+ {{0xFFF6E8CC, 0xFFEBD6B2, 0xFFDCC19A, 0xFFC9A883}, 0xFF96D36E, 0xFFF2E2C4, 0xFF4F9D5A, 0xFFF08A5D, 1.f,   0.f,  W3Extra_Vines},
+ // Sunward Isles: golden sandstone, flat mesas
+ {{0xFFF7DFA0, 0xFFEBC77A, 0xFFD9AA5C, 0xFFC08A45}, 0xFFB9D26A, 0xFFF5E3B0, 0xFF86B84A, 0xFFF2C14E, .7f,   .03f, W3Extra_None},
+ // Driftwood Shoals: grey-blue sea rock, rough
+ {{0xFFD5DCE0, 0xFFB4C0C8, 0xFF94A3AE, 0xFF76858F}, 0xFF7CC7A0, 0xFFE2E7EA, 0xFF3E8E6E, 0xFFF5F5F5, 1.15f, .12f, W3Extra_None},
+ // Ember Archipelago: red rock, autumn trees
+ {{0xFFE9A27C, 0xFFD5825C, 0xFFB8623F, 0xFF8F4A30}, 0xFFA8C060, 0xFFF0C3A6, 0xFFE0752E, 0xFFF2D04E, 1.05f, .07f, W3Extra_None},
+ // Crystal Spires: lavender stone, crystals under the rock
+ {{0xFFE6DDF2, 0xFFCDBFE6, 0xFFB3A1D6, 0xFF937FC0}, 0xFF9FE0B8, 0xFFEFE8F8, 0xFF5AAE8A, 0xFFB58CF0, 1.f,   .03f, W3Extra_Crystals},
+ // Mistral Keys: white chalk, tall cliffs
+ {{0xFFFBFBF6, 0xFFECECE4, 0xFFD9D9CE, 0xFFBDBDB0}, 0xFF8ED67A, 0xFFFFFFFF, 0xFF4E9A7A, 0xFF7FB3E8, 1.45f, .05f, W3Extra_None},
+ // Saltglass Atolls: coral pink stone, blossom trees
+ {{0xFFF8D9D0, 0xFFEFBFB2, 0xFFE0A396, 0xFFC9867A}, 0xFF8CD3B5, 0xFFFBE7E1, 0xFFF29BB8, 0xFFFFFFFF, .85f,  .05f, W3Extra_Vines},
+};
+StaticAssert(ArrayCount(W3ClusterThemes) == WorldGen_ClusterCount, W3ClusterThemesMatch);
+
+internal w3_theme *
+W3ThemeFor(app_state *App, u32 IslandIdx, u32 IslandCount)
+{
+ u32 Cluster = App->HasMapLayout ? WorldGenClusterOf(IslandIdx, IslandCount) : 0;
+ w3_theme *Result = &W3ClusterThemes[Cluster % ArrayCount(W3ClusterThemes)];
+ return Result;
+}
+
+//~ Island body
 internal void
-W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor)
+W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, v3 Top, f32 Radius, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor)
 {
  random_series Series = {0};
  RandomSeed(&Series, W3_Seed*7 + 101*(u64)Index);
 
- //- Stone base: a smooth rounded bowl under the lowest terrace
- {
-  f32 RingRadius[5] = {1.f, .93f, .74f, .45f, .12f};
-  f32 RingDepth[5]  = {.35f, 1.2f, 2.3f, 3.3f, 4.f};
-  u32 RingColor[4]  = {W3_ColorStoneTop, W3_ColorStoneMid, W3_ColorStoneLow, W3_ColorStoneBottom};
+ //- Rock base: a rounded bowl under the lawn; rough themes vary its outline
+ f32 RingRadius[5] = {1.f, .93f, .74f, .45f, .12f};
+ f32 RingDepth[5]  = {.35f, 1.2f, 2.3f, 3.3f, 4.f};
+ for(u32 Ring = 1; Ring < 5; Ring += 1) RingDepth[Ring] *= Theme->Depth;
 
+ f32 Rough[5][W3_IslandSides];
+ for(u32 Ring = 0; Ring < 5; Ring += 1)
+ {
   for(u32 Side = 0; Side < W3_IslandSides; Side += 1)
   {
-   f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)W3_IslandSides;
-   f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)W3_IslandSides;
-   for(u32 Ring = 0; Ring < 4; Ring += 1)
-   {
-    f32 R0 = Radius*RingRadius[Ring];
-    f32 R1 = Radius*RingRadius[Ring + 1];
-    f32 Y0 = Top.Y - RingDepth[Ring];
-    f32 Y1 = Top.Y - RingDepth[Ring + 1];
-    v3 P0 = V3(Top.X + R0*R3Cos(Angle0), Y0, Top.Z + R0*R3Sin(Angle0));
-    v3 P1 = V3(Top.X + R0*R3Cos(Angle1), Y0, Top.Z + R0*R3Sin(Angle1));
-    v3 P2 = V3(Top.X + R1*R3Cos(Angle1), Y1, Top.Z + R1*R3Sin(Angle1));
-    v3 P3 = V3(Top.X + R1*R3Cos(Angle0), Y1, Top.Z + R1*R3Sin(Angle0));
-    R3PushQuad(Opaque, P0, P1, P2, P3, V3(Top.X, .5f*(Y0 + Y1), Top.Z),
-               W3Shade(R3Color(RingColor[Ring]), &Series));
-   }
+   // The top ring stays round, so it meets the lawn.
+   Rough[Ring][Side] = (Ring == 0) ? 1.f : 1.f + Theme->Rough*RandomBilateral(&Series);
+  }
+ }
+
+ for(u32 Side = 0; Side < W3_IslandSides; Side += 1)
+ {
+  u32 Next = (Side + 1) % W3_IslandSides;
+  f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)W3_IslandSides;
+  f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)W3_IslandSides;
+  for(u32 Ring = 0; Ring < 4; Ring += 1)
+  {
+   f32 R00 = Radius*RingRadius[Ring]*Rough[Ring][Side];
+   f32 R01 = Radius*RingRadius[Ring]*Rough[Ring][Next];
+   f32 R10 = Radius*RingRadius[Ring + 1]*Rough[Ring + 1][Side];
+   f32 R11 = Radius*RingRadius[Ring + 1]*Rough[Ring + 1][Next];
+   f32 Y0 = Top.Y - RingDepth[Ring];
+   f32 Y1 = Top.Y - RingDepth[Ring + 1];
+   v3 P0 = V3(Top.X + R00*R3Cos(Angle0), Y0, Top.Z + R00*R3Sin(Angle0));
+   v3 P1 = V3(Top.X + R01*R3Cos(Angle1), Y0, Top.Z + R01*R3Sin(Angle1));
+   v3 P2 = V3(Top.X + R11*R3Cos(Angle1), Y1, Top.Z + R11*R3Sin(Angle1));
+   v3 P3 = V3(Top.X + R10*R3Cos(Angle0), Y1, Top.Z + R10*R3Sin(Angle0));
+   R3PushQuad(Opaque, P0, P1, P2, P3, V3(Top.X, .5f*(Y0 + Y1), Top.Z), W3Shade(R3Color(Theme->Stone[Ring]), &Series));
   }
 
   // Close the bottom.
-  f32 TipR = Radius*RingRadius[4];
-  v3 TipCenter = V3(Top.X, Top.Y - RingDepth[4] - .15f, Top.Z);
-  for(u32 Side = 0; Side < W3_IslandSides; Side += 1)
+  f32 TipR0 = Radius*RingRadius[4]*Rough[4][Side];
+  f32 TipR1 = Radius*RingRadius[4]*Rough[4][Next];
+  f32 TipY = Top.Y - RingDepth[4];
+  v3 TipCenter = V3(Top.X, TipY - .15f, Top.Z);
+  v3 P0 = V3(Top.X + TipR0*R3Cos(Angle0), TipY, Top.Z + TipR0*R3Sin(Angle0));
+  v3 P1 = V3(Top.X + TipR1*R3Cos(Angle1), TipY, Top.Z + TipR1*R3Sin(Angle1));
+  R3PushTri(Opaque, P0, P1, TipCenter, V3(Top.X, TipY + 1.f, Top.Z), R3Color(Theme->Stone[3]));
+ }
+
+ //- Theme extras under the rock
+ if(Theme->Extra == W3Extra_Vines)
+ {
+  for(u32 Vine = 0; Vine < 7; Vine += 1)
   {
-   f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)W3_IslandSides;
-   f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)W3_IslandSides;
-   v3 P0 = V3(Top.X + TipR*R3Cos(Angle0), Top.Y - RingDepth[4], Top.Z + TipR*R3Sin(Angle0));
-   v3 P1 = V3(Top.X + TipR*R3Cos(Angle1), Top.Y - RingDepth[4], Top.Z + TipR*R3Sin(Angle1));
-   R3PushTri(Opaque, P0, P1, TipCenter, V3(Top.X, Top.Y - 3.f, Top.Z), R3Color(W3_ColorStoneBottom));
+   f32 Angle = 2.f*Pi32*((f32)Vine + .6f*RandomUnilateral(&Series))/7.f;
+   f32 Length = (.8f + 1.4f*RandomUnilateral(&Series))*Theme->Depth;
+   v3 Start = V3(Top.X + .97f*Radius*R3Cos(Angle), Top.Y - .3f, Top.Z + .97f*Radius*R3Sin(Angle));
+   v3 End = V3(Start.X, Start.Y - Length, Start.Z);
+   R3PushCylinder(Opaque, Start, End, .045f, 4, R3Color(Theme->Leaves));
+   R3PushEllipsoid(Opaque, End, V3(.16f, .2f, .16f), 3, 5, W3Shade(R3Color(Theme->Leaves), &Series), false);
+  }
+ }
+ else if(Theme->Extra == W3Extra_Crystals)
+ {
+  for(u32 Crystal = 0; Crystal < 5; Crystal += 1)
+  {
+   f32 Angle = 2.f*Pi32*RandomUnilateral(&Series);
+   f32 Out = .25f*Radius*RandomUnilateral(&Series);
+   f32 Length = 1.2f + 1.6f*RandomUnilateral(&Series);
+   v3 Base = V3(Top.X + Out*R3Cos(Angle), Top.Y - RingDepth[3] + .3f, Top.Z + Out*R3Sin(Angle));
+   v3 Tip = V3(Base.X + .3f*RandomBilateral(&Series), Base.Y - Length, Base.Z + .3f*RandomBilateral(&Series));
+   R3PushCone(Translucent, Base, Tip, .32f, 5, R3WithAlpha(R3Color(0xFF9FD8FF), .65f));
   }
  }
 
- //- Terraces
- W3PushTerrace(Opaque, Top, Radius, .35f, W3_IslandSides, R3Color(W3_ColorLawn), R3Color(W3_ColorStoneTop));
-
- v3 Terrace1 = R3Add(Top, W3_Terrace1Offset);
- W3PushTerrace(Opaque, Terrace1, W3_Terrace1Radius, W3_TerraceWall + .05f, 16, R3Color(W3_ColorCropSoil), R3Color(W3_ColorTerraceWall));
-
- // Crop rows on the middle terrace, alternating wheat and greens.
- for(u32 Row = 0; Row < 4; Row += 1)
- {
-  f32 Z = Terrace1.Z - .78f + .52f*(f32)Row;
-  f32 HalfLength = .8f*R3Sqrt(Max(W3_Terrace1Radius*W3_Terrace1Radius - (Z - Terrace1.Z)*(Z - Terrace1.Z), .01f));
-  u32 Color = (Row & 1) ? W3_ColorCropGreen : W3_ColorCropWheat;
-  R3PushBox(Opaque, V3(Terrace1.X, Terrace1.Y + .07f, Z), V3(HalfLength, .07f, .12f), R3Color(Color));
- }
+ //- Lawn and the top terrace with the greenhouse
+ W3PushTerrace(Opaque, Top, Radius, .35f, W3_IslandSides, R3Color(Theme->Lawn), R3Color(Theme->Stone[0]));
 
  v3 Terrace2 = R3Add(Top, W3_Terrace2Offset);
- W3PushTerrace(Opaque, Terrace2, W3_Terrace2Radius, W3_TerraceWall + .05f, 14, R3Color(W3_ColorLawn), R3Color(W3_ColorTerraceWall));
+ W3PushTerrace(Opaque, Terrace2, W3_Terrace2Radius, W3_TerraceWall + .05f, 14, R3Color(Theme->Lawn), R3Color(Theme->Wall));
 
  // Greenhouse: a glass dome with a white rim.
  W3PushTerrace(Opaque, R3Add(Terrace2, V3(0.f, .06f, 0.f)), .62f, .06f, 14, R3Color(W3_ColorDomeRim), R3Color(W3_ColorDomeRim));
@@ -317,6 +382,7 @@ W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 
   v4 Water = R3WithAlpha(R3Color(W3_ColorWater), .75f);
   v4 Falling = R3WithAlpha(R3Color(W3_ColorWater), .5f);
   f32 Half = .17f;
+  f32 FallDepth = 3.2f*Theme->Depth;
 
   v3 StreamStart = R3Add(Top, R3Scale(Out, .55f*Radius));
   v3 Edge = R3Add(Top, R3Scale(Out, .98f*Radius));
@@ -326,7 +392,7 @@ W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 
   R3PushTriUnlit(Opaque, R3Add(StreamStart, R3Scale(Side, Half)), R3Add(Edge, R3Scale(Side, -Half)), R3Add(StreamStart, R3Scale(Side, -Half)), Water);
 
   v3 FallTop = R3Add(Edge, R3Scale(Out, .08f));
-  v3 FallBottom = R3Add(R3Add(Top, R3Scale(Out, 1.12f*Radius)), V3(0.f, -3.2f, 0.f));
+  v3 FallBottom = R3Add(R3Add(Top, R3Scale(Out, 1.12f*Radius)), V3(0.f, -FallDepth, 0.f));
   R3PushTriUnlit(Translucent, R3Add(FallTop, R3Scale(Side, Half)), R3Add(FallBottom, R3Scale(Side, 1.6f*Half)), R3Add(FallBottom, R3Scale(Side, -1.6f*Half)), Falling);
   R3PushTriUnlit(Translucent, R3Add(FallTop, R3Scale(Side, Half)), R3Add(FallBottom, R3Scale(Side, -1.6f*Half)), R3Add(FallTop, R3Scale(Side, -Half)), Falling);
   R3PushEllipsoid(Translucent, FallBottom, V3(.55f, .3f, .55f), 4, 8, R3WithAlpha(R3Color(W3_ColorMist), .35f), true);
@@ -340,43 +406,340 @@ W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, v3 Top, f32 Radius, u32 
  }
 }
 
-// NOTE: Round fruit trees on both sides and solar panels at the back corners
-// (the front of the lawn holds the crates).
+//~ What an island makes, shown on its terraces
+// NOTE: The island's main food (the one it makes most of) fills the middle terrace;
+// a second food gets something small on the back corners of the lawn. An island that
+// catches fish also gets a dock with a sky boat.
+#define W3_ColorDarkWood  0xFF6E4A2C
+#define W3_ColorSail      0xFFFFF8EC
+#define W3_ColorBarn      0xFFB5523B
+#define W3_ColorRoof      0xFF6B4A3A
+#define W3_ColorCow       0xFFF4EFE6
+#define W3_ColorCowSpot   0xFF4A3A30
+#define W3_ColorHen       0xFFFFFFFF
+#define W3_ColorComb      0xFFE0453A
+#define W3_ColorFarmSoil  0xFF8A6A4A
+#define W3_ColorPasture   0xFF9BD27A
+
+// NOTE: The greenhouse terrace covers the back of the middle terrace, so things go on
+// the visible crescent: angles from about -30 to 210 degrees (0 = +X, 90 = front).
+internal v3
+W3TerracePoint(v3 T, f32 Degrees, f32 Distance)
+{
+ f32 Angle = Degrees*Pi32/180.f;
+ v3 Result = R3Add(T, V3(Distance*R3Cos(Angle), 0.f, Distance*R3Sin(Angle)));
+ return Result;
+}
+
+// NOTE: A round fruit tree; Pear makes the fruits pear-shaped.
 internal void
-W3PushDecorations(r3_mesh *Mesh, v3 Top, f32 Radius, u32 Index)
+W3PushFruitTree(r3_mesh *Mesh, v3 Base, f32 Scale, u32 LeafColor, product_kind Fruit, random_series *Series)
+{
+ R3PushCylinder(Mesh, Base, R3Add(Base, V3(0.f, .55f*Scale, 0.f)), .07f*Scale, 6, R3Color(W3_ColorTrunk));
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .8f*Scale, 0.f)), V3(.4f*Scale, .36f*Scale, .4f*Scale), 5, 8,
+                 W3Shade(R3Color(LeafColor), Series), false);
+ for(u32 Idx = 0; Idx < 5; Idx += 1)
+ {
+  f32 Angle = 2.f*Pi32*RandomUnilateral(Series);
+  v3 P = R3Add(Base, V3(.36f*Scale*R3Cos(Angle), (.7f + .25f*RandomUnilateral(Series))*Scale, .36f*Scale*R3Sin(Angle)));
+  v3 Radii = (Fruit == ProductKind_Pears) ? V3(.06f, .09f, .06f) : V3(.075f, .075f, .075f);
+  R3PushEllipsoid(Mesh, P, Radii, 3, 5, R3Color(W3ProductColors[Fruit]), false);
+ }
+}
+
+internal void
+W3PushCabbage(r3_mesh *Mesh, v3 Base, random_series *Series)
+{
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .1f, 0.f)), V3(.15f, .12f, .15f), 4, 7, W3Shade(R3Color(W3ProductColors[ProductKind_Cabbage]), Series), false);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .13f, 0.f)), V3(.09f, .09f, .09f), 3, 6, R3Color(0xFFA8DC7E), false);
+}
+
+internal void
+W3PushCarrot(r3_mesh *Mesh, v3 Base)
+{
+ R3PushCone(Mesh, R3Add(Base, V3(0.f, .08f, 0.f)), R3Add(Base, V3(0.f, -.1f, 0.f)), .06f, 5, R3Color(W3ProductColors[ProductKind_Carrots]));
+ R3PushCone(Mesh, R3Add(Base, V3(-.03f, .07f, 0.f)), R3Add(Base, V3(-.06f, .28f, 0.f)), .03f, 4, R3Color(0xFF4F9D3A));
+ R3PushCone(Mesh, R3Add(Base, V3(.03f, .07f, 0.f)), R3Add(Base, V3(.06f, .26f, .02f)), .03f, 4, R3Color(0xFF4F9D3A));
+}
+
+// NOTE: A cow, facing +X (or -X with Facing = -1).
+internal void
+W3PushCow(r3_mesh *Mesh, v3 Base, f32 Facing)
+{
+ v3 Body = R3Add(Base, V3(0.f, .3f, 0.f));
+ R3PushBox(Mesh, Body, V3(.24f, .12f, .12f), R3Color(W3_ColorCow));
+ R3PushBox(Mesh, R3Add(Body, V3(-.05f*Facing, .07f, 0.f)), V3(.08f, .06f, .125f), R3Color(W3_ColorCowSpot));
+ R3PushBox(Mesh, R3Add(Body, V3(.3f*Facing, .06f, 0.f)), V3(.08f, .08f, .08f), R3Color(W3_ColorCow));
+ R3PushBox(Mesh, R3Add(Body, V3(.37f*Facing, .03f, 0.f)), V3(.025f, .045f, .06f), R3Color(0xFFE8B4A6));
+ for(u32 Leg = 0; Leg < 4; Leg += 1)
+ {
+  f32 DX = (Leg & 1) ? .17f : -.17f;
+  f32 DZ = (Leg & 2) ? .08f : -.08f;
+  R3PushBox(Mesh, R3Add(Base, V3(DX, .09f, DZ)), V3(.03f, .09f, .03f), R3Color(W3_ColorCowSpot));
+ }
+}
+
+internal void
+W3PushHen(r3_mesh *Mesh, v3 Base, f32 Facing)
+{
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .1f, 0.f)), V3(.11f, .09f, .08f), 4, 6, R3Color(W3_ColorHen), false);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(.09f*Facing, .2f, 0.f)), V3(.05f, .05f, .05f), 3, 5, R3Color(W3_ColorHen), false);
+ R3PushBox(Mesh, R3Add(Base, V3(.09f*Facing, .26f, 0.f)), V3(.02f, .02f, .01f), R3Color(W3_ColorComb));
+ R3PushCone(Mesh, R3Add(Base, V3(.13f*Facing, .2f, 0.f)), R3Add(Base, V3(.18f*Facing, .19f, 0.f)), .02f, 4, R3Color(0xFFF2B33D));
+}
+
+// NOTE: A little house: walls and a pitched roof, ridge along X.
+internal void
+W3PushHut(r3_mesh *Mesh, v3 Base, v3 Half, u32 WallColor)
+{
+ v3 Center = R3Add(Base, V3(0.f, Half.Y, 0.f));
+ R3PushBox(Mesh, Center, Half, R3Color(WallColor));
+ f32 Y0 = Base.Y + 2.f*Half.Y;
+ f32 Y1 = Y0 + .8f*Half.Z;
+ v3 A0 = V3(Base.X - Half.X - .04f, Y0, Base.Z - Half.Z - .05f);
+ v3 A1 = V3(Base.X + Half.X + .04f, Y0, Base.Z - Half.Z - .05f);
+ v3 B0 = V3(Base.X - Half.X - .04f, Y0, Base.Z + Half.Z + .05f);
+ v3 B1 = V3(Base.X + Half.X + .04f, Y0, Base.Z + Half.Z + .05f);
+ v3 R0 = V3(Base.X - Half.X - .04f, Y1, Base.Z);
+ v3 R1 = V3(Base.X + Half.X + .04f, Y1, Base.Z);
+ v3 Inside = V3(Base.X, Y0, Base.Z);
+ R3PushQuad(Mesh, A0, A1, R1, R0, Inside, R3Color(W3_ColorRoof));
+ R3PushQuad(Mesh, B0, B1, R1, R0, Inside, R3Color(W3_ColorRoof));
+ R3PushTri(Mesh, A0, B0, R0, R3Add(Inside, V3(1.f, 0.f, 0.f)), R3Color(WallColor));
+ R3PushTri(Mesh, A1, B1, R1, R3Add(Inside, V3(-1.f, 0.f, 0.f)), R3Color(WallColor));
+}
+
+// NOTE: The middle terrace, filled for the island's main food. T is the centre of the
+// terrace's top.
+internal void
+W3PushMainProduct(r3_mesh *Opaque, w3_theme *Theme, product_kind Kind, v3 T, random_series *Series)
+{
+ f32 R = W3_Terrace1Radius;
+ f32 Wall = W3_TerraceWall + .05f;
+ v4 WallColor = R3Color(Theme->Wall);
+
+ switch(Kind)
+ {
+  case ProductKind_Apples:
+  case ProductKind_Pears:
+  {
+   // An orchard.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(Theme->Lawn), WallColor);
+   u32 Leaves = (Kind == ProductKind_Pears) ? 0xFF6FAE4A : 0xFF3F8E4A;
+   for(u32 Tree = 0; Tree < 5; Tree += 1)
+   {
+    W3PushFruitTree(Opaque, W3TerracePoint(T, -15.f + 52.f*(f32)Tree, (Tree & 1) ? .7f : 1.05f), 1.f + .25f*RandomUnilateral(Series), Leaves, Kind, Series);
+   }
+  } break;
+
+  case ProductKind_Cabbage:
+  {
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
+   for(u32 Ring = 0; Ring < 2; Ring += 1)
+   {
+    for(u32 Head = 0; Head < 8; Head += 1)
+    {
+     W3PushCabbage(Opaque, W3TerracePoint(T, -20.f + 31.f*(f32)Head + 15.f*(f32)Ring, Ring ? .75f : 1.1f), Series);
+    }
+   }
+  } break;
+
+  case ProductKind_Carrots:
+  {
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
+   for(u32 Ring = 0; Ring < 3; Ring += 1)
+   {
+    for(u32 Carrot = 0; Carrot < 11; Carrot += 1)
+    {
+     W3PushCarrot(Opaque, W3TerracePoint(T, -20.f + 22.f*(f32)Carrot + 8.f*(f32)Ring, .7f + .2f*(f32)Ring));
+    }
+   }
+  } break;
+
+  case ProductKind_Fish:
+  {
+   // A fish pond, with fish.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorWater), WallColor);
+   for(u32 Fish = 0; Fish < 7; Fish += 1)
+   {
+    v3 P = W3TerracePoint(T, -20.f + 220.f*RandomUnilateral(Series), .85f + .3f*RandomUnilateral(Series));
+    P.Y += .04f;
+    R3PushEllipsoid(Opaque, P, V3(.16f, .05f, .07f), 3, 6, R3Color(W3ProductColors[ProductKind_Fish]), false);
+   }
+  } break;
+
+  case ProductKind_Meat:
+  {
+   // A pasture with cows and a barn.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorPasture), WallColor);
+   W3PushHut(Opaque, W3TerracePoint(T, 170.f, .95f), V3(.32f, .22f, .26f), W3_ColorBarn);
+   W3PushCow(Opaque, W3TerracePoint(T, 10.f, .95f), -1.f);
+   W3PushCow(Opaque, W3TerracePoint(T, 60.f, 1.f), 1.f);
+   W3PushCow(Opaque, W3TerracePoint(T, 110.f, .9f), -1.f);
+  } break;
+
+  case ProductKind_Eggs:
+  {
+   // A hen house with hens around it.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorPasture), WallColor);
+   W3PushHut(Opaque, W3TerracePoint(T, 15.f, .95f), V3(.25f, .18f, .2f), 0xFFE9C98F);
+   for(u32 Hen = 0; Hen < 6; Hen += 1)
+   {
+    W3PushHen(Opaque, W3TerracePoint(T, 50.f + 28.f*(f32)Hen, (Hen & 1) ? .8f : 1.1f), (Hen & 1) ? 1.f : -1.f);
+   }
+  } break;
+
+  case ProductKind_Wheat:
+  default:
+  {
+   // A wheat field with a windmill.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
+   for(u32 Row = 0; Row < 4; Row += 1)
+   {
+    f32 Z = T.Z - .78f + .52f*(f32)Row;
+    f32 HalfLength = .8f*R3Sqrt(Max(R*R - (Z - T.Z)*(Z - T.Z), .01f));
+    R3PushBox(Opaque, V3(T.X, T.Y + .1f, Z), V3(HalfLength, .1f, .14f), W3Shade(R3Color(W3ProductColors[ProductKind_Wheat]), Series));
+   }
+   v3 Mill = W3TerracePoint(T, 170.f, 1.f);
+   R3PushCone(Opaque, Mill, R3Add(Mill, V3(0.f, 1.3f, 0.f)), .28f, 8, R3Color(0xFFF4EBDD));
+   v3 Hub = R3Add(Mill, V3(0.f, 1.05f, .25f));
+   for(u32 Blade = 0; Blade < 4; Blade += 1)
+   {
+    f32 Angle = .4f + .5f*Pi32*(f32)Blade;
+    v3 Dir = V3(R3Cos(Angle), R3Sin(Angle), 0.f);
+    R3PushOrientedBox(Opaque, R3Add(Hub, R3Scale(Dir, .32f)), R3Scale(Dir, .3f), V3(-Dir.Y*.07f, Dir.X*.07f, 0.f), V3(0.f, 0.f, .015f), R3Color(0xFFD9C4A0));
+   }
+  } break;
+ }
+}
+
+// NOTE: Something small for a second food (or a bush when there is none), on one of
+// the back corners of the lawn.
+internal void
+W3PushSmallProduct(r3_mesh *Opaque, w3_theme *Theme, product_kind Kind, v3 Base, random_series *Series)
+{
+ switch(Kind)
+ {
+  case ProductKind_Apples:  W3PushFruitTree(Opaque, Base, 1.f, 0xFF3F8E4A, ProductKind_Apples, Series); break;
+  case ProductKind_Pears:   W3PushFruitTree(Opaque, Base, 1.f, 0xFF6FAE4A, ProductKind_Pears, Series); break;
+  case ProductKind_Cabbage:
+  {
+   for(u32 Head = 0; Head < 3; Head += 1) W3PushCabbage(Opaque, R3Add(Base, V3(-.3f + .3f*(f32)Head, 0.f, .1f*(f32)(Head & 1))), Series);
+  } break;
+  case ProductKind_Carrots:
+  {
+   for(u32 Carrot = 0; Carrot < 6; Carrot += 1) W3PushCarrot(Opaque, R3Add(Base, V3(-.3f + .12f*(f32)Carrot, 0.f, (Carrot & 1) ? .1f : -.1f)));
+  } break;
+  case ProductKind_Wheat:
+  {
+   // Hay bales.
+   R3PushCylinder(Opaque, R3Add(Base, V3(-.2f, .17f, -.15f)), R3Add(Base, V3(-.2f, .17f, .15f)), .17f, 8, R3Color(W3ProductColors[ProductKind_Wheat]));
+   R3PushCylinder(Opaque, R3Add(Base, V3(.2f, .17f, -.15f)), R3Add(Base, V3(.2f, .17f, .15f)), .17f, 8, W3Shade(R3Color(W3ProductColors[ProductKind_Wheat]), Series));
+  } break;
+  case ProductKind_Fish:
+  {
+   // A drying rack with fish.
+   R3PushCylinder(Opaque, R3Add(Base, V3(-.3f, 0.f, 0.f)), R3Add(Base, V3(-.3f, .6f, 0.f)), .03f, 4, R3Color(W3_ColorDarkWood));
+   R3PushCylinder(Opaque, R3Add(Base, V3(.3f, 0.f, 0.f)), R3Add(Base, V3(.3f, .6f, 0.f)), .03f, 4, R3Color(W3_ColorDarkWood));
+   R3PushCylinder(Opaque, R3Add(Base, V3(-.32f, .58f, 0.f)), R3Add(Base, V3(.32f, .58f, 0.f)), .025f, 4, R3Color(W3_ColorDarkWood));
+   for(u32 Fish = 0; Fish < 3; Fish += 1)
+   {
+    R3PushEllipsoid(Opaque, R3Add(Base, V3(-.18f + .18f*(f32)Fish, .42f, 0.f)), V3(.05f, .13f, .03f), 3, 5, R3Color(W3ProductColors[ProductKind_Fish]), false);
+   }
+  } break;
+  case ProductKind_Meat:  W3PushCow(Opaque, Base, 1.f); break;
+  case ProductKind_Eggs:
+  {
+   W3PushHen(Opaque, R3Add(Base, V3(-.15f, 0.f, 0.f)), 1.f);
+   W3PushHen(Opaque, R3Add(Base, V3(.18f, 0.f, .1f)), -1.f);
+  } break;
+  default:
+  {
+   // A flowering bush.
+   R3PushEllipsoid(Opaque, R3Add(Base, V3(0.f, .2f, 0.f)), V3(.3f, .24f, .3f), 4, 7, W3Shade(R3Color(Theme->Leaves), Series), false);
+   for(u32 Flower = 0; Flower < 4; Flower += 1)
+   {
+    f32 Angle = 2.f*Pi32*RandomUnilateral(Series);
+    R3PushEllipsoid(Opaque, R3Add(Base, V3(.26f*R3Cos(Angle), .28f, .26f*R3Sin(Angle))), V3(.06f, .06f, .06f), 3, 5, R3Color(Theme->Fruit), false);
+   }
+  } break;
+ }
+}
+
+// NOTE: A wooden dock out from the island's side, with a little sky boat moored at it.
+internal void
+W3PushDock(r3_mesh *Mesh, v3 Top, f32 Radius, f32 SideSign)
+{
+ v3 Out = V3(SideSign, 0.f, 0.f);
+ v3 Start = R3Add(Top, V3(SideSign*.85f*Radius, -.1f, .35f*Radius));
+ v3 End = R3Add(Start, R3Scale(Out, 1.6f));
+ v3 Mid = R3Scale(R3Add(Start, End), .5f);
+ R3PushBox(Mesh, Mid, V3(.82f, .05f, .2f), R3Color(W3_ColorDarkWood));
+ R3PushCylinder(Mesh, R3Add(End, V3(0.f, -.6f, -.2f)), R3Add(End, V3(0.f, .25f, -.2f)), .05f, 5, R3Color(W3_ColorDarkWood));
+ R3PushCylinder(Mesh, R3Add(End, V3(0.f, -.6f, .2f)), R3Add(End, V3(0.f, .25f, .2f)), .05f, 5, R3Color(W3_ColorDarkWood));
+
+ // Boat beside the end of the dock: a hull, a mast and a sail.
+ v3 Boat = R3Add(End, V3(-SideSign*.3f, -.15f, .65f));
+ R3PushEllipsoid(Mesh, Boat, V3(.7f, .2f, .26f), 4, 8, R3Color(0xFF9C6B43), false);
+ R3PushBox(Mesh, R3Add(Boat, V3(0.f, .1f, 0.f)), V3(.55f, .03f, .18f), R3Color(0xFFD9B98F));
+ v3 MastTop = R3Add(Boat, V3(0.f, 1.f, 0.f));
+ R3PushCylinder(Mesh, R3Add(Boat, V3(0.f, .1f, 0.f)), MastTop, .03f, 4, R3Color(W3_ColorDarkWood));
+ R3PushTri(Mesh, R3Add(Boat, V3(.05f, .25f, 0.f)), R3Add(MastTop, V3(.05f, -.05f, 0.f)), R3Add(Boat, V3(.55f, .25f, 0.f)),
+           R3Add(Boat, V3(.2f, .4f, -1.f)), R3Color(W3_ColorSail));
+ R3PushTri(Mesh, R3Add(Boat, V3(.05f, .25f, 0.f)), R3Add(MastTop, V3(.05f, -.05f, 0.f)), R3Add(Boat, V3(.55f, .25f, 0.f)),
+           R3Add(Boat, V3(.2f, .4f, 1.f)), R3Color(W3_ColorSail));
+}
+
+// NOTE: Trees on both sides (in the cluster's colours), what the island makes, and a
+// dock when it catches fish. The front of the lawn holds the crates.
+internal void
+W3PushDecorations(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, island *Island, v3 Top, f32 Radius, u32 Index)
 {
  random_series Series = {0};
  RandomSeed(&Series, W3_Seed*13 + 977*(u64)Index);
 
+ //- Main and second product (main = the one it makes most of)
+ product_kind Main = ProductKind_None;
+ product_kind Second = ProductKind_None;
+ u64 MainAmount = 0;
+ for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
+ {
+  if(Main == ProductKind_None || Product->Amount > MainAmount)
+  {
+   Second = Main;
+   Main = Product->Kind;
+   MainAmount = Product->Amount;
+  }
+  else if(Second == ProductKind_None)
+  {
+   Second = Product->Kind;
+  }
+ }
+
+ W3PushMainProduct(Opaque, Theme, Main, R3Add(Top, W3_Terrace1Offset), &Series);
+
+ b32 MakesFish = (Main == ProductKind_Fish || Second == ProductKind_Fish);
+ for(u32 Corner = 0; Corner < 2; Corner += 1)
+ {
+  f32 SideSign = (Corner == 0) ? -1.f : 1.f;
+  v3 Base = V3(Top.X + SideSign*.62f*Radius, Top.Y, Top.Z - .6f*Radius);
+  W3PushSmallProduct(Opaque, Theme, (Second == ProductKind_Fish) ? ProductKind_None : Second, Base, &Series);
+ }
+ if(MakesFish)
+ {
+  W3PushDock(Opaque, Top, Radius, (Index & 1) ? 1.f : -1.f);
+ }
+
+ //- Shade trees on both sides, in the cluster's colours (no fruit, so they are not
+ // mistaken for an orchard)
  for(u32 Tree = 0; Tree < 2; Tree += 1)
  {
   f32 SideSign = (Tree == 0) ? -1.f : 1.f;
   f32 Scale = .85f + .35f*RandomUnilateral(&Series);
   v3 Base = V3(Top.X + SideSign*.72f*Radius, Top.Y, Top.Z + .1f + .35f*RandomBilateral(&Series));
-  R3PushCylinder(Mesh, Base, R3Add(Base, V3(0.f, .75f*Scale, 0.f)), .09f*Scale, 6, R3Color(W3_ColorTrunk));
-  R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, 1.05f*Scale, 0.f)), V3(.5f*Scale, .45f*Scale, .5f*Scale), 5, 8,
-                  W3Shade(R3Color(W3_ColorLeaves), &Series), false);
-
-  // A few fruits
-  for(u32 Fruit = 0; Fruit < 3; Fruit += 1)
-  {
-   f32 Angle = 2.f*Pi32*RandomUnilateral(&Series);
-   v3 P = R3Add(Base, V3(.42f*Scale*R3Cos(Angle), (.95f + .25f*RandomUnilateral(&Series))*Scale, .42f*Scale*R3Sin(Angle)));
-   R3PushEllipsoid(Mesh, P, V3(.07f, .07f, .07f), 3, 5, R3Color(W3_ColorFruit), false);
-  }
- }
-
- for(u32 Panel = 0; Panel < 2; Panel += 1)
- {
-  f32 SideSign = (Panel == 0) ? -1.f : 1.f;
-  v3 Base = V3(Top.X + SideSign*.62f*Radius, Top.Y, Top.Z - .6f*Radius);
-  v3 PanelCenter = R3Add(Base, V3(0.f, .55f, 0.f));
-  R3PushCylinder(Mesh, Base, PanelCenter, .05f, 5, R3Color(W3_ColorPost));
-  R3PushOrientedBox(Mesh, PanelCenter,
-                    V3(.36f, 0.f, 0.f),
-                    V3(0.f, .028f, -.016f),
-                    V3(0.f, .14f, .25f),
-                    R3Color(W3_ColorPanel));
+  R3PushCylinder(Opaque, Base, R3Add(Base, V3(0.f, .75f*Scale, 0.f)), .09f*Scale, 6, R3Color(W3_ColorTrunk));
+  R3PushEllipsoid(Opaque, R3Add(Base, V3(0.f, 1.05f*Scale, 0.f)), V3(.5f*Scale, .45f*Scale, .5f*Scale), 5, 8,
+                  W3Shade(R3Color(Theme->Leaves), &Series), false);
  }
 }
 
@@ -463,9 +826,9 @@ W3PushClouds(r3_mesh *Mesh)
  v4 Color = R3WithAlpha(R3Color(W3_ColorCloud), .42f);
  for(u32 Cloud = 0; Cloud < W3_CloudCount; Cloud += 1)
  {
-  v3 Center = V3(70.f*RandomBilateral(&Series),
-                 -13.f - 3.f*RandomUnilateral(&Series),
-                 70.f*RandomBilateral(&Series));
+  v3 Center = V3(80.f*RandomBilateral(&Series),
+                 -14.f - 3.f*RandomUnilateral(&Series),
+                 80.f*RandomBilateral(&Series));
   u32 Puffs = 3 + RandomNext(&Series) % 3;
   for(u32 Puff = 0; Puff < Puffs; Puff += 1)
   {
@@ -559,9 +922,10 @@ W3BuildWorld(app_state *App)
 
   b32 Hovered = (R3->HoveredIdx == (s32)Index);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
-  W3PushIslandBody(&R3->Opaque, &R3->Translucent, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
+  w3_theme *Theme = W3ThemeFor(App, Index, R3->IslandCount);
+  W3PushIslandBody(&R3->Opaque, &R3->Translucent, Theme, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
                    Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected);
-  W3PushDecorations(&R3->Opaque, Top, Radius, Index);
+  W3PushDecorations(&R3->Opaque, &R3->Translucent, Theme, Island, Top, Radius, Index);
   W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
 
   f32 KnownFraction = 0.f;

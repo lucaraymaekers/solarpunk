@@ -1,26 +1,17 @@
 //-
 // SolarPunk 3D view: runs the 3D pass and draws the 2D overlay on top of it:
-//   - summary bar (top left): round, speed, how many islands are ok / waiting / short,
-//     and which products are short worldwide
-//   - island labels (name + status dot), cable costs of the hovered island
-//   - camera buttons (top right)
-//   - "Legend" and "Controls" buttons (bottom left) that open those boxes
+//   - the top bar: island status (left), time controls (middle), camera and help (right)
+//   - under it, the products that are short worldwide
+//   - cluster names, island labels (name + status dot), cable costs of the hovered island
+//   - the help card ("?"), also shown on the first start
 //-
 
 //~ Constants
-#define V3D_Margin       12.f
+#define V3D_Margin       Ui_Margin
 #define V3D_LabelPadding 5.f
-#define V3D_ChipPadding  8.f
+#define V3D_ChipPadding  10.f
 
-// NOTE: Area of the summary bar and the two rows of time controls under it (top left).
-#define V3D_ControlsAreaWidth   840.f
-#define V3D_ControlsAreaHeight  120.f
-
-#define V3D_ColorLabelBg     0xE02E3440
-#define V3D_ColorLabelBorder 0xFF88C0D0
-#define V3D_ColorChip        0xE62E3440
-#define V3D_ColorChipHot     0xE64C566A
-#define V3D_ColorChipOpen    0xE65E81AC
+#define V3D_ColorLabelBg     0xF0FFF9EF
 
 //~ UI areas
 internal void
@@ -104,7 +95,6 @@ internal void
 V3DrawClusterLabels(app_state *App, app_input *Input)
 {
  r3_state *R3 = &App->R3;
- font_atlas *Atlas = &App->FontAtlas;
  font *Font = &App->Font;
  f32 LineHeight = Font->HeightPx;
  f32 Dot = LineHeight - 10.f;
@@ -144,7 +134,7 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
   {
    if(Counts[Status]) Width += 10.f + Dot + 4.f + V3Measure(App, Str8Fmt("%u", Counts[Status]));
   }
-  f32 Height = LineHeight + BroadcastView_ButtonPadding + 4.f;
+  f32 Height = LineHeight + 2.f*Ui_ButtonPadY;
   v4 Box = RectFromSize(V2(FloorF32(Screen.X - .5f*Width), FloorF32(Screen.Y - Height)), V2(Width, Height));
 
   // Not on top of the panel or the controls: slide it left of what covers it (the
@@ -168,13 +158,18 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
   //- Draw and click
   b32 Focused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
   b32 Hot = IsInsideRectV2(MousePos, Box) && !IsInsideRectV2(MousePos, R3->PopupRect);
-  u32 Background = Focused ? V3D_ColorChipOpen : (Hot ? V3D_ColorChipHot : V3D_ColorChip);
+  u32 Background = Focused ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorCard);
+  UiCard(Box, .5f*Height);
   DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, 0.f);
-  DrawRect(Box, V4FromU32(Focused ? W3_ColorSelected : V3D_ColorLabelBorder), .5f*Height, Focused ? 2.f : 1.f, 0.f);
+  if(Hot)
+  {
+   UiSetHint(Focused ? "Click to see all clusters again" : "Click to fly here and show the island names",
+             V2(.5f*(Box.Min.X + Box.Max.X), Box.Max.Y + 6.f));
+  }
 
   f32 X = Box.Min.X + V3D_ChipPadding;
   f32 TextY = Box.Min.Y + .5f*(Height - LineHeight);
-  GraphDrawText(Atlas, Font, V2(X, TextY), Name, V4FromU32(Graph_ColorTitle));
+  UiText(App, V2(X, TextY), Name, Focused ? Ui_ColorOnAccent : Ui_ColorText);
   X += V3Measure(App, Name) + 10.f;
   for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
   {
@@ -183,7 +178,7 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
     V3StatusDot(V2(X, Box.Min.Y + .5f*(Height - Dot)), Dot, W3StatusColor(Status));
     X += Dot + 4.f;
     str8 Number = Str8Fmt("%u", Counts[Status]);
-    GraphDrawText(Atlas, Font, V2(X, TextY), Number, V4FromU32(Focused ? Graph_ColorTitle : W3StatusColor(Status)));
+    UiText(App, V2(X, TextY), Number, Focused ? Ui_ColorOnAccent : UiStatusText(Status));
     X += V3Measure(App, Number) + 10.f;
    }
   }
@@ -204,7 +199,6 @@ internal void
 V3DrawIslandLabels(app_state *App)
 {
  r3_state *R3 = &App->R3;
- font_atlas *Atlas = &App->FontAtlas;
  font *Font = &App->Font;
  f32 LineHeight = Font->HeightPx;
  f32 Dot = LineHeight - 10.f;
@@ -265,7 +259,7 @@ V3DrawIslandLabels(app_state *App)
   b32 Hovered = (R3->HoveredIdx == (s32)Index);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
 
-  f32 Width = Dot + 6.f + V3Measure(App, Island->Name) + 2.f*V3D_LabelPadding;
+  f32 Width = Dot + 10.f + V3Measure(App, Island->Name) + 2.f*V3D_LabelPadding;
   f32 Height = LineHeight + 2.f*V3D_LabelPadding;
   v2 Anchor = R3->IslandScreen[Index];
   v2 Min = V2(FloorF32(Anchor.X - .5f*Width), FloorF32(Anchor.Y - Height));
@@ -282,14 +276,13 @@ V3DrawIslandLabels(app_state *App)
    Placed[PlacedCount] = Box;
    PlacedCount += 1;
 
-   u32 Border = Hovered ? W3_ColorHover : (Selected ? W3_ColorSelected : V3D_ColorLabelBorder);
-   DrawRect(Box, V4FromU32(V3D_ColorLabelBg), 5.f, 0.f, 0.f);
+   DrawRect(Box, V4FromU32(V3D_ColorLabelBg), .5f*Height, 0.f, 0.f);
    if(Hovered || Selected)
    {
-    DrawRect(Box, V4FromU32(Border), 5.f, 2.f, 0.f);
+    DrawRect(Box, V4FromU32(Hovered ? Ui_ColorAccent : Ui_ColorSelected), .5f*Height, 2.f, 0.f);
    }
-   V3StatusDot(V2(Min.X + V3D_LabelPadding, Min.Y + .5f*(Height - Dot)), Dot, W3StatusColor(R3->IslandStatus[Index]));
-   GraphDrawText(Atlas, Font, V2(Min.X + V3D_LabelPadding + Dot + 6.f, Min.Y + V3D_LabelPadding), Island->Name, V4FromU32(Graph_ColorTitle));
+   V3StatusDot(V2(Min.X + V3D_LabelPadding + 2.f, Min.Y + .5f*(Height - Dot)), Dot, W3StatusColor(R3->IslandStatus[Index]));
+   UiText(App, V2(Min.X + V3D_LabelPadding + Dot + 8.f, Min.Y + V3D_LabelPadding), Island->Name, Ui_ColorText);
   }
  }
 }
@@ -299,7 +292,6 @@ internal void
 V3DrawHoveredCableCosts(app_state *App)
 {
  r3_state *R3 = &App->R3;
- font_atlas *Atlas = &App->FontAtlas;
  font *Font = &App->Font;
  f32 LineHeight = Font->HeightPx;
 
@@ -324,8 +316,8 @@ V3DrawHoveredCableCosts(app_state *App)
        f32 Width = V3Measure(App, Text) + 2.f*V3D_LabelPadding;
        v2 Min = V2(FloorF32(Screen.X - .5f*Width), FloorF32(Screen.Y - .5f*LineHeight));
        v4 Box = RectFromSize(Min, V2(Width, LineHeight + 2.f));
-       DrawRect(Box, V4FromU32(V3D_ColorLabelBg), 4.f, 0.f, 0.f);
-       GraphDrawText(Atlas, Font, V2(Min.X + V3D_LabelPadding, Min.Y + 1.f), Text, V4FromU32(Graph_ColorCost));
+       DrawRect(Box, V4FromU32(V3D_ColorLabelBg), 5.f, 0.f, 0.f);
+       UiText(App, V2(Min.X + V3D_LabelPadding, Min.Y + 1.f), Text, Ui_ColorTitle);
       }
      }
     }
@@ -335,52 +327,47 @@ V3DrawHoveredCableCosts(app_state *App)
  }
 }
 
-//~ Summary bar (top left)
-// NOTE: Each chip is a button: it opens a dropdown listing the islands behind the number.
+//~ Top bar
+// NOTE: One bar across the top: island status chips (left), time controls (middle),
+// camera buttons and help (right). Every status chip opens a list of those islands.
 
 internal void PanelSelect(app_state *App, s32 IslandIdx);
 
-#define V3D_PopupWidth     360.f
-#define V3D_ColorPopupBg   0xF02E3440
-#define V3D_ColorRowHover  0xFF4C566A
-#define V3D_ColorSection   0xFFEBCB8B
-#define V3D_ColorDim       0xFF9AA3B5
-#define V3D_ColorGood      0xFFA3BE8C
+#define V3D_PopupWidth 360.f
 
-// NOTE: A chip: rounded background, optional coloured dot (or product swatch), text.
-// Clickable chips highlight on hover and return true when clicked.
+// NOTE: A pill with a dot (round) or product swatch (square) and text. Clickable;
+// the open one is filled with the accent colour. Returns true when clicked.
 internal b32
-V3Chip(app_state *App, app_input *Input, v2 *Cursor, str8 Text, u32 DotColor, b32 HasDot, b32 Square, u32 TextColor, b32 Clickable, b32 Open)
+V3Chip(app_state *App, app_input *Input, v2 *Cursor, str8 Text, u32 DotColor, b32 Square, u32 TextColor, b32 Open, char *Hint)
 {
- font *Font = &App->Font;
- f32 Height = Font->HeightPx + BroadcastView_ButtonPadding;
- f32 Dot = Font->HeightPx - 8.f;
- f32 DotSpace = HasDot ? Dot + 6.f : 0.f;
- f32 Width = 2.f*V3D_ChipPadding + DotSpace + V3Measure(App, Text);
+ f32 Height = UiButtonHeight(App);
+ f32 Dot = UiLineHeight(App) - 8.f;
+ f32 Width = 2.f*V3D_ChipPadding + Dot + 6.f + V3Measure(App, Text);
  v4 Box = RectFromSize(*Cursor, V2(Width, Height));
 
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
- b32 Hot = Clickable && IsInsideRectV2(MousePos, Box);
- u32 Background = Open ? V3D_ColorChipOpen : (Hot ? V3D_ColorChipHot : V3D_ColorChip);
-
+ b32 Hot = IsInsideRectV2(MousePos, Box) && !UiMouseBlocked(App, MousePos);
+ u32 Background = Open ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorButton);
  DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, 0.f);
- if(HasDot)
+
+ v2 DotPos = V2(Box.Min.X + V3D_ChipPadding, Box.Min.Y + .5f*(Height - Dot));
+ if(Open) DrawRect(RectFromSize(V2(DotPos.X - 2.f, DotPos.Y - 2.f), V2(Dot + 4.f, Dot + 4.f)), V4FromU32(Ui_ColorCard), Square ? 4.f : .5f*Dot + 2.f, 0.f, 0.f);
+ DrawRect(RectFromSize(DotPos, V2(Dot, Dot)), V4FromU32(DotColor), Square ? 3.f : .5f*Dot, 0.f, 0.f);
+ UiText(App, V2(DotPos.X + Dot + 6.f, Box.Min.Y + Ui_ButtonPadY), Text, Open ? Ui_ColorOnAccent : TextColor);
+
+ if(Hot && Hint)
  {
-  v2 DotPos = V2(Box.Min.X + V3D_ChipPadding, Box.Min.Y + .5f*(Height - Dot));
-  DrawRect(RectFromSize(DotPos, V2(Dot, Dot)), V4FromU32(DotColor), Square ? 3.f : .5f*Dot, 0.f, 0.f);
+  UiSetHint(Hint, V2(.5f*(Box.Min.X + Box.Max.X), Box.Max.Y + 6.f));
  }
- // White text on the open (blue) chip, so coloured text stays readable.
- GraphDrawText(&App->FontAtlas, Font, V2(Box.Min.X + V3D_ChipPadding + DotSpace, Box.Min.Y + .5f*BroadcastView_ButtonPadding),
-               Text, V4FromU32(Open ? Graph_ColorTitle : TextColor));
- Cursor->X += Width + BroadcastView_ButtonGap;
+ Cursor->X += Width + Ui_Gap;
 
  b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
  return Result;
 }
 
-// NOTE: Clicking a chip opens its list; clicking the open chip closes it.
+// NOTE: Clicking a chip opens its list under it; clicking the open chip closes it.
 internal void
-V3ToggleSummary(r3_state *R3, s32 Which, v2 ChipBottomLeft)
+V3ToggleSummary(r3_state *R3, s32 Which, v2 TopLeft)
 {
  if(R3->SummaryOpen == Which)
  {
@@ -389,48 +376,185 @@ V3ToggleSummary(r3_state *R3, s32 Which, v2 ChipBottomLeft)
  else
  {
   R3->SummaryOpen = Which;
-  R3->PopupRect = RectFromSize(ChipBottomLeft, V2(0.f, 0.f)); // real size set when drawn
+  R3->PopupRect = RectFromSize(TopLeft, V2(0.f, 0.f)); // real size set when drawn
  }
 }
 
+internal f32
+V3ChipWidth(app_state *App, str8 Text)
+{
+ f32 Dot = UiLineHeight(App) - 8.f;
+ f32 Result = 2.f*V3D_ChipPadding + Dot + 6.f + V3Measure(App, Text);
+ return Result;
+}
+
+// NOTE: When the text is big and everything does not fit in one row, the time controls
+// move to a second row of the bar.
 internal void
-V3DrawSummaryBar(app_state *App, app_input *Input)
+V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
- broadcast_state *Broadcast = &App->Broadcast;
- f32 Height = App->Font.HeightPx + BroadcastView_ButtonPadding;
- v2 Cursor = V2(V3D_Margin, V3D_Margin);
-
- //- Time (not a button)
- V3Chip(App, Input, &Cursor, Str8Fmt("Round %llu   %s", Broadcast->Round, BroadcastSpeedLabels[BroadcastSpeedIdx(Broadcast)]),
-        0, false, false, Graph_ColorTitle, false, false);
- Cursor.X += 10.f;
-
- //- Islands per status
+ f32 ButtonHeight = UiButtonHeight(App);
+ f32 Square = ButtonHeight;
+ f32 Scale = UiScale(App);
+ 
+ //- Islands per status, and the width of each group
  u32 Counts[IslandStatus_Count] = {0};
  for(u32 Idx = 0; Idx < R3->IslandCount; Idx += 1)
  {
   if(R3->IslandStatus[Idx] < IslandStatus_Count) Counts[R3->IslandStatus[Idx]] += 1;
  }
-
+ 
  // NOTE: Plain C strings: MSVC warns (C4204) about non-constant aggregate initializers.
- char *StatusFormats[IslandStatus_Count] = {"%u ok", "%u waiting for news", "%u short"};
- u32 Order[IslandStatus_Count] = {IslandStatus_Ok, IslandStatus_Waiting, IslandStatus_Short};
- for(u32 OrderIdx = 0; OrderIdx < IslandStatus_Count; OrderIdx += 1)
+ char *StatusFormats[IslandStatus_Count] = {"%u ok", "%u waiting", "%u short"};
+ char *StatusHints[IslandStatus_Count] =
  {
-  u32 Status = Order[OrderIdx];
+  "Islands that know a supplier for every need. Click for the list",
+  "Islands still waiting for news of a supplier. Click for the list",
+  "Islands that need a product the world lacks. Click for the list",
+ };
+ str8 StatusTexts[IslandStatus_Count];
+ f32 LeftWidth = 0.f;
+ for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
+ {
+  StatusTexts[Status] = Str8Fmt(StatusFormats[Status], Counts[Status]);
+  LeftWidth += V3ChipWidth(App, StatusTexts[Status]) + Ui_Gap;
+ }
+ 
+ b32 HasClusters = (V3ClusterCount(App) > 0);
+ f32 RightWidth = UiButtonWidth(App, S8("?"), Square) + Ui_Gap;
+ if(HasClusters) RightWidth += UiButtonWidth(App, S8("All clusters"), 0.f) + 12.f + Ui_Gap;
+ 
+ f32 Fixed = TimeControlsFixedWidth(App);
+ f32 MinTimeline = 120.f*Scale;
+ f32 MaxTimeline = 340.f*Scale;
+ f32 Inner = BufferDim.X - 2.f*Ui_Margin - 2.f*Ui_Pad;
+ b32 OneRow = (LeftWidth + 16.f + Fixed + MinTimeline + 16.f + RightWidth <= Inner);
+ 
+ //- The bar
+ f32 BarHeight = (OneRow ? ButtonHeight : 2.f*ButtonHeight + Ui_Gap) + 2.f*Ui_Pad;
+ v4 Bar = RectFromSize(V2(Ui_Margin, Ui_Margin), V2(BufferDim.X - 2.f*Ui_Margin, BarHeight));
+ UiCard(Bar, Ui_CardRadius);
+ R3->TopBarRect = Bar;
+ V3AddUIRect(R3, Bar);
+ f32 Y = Bar.Min.Y + Ui_Pad;
+ // Status lists open under the shortage strip (see V3DrawShortageStrip), so it stays visible.
+ f32 PopupY = Bar.Max.Y + Ui_Gap + (ButtonHeight + 2.f*6.f) + Ui_Gap;
+ 
+ //- Left: islands per status
+ v2 Cursor = V2(Bar.Min.X + Ui_Pad, Y);
+ for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
+ {
   s32 Which = 1 + (s32)Status;
   v2 ChipPos = Cursor;
-  if(V3Chip(App, Input, &Cursor, Str8Fmt(StatusFormats[Status], Counts[Status]), W3StatusColor(Status), true, false,
-            Graph_ColorTitle, true, (R3->SummaryOpen == Which)))
+  if(V3Chip(App, Input, &Cursor, StatusTexts[Status], W3StatusColor(Status), false,
+            Ui_ColorText, (R3->SummaryOpen == Which), StatusHints[Status]))
   {
-   V3ToggleSummary(R3, Which, V2(ChipPos.X, ChipPos.Y + Height + BroadcastView_ButtonGap));
+   V3ToggleSummary(R3, Which, V2(ChipPos.X, PopupY));
   }
  }
- Cursor.X += 10.f;
+ f32 LeftEnd = Cursor.X;
+ R3->SummaryBarRect = V4(Bar.Min.X, Bar.Min.Y, LeftEnd, Y + ButtonHeight + Ui_Pad);
+ 
+ //- Right: "All clusters" (a list of the clusters) and help, laid out from the right edge
+ f32 RightStart = Bar.Max.X - Ui_Pad - RightWidth + Ui_Gap;
+ Cursor = V2(RightStart, Y);
+ R3->ClustersButtonRect = V4(0.f, 0.f, 0.f, 0.f);
+ if(HasClusters)
+ {
+  v2 ButtonPos = Cursor;
+  b32 Open = (R3->SummaryOpen == R3_SummaryClusters);
+  if(UiButtonEx(App, Input, &Cursor, S8("All clusters"), Open ? UiButton_Toggled : UiButton_Normal,
+                "Every cluster: its islands and the products it lacks", 0.f))
+  {
+   V3ToggleSummary(R3, R3_SummaryClusters, V2(ButtonPos.X, Bar.Max.Y + Ui_Gap));
+  }
+  R3->ClustersButtonRect = RectFromSize(ButtonPos, V2(UiButtonWidth(App, S8("All clusters"), 0.f), ButtonHeight));
+  Cursor.X += 12.f;
+ }
+ v2 HelpPos = Cursor;
+ if(UiButtonEx(App, Input, &Cursor, S8("?"), R3->HelpOpen ? UiButton_Toggled : UiButton_Normal, "Help: what the colours mean, mouse and keys", Square))
+ {
+  R3->HelpOpen = !R3->HelpOpen;
+  R3->SummaryOpen = 0;
+ }
+ R3->HelpButtonRect = RectFromSize(HelpPos, V2(UiButtonWidth(App, S8("?"), Square), ButtonHeight));
+ 
+ //- Time controls: in the middle of the row, or centred on a second row
+ f32 RowY = Y;
+ f32 SpaceMin = LeftEnd + 16.f;
+ f32 SpaceMax = RightStart - 16.f;
+ if(!OneRow)
+ {
+  RowY = Y + ButtonHeight + Ui_Gap;
+  SpaceMin = Bar.Min.X + Ui_Pad;
+  SpaceMax = Bar.Max.X - Ui_Pad;
+ }
+ f32 TimelineWidth = Clamp(60.f, (SpaceMax - SpaceMin) - Fixed, MaxTimeline);
+ f32 Total = Fixed + TimelineWidth;
+ f32 Start = .5f*(Bar.Min.X + Bar.Max.X) - .5f*Total;
+ Start = Min(Start, SpaceMax - Total);
+ Start = Max(Start, SpaceMin);
+ 
+ // Thin dividers between the groups.
+ if(OneRow)
+ {
+  DrawRect(RectFromSize(V2(Start - 9.f, Y + 4.f), V2(1.f, ButtonHeight - 8.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+  DrawRect(RectFromSize(V2(RightStart - 9.f, Y + 4.f), V2(1.f, ButtonHeight - 8.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+ }
+ else
+ {
+  DrawRect(RectFromSize(V2(Bar.Min.X + Ui_Pad, RowY - .5f*Ui_Gap), V2(Bar.Max.X - Bar.Min.X - 2.f*Ui_Pad, 1.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+ }
+ 
+ Cursor = V2(Start, RowY);
+ DrawTimeControls(App, Input, &Cursor, TimelineWidth);
+}
 
- //- Products that are short worldwide
- b32 AnyShort = false;
+//~ Products short worldwide (under the top bar)
+internal void
+V3DrawShortageStrip(app_state *App, app_input *Input)
+{
+ r3_state *R3 = &App->R3;
+ f32 ButtonHeight = UiButtonHeight(App);
+ v2 Origin = V2(R3->TopBarRect.Min.X, R3->TopBarRect.Max.Y + Ui_Gap);
+
+ // Measure first, so the card can be drawn under the chips.
+ str8 Label = S8("Short worldwide:");
+ f32 Dot = UiLineHeight(App) - 8.f;
+ f32 Width = Ui_Pad + UiMeasure(App, Label) + Ui_Gap;
+ u32 ShortCount = 0;
+ for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
+ {
+  if(R3->TotalNeeded[Kind] > R3->TotalProduced[Kind])
+  {
+   s64 Missing = (s64)R3->TotalNeeded[Kind] - (s64)R3->TotalProduced[Kind];
+   str8 Name = ProductNames[Kind];
+   Width += 2.f*V3D_ChipPadding + Dot + 6.f + UiMeasure(App, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing)) + Ui_Gap;
+   ShortCount += 1;
+  }
+ }
+ if(ShortCount == 0)
+ {
+  Label = S8("No product is short worldwide");
+  Width = UiMeasure(App, Label) + 2.f*Ui_Pad + Dot + 6.f;
+ }
+ Width += Ui_Pad - Ui_Gap;
+
+ v4 Box = RectFromSize(Origin, V2(Width, ButtonHeight + 2.f*6.f));
+ UiCard(Box, Ui_CardRadius);
+ V3AddUIRect(R3, Box);
+
+ v2 Cursor = V2(Box.Min.X + Ui_Pad, Box.Min.Y + 6.f);
+ if(ShortCount == 0)
+ {
+  UiDot(V2(Cursor.X, Cursor.Y + .5f*(ButtonHeight - Dot)), Dot, W3_ColorStatusOk);
+  UiText(App, V2(Cursor.X + Dot + 6.f, Cursor.Y + Ui_ButtonPadY), Label, Ui_ColorOkText);
+  return;
+ }
+
+ UiText(App, V2(Cursor.X, Cursor.Y + Ui_ButtonPadY), Label, Ui_ColorTextDim);
+ Cursor.X += UiMeasure(App, Label) + Ui_Gap;
  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
   if(R3->TotalNeeded[Kind] > R3->TotalProduced[Kind])
@@ -439,21 +563,16 @@ V3DrawSummaryBar(app_state *App, app_input *Input)
    str8 Name = ProductNames[Kind];
    s32 Which = R3_SummaryProductBase + (s32)Kind;
    v2 ChipPos = Cursor;
-   if(V3Chip(App, Input, &Cursor, Str8Fmt("%.*s short by %lld", (s32)Name.Size, Name.Data, Missing),
-             W3ProductColors[Kind], true, true, W3_ColorStatusShort, true, (R3->SummaryOpen == Which)))
+   if(V3Chip(App, Input, &Cursor, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing), W3ProductColors[Kind], true,
+             Ui_ColorShortText, (R3->SummaryOpen == Which), "More is needed than made. Click to see who needs and makes it"))
    {
-    V3ToggleSummary(R3, Which, V2(ChipPos.X, ChipPos.Y + Height + BroadcastView_ButtonGap));
+    V3ToggleSummary(R3, Which, V2(ChipPos.X, Box.Max.Y + Ui_Gap));
    }
-   AnyShort = true;
   }
  }
- if(!AnyShort)
- {
-  V3Chip(App, Input, &Cursor, S8("no product shortages"), 0, false, false, W3_ColorStatusOk, false, false);
- }
-
- R3->SummaryBarRect = RectFromSize(V2(0.f, 0.f), V2(Cursor.X, V3D_Margin + Height));
- V3AddUIRect(R3, R3->SummaryBarRect);
+ // The chips open dropdowns too, so clicks here must not close them.
+ R3->SummaryBarRect.Max.Y = Box.Max.Y;
+ R3->ShortStripRect = Box;
 }
 
 //~ Summary dropdown
@@ -462,17 +581,17 @@ internal b32
 V3PopupIslandRow(app_state *App, app_input *Input, v2 *Line, f32 Width, u32 IslandIdx, island *Island)
 {
  r3_state *R3 = &App->R3;
- f32 LineHeight = App->Font.HeightPx;
+ f32 LineHeight = UiLineHeight(App);
  f32 Dot = LineHeight - 10.f;
  v4 Row = RectFromSize(V2(Line->X - 4.f, Line->Y), V2(Width + 8.f, LineHeight));
- b32 Hot = IsInsideRectV2(V2V2S32(Input->Mouse.Pos), Row);
+ b32 Hot = IsInsideRectV2(V2V2S32(Input->Mouse.Pos), Row) && !R3->HelpOpen;
  if(Hot)
  {
-  DrawRect(Row, V4FromU32(V3D_ColorRowHover), 3.f, 0.f, 0.f);
+  DrawRect(Row, V4FromU32(Ui_ColorRowHover), 4.f, 0.f, 0.f);
   R3->PopupHoverPlusOne = (s32)IslandIdx + 1;
  }
  V3StatusDot(V2(Line->X, Line->Y + .5f*(LineHeight - Dot)), Dot, W3StatusColor(R3->IslandStatus[IslandIdx]));
- GraphDrawText(&App->FontAtlas, &App->Font, V2(Line->X + Dot + 6.f, Line->Y), Island->Name, V4FromU32(Graph_ColorTitle));
+ UiText(App, V2(Line->X + Dot + 6.f, Line->Y), Island->Name, Ui_ColorText);
  b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
  return Result;
 }
@@ -480,22 +599,189 @@ V3PopupIslandRow(app_state *App, app_input *Input, v2 *Line, f32 Width, u32 Isla
 internal void
 V3PopupSwatch(app_state *App, v2 Line, f32 X, product_kind Kind)
 {
- f32 Size = App->Font.HeightPx - 6.f;
+ f32 Size = UiLineHeight(App) - 6.f;
  DrawRect(RectFromSize(V2(X, Line.Y + 3.f), V2(Size, Size)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
 }
 
-// NOTE: Draws the open dropdown (call last, so it is on top of the other controls).
+//~ Clusters dropdown ("All clusters" in the top bar)
+// NOTE: Every cluster with how many of its islands are ok / waiting / short, and the
+// products its islands need more of than the cluster itself makes. Clicking a cluster
+// flies to it and shows its island names.
+#define V3D_ClustersPopupWidth 760.f
+
+typedef struct v3d_cluster_info v3d_cluster_info;
+struct v3d_cluster_info
+{
+ u32 Counts[IslandStatus_Count];
+ u64 Produced[ProductKind_Count];
+ u64 Needed[ProductKind_Count];
+};
+
+internal v3d_cluster_info
+V3ClusterInfo(app_state *App, u32 Cluster)
+{
+ r3_state *R3 = &App->R3;
+ v3d_cluster_info Result = {0};
+ u32 Index = 0;
+ for(island *Island = App->FirstIsland; Island && Index < R3->IslandCount; Island = Island->Next)
+ {
+  if(WorldGenClusterOf(Index, R3->IslandCount) == Cluster)
+  {
+   if(R3->IslandStatus[Index] < IslandStatus_Count) Result.Counts[R3->IslandStatus[Index]] += 1;
+   for(product *Product = Island->FirstProduct; Product; Product = Product->Next) Result.Produced[Product->Kind] += Product->Amount;
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) Result.Needed[Req->Kind] += Req->Amount;
+  }
+  Index += 1;
+ }
+ return Result;
+}
+
+// NOTE: Lays out (and draws, when Draw) one cluster entry with its top-left at Pos.
+// Returns its height.
+internal f32
+V3ClusterEntry(app_state *App, u32 Cluster, v3d_cluster_info *Info, v2 Pos, f32 Width, b32 Draw, b32 Focused)
+{
+ f32 LineHeight = UiLineHeight(App);
+ f32 Dot = LineHeight - 10.f;
+ f32 Swatch = LineHeight - 8.f;
+ 
+ //- Name, and the status counts on the right
+ if(Draw)
+ {
+  str8 Name = S8FromCString(WorldGenClusterNames[Cluster]);
+  UiText(App, Pos, Name, Focused ? Ui_ColorAccentDown : Ui_ColorText);
+  f32 X = Pos.X + Width;
+  for(u32 Back = 0; Back < IslandStatus_Count; Back += 1)
+  {
+   u32 Status = IslandStatus_Count - 1 - Back;
+   str8 Number = Str8Fmt("%u %s", Info->Counts[Status], (Status == IslandStatus_Ok) ? "ok" : ((Status == IslandStatus_Waiting) ? "waiting" : "short"));
+   X -= UiMeasure(App, Number);
+   UiText(App, V2(X, Pos.Y), Number, (Info->Counts[Status] > 0) ? UiStatusText(Status) : Ui_ColorTextDim);
+   X -= Dot + 5.f;
+   UiDot(V2(X, Pos.Y + .5f*(LineHeight - Dot)), Dot, (Info->Counts[Status] > 0) ? W3StatusColor(Status) : Ui_ColorLine);
+   X -= 18.f;
+  }
+ }
+ f32 Y = Pos.Y + LineHeight;
+ 
+ //- Products it lacks, wrapped over as many lines as needed
+ f32 Indent = 16.f;
+ f32 X = Pos.X + Indent;
+ b32 Any = false;
+ for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
+ {
+  if(Info->Needed[Kind] > Info->Produced[Kind])
+  {
+   str8 Name = ProductNames[Kind];
+   str8 Text = Str8Fmt("%.*s -%llu", (s32)Name.Size, Name.Data, Info->Needed[Kind] - Info->Produced[Kind]);
+   f32 ItemWidth = Swatch + 6.f + UiMeasure(App, Text) + 18.f;
+   if(X + ItemWidth > Pos.X + Width + 18.f && X > Pos.X + Indent)
+   {
+    X = Pos.X + Indent;
+    Y += LineHeight;
+   }
+   if(Draw)
+   {
+    DrawRect(RectFromSize(V2(X, Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+    UiText(App, V2(X + Swatch + 6.f, Y), Text, Ui_ColorShortText);
+   }
+   X += ItemWidth;
+   Any = true;
+  }
+ }
+ if(!Any && Draw)
+ {
+  UiText(App, V2(X, Y), S8("makes everything its islands need"), Ui_ColorOkText);
+ }
+ Y += LineHeight;
+ 
+ f32 Result = Y - Pos.Y;
+ return Result;
+}
+
+internal void
+V3DrawClustersPopup(app_state *App, app_input *Input, v2 BufferDim)
+{
+ r3_state *R3 = &App->R3;
+ f32 LineHeight = UiLineHeight(App);
+ f32 Pad = Ui_Pad + 4.f;
+ f32 EntryGap = 6.f;
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ b32 Clicked = WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]);
+ u32 ClusterCount = V3ClusterCount(App);
+ b32 Focused = (R3->FocusedClusterPlusOne != 0);
+ 
+ f32 Width = Min(V3D_ClustersPopupWidth*UiScale(App), BufferDim.X - 2.f*V3D_Margin);
+ f32 Inner = Width - 2.f*Pad;
+ 
+ //- Measure
+ v3d_cluster_info Infos[WorldGen_ClusterCount];
+ f32 Heights[WorldGen_ClusterCount];
+ f32 Height = 2.f*Pad + 2.f*LineHeight + 6.f;
+ if(Focused) Height += LineHeight + EntryGap;
+ for(u32 Cluster = 0; Cluster < ClusterCount; Cluster += 1)
+ {
+  Infos[Cluster] = V3ClusterInfo(App, Cluster);
+  Heights[Cluster] = V3ClusterEntry(App, Cluster, &Infos[Cluster], V2(0.f, 0.f), Inner, false, false);
+  Height += Heights[Cluster] + EntryGap;
+ }
+ 
+ // Under its button, kept inside the window.
+ v2 Min = R3->PopupRect.Min;
+ Min.X = Max(V3D_Margin, Min(Min.X, BufferDim.X - V3D_Margin - Width));
+ v4 Box = RectFromSize(Min, V2(Width, Height));
+ R3->PopupRect = Box;
+ UiCard(Box, Ui_CardRadius);
+ 
+ v2 Line = V2(Box.Min.X + Pad, Box.Min.Y + Pad);
+ UiText(App, Line, S8("Clusters: their islands, and what each cluster lacks itself"), Ui_ColorTitle);
+ Line.Y += LineHeight;
+ UiText(App, Line, S8("Click a cluster to fly to it and show its island names"), Ui_ColorTextDim);
+ Line.Y += LineHeight + 6.f;
+ 
+ //- Back to the whole world, while a cluster is open
+ if(Focused)
+ {
+  v4 Row = RectFromSize(V2(Line.X - 6.f, Line.Y - 2.f), V2(Inner + 12.f, LineHeight + 4.f));
+  b32 Hot = IsInsideRectV2(MousePos, Row) && !R3->HelpOpen;
+  if(Hot) DrawRect(Row, V4FromU32(Ui_ColorRowHover), 6.f, 0.f, 0.f);
+  UiText(App, Line, S8("Show the whole world"), Ui_ColorAccentDown);
+  if(Hot && Clicked)
+  {
+   V3FocusCluster(App, 0);
+   R3->SummaryOpen = 0;
+  }
+  Line.Y += LineHeight + EntryGap;
+ }
+ 
+ //- One entry per cluster
+ for(u32 Cluster = 0; Cluster < ClusterCount; Cluster += 1)
+ {
+  v4 Row = RectFromSize(V2(Line.X - 6.f, Line.Y - 3.f), V2(Inner + 12.f, Heights[Cluster] + 6.f));
+  b32 Hot = IsInsideRectV2(MousePos, Row) && !R3->HelpOpen;
+  b32 IsFocused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
+  if(Hot || IsFocused) DrawRect(Row, V4FromU32(Hot ? Ui_ColorRowHover : Ui_ColorRowAlt), 6.f, 0.f, 0.f);
+  V3ClusterEntry(App, Cluster, &Infos[Cluster], Line, Inner, true, IsFocused);
+  if(Hot && Clicked)
+  {
+   if(!IsFocused) V3FocusCluster(App, (s32)Cluster + 1);
+   R3->SummaryOpen = 0;
+  }
+  Line.Y += Heights[Cluster] + EntryGap;
+ }
+}
+
+// NOTE: Draws the open dropdown (call after the panel, so it is on top of it).
 // Clicking a row opens that island in the panel; clicking outside closes the dropdown.
 internal void
 DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
- font_atlas *Atlas = &App->FontAtlas;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
- f32 Pad = BroadcastView_ButtonPadding;
+ f32 LineHeight = UiLineHeight(App);
+ f32 Pad = Ui_Pad + 2.f;
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  b32 Clicked = WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]);
+ R3->PopupHoverPlusOne = 0;
 
  if(R3->SummaryOpen == 0)
  {
@@ -504,10 +790,17 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
  }
 
  //- Close when clicking anywhere else (the chips toggle themselves)
- if(Clicked && !IsInsideRectV2(MousePos, R3->PopupRect) && !IsInsideRectV2(MousePos, R3->SummaryBarRect))
+ if(Clicked && !IsInsideRectV2(MousePos, R3->PopupRect) && !IsInsideRectV2(MousePos, R3->SummaryBarRect) &&
+    !IsInsideRectV2(MousePos, R3->ShortStripRect) && !IsInsideRectV2(MousePos, R3->ClustersButtonRect))
  {
   R3->SummaryOpen = 0;
   R3->PopupRect = V4(0.f, 0.f, 0.f, 0.f);
+  return;
+ }
+ 
+ if(R3->SummaryOpen == R3_SummaryClusters)
+ {
+  V3DrawClustersPopup(App, Input, BufferDim);
   return;
  }
 
@@ -560,11 +853,11 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  //- Title and layout
  str8 Title = {0};
- str8 Hint = S8("click an island to open it");
+ str8 Hint = S8("Click an island to open it");
  if(IsProduct)
  {
   str8 Name = ProductNames[Kind];
-  Title = Str8Fmt("%.*s: %llu needed, %llu produced", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+  Title = Str8Fmt("%.*s: %llu needed, %llu made", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
  }
  else
  {
@@ -579,36 +872,34 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  u32 SectionRows = (IsProduct ? 2u : 0u);
  v2 Min = R3->PopupRect.Min;
- f32 Width = Max(V3D_PopupWidth, V3Measure(App, Title) + 2.f*Pad);
+ f32 Width = Max(V3D_PopupWidth*UiScale(App), UiMeasure(App, Title) + 2.f*Pad);
  f32 MaxHeight = BufferDim.Y - Min.Y - V3D_Margin;
  u32 MaxRows = (u32)Max(1.f, (MaxHeight - 2.f*Pad)/LineHeight - 3.f - (f32)SectionRows);
  u32 ShownRows = Min(RowCount, MaxRows);
- f32 Height = (f32)(ShownRows + 2 + SectionRows + (RowCount > ShownRows ? 1 : 0))*LineHeight + 2.f*Pad;
+ f32 Height = (f32)(ShownRows + 2 + SectionRows + (RowCount > ShownRows ? 1 : 0))*LineHeight + 2.f*Pad + 4.f;
  if(RowCount == 0) Height += LineHeight;
  v4 Box = RectFromSize(Min, V2(Width, Height));
  R3->PopupRect = Box;
-
- DrawRect(Box, V4FromU32(V3D_ColorPopupBg), 8.f, 0.f, 0.f);
- DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 8.f, 1.f, 0.f);
+ UiCard(Box, Ui_CardRadius);
 
  v2 Line = V2(Box.Min.X + Pad, Box.Min.Y + Pad);
  f32 Inner = Width - 2.f*Pad;
- GraphDrawText(Atlas, Font, Line, Title, V4FromU32(V3D_ColorSection));
+ UiText(App, Line, Title, Ui_ColorTitle);
  Line.Y += LineHeight;
- GraphDrawText(Atlas, Font, Line, Hint, V4FromU32(V3D_ColorDim));
- Line.Y += LineHeight;
+ UiText(App, Line, Hint, Ui_ColorTextDim);
+ Line.Y += LineHeight + 4.f;
 
  if(RowCount == 0)
  {
-  GraphDrawText(Atlas, Font, Line, S8("none"), V4FromU32(V3D_ColorDim));
+  UiText(App, Line, S8("none"), Ui_ColorTextDim);
  }
 
  for(u32 Row = 0; Row < ShownRows; Row += 1)
  {
   if(IsProduct && (Row == 0 || (Row == NeedCount)))
   {
-   str8 Section = (Row == 0 && NeedCount > 0) ? S8("Need it:") : S8("Produce it:");
-   GraphDrawText(Atlas, Font, Line, Section, V4FromU32(V3D_ColorDim));
+   str8 Section = (Row == 0 && NeedCount > 0) ? S8("Need it:") : S8("Make it:");
+   UiText(App, Line, Section, Ui_ColorTextDim);
    Line.Y += LineHeight;
   }
 
@@ -625,8 +916,7 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
   if(IsProduct)
   {
    str8 Amount = Produces[Row] ? Str8Fmt("+%llu", Amounts[Row]) : Str8Fmt("-%llu", Amounts[Row]);
-   GraphDrawText(Atlas, Font, V2(Right - V3Measure(App, Amount), Line.Y), Amount,
-                 V4FromU32(Produces[Row] ? V3D_ColorGood : W3_ColorNeedPad));
+   UiText(App, V2(Right - UiMeasure(App, Amount), Line.Y), Amount, Produces[Row] ? Ui_ColorOkText : Ui_ColorWaitingText);
   }
   else if(Status != IslandStatus_Ok)
   {
@@ -647,187 +937,202 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  if(RowCount > ShownRows)
  {
-  GraphDrawText(Atlas, Font, Line, Str8Fmt("+%u more (see the Islands tab)", RowCount - ShownRows), V4FromU32(V3D_ColorDim));
+  UiText(App, Line, Str8Fmt("+%u more (see the Islands tab)", RowCount - ShownRows), Ui_ColorTextDim);
  }
 }
 
-//~ Camera controls (top right)
-internal void
-V3DrawCameraControls(app_state *App, app_input *Input, v2 BufferDim)
+//~ Help card ("?" in the top bar; also open on the first start)
+global_variable char *V3HelpStatusNotes[] =
 {
- r3_camera *Camera = &App->R3.Camera;
- f32 Height = App->Font.HeightPx + BroadcastView_ButtonPadding;
+ "Green: knows a supplier for everything it needs",
+ "Orange: still waiting for news of a supplier",
+ "Red: knows its suppliers, but a need is short worldwide",
+};
+global_variable char *V3HelpMapNotes[] =
+{
+ "Solid crates on a green pad: what an island makes",
+ "Crate frames on an orange pad: what it needs",
+ "Light pulse on a cable: news travelling",
+};
+global_variable u32 V3HelpMapColors[] = {W3_ColorProducePad, W3_ColorNeedPad, W3_ColorPulse};
+StaticAssert(ArrayCount(V3HelpMapNotes) == ArrayCount(V3HelpMapColors), V3HelpMapNotesMatch);
 
- // NOTE: Plain C strings: MSVC warns (C4204) about arrays initialized with S8(...).
- char *LabelStrings[] = {"Zoom in", "Zoom out", "Reset view"};
- str8 Labels[ArrayCount(LabelStrings)];
- f32 TotalWidth = 0.f;
- for EachElement(Idx, LabelStrings)
+global_variable char *V3HelpKeys[] =
+{
+ "Click",        "Right drag",   "Middle drag", "Mouse wheel",
+ "Up / Down",    "Right",        "Left",        "Ctrl + / Ctrl -",
+};
+global_variable char *V3HelpActions[] =
+{
+ "open an island", "move the map", "turn the map", "zoom",
+ "faster / slower",             "next round",   "restart",      "text size",
+};
+StaticAssert(ArrayCount(V3HelpKeys) == ArrayCount(V3HelpActions), V3HelpKeysMatch);
+
+// NOTE: What an island that makes each product looks like (its middle terrace).
+global_variable char *V3HelpProductLooks[ProductKind_Count] =
+{
+ "", "apple orchard", "pear orchard", "cabbage patch", "carrot rows",
+ "wheat field, windmill", "fish pond, dock", "cows, barn", "hens, hen house",
+};
+
+#define V3D_HelpWidth   760.f
+#define V3D_HelpColumns 2
+
+// NOTE: Section title with a thin line under it; advances Y.
+internal void
+V3HelpSection(app_state *App, f32 X, f32 *Y, f32 Width, char *Title)
+{
+ UiText(App, V2(X, *Y), S8FromCString(Title), Ui_ColorTitle);
+ *Y += UiLineHeight(App) + 2.f;
+ DrawRect(RectFromSize(V2(X, *Y), V2(Width, 1.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+ *Y += 6.f;
+}
+
+internal void
+DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
+{
+ r3_state *R3 = &App->R3;
+
+ // Open on the first start, so new users see what everything means.
+ if(!R3->HelpShownOnce)
  {
-  Labels[Idx] = S8FromCString(LabelStrings[Idx]);
-  TotalWidth += V3Measure(App, Labels[Idx]) + 2.f*BroadcastView_ButtonPadding + BroadcastView_ButtonGap;
+  R3->HelpShownOnce = true;
+  R3->HelpOpen = true;
+ }
+ if(!R3->HelpOpen) return;
+
+ f32 LineHeight = UiLineHeight(App);
+ f32 Pad = 20.f;
+ f32 Swatch = LineHeight - 8.f;
+ u32 ProductCount = ProductKind_Count - 1;
+ u32 ProductRows = (ProductCount + V3D_HelpColumns - 1)/V3D_HelpColumns;
+ u32 KeyRows = (u32)ArrayCount(V3HelpKeys);
+
+ f32 Width = Min(V3D_HelpWidth*UiScale(App), BufferDim.X - 2.f*Ui_Margin);
+ f32 Inner = Width - 2.f*Pad;
+ f32 Height = (3.f*LineHeight + 10.f) +                                          // title, intro
+  3.f*(LineHeight + 12.f) +                                                      // section titles
+  (f32)(ArrayCount(V3HelpStatusNotes) + ArrayCount(V3HelpMapNotes))*LineHeight + 8.f +
+  (f32)ProductRows*LineHeight + 8.f +
+  (f32)((KeyRows + 1)/2)*LineHeight + 8.f +
+  UiButtonHeight(App) + 12.f + 2.f*Pad;
+ v4 Box = RectFromSize(V2(FloorF32(.5f*(BufferDim.X - Width)), FloorF32(Max(Ui_Margin, .5f*(BufferDim.Y - Height)))), V2(Width, Height));
+
+ //- Close: the button, or a click outside the card (but not on "?", which toggles it)
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ b32 Clicked = WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]);
+ if(Clicked && !IsInsideRectV2(MousePos, Box) && !IsInsideRectV2(MousePos, R3->HelpButtonRect))
+ {
+  R3->HelpOpen = false;
+  return;
  }
 
- v2 Cursor = V2(BufferDim.X - V3D_Margin - TotalWidth, V3D_Margin);
- V3AddUIRect(&App->R3, RectFromSize(Cursor, V2(TotalWidth, Height)));
- if(BroadcastButton(App, Input, &Cursor, Labels[0])) R3CameraZoom(Camera, 1.f/R3_CameraZoomStep);
- if(BroadcastButton(App, Input, &Cursor, Labels[1])) R3CameraZoom(Camera, R3_CameraZoomStep);
- if(BroadcastButton(App, Input, &Cursor, Labels[2]))
- {
-  R3CameraReset(Camera);
-  App->R3.FocusedClusterPlusOne = 0;
- }
+ DrawRect(V4(0.f, 0.f, BufferDim.X, BufferDim.Y), V4FromU32(Ui_ColorDimBackdrop), 0.f, 0.f, 0.f);
+ UiCard(Box, 14.f);
+ V3AddUIRect(R3, Box);
 
- // While a cluster is open: a button to go back to all clusters, under the others.
- if(App->R3.FocusedClusterPlusOne)
+ f32 X = Box.Min.X + Pad;
+ f32 Y = Box.Min.Y + Pad;
+ UiText(App, V2(X, Y), S8("How to read the map"), Ui_ColorText);
+ Y += LineHeight;
+ UiText(App, V2(X, Y), S8("Every island tells its neighbours what it makes and needs."), Ui_ColorTextDim);
+ Y += LineHeight;
+ UiText(App, V2(X, Y), S8("Each round, that news moves one cable further."), Ui_ColorTextDim);
+ Y += LineHeight + 10.f;
+
+ //- Colours and shapes
+ V3HelpSection(App, X, &Y, Inner, "Ring around an island");
+ for EachElement(Idx, V3HelpStatusNotes)
  {
-  str8 Back = S8("All clusters");
-  f32 BackWidth = V3Measure(App, Back) + 2.f*BroadcastView_ButtonPadding;
-  v2 BackCursor = V2(BufferDim.X - V3D_Margin - BackWidth - BroadcastView_ButtonGap, V3D_Margin + Height + BroadcastView_ButtonGap);
-  V3AddUIRect(&App->R3, RectFromSize(BackCursor, V2(BackWidth, Height)));
-  if(BroadcastButton(App, Input, &BackCursor, Back))
+  UiDot(V2(X, Y + .5f*(LineHeight - Swatch)), Swatch, W3StatusColor((u32)Idx));
+  UiText(App, V2(X + Swatch + 8.f, Y), S8FromCString(V3HelpStatusNotes[Idx]), Ui_ColorText);
+  Y += LineHeight;
+ }
+ for EachElement(Idx, V3HelpMapNotes)
+ {
+  v4 Dot = RectFromSize(V2(X, Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch));
+  DrawRect(Dot, V4FromU32(V3HelpMapColors[Idx]), 3.f, 0.f, 0.f);
+  DrawRect(Dot, V4FromU32(Ui_ColorCardBorder), 3.f, 1.f, 0.f);
+  UiText(App, V2(X + Swatch + 8.f, Y), S8FromCString(V3HelpMapNotes[Idx]), Ui_ColorText);
+  Y += LineHeight;
+ }
+ Y += 8.f;
+
+ //- Products
+ V3HelpSection(App, X, &Y, Inner, "Products: crate colour, and what an island that makes it looks like");
+ {
+  f32 ColumnWidth = Inner/(f32)V3D_HelpColumns;
+  for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
   {
-   V3FocusCluster(App, 0);
+   u32 Item = Kind - 1;
+   v2 Pos = V2(X + (f32)(Item/ProductRows)*ColumnWidth, Y + (f32)(Item % ProductRows)*LineHeight);
+   DrawRect(RectFromSize(V2(Pos.X, Pos.Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+   UiText(App, V2(Pos.X + Swatch + 8.f, Pos.Y), ProductNames[Kind], Ui_ColorText);
+   UiText(App, V2(Pos.X + Swatch + 8.f + UiMeasure(App, ProductNames[Kind]) + 10.f, Pos.Y),
+          S8FromCString(V3HelpProductLooks[Kind]), Ui_ColorTextDim);
+  }
+  Y += (f32)ProductRows*LineHeight + 8.f;
+ }
+
+ //- Mouse and keys, in two columns
+ V3HelpSection(App, X, &Y, Inner, "Mouse and keys");
+ {
+  f32 KeyWidth = 0.f;
+  for EachElement(Idx, V3HelpKeys) KeyWidth = Max(KeyWidth, UiMeasure(App, S8FromCString(V3HelpKeys[Idx])));
+  KeyWidth += 16.f;
+  u32 Rows = (KeyRows + 1)/2;
+  for EachElement(Idx, V3HelpKeys)
+  {
+   v2 Pos = V2(X + (f32)((u32)Idx/Rows)*.5f*Inner, Y + (f32)((u32)Idx % Rows)*LineHeight);
+   str8 Key = S8FromCString(V3HelpKeys[Idx]);
+   DrawRect(RectFromSize(V2(Pos.X - 4.f, Pos.Y + 1.f), V2(UiMeasure(App, Key) + 8.f, LineHeight - 2.f)), V4FromU32(Ui_ColorButton), 4.f, 0.f, 0.f);
+   UiText(App, Pos, Key, Ui_ColorText);
+   UiText(App, V2(Pos.X + KeyWidth, Pos.Y), S8FromCString(V3HelpActions[Idx]), Ui_ColorTextDim);
+  }
+  Y += (f32)Rows*LineHeight + 8.f;
+ }
+
+ //- Close button (bottom right). Drawn by hand: the other buttons are blocked while help is open.
+ {
+  str8 Label = S8("Got it");
+  f32 ButtonWidth = UiMeasure(App, Label) + 2.f*Ui_ButtonPadX + 20.f;
+  v4 Button = RectFromSize(V2(Box.Max.X - Pad - ButtonWidth, Box.Max.Y - Pad - UiButtonHeight(App)), V2(ButtonWidth, UiButtonHeight(App)));
+  b32 Hot = IsInsideRectV2(MousePos, Button);
+  DrawRect(Button, V4FromU32(Hot ? Ui_ColorAccentHot : Ui_ColorAccent), Ui_ButtonRadius, 0.f, 0.f);
+  UiText(App, V2(FloorF32(Button.Min.X + .5f*(ButtonWidth - UiMeasure(App, Label))), Button.Min.Y + Ui_ButtonPadY), Label, Ui_ColorOnAccent);
+  UiText(App, V2(X, Button.Min.Y + Ui_ButtonPadY), S8("Open this again with the ? button, top right."), Ui_ColorTextDim);
+  if(Hot && Clicked)
+  {
+   R3->HelpOpen = false;
   }
  }
 }
 
-//~ Legend (opened with the "Legend" button)
-global_variable char *V3LegendNotes[] =
-{
- "green ring: has a supplier for all its needs",
- "orange ring: still waiting for news of a supplier",
- "red ring: knows its suppliers, but a need is short worldwide",
- "solid crates, green pad: what it produces",
- "crate frames, orange pad: what it needs",
- "yellow pulse on a cable: news travelling",
-};
-global_variable u32 V3LegendNoteColors[] =
-{
- W3_ColorStatusOk, W3_ColorStatusWaiting, W3_ColorStatusShort,
- W3_ColorProducePad, W3_ColorNeedPad, W3_ColorPulse,
-};
-StaticAssert(ArrayCount(V3LegendNotes) == ArrayCount(V3LegendNoteColors), V3DLegendNotesMatch);
-
-typedef struct v3d_legend_layout v3d_legend_layout;
-struct v3d_legend_layout
-{
- v4 Box;
- u32 ProductRows;
- f32 ProductColumnWidth;
-};
-
-// NOTE: The box sits with its bottom-left corner at BottomLeft.
-internal v3d_legend_layout
-V3LegendLayout(app_state *App, v2 BottomLeft)
-{
- f32 LineHeight = App->Font.HeightPx;
- f32 Pad = BroadcastView_ButtonPadding;
- f32 Swatch = LineHeight - 6.f;
-
- v3d_legend_layout Result = {0};
- u32 ProductCount = ProductKind_Count - 1;
- Result.ProductRows = (ProductCount + 1)/2;
- for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
- {
-  Result.ProductColumnWidth = Max(Result.ProductColumnWidth, Swatch + Pad + V3Measure(App, ProductNames[Kind]));
- }
- Result.ProductColumnWidth += 2.f*Pad;
-
- f32 NotesWidth = 0.f;
- for EachElement(Idx, V3LegendNotes)
- {
-  NotesWidth = Max(NotesWidth, Swatch + Pad + V3Measure(App, S8FromCString(V3LegendNotes[Idx])));
- }
-
- u32 Rows = Max(Result.ProductRows, (u32)ArrayCount(V3LegendNotes));
- f32 Width = 2.f*Result.ProductColumnWidth + NotesWidth + 2.f*Pad;
- f32 Height = (f32)(Rows + 1)*LineHeight + 2.f*Pad;
- Result.Box = RectFromSize(V2(BottomLeft.X, BottomLeft.Y - Height), V2(Width, Height));
- return Result;
-}
-
-// NOTE: Product colours in two columns on the left, what the colours and shapes mean on the right.
-internal void
-V3DrawLegend(app_state *App, v2 BottomLeft)
-{
- font_atlas *Atlas = &App->FontAtlas;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
- f32 Pad = BroadcastView_ButtonPadding;
- f32 Swatch = LineHeight - 6.f;
-
- v3d_legend_layout Layout = V3LegendLayout(App, BottomLeft);
- v4 Box = Layout.Box;
- DrawRect(Box, V4FromU32(V3D_ColorLabelBg), 6.f, 0.f, 0.f);
- DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 6.f, 1.f, 0.f);
-
- v2 Origin = V2(Box.Min.X + Pad, Box.Min.Y + Pad);
- GraphDrawText(Atlas, Font, Origin, S8("Legend"), V4FromU32(Graph_ColorTitle));
- Origin.Y += LineHeight;
-
- for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
- {
-  u32 Item = Kind - 1;
-  v2 Line = V2(Origin.X + (f32)(Item/Layout.ProductRows)*Layout.ProductColumnWidth, Origin.Y + (f32)(Item % Layout.ProductRows)*LineHeight);
-  DrawRect(RectFromSize(V2(Line.X, Line.Y + 3.f), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
-  GraphDrawText(Atlas, Font, V2(Line.X + Swatch + Pad, Line.Y), ProductNames[Kind], V4FromU32(Graph_ColorTitle));
- }
-
- for EachElement(Idx, V3LegendNotes)
- {
-  v2 Line = V2(Origin.X + 2.f*Layout.ProductColumnWidth, Origin.Y + (f32)Idx*LineHeight);
-  DrawRect(RectFromSize(V2(Line.X, Line.Y + 3.f), V2(Swatch, Swatch)), V4FromU32(V3LegendNoteColors[Idx]), .5f*Swatch, 0.f, 0.f);
-  GraphDrawText(Atlas, Font, V2(Line.X + Swatch + Pad, Line.Y), S8FromCString(V3LegendNotes[Idx]), V4FromU32(Graph_ColorKnows));
- }
-}
-
-//~ Bottom left: Legend / Controls buttons and their boxes
-internal void
-V3DrawHelpButtons(app_state *App, app_input *Input, v2 BufferDim)
-{
- r3_state *R3 = &App->R3;
- f32 Height = App->Font.HeightPx + BroadcastView_ButtonPadding;
-
- v2 Cursor = V2(V3D_Margin, BufferDim.Y - V3D_Margin - Height);
- v2 RowStart = Cursor;
- if(BroadcastButton(App, Input, &Cursor, R3->ShowLegend ? S8("Hide legend") : S8("Legend")))
- {
-  R3->ShowLegend = !R3->ShowLegend;
- }
- if(BroadcastButton(App, Input, &Cursor, R3->ShowControls ? S8("Hide controls") : S8("Controls")))
- {
-  R3->ShowControls = !R3->ShowControls;
- }
- V3AddUIRect(R3, RectFromSize(RowStart, V2(Cursor.X - RowStart.X, Height)));
-
- // Boxes open above the buttons, side by side.
- v2 BottomLeft = V2(V3D_Margin, RowStart.Y - BroadcastView_ButtonGap);
- if(R3->ShowLegend)
- {
-  v3d_legend_layout Layout = V3LegendLayout(App, BottomLeft);
-  V3DrawLegend(App, BottomLeft);
-  V3AddUIRect(R3, Layout.Box);
-  BottomLeft.X = Layout.Box.Max.X + BroadcastView_ButtonGap;
- }
- if(R3->ShowControls)
- {
-  V3AddUIRect(R3, ControlsHelpRect(App, BottomLeft));
-  DrawControlsHelp(App, BottomLeft);
- }
-}
-
 //~ Entry point
-// NOTE: Call after RenderClear() and before DrawIslandPanel and DrawBroadcastControls,
-// so the panel and the hover tooltip end up on top.
+// NOTE: Call after RenderClear() and before DrawIslandPanel, so the panel, the dropdown,
+// the help card and the hover tooltip end up on top.
 internal void
 DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
+ UiTextSizeKeys(App, Input);
+ UiUpdateTextSize(App);   // before any text this frame
 
  // NOTE: Over the panel the wheel scrolls the panel instead of zooming.
- b32 MouseOverUI = IsInsideRectV2(V2V2S32(Input->Mouse.Pos), App->Panel.LastRect);
+ b32 MouseOverUI = (IsInsideRectV2(V2V2S32(Input->Mouse.Pos), App->Panel.LastRect) || R3->HelpOpen);
  R3CameraUpdate(&R3->Camera, Input, MouseOverUI);
+ 
+ // Centre the map in the space the top bar and the panel leave free (last frame's sizes).
+ {
+  f32 Right = App->Panel.Hidden ? BufferDim.X : App->Panel.LastRect.Min.X;
+  if(Right <= 0.f) Right = BufferDim.X;
+  f32 Top = R3->TopBarRect.Max.Y;
+  v2 Target = V2(-(BufferDim.X - Right)/Max(BufferDim.X, 1.f), -Top/Max(BufferDim.Y, 1.f));
+  f32 t = Min(1.f, 8.f*Input->dtForFrame);
+  R3->LensShift.X += (Target.X - R3->LensShift.X)*t;
+  R3->LensShift.Y += (Target.Y - R3->LensShift.Y)*t;
+ }
  R3BeginFrame(R3, FrameArena, BufferDim);
  W3ComputeStatus(App);
  W3PrepareIslands(App, Input);   // uses last frame's UI areas for hovering
@@ -839,12 +1144,11 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
 
  //- UI, recording the areas it covers
  R3->UIRectCount = 0;
- V3AddUIRect(R3, RectFromSize(V2(0.f, 0.f), V2(V3D_ControlsAreaWidth, V3D_ControlsAreaHeight)));
+ R3->ShortStripRect = V4(0.f, 0.f, 0.f, 0.f);
  V3AddUIRect(R3, App->Panel.LastRect);
- V3AddUIRect(R3, R3->PopupRect);   // summary dropdown, drawn last (see DrawSummaryPopup)
- V3DrawSummaryBar(App, Input);
- V3DrawCameraControls(App, Input, BufferDim);
- V3DrawHelpButtons(App, Input, BufferDim);
+ V3AddUIRect(R3, R3->PopupRect);   // summary dropdown, drawn later (see DrawSummaryPopup)
+ V3DrawTopBar(App, Input, BufferDim);
+ V3DrawShortageStrip(App, Input);
 
  V3DrawClusterLabels(App, Input);
  V3DrawIslandLabels(App);

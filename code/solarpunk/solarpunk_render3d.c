@@ -338,7 +338,7 @@ R3PushEllipsoid(r3_mesh *Mesh, v3 Center, v3 Radii, u32 Rings, u32 Segments, v4 
 //~ Camera
 #define R3_CameraDefaultYaw      .55f
 #define R3_CameraDefaultPitch    .72f
-#define R3_CameraDefaultDistance 86.f
+#define R3_CameraDefaultDistance 100.f
 #define R3_CameraMinDistance     20.f
 #define R3_CameraMaxDistance     220.f
 #define R3_CameraMinPitch        .12f
@@ -472,8 +472,8 @@ R3CameraEye(r3_camera *Camera)
 
 //~ GL
 #define R3_MaxSkyVertices         1024
-#define R3_MaxOpaqueVertices      (256*1024)
-#define R3_MaxTranslucentVertices (128*1024)
+#define R3_MaxOpaqueVertices      (640*1024)
+#define R3_MaxTranslucentVertices (192*1024)
 
 // NOTE: Golden hour: gold at the horizon, coral in the middle, soft violet at the top.
 #define R3_ColorSkyTop     0xFF5C4D8C
@@ -585,6 +585,10 @@ R3BeginFrame(r3_state *R3, arena *Arena, v2 ViewportDim)
  R3->Eye = R3CameraEye(&R3->Camera);
  m4 View = M4LookAt(R3->Eye, R3->Camera.Target, V3(0.f, 1.f, 0.f));
  m4 Projection = M4Perspective(50.f*Pi32/180.f, Aspect, .5f, 600.f);
+ // Lens shift: moves the picture's centre by LensShift (in -1..1 screen units) without
+ // turning the camera, so the map is centred in the part of the window the UI leaves free.
+ Projection.e[2][0] = -R3->LensShift.X;
+ Projection.e[2][1] = -R3->LensShift.Y;
  R3->ViewProj = M4Mul(Projection, View);
 
  // Sky: a screen-filling gradient, drawn with an identity matrix (positions are in clip space).

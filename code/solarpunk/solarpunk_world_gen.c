@@ -5,12 +5,12 @@
 //-
 
 //~ Constants
-#define WorldGen_IslandCount    32
+#define WorldGen_IslandCount    48
 #define WorldGen_Seed           20261121
 #define WorldGen_MaxIslands     64
 
-#define WorldGen_ClusterCount   4
-#define WorldGen_ClusterRadius  .17f  // in 0..1 map units
+#define WorldGen_ClusterCount   7
+#define WorldGen_ClusterRadius  .155f // in 0..1 map units, for a cluster of 8 islands
 #define WorldGen_MinIslandGap   .07f  // islands closer than this are re-rolled
 #define WorldGen_PlaceAttempts  64
 #define WorldGen_ExtraLinkChance .7f  // chance of an extra link inside a cluster
@@ -20,23 +20,37 @@
 #define WorldGen_MinBridgeCost  6
 #define WorldGen_MaxBridgeCost  9
 
-// NOTE: Cluster centres in 0..1 map units, one per quadrant.
+// NOTE: Cluster centres in 0..1 map units.
 global_variable v2 WorldGenClusterCenters[WorldGen_ClusterCount] =
 {
- {.22f, .27f}, {.76f, .24f}, {.26f, .76f}, {.78f, .73f},
+ {.17f, .18f}, {.52f, .12f}, {.86f, .22f},
+ {.14f, .60f}, {.50f, .50f}, {.86f, .64f},
+ {.46f, .88f},
 };
 
-// NOTE: Cluster names, in the same order as the centres (top left, top right,
-// bottom left, bottom right).
+// NOTE: How many islands each cluster gets, relative to the others (they sum to 48,
+// so with 48 islands these are the exact counts).
+global_variable u32 WorldGenClusterWeights[WorldGen_ClusterCount] =
+{
+ 10, 5, 8,
+ 6, 9, 4,
+ 6,
+};
+
+// NOTE: Cluster names, in the same order as the centres. Each cluster also has its own
+// look (see W3ClusterThemes).
 global_variable char *WorldGenClusterNames[WorldGen_ClusterCount] =
 {
- "Verdant Reach", "Sunward Isles", "Driftwood Shoals", "Ember Archipelago",
+ "Verdant Reach", "Sunward Isles", "Driftwood Shoals",
+ "Ember Archipelago", "Crystal Spires", "Mistral Keys",
+ "Saltglass Atolls",
 };
 
-// NOTE: Bridges between clusters, as pairs of cluster indices. They form a ring.
+// NOTE: Bridges between clusters, as pairs of cluster indices.
 global_variable u32 WorldGenBridges[][2] =
 {
- {0, 1}, {1, 3}, {3, 2}, {2, 0},
+ {0, 1}, {1, 2}, {0, 3}, {1, 4}, {2, 5},
+ {3, 4}, {4, 5}, {3, 6}, {5, 6},
 };
 
 global_variable char *WorldGenNames[] =
@@ -48,19 +62,38 @@ global_variable char *WorldGenNames[] =
  "Hearthbloom",    "Skyloom",      "Cedar Rest",    "Driftmoor",
  "Petal Point",    "Ironbloom",    "Mistral Key",   "Saltgarden",
  "Honeycomb Rock", "Starfall",     "Greenvault",    "Tidewell",
- "Emberfield",     "Quietcove",    "Weaver's Rise", "Dawnhollow",
+ "Emberfield",     "Quietcove",    "Weaver's Rise",  "Dawnhollow",
+ "Gullcrest",      "Breezehaven",  "Sorrel Isle",   "Lanternfield",
+ "Coralwick",      "Pinecradle",   "Sunmeadow",     "Rainvale",
+ "Brackenmoor",    "Opal Ridge",   "Seedcastle",    "Hollyfen",
+ "Wavecrest",      "Duskwillow",   "Marigold Key",  "Stillwater",
 };
 
 //~ Helpers
-// NOTE: Which cluster an island belongs to. Cluster C owns the islands with index in
-// [IslandCount*C/ClusterCount, IslandCount*(C + 1)/ClusterCount), as built below.
+// NOTE: Index of the first island of a cluster (Cluster == ClusterCount gives the end).
+// Islands are split over the clusters by WorldGenClusterWeights.
+internal u32
+WorldGenClusterFirst(u32 Cluster, u32 IslandCount)
+{
+ u32 Total = 0;
+ u32 Before = 0;
+ for(u32 Idx = 0; Idx < WorldGen_ClusterCount; Idx += 1)
+ {
+  Total += WorldGenClusterWeights[Idx];
+  if(Idx < Cluster) Before += WorldGenClusterWeights[Idx];
+ }
+ u32 Result = (IslandCount*Before)/Total;
+ return Result;
+}
+
+// NOTE: Which cluster an island belongs to (see WorldGenClusterFirst).
 internal u32
 WorldGenClusterOf(u32 IslandIdx, u32 IslandCount)
 {
  u32 Result = 0;
  for(u32 Cluster = 0; Cluster < WorldGen_ClusterCount; Cluster += 1)
  {
-  if(IslandIdx >= (IslandCount*Cluster)/WorldGen_ClusterCount)
+  if(IslandIdx >= WorldGenClusterFirst(Cluster, IslandCount))
   {
    Result = Cluster;
   }
@@ -135,33 +168,75 @@ WorldGenIsLinked(island *A, island *B)
  return Result;
 }
 
-internal void
-WorldGenProductsAndNeeds(app_state *App, random_series *Series, island *Island)
+// NOTE: What each cluster grows or catches, in the same order as the clusters. Islands
+// only make their cluster's foods and only need foods their cluster does not make, so
+// every need is traded in from another cluster.
+#define WorldGen_MaxSpecialties 3
+global_variable product_kind WorldGenClusterFoods[WorldGen_ClusterCount][WorldGen_MaxSpecialties] =
 {
- // Production: 1 or 2 different kinds.
+ {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Cabbage}, // Verdant Reach: orchards
+ {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_None},    // Sunward Isles: fields and hens
+ {ProductKind_Fish,    ProductKind_None,    ProductKind_None},    // Driftwood Shoals: fishing
+ {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},    // Ember Archipelago: herds
+ {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},    // Crystal Spires: vegetables
+ {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},    // Mistral Keys: fishing, hens
+ {ProductKind_Fish,    ProductKind_Carrots, ProductKind_Wheat},   // Saltglass Atolls
+};
+
+// NOTE: Scarce foods: made in smaller amounts than the others, so the world as a whole
+// does not have enough of them and islands needing them turn red.
+internal b32
+WorldGenIsScarce(product_kind Kind)
+{
+ b32 Result = (Kind == ProductKind_Meat || Kind == ProductKind_Pears);
+ return Result;
+}
+
+internal b32
+WorldGenClusterMakes(u32 Cluster, product_kind Kind)
+{
+ b32 Result = false;
+ for(u32 Idx = 0; Idx < WorldGen_MaxSpecialties; Idx += 1)
+ {
+  Result = Result || (WorldGenClusterFoods[Cluster][Idx] == Kind && Kind != ProductKind_None);
+ }
+ return Result;
+}
+
+internal void
+WorldGenProductsAndNeeds(app_state *App, random_series *Series, island *Island, u32 Cluster)
+{
+ //- Makes: 1 or 2 of its cluster's foods
+ u32 FoodCount = 0;
+ for(u32 Idx = 0; Idx < WorldGen_MaxSpecialties; Idx += 1)
+ {
+  if(WorldGenClusterFoods[Cluster][Idx] != ProductKind_None) FoodCount += 1;
+ }
  b32 Produces[ProductKind_Count] = {0};
- u32 ProduceCount = WorldGenRandomInt(Series, 1, 2);
+ u32 ProduceCount = Min(WorldGenRandomInt(Series, 1, 2), FoodCount);
  for(u32 Produced = 0; Produced < ProduceCount; )
  {
-  product_kind Kind = WorldGenRandomKind(Series);
+  product_kind Kind = WorldGenClusterFoods[Cluster][WorldGenRandomInt(Series, 0, FoodCount - 1)];
   if(!Produces[Kind])
   {
    Produces[Kind] = true;
-   PushProduct(App, Island, Kind, 10*(u64)WorldGenRandomInt(Series, 2, 20));
+   u64 Amount = 10*(u64)WorldGenRandomInt(Series, 6, 16);
+   if(WorldGenIsScarce(Kind)) Amount = 10*(u64)WorldGenRandomInt(Series, 2, 5);
+   PushProduct(App, Island, Kind, Amount);
    Produced += 1;
   }
  }
-
- // Needs: 2 or 3 kinds it does not produce itself, so every island must trade.
+ 
+ //- Needs: 2 or 3 foods its cluster does not make, so they come from other clusters
  b32 Needs[ProductKind_Count] = {0};
  u32 NeedCount = WorldGenRandomInt(Series, 2, 3);
- for(u32 Needed = 0; Needed < NeedCount; )
+ for(u32 Needed = 0, Tries = 0; Needed < NeedCount && Tries < 100; Tries += 1)
  {
   product_kind Kind = WorldGenRandomKind(Series);
-  if(!Produces[Kind] && !Needs[Kind])
+  if(!WorldGenClusterMakes(Cluster, Kind) && !Needs[Kind])
   {
    Needs[Kind] = true;
-   PushRequirement(App, Island, Kind, 5*(u64)WorldGenRandomInt(Series, 1, 12));
+   PushRequirement(App, Island, Kind, 5*(u64)WorldGenRandomInt(Series, 2, 10));
    Needed += 1;
   }
  }
@@ -189,13 +264,16 @@ BuildGeneratedWorld(app_state *App, u32 IslandCount)
  u32 ClusterFirst[WorldGen_ClusterCount + 1] = {0};
  for(u32 Cluster = 0; Cluster <= WorldGen_ClusterCount; Cluster += 1)
  {
-  ClusterFirst[Cluster] = (IslandCount*Cluster)/WorldGen_ClusterCount;
+  ClusterFirst[Cluster] = WorldGenClusterFirst(Cluster, IslandCount);
  }
 
  //- Islands: position inside their cluster, production and needs
  for(u32 Cluster = 0; Cluster < WorldGen_ClusterCount; Cluster += 1)
  {
   v2 Center = WorldGenClusterCenters[Cluster];
+  // Bigger clusters spread wider, so islands keep about the same spacing.
+  u32 Size = ClusterFirst[Cluster + 1] - ClusterFirst[Cluster];
+  f32 ClusterRadius = WorldGen_ClusterRadius*(f32)SqrtF64((f64)Size/8.0);
 
   for(u32 Idx = ClusterFirst[Cluster]; Idx < ClusterFirst[Cluster + 1]; Idx += 1)
   {
@@ -213,7 +291,7 @@ BuildGeneratedWorld(app_state *App, u32 IslandCount)
    for(u32 Attempt = 0; Attempt < WorldGen_PlaceAttempts; Attempt += 1)
    {
     f32 Angle = 2.f*Pi32*RandomUnilateral(&Series);
-    f32 Distance = WorldGen_ClusterRadius*(f32)SqrtF64((f64)RandomUnilateral(&Series));
+    f32 Distance = ClusterRadius*(f32)SqrtF64((f64)RandomUnilateral(&Series));
     Pos = V2(Center.X + Distance*(f32)CosF64((f64)Angle),
              Center.Y + Distance*(f32)SinF64((f64)Angle));
 
@@ -230,7 +308,7 @@ BuildGeneratedWorld(app_state *App, u32 IslandCount)
    }
    Island->MapPos = Pos;
 
-   WorldGenProductsAndNeeds(App, &Series, Island);
+   WorldGenProductsAndNeeds(App, &Series, Island, Cluster);
   }
  }
 
