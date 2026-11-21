@@ -14,22 +14,23 @@
 #define Food_MaxIslands    64   // same as Broadcast_MaxIslands
 #define Food_MaxLots       48   // lots per (island, kind); more are merged
 #define Food_RoundsPerDay  10   // product Amounts are per day; one round = 1/RoundsPerDay day
-#define Food_MergeRounds    3   // a new lot within this many rounds of the newest one is merged into it
-#define Food_SoonRounds    Food_RoundsPerDay  // "expiring soon" = within one day
+#define Food_MergeRounds    1   // a new lot within this many rounds of the newest one is merged into it (1 = same round only)
+#define Food_SoonRounds     3   // "goes bad soon" = within this many rounds
 
-// NOTE(L4): Shelf life in days per product kind; 0 = never spoils, not tracked.
-// Every product in the catalog is a food now (solarpunk.mdesk). Starting values, roughly in
-// real-world order (fish and meat first, grain last); tune with SolarSim.
-global_variable const f32 FoodShelfLifeDays[ProductKind_Count] =
+// NOTE(L4): Shelf life in ROUNDS per product kind; 0 = never spoils, not tracked.
+// Every product in the catalog is a food (solarpunk.mdesk). Short on purpose: the demo runs
+// about 30 rounds, so every food must be able to go bad inside it. Roughly in real-world
+// order (fish and meat first, grain last); tune with SolarSim.
+global_variable const u32 FoodShelfLife[ProductKind_Count] =
 {
- [ProductKind_Fish]    =  2.f,
- [ProductKind_Meat]    =  3.f,
- [ProductKind_Eggs]    =  5.f,
- [ProductKind_Pears]   =  6.f,
- [ProductKind_Cabbage] =  8.f,
- [ProductKind_Apples]  = 10.f,
- [ProductKind_Carrots] = 12.f,
- [ProductKind_Wheat]   = 30.f,
+ [ProductKind_Fish]    =  6,
+ [ProductKind_Meat]    =  8,
+ [ProductKind_Eggs]    = 10,
+ [ProductKind_Pears]   = 12,
+ [ProductKind_Cabbage] = 14,
+ [ProductKind_Apples]  = 16,
+ [ProductKind_Carrots] = 18,
+ [ProductKind_Wheat]   = 24,
 };
 
 //~ Types

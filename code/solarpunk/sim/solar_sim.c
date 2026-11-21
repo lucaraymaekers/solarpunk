@@ -87,8 +87,12 @@ TestCatalog(void)
  Check(AllFood, "every product in the catalog is food and spoils");
  Check(!FoodIsPerishable(ProductKind_None), "ProductKind_None is not tracked");
  Check(FoodShelfLifeRounds(ProductKind_Fish) < FoodShelfLifeRounds(ProductKind_Wheat), "fish goes bad before wheat");
- Check(FoodShelfLifeRounds(ProductKind_Fish) == (u64)(FoodShelfLifeDays[ProductKind_Fish]*Food_RoundsPerDay),
-       "shelf life in rounds = days * rounds per day");
+ b32 AllInDemo = true;
+ for(u32 Kind = ProductKind_None + 1; Kind < ProductKind_Count; Kind += 1)
+ {
+  AllInDemo = AllInDemo && FoodShelfLifeRounds((product_kind)Kind) <= 30;
+ }
+ Check(AllInDemo, "every food can go bad inside a 30-round demo");
  
  food_state *Food = SimAllocFood();
  FoodIslandRound(Food, 0, ProductKind_None, 100.f, 50.f, 1);
@@ -155,7 +159,8 @@ internal void
 TestTakeGive(void)
 {
  food_state *Food = SimAllocFood();
- for(u64 Round = 1; Round <= 8; Round += 1)
+ // Fewer rounds than the fish shelf life, so nothing has gone bad before the hand-over.
+ for(u64 Round = 1; Round <= 4; Round += 1)
  {
   FoodIslandRound(Food, 0, ProductKind_Fish, 4.f*(f32)Food_RoundsPerDay, 0.f, Round);
  }
@@ -167,17 +172,17 @@ TestTakeGive(void)
  Check(Took == 6 && OutCount >= 1 && Out[0].ExpiresRound == Soonest, "FoodTake gives the soonest-expiring food first");
  Check(Food->Counts[0][ProductKind_Fish].Sent == 6, "Sent counted");
 
- FoodGive(Food, 1, ProductKind_Fish, Out, OutCount, 9);
+ FoodGive(Food, 1, ProductKind_Fish, Out, OutCount, 5);
  Check(FoodStockQty(Food, 1, ProductKind_Fish) == 6 && Food->Stock[1][ProductKind_Fish].Lots[0].ExpiresRound == Soonest,
        "FoodGive keeps the expiry date");
 
  food_lot Old;
- Old.Qty = 3; Old.ExpiresRound = 9;
- FoodGive(Food, 1, ProductKind_Fish, &Old, 1, 9);
+ Old.Qty = 3; Old.ExpiresRound = 5;
+ FoodGive(Food, 1, ProductKind_Fish, &Old, 1, 5);
  Check(Food->Counts[1][ProductKind_Fish].Wasted == 3 && FoodStockQty(Food, 1, ProductKind_Fish) == 6,
        "food that arrives already bad is waste at the receiver");
 
- u32 Soon = FoodExpiringSoon(Food, 0, ProductKind_Fish, 9);
+ u32 Soon = FoodExpiringSoon(Food, 0, ProductKind_Fish, 5);
  Check(Soon <= FoodStockQty(Food, 0, ProductKind_Fish), "expiring-soon is part of the stock");
  Check(SimAllConserved(Food, 2), "conserved across take/give");
 
@@ -341,7 +346,7 @@ RunSim(u64 Seed, s32 Days)
  {
   b32 Share = (Pass == 1);
   Log("\n%s\n", Share ? "with sharing (soonest-expiring food to a short neighbour)" : "no sharing");
-  Log("   kind          shelf(d)  produced     eaten    wasted  shortage\n");
+  Log("   kind       shelf(rnd)  produced     eaten    wasted  shortage\n");
   SimRun(Food, World, Days, Share, 0);
   for(u32 K = 0; K < ProductKind_Count; K += 1)
   {
@@ -356,7 +361,7 @@ RunSim(u64 Seed, s32 Days)
      Sum.Shortage += Food->Counts[I][K].Shortage;
     }
     Log("   %-12.*s  %8.1f  %8llu  %8llu  %8llu  %8llu\n", (s32)ProductNames[K].Size, ProductNames[K].Data,
-        FoodShelfLifeDays[K], Sum.Produced, Sum.Eaten, Sum.Wasted, Sum.Shortage);
+        (f32)FoodShelfLife[K], Sum.Produced, Sum.Eaten, Sum.Wasted, Sum.Shortage);
    }
   }
  }

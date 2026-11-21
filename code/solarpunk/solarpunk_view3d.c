@@ -539,6 +539,9 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
   Label = S8("No product is short worldwide");
   Width = UiMeasure(App, Label) + 2.f*Ui_Pad + Dot + 6.f;
  }
+ // Food that went bad so far (solarpunk_food_app.c), shown at the end of the strip.
+ str8 Wasted = FoodWastedText(App);
+ Width += Ui_Gap + UiMeasure(App, Wasted);
  Width += Ui_Pad - Ui_Gap;
 
  v4 Box = RectFromSize(Origin, V2(Width, ButtonHeight + 2.f*6.f));
@@ -550,6 +553,7 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
  {
   UiDot(V2(Cursor.X, Cursor.Y + .5f*(ButtonHeight - Dot)), Dot, W3_ColorStatusOk);
   UiText(App, V2(Cursor.X + Dot + 6.f, Cursor.Y + Ui_ButtonPadY), Label, Ui_ColorOkText);
+  UiText(App, V2(Box.Max.X - Ui_Pad - UiMeasure(App, Wasted), Cursor.Y + Ui_ButtonPadY), Wasted, Ui_ColorShortText);
   return;
  }
 
@@ -570,6 +574,8 @@ V3DrawShortageStrip(app_state *App, app_input *Input)
    }
   }
  }
+ UiText(App, V2(Box.Max.X - Ui_Pad - UiMeasure(App, Wasted), Cursor.Y + Ui_ButtonPadY), Wasted, Ui_ColorShortText);
+ 
  // The chips open dropdowns too, so clicks here must not close them.
  R3->SummaryBarRect.Max.Y = Box.Max.Y;
  R3->ShortStripRect = Box;
@@ -853,11 +859,14 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  //- Title and layout
  str8 Title = {0};
+ str8 FoodLine = {0};   // what really happened to this food so far (solarpunk_food_app.c)
  str8 Hint = S8("Click an island to open it");
  if(IsProduct)
  {
   str8 Name = ProductNames[Kind];
   Title = Str8Fmt("%.*s: %llu needed, %llu made", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+  food_counts Food = FoodKindTotals(App, Kind);
+  FoodLine = Str8Fmt("So far: %llu gone bad, %llu missing", Food.Wasted, Food.Shortage);
  }
  else
  {
@@ -870,9 +879,9 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
   Title = S8FromCString(Titles[Status]);
  }
 
- u32 SectionRows = (IsProduct ? 2u : 0u);
+ u32 SectionRows = (IsProduct ? 3u : 0u);   // "Need it:", "Make it:" and the food line
  v2 Min = R3->PopupRect.Min;
- f32 Width = Max(V3D_PopupWidth*UiScale(App), UiMeasure(App, Title) + 2.f*Pad);
+ f32 Width = Max(V3D_PopupWidth*UiScale(App), Max(UiMeasure(App, Title), UiMeasure(App, FoodLine)) + 2.f*Pad);
  f32 MaxHeight = BufferDim.Y - Min.Y - V3D_Margin;
  u32 MaxRows = (u32)Max(1.f, (MaxHeight - 2.f*Pad)/LineHeight - 3.f - (f32)SectionRows);
  u32 ShownRows = Min(RowCount, MaxRows);
@@ -886,6 +895,11 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
  f32 Inner = Width - 2.f*Pad;
  UiText(App, Line, Title, Ui_ColorTitle);
  Line.Y += LineHeight;
+ if(FoodLine.Size)
+ {
+  UiText(App, Line, FoodLine, Ui_ColorShortText);
+  Line.Y += LineHeight;
+ }
  UiText(App, Line, Hint, Ui_ColorTextDim);
  Line.Y += LineHeight + 4.f;
 

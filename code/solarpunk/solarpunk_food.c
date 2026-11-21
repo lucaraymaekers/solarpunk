@@ -7,19 +7,14 @@
 internal b32
 FoodIsPerishable(product_kind Kind)
 {
- b32 Result = (Kind > ProductKind_None && Kind < ProductKind_Count && FoodShelfLifeDays[Kind] > 0.f);
+ b32 Result = (Kind > ProductKind_None && Kind < ProductKind_Count && FoodShelfLife[Kind] > 0);
  return Result;
 }
 
 internal u64
 FoodShelfLifeRounds(product_kind Kind)
 {
- u64 Result = 0;
- if(FoodIsPerishable(Kind))
- {
-  Result = (u64)(FoodShelfLifeDays[Kind]*(f32)Food_RoundsPerDay + .5f);
-  Result = Max(Result, 1);
- }
+ u64 Result = FoodIsPerishable(Kind) ? (u64)FoodShelfLife[Kind] : 0;
  return Result;
 }
 

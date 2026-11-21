@@ -165,3 +165,35 @@ FoodLegendShortLines(str8 *Lines, u32 Cap, char *ColorName)
  if(Result < Cap) Lines[Result++] = Str8Fmt("%s = goes bad within %d rounds.", ColorName, Food_SoonRounds);
  return Result;
 }
+
+// NOTE(L4): What really happened to one food across all islands so far (for the 3D view's
+// shortage strip and dropdown, which otherwise only compare the per-day amounts).
+internal food_counts
+FoodKindTotals(app_state *App, product_kind Kind)
+{
+ food_counts Result = {0};
+ u32 Count = Min(App->Broadcast.IslandCount, (u32)Food_MaxIslands);
+ if(Kind < ProductKind_Count)
+ {
+  for(u32 I = 0; I < Count; I += 1)
+  {
+   food_counts *C = &App->Food.Counts[I][Kind];
+   Result.Produced += C->Produced;
+   Result.Eaten += C->Eaten;
+   Result.Wasted += C->Wasted;
+   Result.Shortage += C->Shortage;
+   Result.Sent += C->Sent;
+   Result.Received += C->Received;
+  }
+ }
+ return Result;
+}
+
+internal str8
+FoodWastedText(app_state *App)
+{
+ food_counts All = FoodTotals(&App->Food, App->Broadcast.IslandCount);
+ str8 Result = Str8Fmt("%llu food gone bad", All.Wasted);
+ return Result;
+}
+
