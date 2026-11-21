@@ -1,48 +1,23 @@
 //-
-// SolarPunk broadcast view: status line and clickable buttons to control time
+// SolarPunk broadcast view: the time controls (in the top bar) and the island tooltip.
+// Drawn with the warm light theme from solarpunk_ui.c.
 //-
 
 //~ Constants
-#define BroadcastView_Margin        12.f
-#define BroadcastView_ButtonPadding 8.f
-#define BroadcastView_ButtonGap     6.f
-
-#define BroadcastView_ColorButton        0xFF434C5E
-#define BroadcastView_ColorButtonHot     0xFF4C566A
-#define BroadcastView_ColorButtonPressed 0xFF5E81AC
+// NOTE: Kept for the other overlays, which share these sizes.
+#define BroadcastView_Margin        Ui_Margin
+#define BroadcastView_ButtonPadding Ui_ButtonPadY
+#define BroadcastView_ButtonGap     Ui_Gap
 
 global_variable char *BroadcastSpeedLabels[] = {"paused", "0.25x", "0.5x", "1x", "2x", "4x", "8x"};
 StaticAssert(ArrayCount(BroadcastSpeedLabels) == ArrayCount(BroadcastSpeeds), BroadcastSpeedLabelsMatch);
 
 //~ Button
-// NOTE: Immediate-mode button: draws itself and returns true on the frame it is clicked.
+// NOTE: The plain button used across the overlays.
 internal b32
 BroadcastButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label)
 {
- font_atlas *Atlas = &App->FontAtlas;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
-
- v2 Size = V2(GraphMeasureText(Atlas, Font, Label) + 2.f*BroadcastView_ButtonPadding,
-              LineHeight + BroadcastView_ButtonPadding);
- v4 Dest = RectFromSize(*Cursor, Size);
-
- v2 MousePos = V2V2S32(Input->Mouse.Pos);
- app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
- // NOTE: The summary dropdown (drawn on top) takes the mouse when it is over it.
- b32 IsHot = IsInsideRectV2(MousePos, Dest) && !IsInsideRectV2(MousePos, App->R3.PopupRect);
- b32 Result = (IsHot && WasPressed(MouseLeft));
-
- u32 Color = BroadcastView_ColorButton;
- if(IsHot) Color = (MouseLeft.EndedDown ? BroadcastView_ColorButtonPressed : BroadcastView_ColorButtonHot);
-
- DrawRect(Dest, V4FromU32(Color), 5.f, 0.f, 0.f);
- DrawRect(Dest, V4FromU32(Graph_ColorNodeBorder), 5.f, 1.f, 0.f);
- GraphDrawText(Atlas, Font, V2(Dest.Min.X + BroadcastView_ButtonPadding, Dest.Min.Y + .5f*BroadcastView_ButtonPadding),
-               Label, V4FromU32(Graph_ColorTitle));
-
- Cursor->X += Size.X + BroadcastView_ButtonGap;
-
+ b32 Result = UiButtonEx(App, Input, Cursor, Label, UiButton_Normal, 0, 0.f);
  return Result;
 }
 
@@ -53,15 +28,20 @@ internal u32 W3NeedStatus(app_state *App, u32 IslandIdx, product_kind Kind);
 //~ Tooltip
 #define BroadcastView_HoverRadius 40.f
 
-// NOTE: Shows the full production and needs of the island under the mouse,
-// since nodes only show their name when there are many islands.
+// NOTE: The island under the mouse: its status, what it produces and needs (each need
+// in the colour of its own state) and how many islands it knows about.
 internal void
 DrawIslandTooltip(app_state *App, app_input *Input)
 {
- font_atlas *Atlas = &App->FontAtlas;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
+ f32 LineHeight = UiLineHeight(App);
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
+
+ // Not when the mouse is on the UI.
+ if(App->R3.HelpOpen) return;
+ for(u32 Idx = 0; Idx < App->R3.UIRectCount; Idx += 1)
+ {
+  if(IsInsideRectV2(MousePos, App->R3.UIRects[Idx])) return;
+ }
 
  //- Find the closest island to the mouse
  island *Hovered = 0;
@@ -81,88 +61,80 @@ DrawIslandTooltip(app_state *App, app_input *Input)
  if(Hovered)
  {
   str8 Lines[32];
-  v4 Colors[32];
+  u32 Colors[32];
   s32 LineCount = 0;
 
-  // NOTE: Border in the island's status colour; each need in the colour of its own state.
   u32 HoveredIdx = BroadcastIslandIndex(App, Hovered);
   u32 Status = (HoveredIdx < R3_MaxIslands) ? App->R3.IslandStatus[HoveredIdx] : IslandStatus_Ok;
-  char *StatusLines[IslandStatus_Count] = {"ok", "waiting for news", "short"};
-  
+  char *StatusLines[IslandStatus_Count] = {"ok: a supplier for every need", "waiting for news", "short: a need is short worldwide"};
+
   Lines[LineCount] = Hovered->Name;
-  Colors[LineCount] = V4FromU32(Graph_ColorTitle);
+  Colors[LineCount] = Ui_ColorText;
   LineCount += 1;
-  
+
   Lines[LineCount] = S8FromCString(StatusLines[Status < IslandStatus_Count ? Status : 0]);
-  Colors[LineCount] = V4FromU32(W3StatusColor(Status));
+  Colors[LineCount] = UiStatusText(Status);
   LineCount += 1;
 
   for(product *Product = Hovered->FirstProduct; Product && LineCount < (s32)ArrayCount(Lines); Product = Product->Next)
   {
-   Lines[LineCount] = Str8Fmt("+ %.*s %llu", (s32)ProductNames[Product->Kind].Size, ProductNames[Product->Kind].Data, Product->Amount);
-   Colors[LineCount] = V4FromU32(Graph_ColorProduct);
+   Lines[LineCount] = Str8Fmt("makes  %.*s %llu", (s32)ProductNames[Product->Kind].Size, ProductNames[Product->Kind].Data, Product->Amount);
+   Colors[LineCount] = Ui_ColorText;
    LineCount += 1;
   }
 
   for(product *Req = Hovered->FirstRequirement; Req && LineCount < (s32)ArrayCount(Lines); Req = Req->Next)
   {
-   Lines[LineCount] = Str8Fmt("- %.*s %llu", (s32)ProductNames[Req->Kind].Size, ProductNames[Req->Kind].Data, Req->Amount);
-   Colors[LineCount] = V4FromU32(W3StatusColor(W3NeedStatus(App, HoveredIdx, Req->Kind)));
+   Lines[LineCount] = Str8Fmt("needs  %.*s %llu", (s32)ProductNames[Req->Kind].Size, ProductNames[Req->Kind].Data, Req->Amount);
+   Colors[LineCount] = UiStatusText(W3NeedStatus(App, HoveredIdx, Req->Kind));
    LineCount += 1;
   }
 
   if(LineCount < (s32)ArrayCount(Lines))
   {
-   Lines[LineCount] = Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Hovered), App->Broadcast.IslandCount);
-   Colors[LineCount] = V4FromU32(Graph_ColorKnows);
+   Lines[LineCount] = Str8Fmt("knows %u of %u islands", BroadcastKnownCount(App, Hovered), App->Broadcast.IslandCount);
+   Colors[LineCount] = Ui_ColorTextDim;
    LineCount += 1;
   }
 
   f32 MaxWidth = 0.f;
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)
   {
-   MaxWidth = Max(MaxWidth, GraphMeasureText(Atlas, Font, Lines[Idx]));
+   MaxWidth = Max(MaxWidth, UiMeasure(App, Lines[Idx]));
   }
 
-  v2 Size = V2(MaxWidth + 2.f*BroadcastView_ButtonPadding,
-               (f32)LineCount*LineHeight + 2.f*BroadcastView_ButtonPadding);
-  v2 Min = V2(MousePos.X + 16.f, MousePos.Y + 16.f);
+  f32 Stripe = 4.f;
+  v2 Size = V2(MaxWidth + 2.f*Ui_Pad + Stripe, (f32)LineCount*LineHeight + 2.f*Ui_Pad);
+  v2 Min = V2(MousePos.X + 18.f, MousePos.Y + 18.f);
   v4 Box = RectFromSize(Min, Size);
-  DrawRect(Box, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
-  DrawRect(Box, V4FromU32(W3StatusColor(Status)), 6.f, 2.f, 0.f);
+  UiCard(Box, 8.f);
+  DrawRect(RectFromSize(V2(Box.Min.X + 3.f, Box.Min.Y + 6.f), V2(Stripe, Size.Y - 12.f)), V4FromU32(W3StatusColor(Status)), 2.f, 0.f, 0.f);
 
-  v2 Cursor = V2(Min.X + BroadcastView_ButtonPadding, Min.Y + BroadcastView_ButtonPadding);
+  v2 Cursor = V2(Min.X + Ui_Pad + Stripe, Min.Y + Ui_Pad);
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)
   {
-   GraphDrawText(Atlas, Font, Cursor, Lines[Idx], Colors[Idx]);
+   UiText(App, Cursor, Lines[Idx], Colors[Idx]);
    Cursor.Y += LineHeight;
   }
  }
 }
 
 //~ Timeline
-#define BroadcastView_TimelineWidth 320.f
-#define BroadcastView_KnobSize      14.f
-
-#define BroadcastView_ColorTrack     0xFF434C5E
-#define BroadcastView_ColorTrackFill 0xFF5E81AC
+#define BroadcastView_KnobSize 16.f
 
 // NOTE: Click or drag on the track to jump to that round (forward or back).
 internal void
-DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Height)
+DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Width, f32 Height)
 {
  broadcast_state *Broadcast = &App->Broadcast;
- font_atlas *Atlas = &App->FontAtlas;
- font *Font = &App->Font;
-
- f32 Width = BroadcastView_TimelineWidth;
  f32 LastRound = (f32)Broadcast_TimelineRounds;
  v4 Track = RectFromSize(*Cursor, V2(Width, Height));
 
  //- Input
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
- if(IsInsideRectV2(MousePos, Track) && !IsInsideRectV2(MousePos, App->R3.PopupRect) && WasPressed(MouseLeft))
+ b32 Hot = IsInsideRectV2(MousePos, Track) && !UiMouseBlocked(App, MousePos);
+ if(Hot && WasPressed(MouseLeft))
  {
   Broadcast->TimelineDragging = true;
  }
@@ -179,129 +151,86 @@ DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Height)
    BroadcastJumpToRound(App, Target);
   }
  }
+ if(Hot)
+ {
+  UiSetHint("Drag to travel to any round (also back in time)", V2(.5f*(Track.Min.X + Track.Max.X), Track.Max.Y + 6.f));
+ }
 
  //- Drawing
  f32 Done = Clamp(0.f, ((f32)Broadcast->Round - 1.f)/(LastRound - 1.f), 1.f);
  f32 TrackY = Track.Min.Y + .5f*Height;
  v4 Bar = RectFromSize(V2(Track.Min.X, TrackY - 3.f), V2(Width, 6.f));
  v4 Fill = RectFromSize(V2(Track.Min.X, TrackY - 3.f), V2(Max(Done*Width, 1.f), 6.f));
- DrawRect(Bar, V4FromU32(BroadcastView_ColorTrack), 3.f, 0.f, 0.f);
- DrawRect(Fill, V4FromU32(BroadcastView_ColorTrackFill), 3.f, 0.f, 0.f);
+ DrawRect(Bar, V4FromU32(Ui_ColorButtonDown), 3.f, 0.f, 0.f);
+ DrawRect(Fill, V4FromU32(Ui_ColorAccent), 3.f, 0.f, 0.f);
 
- v2 KnobCenter = V2(Track.Min.X + Done*Width, TrackY);
  f32 Knob = BroadcastView_KnobSize;
- b32 KnobHot = (IsInsideRectV2(MousePos, Track) || Broadcast->TimelineDragging);
- DrawRect(RectFromSize(V2(KnobCenter.X - .5f*Knob, KnobCenter.Y - .5f*Knob), V2(Knob, Knob)),
-          V4FromU32(KnobHot ? Graph_ColorCost : Graph_ColorTitle), .5f*Knob, 0.f, 0.f);
+ v2 KnobMin = V2(Track.Min.X + Done*Width - .5f*Knob, TrackY - .5f*Knob);
+ b32 KnobHot = (Hot || Broadcast->TimelineDragging);
+ DrawRect(RectFromSize(KnobMin, V2(Knob, Knob)), V4FromU32(Ui_ColorCard), .5f*Knob, 0.f, 0.f);
+ DrawRect(RectFromSize(KnobMin, V2(Knob, Knob)), V4FromU32(KnobHot ? Ui_ColorAccentDown : Ui_ColorAccent), .5f*Knob, 3.f, 0.f);
 
- str8 Label = Str8Fmt("round %llu / %u", Broadcast->Round, (u32)Broadcast_TimelineRounds);
- v2 LabelPos = V2(Track.Max.X + 12.f, Track.Min.Y + .5f*BroadcastView_ButtonPadding);
- DrawRect(RectFromSize(V2(LabelPos.X - 6.f, LabelPos.Y - 3.f), V2(GraphMeasureText(Atlas, Font, Label) + 12.f, Font->HeightPx + 6.f)),
-          V4FromU32(Graph_ColorNodeBg), 5.f, 0.f, 0.f);
- GraphDrawText(Atlas, Font, LabelPos, Label, V4FromU32(Graph_ColorKnows));
-
- Cursor->X = Track.Max.X + BroadcastView_ButtonGap;
+ Cursor->X = Track.Max.X + Ui_Gap;
 }
 
-//~ Controls help (opened with the "Controls" button)
-// NOTE: Plain C strings: MSVC warns (C4204) about arrays initialized with S8(...).
-global_variable char *ControlsHelpKeys[] =
-{
- "Up",     "Down",                    "Right",      "Left",
- "Wheel",  "Right drag",              "Middle drag", "Click",
-};
-global_variable char *ControlsHelpActions[] =
-{
- "faster", "slower (lowest = pause)", "next round", "restart",
- "zoom",   "move the map",            "rotate",      "open an island",
-};
-StaticAssert(ArrayCount(ControlsHelpKeys) == ArrayCount(ControlsHelpActions), ControlsHelpMatch);
+//~ Time controls (in the top bar)
+// NOTE: Fixed widths, measured from the widest text they hold, so they grow with the text size.
+internal f32 TimeControlsPlayWidth(app_state *App)  { return UiButtonWidth(App, S8("Pause"), 0.f); }
+internal f32 TimeControlsSpeedWidth(app_state *App) { return UiMeasure(App, S8("0.25x")) + 12.f; }
+internal f32 TimeControlsRoundWidth(app_state *App) { return UiMeasure(App, S8("Round 999")) + 8.f; }
 
+// NOTE: Width of everything in the time controls except the timeline track.
 internal f32
-ControlsHelpKeyColumn(app_state *App)
+TimeControlsFixedWidth(app_state *App)
 {
+ f32 Square = UiButtonHeight(App);
  f32 Result = 0.f;
- for EachElement(Idx, ControlsHelpKeys)
- {
-  Result = Max(Result, GraphMeasureText(&App->FontAtlas, &App->Font, S8FromCString(ControlsHelpKeys[Idx])));
- }
- Result += 2.f*BroadcastView_ButtonPadding;
+ Result += UiButtonWidth(App, S8("<< 5"), 0.f) + UiButtonWidth(App, S8("< 1"), 0.f);
+ Result += TimeControlsPlayWidth(App);
+ Result += UiButtonWidth(App, S8("1 >"), 0.f) + UiButtonWidth(App, S8("5 >>"), 0.f);
+ Result += 5.f*Ui_Gap + 12.f;
+ Result += Square + TimeControlsSpeedWidth(App) + Square + 3.f*Ui_Gap + 12.f;
+ Result += TimeControlsRoundWidth(App) + Ui_Gap;
+ Result += UiButtonWidth(App, S8("Restart"), 0.f);
  return Result;
 }
 
-// NOTE: The box sits with its bottom-left corner at BottomLeft.
-internal v4
-ControlsHelpRect(app_state *App, v2 BottomLeft)
-{
- font *Font = &App->Font;
- f32 ActionColumn = 0.f;
- for EachElement(Idx, ControlsHelpActions)
- {
-  ActionColumn = Max(ActionColumn, GraphMeasureText(&App->FontAtlas, Font, S8FromCString(ControlsHelpActions[Idx])));
- }
- f32 Width = ControlsHelpKeyColumn(App) + ActionColumn + 2.f*BroadcastView_ButtonPadding;
- f32 Height = (f32)(ArrayCount(ControlsHelpKeys) + 1)*Font->HeightPx + 2.f*BroadcastView_ButtonPadding;
- v4 Result = RectFromSize(V2(BottomLeft.X, BottomLeft.Y - Height), V2(Width, Height));
- return Result;
-}
-
+// NOTE: Step back/forward, play/pause, speed, the timeline and restart, in one row.
 internal void
-DrawControlsHelp(app_state *App, v2 BottomLeft)
-{
- font_atlas *Atlas = &App->FontAtlas;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
- v4 Box = ControlsHelpRect(App, BottomLeft);
- f32 KeyColumn = ControlsHelpKeyColumn(App);
-
- DrawRect(Box, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
- DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 6.f, 1.f, 0.f);
-
- v2 Line = V2(Box.Min.X + BroadcastView_ButtonPadding, Box.Min.Y + BroadcastView_ButtonPadding);
- GraphDrawText(Atlas, Font, Line, S8("Controls"), V4FromU32(Graph_ColorTitle));
- Line.Y += LineHeight;
- for EachElement(Idx, ControlsHelpKeys)
- {
-  GraphDrawText(Atlas, Font, Line, S8FromCString(ControlsHelpKeys[Idx]), V4FromU32(Graph_ColorCost));
-  GraphDrawText(Atlas, Font, V2(Line.X + KeyColumn, Line.Y), S8FromCString(ControlsHelpActions[Idx]), V4FromU32(Graph_ColorKnows));
-  Line.Y += LineHeight;
- }
-}
-
-//~ Controls
-// NOTE: Two rows of time controls at the top left. The row above them is the summary
-// bar (round, speed, island status), drawn by the 3D view.
-internal void
-DrawBroadcastControls(app_state *App, app_input *Input)
+DrawTimeControls(app_state *App, app_input *Input, v2 *Cursor, f32 TimelineWidth)
 {
  broadcast_state *Broadcast = &App->Broadcast;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
- f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
+ f32 Height = UiButtonHeight(App);
 
- v2 Pos = V2(BroadcastView_Margin, BroadcastView_Margin);
+ //- Stepping and play/pause
+ if(UiButtonEx(App, Input, Cursor, S8("<< 5"), UiButton_Normal, "Go back 5 rounds", 0.f))      BroadcastJumpBy(App, -5);
+ if(UiButtonEx(App, Input, Cursor, S8("< 1"), UiButton_Normal, "Go back 1 round", 0.f))        BroadcastJumpBy(App, -1);
+ b32 Paused = BroadcastIsPaused(Broadcast);
+ if(UiButtonEx(App, Input, Cursor, Paused ? S8("Play") : S8("Pause"), UiButton_Primary,
+               Paused ? "Let time run" : "Stop time", TimeControlsPlayWidth(App)))                  BroadcastTogglePause(Broadcast);
+ if(UiButtonEx(App, Input, Cursor, S8("1 >"), UiButton_Normal, "Go forward 1 round", 0.f))     BroadcastJumpBy(App, 1);
+ if(UiButtonEx(App, Input, Cursor, S8("5 >>"), UiButton_Normal, "Go forward 5 rounds", 0.f))   BroadcastJumpBy(App, 5);
+ Cursor->X += 12.f;
 
- //- Speed and stepping
- v2 Cursor = V2(Pos.X, Pos.Y + ButtonHeight + 2.f*BroadcastView_ButtonGap);
+ //- Speed: [-] 1x [+]
+ if(UiButtonEx(App, Input, Cursor, S8("-"), UiButton_Normal, "Slower", Height)) BroadcastSlower(Broadcast);
+ {
+  str8 Speed = S8FromCString(BroadcastSpeedLabels[BroadcastSpeedIdx(Broadcast)]);
+  f32 SpeedWidth = TimeControlsSpeedWidth(App);
+  f32 TextX = Cursor->X + .5f*(SpeedWidth - UiMeasure(App, Speed));
+  UiText(App, V2(FloorF32(TextX), Cursor->Y + Ui_ButtonPadY), Speed, Ui_ColorText);
+  Cursor->X += SpeedWidth + Ui_Gap;
+ }
+ if(UiButtonEx(App, Input, Cursor, S8("+"), UiButton_Normal, "Faster", Height)) BroadcastFaster(Broadcast);
+ Cursor->X += 12.f;
 
- if(BroadcastButton(App, Input, &Cursor, S8("Slower"))) BroadcastSlower(Broadcast);
- if(BroadcastButton(App, Input, &Cursor, S8("Faster"))) BroadcastFaster(Broadcast);
+ //- Timeline and round
+ DrawBroadcastTimeline(App, Input, Cursor, TimelineWidth, Height);
+ {
+  str8 Round = Str8Fmt("Round %llu", Broadcast->Round);
+  UiText(App, V2(Cursor->X + 4.f, Cursor->Y + Ui_ButtonPadY), Round, Ui_ColorText);
+  Cursor->X += TimeControlsRoundWidth(App) + Ui_Gap;
+ }
 
- str8 PauseLabel = (BroadcastIsPaused(Broadcast) ? S8("Play") : S8("Pause"));
- if(BroadcastButton(App, Input, &Cursor, PauseLabel)) BroadcastTogglePause(Broadcast);
-
- if(BroadcastButton(App, Input, &Cursor, S8("Next round"))) BroadcastStep(App);
- if(BroadcastButton(App, Input, &Cursor, S8("Restart")))    BroadcastRestart(App);
-
- //- Time travel: step buttons and a timeline slider
- Cursor = V2(Pos.X, Cursor.Y + ButtonHeight + BroadcastView_ButtonGap);
-
- if(BroadcastButton(App, Input, &Cursor, S8("Back 5")))    BroadcastJumpBy(App, -5);
- if(BroadcastButton(App, Input, &Cursor, S8("Back 1")))    BroadcastJumpBy(App, -1);
- if(BroadcastButton(App, Input, &Cursor, S8("Forward 1"))) BroadcastJumpBy(App, 1);
- if(BroadcastButton(App, Input, &Cursor, S8("Forward 5"))) BroadcastJumpBy(App, 5);
-
- DrawBroadcastTimeline(App, Input, &Cursor, ButtonHeight);
-
- DrawIslandTooltip(App, Input);
+ if(UiButtonEx(App, Input, Cursor, S8("Restart"), UiButton_Normal, "Start again from round 1", 0.f)) BroadcastRestart(App);
 }

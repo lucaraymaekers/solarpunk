@@ -39,6 +39,7 @@
 #include "solarpunk/solarpunk_food_app.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
+#include "solarpunk/solarpunk_ui.c"
 #include "solarpunk/solarpunk_broadcast_view.c"
 #include "solarpunk/solarpunk_render3d.c"
 #include "solarpunk/solarpunk_world3d.c"
@@ -125,8 +126,10 @@ UPDATE_AND_RENDER(UpdateAndRender)
   // NOTE: DrawIslandGraph(App, BufferDim) is the old 2D view.
   DrawWorld3D(App, Input, BufferDim);
   DrawIslandPanel(App, Input, BufferDim);
-  DrawBroadcastControls(App, Input);
   DrawSummaryPopup(App, Input, BufferDim);
+  DrawIslandTooltip(App, Input);
+  DrawHelpCard(App, Input, BufferDim);
+  UiDrawHint(App, BufferDim);
   RenderDrawAllRectangles(&App->Render, BufferDim, &App->FontAtlas);
  }
 

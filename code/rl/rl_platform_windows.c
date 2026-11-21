@@ -818,6 +818,16 @@ P_PROCESS_MESSAGES()
       if(Shift) Key->Modifiers |= PlatformKeyModifier_Shift;
       if(Ctrl)  Key->Modifiers |= PlatformKeyModifier_Control;
       
+      // NOTE: Ctrl + / Ctrl - (main keyboard or numpad) arrive as '+' / '-' with the
+      // Control modifier. With Ctrl held, ToUnicode gives a control character or nothing.
+      b32 PlusKey = (VKCode == VK_OEM_PLUS || VKCode == VK_ADD);
+      b32 MinusKey = (VKCode == VK_OEM_MINUS || VKCode == VK_SUBTRACT);
+      if(Ctrl && (PlusKey || MinusKey))
+      {
+       Key->Codepoint = PlusKey ? L'+' : L'-';
+       DLLIDAppend(Input->Text.Buffer, Id, Input->Text.First, Input->Text.Last);
+      }
+      else
       // Text input
       {
        // Try to convert to Unicode character
