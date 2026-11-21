@@ -1,5 +1,5 @@
 //-
-// SolarPunk 3D world: floating sky islands, product crates, cables and news pulses.
+// SolarPunk 3D world: floating sky islands, product crates, maglev rails and news trains.
 //-
 
 //~ Constants
@@ -9,9 +9,9 @@
 #define W3_IslandSides      24
 #define W3_Seed             7919
 
-#define W3_CableRadius      .07f
-#define W3_CableSegments    16
-#define W3_CableSag         .06f   // sag as a fraction of the cable length
+#define W3_RailSegments     20
+#define W3_RailArch         .045f  // upward arch as a fraction of the rail length
+#define W3_RailRingEvery    5      // a floating light ring every this many segments
 
 #define W3_CrateHalf        .24f
 #define W3_CrateUnitsPerBox 70     // one stacked crate per this many units produced
@@ -32,10 +32,14 @@
 #define W3_ColorPost        0xFFB0B7C3
 #define W3_ColorProducePad  0xFF8FD18C
 #define W3_ColorNeedPad     0xFFF2A65A
-#define W3_ColorCable       0xFF4A3F5C
-#define W3_ColorCableLit    0xFFEBCB8B
-#define W3_ColorCableHover  0xFFFFE08A
-#define W3_ColorPulse       0xFFFFF3B0
+#define W3_ColorRailBeam    0xFFEEF1F6
+#define W3_ColorRailSkirt   0xFF55607A
+#define W3_ColorRailGlow    0xFF45D4F0   // the strip on top of a rail
+#define W3_ColorRailLit     0xFFD8FFFF   // ... while news rides it
+#define W3_ColorRailHover   0xFFFFC857   // ... on the hovered island's rails
+#define W3_ColorTrainBody   0xFFF7F9FC
+#define W3_ColorTrainWindow 0xFF27344F
+#define W3_ColorTrainGlow   0xFF7FF0FF
 #define W3_ColorCrystalLow  0xFF8892A0
 #define W3_ColorCrystalHigh 0xFF7FE3F0
 #define W3_ColorHover       0xFFFFE08A
@@ -73,7 +77,8 @@ W3IslandTopFromMap(v2 MapPos, u32 Index)
  return Result;
 }
 
-// NOTE: Cable between two island tops. Point at t (0..1) going from A to B, with sag.
+// NOTE: Rail between two island tops. Point at t (0..1) going from A to B, gently arched
+// upwards like a bridge.
 internal v3
 W3CablePoint(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t)
 {
@@ -83,9 +88,9 @@ W3CablePoint(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t)
  v3 A = R3Add(R3Add(TopA, R3Scale(Direction, .8f*RadiusA)), Down);
  v3 B = R3Add(R3Sub(TopB, R3Scale(Direction, .8f*RadiusB)), Down);
 
- f32 Sag = W3_CableSag*R3Length(R3Sub(B, A));
+ f32 Arch = W3_RailArch*R3Length(R3Sub(B, A));
  v3 Result = R3Lerp(A, B, t);
- Result.Y -= 4.f*Sag*t*(1.f - t);
+ Result.Y += 4.f*Arch*t*(1.f - t);
  return Result;
 }
 
@@ -97,6 +102,130 @@ W3Shade(v4 Color, random_series *Series)
  v4 Result = V4(Color.X*Factor, Color.Y*Factor, Color.Z*Factor, Color.W);
  return Result;
 }
+
+//~ Maglev rails and news trains
+// NOTE: Every link is a maglev monorail: a pale beam with a glowing strip on top, a dark
+// skirt under it and floating light rings along it. News rides it as a little train.
+
+// NOTE: Frame along the rail at t: Dir = forward, Side = to the right, Up = the beam's top.
+internal void
+W3RailFrame(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, v3 *Dir, v3 *Side, v3 *Up)
+{
+ f32 Step = .01f;
+ v3 P0 = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Max(0.f, t - Step));
+ v3 P1 = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Min(1.f, t + Step));
+ *Dir = R3Normalize(R3Sub(P1, P0));
+ *Side = R3Normalize(R3Cross(*Dir, V3(0.f, 1.f, 0.f)));
+ *Up = R3Cross(*Side, *Dir);
+}
+
+// NOTE: A flat quad that ignores lighting, so it glows.
+internal void
+W3PushGlowQuad(r3_mesh *Mesh, v3 P0, v3 P1, v3 P2, v3 P3, v4 Color)
+{
+ R3PushTriUnlit(Mesh, P0, P1, P2, Color);
+ R3PushTriUnlit(Mesh, P0, P2, P3, Color);
+}
+
+internal void
+W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b32 Highlight)
+{
+ f32 HalfWidth = Highlight ? .3f : .25f;
+ f32 HalfHeight = .11f;
+ f32 GlowHalf = Highlight ? .12f : .08f;
+ v4 Beam = R3Color(W3_ColorRailBeam);
+ v4 Skirt = R3Color(W3_ColorRailSkirt);
+ 
+ for(u32 Segment = 0; Segment < W3_RailSegments; Segment += 1)
+ {
+  f32 T0 = (f32)Segment/(f32)W3_RailSegments;
+  f32 T1 = (f32)(Segment + 1)/(f32)W3_RailSegments;
+  v3 A = W3CablePoint(TopA, RadiusA, TopB, RadiusB, T0);
+  v3 B = W3CablePoint(TopA, RadiusA, TopB, RadiusB, T1);
+  v3 Dir, Side, Up;
+  W3RailFrame(TopA, RadiusA, TopB, RadiusB, .5f*(T0 + T1), &Dir, &Side, &Up);
+  v3 Center = R3Scale(R3Add(A, B), .5f);
+  v3 Half = R3Scale(R3Sub(B, A), .5f);
+  
+  // The beam, and the darker skirt under it.
+  R3PushOrientedBox(&R3->Opaque, Center, Half, R3Scale(Up, HalfHeight), R3Scale(Side, HalfWidth), Beam);
+  R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, -1.6f*HalfHeight)), Half, R3Scale(Up, .6f*HalfHeight),
+                    R3Scale(Side, .55f*HalfWidth), Skirt);
+  
+  // The glowing strip on top (just above the beam, so it is never hidden by it).
+  v3 TopA0 = R3Add(A, R3Scale(Up, HalfHeight + .01f));
+  v3 TopB0 = R3Add(B, R3Scale(Up, HalfHeight + .01f));
+  W3PushGlowQuad(&R3->Opaque, R3Add(TopA0, R3Scale(Side, -GlowHalf)), R3Add(TopB0, R3Scale(Side, -GlowHalf)),
+                 R3Add(TopB0, R3Scale(Side, GlowHalf)), R3Add(TopA0, R3Scale(Side, GlowHalf)), Glow);
+  
+  // A floating light ring every few segments.
+  if(Segment % W3_RailRingEvery == W3_RailRingEvery/2)
+  {
+   R3PushCylinder(&R3->Translucent, R3Add(A, R3Scale(Dir, -.04f)), R3Add(A, R3Scale(Dir, .04f)), .55f, 10,
+                  R3WithAlpha(Glow, .35f));
+  }
+ }
+ 
+ // A docking pad where the rail meets each island.
+ for(u32 End = 0; End < 2; End += 1)
+ {
+  f32 t = (End == 0) ? 0.f : 1.f;
+  v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, t);
+  v3 Dir, Side, Up;
+  W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+  R3PushOrientedBox(&R3->Opaque, R3Add(P, R3Scale(Up, -.05f)), R3Scale(Dir, .35f), R3Scale(Up, .16f), R3Scale(Side, .42f), Skirt);
+  v3 Top = R3Add(P, R3Scale(Up, .12f));
+  W3PushGlowQuad(&R3->Opaque, R3Add(R3Add(Top, R3Scale(Dir, -.3f)), R3Scale(Side, -.38f)), R3Add(R3Add(Top, R3Scale(Dir, .3f)), R3Scale(Side, -.38f)),
+                 R3Add(R3Add(Top, R3Scale(Dir, .3f)), R3Scale(Side, .38f)), R3Add(R3Add(Top, R3Scale(Dir, -.3f)), R3Scale(Side, .38f)), Glow);
+ }
+}
+
+// NOTE: One train car hovering over the rail at t; Nose/Tail add the pointed ends.
+internal void
+W3PushTrainCar(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, b32 Nose, b32 Tail, f32 NoseSign)
+{
+ v3 Dir, Side, Up;
+ W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+ Dir = R3Scale(Dir, NoseSign);
+ Side = R3Scale(Side, NoseSign);
+ v3 Center = R3Add(W3CablePoint(TopA, RadiusA, TopB, RadiusB, t), R3Scale(Up, .11f + .1f + .22f));
+ f32 HalfLength = .55f, HalfWidth = .24f, HalfHeight = .22f;
+ 
+ R3PushOrientedBox(&R3->Opaque, Center, R3Scale(Dir, HalfLength), R3Scale(Up, HalfHeight), R3Scale(Side, HalfWidth), R3Color(W3_ColorTrainBody));
+ // Window band, and a glowing line along each side.
+ R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, .06f)), R3Scale(Dir, .9f*HalfLength), R3Scale(Up, .07f),
+                   R3Scale(Side, HalfWidth + .01f), R3Color(W3_ColorTrainWindow));
+ R3PushOrientedBox(&R3->Opaque, R3Add(Center, R3Scale(Up, -.1f)), R3Scale(Dir, HalfLength), R3Scale(Up, .02f),
+                   R3Scale(Side, HalfWidth + .012f), R3Color(W3_ColorTrainGlow));
+ if(Nose)
+ {
+  v3 Front = R3Add(Center, R3Scale(Dir, HalfLength));
+  R3PushCone(&R3->Opaque, Front, R3Add(Front, R3Scale(Dir, .45f)), .26f, 10, R3Color(W3_ColorTrainBody));
+ }
+ if(Tail)
+ {
+  v3 Back = R3Add(Center, R3Scale(Dir, -HalfLength));
+  R3PushCone(&R3->Opaque, Back, R3Add(Back, R3Scale(Dir, -.25f)), .26f, 10, R3Color(W3_ColorTrainBody));
+ }
+ // The maglev glow between the car and the rail.
+ R3PushEllipsoid(&R3->Translucent, R3Add(Center, R3Scale(Up, -.3f)), V3(.6f, .06f, .6f), 3, 8, R3WithAlpha(R3Color(W3_ColorTrainGlow), .45f), true);
+}
+
+// NOTE: A two-car train going from island A (t = 0) to island B (t = 1); Progress is
+// where its nose is. Direction = +1 when it runs A to B along t, -1 the other way.
+internal void
+W3PushTrain(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Progress, f32 Direction)
+{
+ f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, 0.f)));
+ f32 CarStep = 1.25f/Max(Length, 1.f);
+ f32 Lead = (Direction > 0.f) ? Progress : 1.f - Progress;
+ f32 Second = Lead - Direction*CarStep;
+ Lead = Clamp(0.f, Lead, 1.f);
+ Second = Clamp(0.f, Second, 1.f);
+ W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Lead, true, false, Direction);
+ W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Second, false, true, Direction);
+}
+
 
 //~ Island status
 internal u32
@@ -1206,7 +1335,7 @@ W3BuildWorld(app_state *App)
  }
  HeroReplayCommands(App);
 
- //- Cables and news pulses
+ //- Maglev rails and news trains
  u32 FromIdx = 0;
  for(island *From = App->FirstIsland; From && FromIdx < R3->IslandCount; From = From->Next)
  {
@@ -1220,38 +1349,27 @@ W3BuildWorld(app_state *App)
     f32 RadiusA = R3->IslandRadius[FromIdx];
     f32 RadiusB = R3->IslandRadius[ToIdx];
 
-    // Every link exists in both directions; draw the cable once.
+    // Every link exists in both directions; build the rail once, from the lower index
+    // (t = 0 at the lower index's island).
     if(FromIdx < ToIdx)
     {
      b32 Highlight = (R3->HoveredIdx == (s32)FromIdx || R3->HoveredIdx == (s32)ToIdx);
      f32 Flash = BroadcastLinkFlash(App, From, Link->Dest);
-     v4 Color = R3LerpColor(R3Color(W3_ColorCable), R3Color(W3_ColorCableLit), Flash);
-     f32 Radius = W3_CableRadius;
-     if(Highlight)
-     {
-      Color = R3Color(W3_ColorCableHover);
-      Radius *= 1.6f;
-     }
-
-     for(u32 Segment = 0; Segment < W3_CableSegments; Segment += 1)
-     {
-      f32 T0 = (f32)Segment/(f32)W3_CableSegments;
-      f32 T1 = (f32)(Segment + 1)/(f32)W3_CableSegments;
-      R3PushCylinder(&R3->Opaque, W3CablePoint(TopA, RadiusA, TopB, RadiusB, T0),
-                     W3CablePoint(TopA, RadiusA, TopB, RadiusB, T1), Radius, 5, Color);
-     }
+     v4 Glow = R3LerpColor(R3Color(W3_ColorRailGlow), R3Color(W3_ColorRailLit), Flash);
+     if(Highlight) Glow = R3Color(W3_ColorRailHover);
+     W3PushRail(R3, TopA, RadiusA, TopB, RadiusB, Glow, Highlight);
     }
 
-    // A pulse travels from sender to receiver while this direction carries news.
+    // A train rides from sender to receiver while this direction carries news.
     if(FromIdx < Broadcast_MaxIslands && ToIdx < Broadcast_MaxIslands)
     {
      f32 Flash = Broadcast->Flash[FromIdx][ToIdx];
      if(Flash > 0.f)
      {
       f32 Progress = Clamp(0.f, 1.f - Flash/Broadcast_FlashSeconds, 1.f);
-      v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Progress);
-      R3PushEllipsoid(&R3->Opaque, P, V3(.32f, .32f, .32f), 5, 8, R3Color(W3_ColorPulse), true);
-      R3PushEllipsoid(&R3->Translucent, P, V3(.75f, .75f, .75f), 5, 8, R3WithAlpha(R3Color(W3_ColorPulse), .3f), true);
+      // The rail runs from the lower index; a train from the higher one runs backwards.
+      if(FromIdx < ToIdx) W3PushTrain(R3, TopA, RadiusA, TopB, RadiusB, Progress, 1.f);
+      else                W3PushTrain(R3, TopB, RadiusB, TopA, RadiusA, Progress, -1.f);
      }
     }
    }
