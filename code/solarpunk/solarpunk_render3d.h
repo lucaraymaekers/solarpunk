@@ -69,6 +69,7 @@ struct r3_state
  gl_uint VBO;
 
  r3_camera Camera;
+ v2 LensShift;   // see R3BeginFrame; eased towards the free part of the window
 
  // Per frame
  m4 ViewProj;

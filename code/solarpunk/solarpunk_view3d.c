@@ -789,8 +789,15 @@ global_variable char *V3HelpActions[] =
 };
 StaticAssert(ArrayCount(V3HelpKeys) == ArrayCount(V3HelpActions), V3HelpKeysMatch);
 
+// NOTE: What an island that makes each product looks like (its middle terrace).
+global_variable char *V3HelpProductLooks[ProductKind_Count] =
+{
+ "", "crop rows", "pond, water tower", "panel rows", "battery cells",
+ "fish pond, dock", "glass tubes", "mine", "pine forest",
+};
+
 #define V3D_HelpWidth   760.f
-#define V3D_HelpColumns 3
+#define V3D_HelpColumns 2
 
 // NOTE: Section title with a thin line under it; advances Y.
 internal void
@@ -873,7 +880,7 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
  Y += 8.f;
 
  //- Products
- V3HelpSection(App, X, &Y, Inner, "Products (crate colours)");
+ V3HelpSection(App, X, &Y, Inner, "Products: crate colour, and what an island that makes it looks like");
  {
   f32 ColumnWidth = Inner/(f32)V3D_HelpColumns;
   for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
@@ -882,6 +889,8 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
    v2 Pos = V2(X + (f32)(Item/ProductRows)*ColumnWidth, Y + (f32)(Item % ProductRows)*LineHeight);
    DrawRect(RectFromSize(V2(Pos.X, Pos.Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
    UiText(App, V2(Pos.X + Swatch + 8.f, Pos.Y), ProductNames[Kind], Ui_ColorText);
+   UiText(App, V2(Pos.X + Swatch + 8.f + UiMeasure(App, ProductNames[Kind]) + 10.f, Pos.Y),
+          S8FromCString(V3HelpProductLooks[Kind]), Ui_ColorTextDim);
   }
   Y += (f32)ProductRows*LineHeight + 8.f;
  }
@@ -932,6 +941,17 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
  // NOTE: Over the panel the wheel scrolls the panel instead of zooming.
  b32 MouseOverUI = (IsInsideRectV2(V2V2S32(Input->Mouse.Pos), App->Panel.LastRect) || R3->HelpOpen);
  R3CameraUpdate(&R3->Camera, Input, MouseOverUI);
+ 
+ // Centre the map in the space the top bar and the panel leave free (last frame's sizes).
+ {
+  f32 Right = App->Panel.Hidden ? BufferDim.X : App->Panel.LastRect.Min.X;
+  if(Right <= 0.f) Right = BufferDim.X;
+  f32 Top = R3->TopBarRect.Max.Y;
+  v2 Target = V2(-(BufferDim.X - Right)/Max(BufferDim.X, 1.f), -Top/Max(BufferDim.Y, 1.f));
+  f32 t = Min(1.f, 8.f*Input->dtForFrame);
+  R3->LensShift.X += (Target.X - R3->LensShift.X)*t;
+  R3->LensShift.Y += (Target.Y - R3->LensShift.Y)*t;
+ }
  R3BeginFrame(R3, FrameArena, BufferDim);
  W3ComputeStatus(App);
  W3PrepareIslands(App, Input);   // uses last frame's UI areas for hovering
