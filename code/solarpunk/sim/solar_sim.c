@@ -80,7 +80,8 @@ internal void
 TestCatalog(void)
 {
  Check(FoodIsPerishable(ProductKind_Fish) && FoodIsPerishable(ProductKind_Algae) &&
-       FoodIsPerishable(ProductKind_FreshWater) && FoodIsPerishable(ProductKind_Seeds), "food + seeds spoil");
+       FoodIsPerishable(ProductKind_Seeds), "fish, algae and seeds spoil");
+ Check(!FoodIsPerishable(ProductKind_FreshWater), "water does not go bad");
  Check(!FoodIsPerishable(ProductKind_Copper) && !FoodIsPerishable(ProductKind_Timber) &&
        !FoodIsPerishable(ProductKind_SolarPanels) && !FoodIsPerishable(ProductKind_Batteries) &&
        !FoodIsPerishable(ProductKind_None), "non-food never spoils");

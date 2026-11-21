@@ -107,8 +107,9 @@ UPDATE_AND_RENDER(UpdateAndRender)
  //- Update 
  {
   // TODO: Replace with real island generation/loading.
-  // NOTE: BuildHardcodedWorld(App) builds the small 5-island world instead.
-  BuildGeneratedWorld(App, WorldGen_IslandCount);
+  // NOTE: The small 5-island world, so each island's food and dates fit on screen.
+  // BuildGeneratedWorld(App, WorldGen_IslandCount) builds the 32-island world instead.
+  BuildHardcodedWorld(App);
   BroadcastUpdate(App, Input);
  }
  
