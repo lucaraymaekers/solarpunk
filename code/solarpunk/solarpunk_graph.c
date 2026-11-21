@@ -147,7 +147,7 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
     v2 Mid = V2(.5f*(A.X + B.X), .5f*(A.Y + B.Y));
     v2 LabelMin = V2(Mid.X - .5f*TextWidth - 4.f, Mid.Y - .5f*LineHeight);
     DrawRect(RectFromSize(LabelMin, V2(TextWidth + 8.f, LineHeight)), 
-             V4FromU32(0xFF2E3440), 4.f, 0.f, 0.f);
+             V4FromU32(0xFF2E3440), 4.f, 0.f, .5f);
     GraphDrawText(Atlas, Font, V2(LabelMin.X + 4.f, LabelMin.Y), CostText, V4FromU32(Graph_ColorCost));
    }
   }
@@ -198,8 +198,8 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
               FloorF32(Island->Pos.Y - .5f*Size.Y));
   v4 Dest = RectFromSize(Min, Size);
   
-  DrawRect(Dest, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
-  DrawRect(Dest, V4FromU32(Graph_ColorNodeBorder), 6.f, 2.f, 0.f);
+  DrawRect(Dest, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, .5f);
+  DrawRect(Dest, V4FromU32(Graph_ColorNodeBorder), 6.f, 2.f, .5f);
   
   v2 Cur = V2(Min.X + Graph_NodePadding, Min.Y + Graph_NodePadding);
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)

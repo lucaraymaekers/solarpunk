@@ -142,8 +142,8 @@ UiCard(v4 Box, f32 Radius)
 {
  v4 Shadow = V4(Box.Min.X - 1.f, Box.Min.Y + 2.f, Box.Max.X + 1.f, Box.Max.Y + 5.f);
  DrawRect(Shadow, V4FromU32(Ui_ColorShadow), Radius + 2.f, 0.f, 6.f);
- DrawRect(Box, V4FromU32(Ui_ColorCard), Radius, 0.f, 0.f);
- DrawRect(Box, V4FromU32(Ui_ColorCardBorder), Radius, 1.f, 0.f);
+ DrawRect(Box, V4FromU32(Ui_ColorCard), Radius, 0.f, .5f);
+ DrawRect(Box, V4FromU32(Ui_ColorCardBorder), Radius, 1.f, .5f);
 }
 
 // NOTE: True while the mouse should not reach the widget under it: the help card is
@@ -160,7 +160,7 @@ UiMouseBlocked(app_state *App, v2 MousePos)
 internal void
 UiDot(v2 Pos, f32 Size, u32 Color)
 {
- DrawRect(RectFromSize(Pos, V2(Size, Size)), V4FromU32(Color), .5f*Size, 0.f, 0.f);
+ DrawRect(RectFromSize(Pos, V2(Size, Size)), V4FromU32(Color), .5f*Size, 0.f, .5f);
 }
 
 //~ Hover hints
@@ -187,7 +187,7 @@ UiDrawHint(app_state *App, v2 BufferDim)
   v2 Pos = UiHintPos;
   Pos.X = Clamp(Ui_Margin, Pos.X - .5f*Width, BufferDim.X - Ui_Margin - Width);
   v4 Box = RectFromSize(Pos, V2(Width, Height));
-  DrawRect(Box, V4FromU32(Ui_ColorText), 6.f, 0.f, 0.f);
+  DrawRect(Box, V4FromU32(Ui_ColorText), 6.f, 0.f, .5f);
   UiText(App, V2(Box.Min.X + Ui_Pad, Box.Min.Y + Ui_ButtonPadY), Text, Ui_ColorCard);
  }
  UiHintText = 0;
@@ -222,7 +222,7 @@ UiButtonEx(app_state *App, app_input *Input, v2 *Cursor, str8 Label, ui_button_k
  if(Hot) Color = MouseLeft.EndedDown ? (Accent ? Ui_ColorAccentDown : Ui_ColorButtonDown)
   : (Accent ? Ui_ColorAccentHot : Ui_ColorButtonHot);
 
- DrawRect(Dest, V4FromU32(Color), Ui_ButtonRadius, 0.f, 0.f);
+ DrawRect(Dest, V4FromU32(Color), Ui_ButtonRadius, 0.f, .5f);
  f32 TextX = Dest.Min.X + .5f*(Width - UiMeasure(App, Label));
  UiText(App, V2(FloorF32(TextX), Dest.Min.Y + Ui_ButtonPadY), Label, Accent ? Ui_ColorOnAccent : Ui_ColorText);
 

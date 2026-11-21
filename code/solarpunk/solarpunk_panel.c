@@ -91,7 +91,7 @@ PanelSwatch(panel_cursor *Cursor, f32 Column, product_kind Kind)
 {
  f32 Size = Cursor->LineHeight - 6.f;
  DrawRect(RectFromSize(V2(Cursor->X + Column, Cursor->Y + 3.f), V2(Size, Size)),
-          V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+          V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, .5f);
 }
 
 // NOTE: Status colours (green ok, orange waiting, red short): a dot, and a light tint
@@ -101,7 +101,7 @@ PanelStatusDot(panel_cursor *Cursor, f32 Column, u32 Status)
 {
  f32 Size = Cursor->LineHeight - 10.f;
  DrawRect(RectFromSize(V2(Cursor->X + Column, Cursor->Y + .5f*(Cursor->LineHeight - Size)), V2(Size, Size)),
-          V4FromU32(W3StatusColor(Status)), .5f*Size, 0.f, 0.f);
+          V4FromU32(W3StatusColor(Status)), .5f*Size, 0.f, .5f);
 }
 
 // NOTE: Room for a status dot before a name.
@@ -117,7 +117,7 @@ PanelTintRow(panel_cursor *Cursor, u32 Status)
 {
  u32 Color = (Panel_TintAlpha << 24) | (W3StatusColor(Status) & 0x00FFFFFFu);
  v4 Row = RectFromSize(V2(Cursor->X - 4.f, Cursor->Y), V2(Cursor->Width + 8.f, Cursor->LineHeight));
- DrawRect(Row, V4FromU32(Color), 3.f, 0.f, 0.f);
+ DrawRect(Row, V4FromU32(Color), 3.f, 0.f, .5f);
 }
 
 internal void
@@ -191,11 +191,11 @@ PanelBeginRow(panel_cursor *Cursor, b32 Clickable, b32 *Hovered)
 
  if(*Hovered)
  {
-  DrawRect(Row, V4FromU32(Panel_ColorRowHover), 3.f, 0.f, 0.f);
+  DrawRect(Row, V4FromU32(Panel_ColorRowHover), 3.f, 0.f, .5f);
  }
  else if(Cursor->RowIndex & 1)
  {
-  DrawRect(Row, V4FromU32(Panel_ColorRowAlt), 3.f, 0.f, 0.f);
+  DrawRect(Row, V4FromU32(Panel_ColorRowAlt), 3.f, 0.f, .5f);
  }
  Cursor->RowIndex += 1;
 
@@ -549,7 +549,7 @@ PanelTabButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label, f32 Wid
 
  if(Active || Hot)
  {
-  DrawRect(Dest, V4FromU32(Active ? Ui_ColorAccent : Ui_ColorButtonHot), Ui_ButtonRadius - 2.f, 0.f, 0.f);
+  DrawRect(Dest, V4FromU32(Active ? Ui_ColorAccent : Ui_ColorButtonHot), Ui_ButtonRadius - 2.f, 0.f, .5f);
  }
  f32 TextWidth = PanelMeasure(App, Label);
  UiText(App, V2(FloorF32(Dest.Min.X + .5f*(Width - TextWidth)), Dest.Min.Y + Ui_ButtonPadY),
@@ -623,7 +623,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
    char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected"};
    f32 TabsWidth = PanelWidth - 2.f*Panel_Pad;
    v4 Track = RectFromSize(V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap), V2(TabsWidth, ButtonHeight + 6.f));
-   DrawRect(Track, V4FromU32(Ui_ColorButton), Ui_ButtonRadius, 0.f, 0.f);
+   DrawRect(Track, V4FromU32(Ui_ColorButton), Ui_ButtonRadius, 0.f, .5f);
    f32 TabWidth = (TabsWidth - 6.f)/(f32)PanelTab_Count;
    v2 TabCursor = V2(Track.Min.X + 3.f, Track.Min.Y + 3.f);
    for(u32 Tab = 0; Tab < PanelTab_Count; Tab += 1)
