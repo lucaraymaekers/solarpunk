@@ -34,6 +34,7 @@ struct island
  
  // Graph view
  v2 Pos;
+ v2 MapPos; // 0..1 position on the map, set by the world generator
 };
 
 struct link
@@ -61,6 +62,7 @@ struct app_state
  arena *LinksArena;
  arena *IslandsArena;
  arena *ProductsArena;
+ b32 HasMapLayout; // islands carry MapPos; the graph uses it instead of a circle
  
  // Announcements of production and needs between islands
  broadcast_state Broadcast;

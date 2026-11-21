@@ -16,6 +16,12 @@
 #define Graph_ColorLinkFlash    0xFFEBCB8B
 #define Graph_ColorKnows        0xFF81A1C1
 
+// NOTE: Above this many islands, nodes only show their name; hover one for details.
+#define Graph_MaxDetailedIslands 8
+#define Graph_MapMarginX       90.f
+#define Graph_MapMarginTop     290.f
+#define Graph_MapMarginBottom  50.f
+
 //~ Text
 internal f32
 GraphMeasureText(font_atlas *Atlas, font *Font, str8 String)
@@ -84,6 +90,22 @@ GraphLayoutIslandsInCircle(app_state *App, v2 BufferDim)
  }
 }
 
+// NOTE: For generated worlds: spread the 0..1 map positions over the window,
+// leaving room at the top for the controls.
+internal void
+GraphLayoutIslandsFromMap(app_state *App, v2 BufferDim)
+{
+ v2 Min = V2(Graph_MapMarginX, Graph_MapMarginTop);
+ v2 Size = V2(Max(BufferDim.X - 2.f*Graph_MapMarginX, 1.f),
+              Max(BufferDim.Y - Graph_MapMarginTop - Graph_MapMarginBottom, 1.f));
+ 
+ for(island *Island = App->FirstIsland; Island; Island = Island->Next)
+ {
+  Island->Pos = V2(Min.X + Island->MapPos.X*Size.X,
+                   Min.Y + Island->MapPos.Y*Size.Y);
+ }
+}
+
 internal void
 DrawIslandGraph(app_state *App, v2 BufferDim)
 {
@@ -91,7 +113,16 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
  font *Font = &App->Font;
  f32 LineHeight = Font->HeightPx;
  
- GraphLayoutIslandsInCircle(App, BufferDim);
+ if(App->HasMapLayout)
+ {
+  GraphLayoutIslandsFromMap(App, BufferDim);
+ }
+ else
+ {
+  GraphLayoutIslandsInCircle(App, BufferDim);
+ }
+ 
+ b32 Compact = (BroadcastCountIslands(App) > Graph_MaxDetailedIslands);
  
  //- Links (drawn first so nodes sit on top)
  for(island *Island = App->FirstIsland; Island; Island = Island->Next)
@@ -134,14 +165,14 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
   Colors[LineCount] = V4FromU32(Graph_ColorTitle);
   LineCount += 1;
   
-  for(product *Product = Island->FirstProduct; Product && LineCount < (s32)ArrayCount(Lines); Product = Product->Next)
+  for(product *Product = Island->FirstProduct; Product && !Compact && LineCount < (s32)ArrayCount(Lines); Product = Product->Next)
   {
    Lines[LineCount] = Str8Fmt("+ %.*s %llu", (s32)ProductNames[Product->Kind].Size, ProductNames[Product->Kind].Data, Product->Amount);
    Colors[LineCount] = V4FromU32(Graph_ColorProduct);
    LineCount += 1;
   }
   
-  for(product *Req = Island->FirstRequirement; Req && LineCount < (s32)ArrayCount(Lines); Req = Req->Next)
+  for(product *Req = Island->FirstRequirement; Req && !Compact && LineCount < (s32)ArrayCount(Lines); Req = Req->Next)
   {
    Lines[LineCount] = Str8Fmt("- %.*s %llu", (s32)ProductNames[Req->Kind].Size, ProductNames[Req->Kind].Data, Req->Amount);
    Colors[LineCount] = V4FromU32(Graph_ColorRequirement);
@@ -150,7 +181,7 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
   
   if(LineCount < (s32)ArrayCount(Lines))
   {
-   Lines[LineCount] = Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount);
+   Lines[LineCount] = Str8Fmt("knows %u/%u", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount);
    Colors[LineCount] = V4FromU32(Graph_ColorKnows);
    LineCount += 1;
   }
