@@ -37,8 +37,8 @@
 #define Ui_ColorShortText   0xFFC23B3B
 
 //~ Text size
-// NOTE: Chosen with the A- / A+ buttons in the top bar; big by default so it reads well
-// on a projector. The atlas is rebuilt at the start of a frame (UiUpdateTextSize), never
+// NOTE: Big by default so it reads well on a projector; R3->TextSizeIdxPlusOne picks
+// another size. The atlas is rebuilt at the start of a frame (UiUpdateTextSize), never
 // in the middle, so the text already queued this frame stays valid.
 global_variable f32 UiTextSizes[] = {20.f, 24.f, 28.f, 32.f, 36.f, 42.f};
 #define Ui_DefaultTextSizeIdx 2
@@ -53,12 +53,6 @@ UiTextSizeIdx(r3_state *R3)
  s32 Result = (R3->TextSizeIdxPlusOne > 0) ? R3->TextSizeIdxPlusOne - 1 : Ui_DefaultTextSizeIdx;
  Result = Clamp(0, Result, (s32)ArrayCount(UiTextSizes) - 1);
  return Result;
-}
-
-internal void
-UiChangeTextSize(r3_state *R3, s32 Delta)
-{
- R3->TextSizeIdxPlusOne = 1 + Clamp(0, UiTextSizeIdx(R3) + Delta, (s32)ArrayCount(UiTextSizes) - 1);
 }
 
 // NOTE: Call at the start of the frame, before any text is drawn or measured.

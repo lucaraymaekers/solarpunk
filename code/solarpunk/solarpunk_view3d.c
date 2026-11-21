@@ -394,7 +394,6 @@ internal void
 V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
- r3_camera *Camera = &R3->Camera;
  f32 ButtonHeight = UiButtonHeight(App);
  f32 Square = ButtonHeight;
  f32 Scale = UiScale(App);
@@ -423,10 +422,7 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
  }
  
  b32 Focused = (R3->FocusedClusterPlusOne != 0);
- f32 RightWidth = (UiButtonWidth(App, S8("A-"), Square) + UiButtonWidth(App, S8("A+"), Square) +
-                   UiButtonWidth(App, S8("+"), Square) + UiButtonWidth(App, S8("-"), Square) +
-                   UiButtonWidth(App, S8("Reset view"), 0.f) + UiButtonWidth(App, S8("?"), Square) +
-                   6.f*Ui_Gap + 2.f*12.f);
+ f32 RightWidth = UiButtonWidth(App, S8("?"), Square) + Ui_Gap;
  if(Focused) RightWidth += UiButtonWidth(App, S8("All clusters"), 0.f) + Ui_Gap;
  
  f32 Fixed = TimeControlsFixedWidth(App);
@@ -460,7 +456,7 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
  f32 LeftEnd = Cursor.X;
  R3->SummaryBarRect = V4(Bar.Min.X, Bar.Min.Y, LeftEnd, Y + ButtonHeight + Ui_Pad);
  
- //- Right: text size, camera and help, laid out from the right edge
+ //- Right: "All clusters" (while one is open) and help, laid out from the right edge
  f32 RightStart = Bar.Max.X - Ui_Pad - RightWidth + Ui_Gap;
  Cursor = V2(RightStart, Y);
  if(Focused)
@@ -470,17 +466,6 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
    V3FocusCluster(App, 0);
   }
  }
- if(UiButtonEx(App, Input, &Cursor, S8("A-"), UiButton_Normal, "Smaller text", Square)) UiChangeTextSize(R3, -1);
- if(UiButtonEx(App, Input, &Cursor, S8("A+"), UiButton_Normal, "Bigger text", Square))  UiChangeTextSize(R3, 1);
- Cursor.X += 12.f;
- if(UiButtonEx(App, Input, &Cursor, S8("+"), UiButton_Normal, "Zoom in (mouse wheel)", Square))  R3CameraZoom(Camera, 1.f/R3_CameraZoomStep);
- if(UiButtonEx(App, Input, &Cursor, S8("-"), UiButton_Normal, "Zoom out (mouse wheel)", Square)) R3CameraZoom(Camera, R3_CameraZoomStep);
- if(UiButtonEx(App, Input, &Cursor, S8("Reset view"), UiButton_Normal, "Back to the starting view", 0.f))
- {
-  R3CameraReset(Camera);
-  R3->FocusedClusterPlusOne = 0;
- }
- Cursor.X += 12.f;
  v2 HelpPos = Cursor;
  if(UiButtonEx(App, Input, &Cursor, S8("?"), R3->HelpOpen ? UiButton_Toggled : UiButton_Normal, "Help: what the colours mean, mouse and keys", Square))
  {
