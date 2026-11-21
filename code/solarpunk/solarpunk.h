@@ -7,7 +7,10 @@
 typedef struct product product;
 struct product
 {
- str8 Name;
+ product *Next;
+ product *Prev;
+ 
+ product_kind Kind;
  u64 Amount;
 };
 
@@ -28,6 +31,9 @@ struct island
  product *LastRequiremement;
  
  str8 Name;
+ 
+ // Graph view
+ v2 Pos;
 };
 
 struct link

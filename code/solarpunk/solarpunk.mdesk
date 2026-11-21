@@ -1,0 +1,30 @@
+//~ Products
+@table(Kind, Name)
+ProductsTable:
+{
+ { None        "None"         }
+ { Seeds       "Seeds"        }
+ { FreshWater  "Fresh Water"  }
+ { SolarPanels "Solar Panels" }
+ { Batteries   "Batteries"    }
+ { Fish        "Fish"         }
+ { Algae       "Algae"        }
+ { Copper      "Copper"       }
+ { Timber      "Timber"       }
+}
+
+@data_enum("product_kind")
+{
+ @expand(ProductsTable)
+  ```ProductKind_$(Kind),
+ ```;
+ `ProductKind_Count`;
+}
+
+@data_table("str8")
+ProductNames:
+{
+ @expand(ProductsTable) @strings
+  ```{$(Name)},
+ ```;
+}

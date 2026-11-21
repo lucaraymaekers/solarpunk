@@ -13,6 +13,7 @@
 #include "rl/generated/rl_ui.meta.c"
 #include "rl/generated/rl_render.meta.c"
 #include "rl/generated/rl_font.meta.c"
+#include "solarpunk/generated/solarpunk.meta.c"
 #include "rl/rl_libs.h"
 #include "rl/rl_font.h"
 #include "rl/rl_platform.h"
@@ -28,6 +29,8 @@
 #include "rl/rl_widgets.c"
 
 #include "solarpunk/solarpunk.h"
+#include "solarpunk/solarpunk_world.c"
+#include "solarpunk/solarpunk_graph.c"
 
 //~ Macros
 #if OS_WINDOWS
@@ -93,12 +96,15 @@ UPDATE_AND_RENDER(UpdateAndRender)
  RenderBeginFrame(FrameArena, 0, 0, V2Arg(Buffer->Dim));
  
  //- Update 
- 
- 
+ {
+  // TODO: Replace with real island generation/loading.
+  BuildHardcodedWorld(App);
+ }
  
  //- Rendering 
  { 
   RenderClear();
+  DrawIslandGraph(App, BufferDim);
   RenderDrawAllRectangles(&App->Render, BufferDim, &App->FontAtlas);
  }
  

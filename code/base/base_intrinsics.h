@@ -60,7 +60,7 @@ ASinF64(f64 X)
 internal inline f64
 SqrtF64(f64 X)
 {
- f64 Result = (X);
+ f64 Result = sqrt(X);
  return Result;
 }
 
