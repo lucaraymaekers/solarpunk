@@ -10,25 +10,21 @@
 
 //~ Constants
 #define Panel_Width        440.f
-#define Panel_Top          92.f
-#define Panel_Margin       12.f
-#define Panel_Pad          10.f
+#define Panel_Margin       Ui_Margin
+#define Panel_Pad          12.f
 #define Panel_ScrollStep   160.f
 #define Panel_WheelStep    60.f
 
-#define Panel_ColorBg        0xF02E3440
-#define Panel_ColorRowAlt    0xFF353C4A
-#define Panel_ColorRowHover  0xFF4C566A
-#define Panel_ColorTab       0xFF3B4252
-#define Panel_ColorTabActive 0xFF5E81AC
-#define Panel_ColorLine      0xFF4C566A
-#define Panel_ColorSection   0xFFEBCB8B
-#define Panel_ColorText      0xFFECEFF4
-#define Panel_ColorDim       0xFF9AA3B5
-#define Panel_ColorGood      0xFFA3BE8C
-#define Panel_ColorShortage  0xFFE0707A
-#define Panel_ColorSelected  0xFF88E0FF
-#define Panel_TintAlpha      0x38u    // status tint over a row
+#define Panel_ColorRowAlt    Ui_ColorRowAlt
+#define Panel_ColorRowHover  Ui_ColorRowHover
+#define Panel_ColorLine      Ui_ColorLine
+#define Panel_ColorSection   Ui_ColorTitle
+#define Panel_ColorText      Ui_ColorText
+#define Panel_ColorDim       Ui_ColorTextDim
+#define Panel_ColorGood      Ui_ColorOkText
+#define Panel_ColorShortage  Ui_ColorShortText
+#define Panel_ColorSelected  Ui_ColorSelected
+#define Panel_TintAlpha      0x2Cu    // status tint over a row
 #define Panel_DotSpace       16.f     // room for a status dot before a name
 
 //~ Helpers
@@ -182,7 +178,8 @@ PanelBeginRow(panel_cursor *Cursor, b32 Clickable, b32 *Hovered)
 {
  v4 Row = RectFromSize(V2(Cursor->X - 4.f, Cursor->Y), V2(Cursor->Width + 8.f, Cursor->LineHeight));
  v2 MousePos = V2V2S32(Cursor->Input->Mouse.Pos);
- *Hovered = (Clickable && IsInsideRectV2(MousePos, Row) && IsInsideRectV2(MousePos, Cursor->Content));
+ *Hovered = (Clickable && IsInsideRectV2(MousePos, Row) && IsInsideRectV2(MousePos, Cursor->Content) &&
+             !UiMouseBlocked(Cursor->App, MousePos));
 
  if(*Hovered)
  {
@@ -392,11 +389,11 @@ PanelDrawIslands(panel_cursor *Cursor)
   {
    str8 Amount = Str8Fmt("%llu", Req->Amount);
    PanelSwatch(Cursor, Column, Req->Kind);
-   PanelText(Cursor, Column + Cursor->LineHeight - 2.f, Amount, W3StatusColor(W3NeedStatus(App, Index, Req->Kind)));
+   PanelText(Cursor, Column + Cursor->LineHeight - 2.f, Amount, UiStatusText(W3NeedStatus(App, Index, Req->Kind)));
    Column += Cursor->LineHeight + PanelMeasure(App, Amount) + 6.f;
   }
 
-  PanelTextRight(Cursor, W, Str8Fmt("%u/%u", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Graph_ColorKnows);
+  PanelTextRight(Cursor, W, Str8Fmt("%u/%u", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Panel_ColorDim);
   PanelNewLine(Cursor);
   Index += 1;
  }
@@ -429,7 +426,7 @@ PanelDrawSelected(panel_cursor *Cursor)
  Cursor->Y += 4.f;
  PanelStatusDot(Cursor, 0.f, Status);
  PanelText(Cursor, Panel_DotSpace, Island->Name, Panel_ColorSelected);
- PanelTextRight(Cursor, W, Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Graph_ColorKnows);
+ PanelTextRight(Cursor, W, Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Panel_ColorDim);
  PanelNewLine(Cursor);
  {
   char *StatusLines[IslandStatus_Count] =
@@ -440,7 +437,7 @@ PanelDrawSelected(panel_cursor *Cursor)
   };
   Cursor->Y += 2.f;
   PanelTintRow(Cursor, Status);
-  PanelText(Cursor, 4.f, S8FromCString(StatusLines[Status < IslandStatus_Count ? Status : 0]), W3StatusColor(Status));
+  PanelText(Cursor, 4.f, S8FromCString(StatusLines[Status < IslandStatus_Count ? Status : 0]), UiStatusText(Status));
   PanelNewLine(Cursor);
  }
 
@@ -489,7 +486,7 @@ PanelDrawSelected(panel_cursor *Cursor)
    }
 
    u32 NeedStatus = W3NeedStatus(App, SelectedIdx, Req->Kind);
-   u32 NeedColor = W3StatusColor(NeedStatus);
+   u32 NeedColor = UiStatusText(NeedStatus);
    PanelTintRow(Cursor, NeedStatus);
    PanelSwatch(Cursor, 0.f, Req->Kind);
    PanelText(Cursor, Cursor->LineHeight, ProductNames[Req->Kind], Panel_ColorText);
@@ -526,30 +523,31 @@ PanelDrawSelected(panel_cursor *Cursor)
    PanelTintRow(Cursor, NeighbourStatus);
    PanelStatusDot(Cursor, 0.f, NeighbourStatus);
    PanelText(Cursor, Panel_DotSpace, Link->Dest->Name, Panel_ColorText);
-   PanelTextRight(Cursor, W, Str8Fmt("%d", Link->Cost), Graph_ColorCost);
+   PanelTextRight(Cursor, W, Str8Fmt("%d", Link->Cost), Ui_ColorTitle);
    PanelNewLine(Cursor);
   }
  }
 }
 
 //~ Tabs
-// NOTE: Tab button; the active tab is filled. Returns true when clicked.
+// NOTE: One segment of the tab bar; the active tab is filled. Returns true when clicked.
 internal b32
 PanelTabButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label, f32 Width, b32 Active)
 {
- font *Font = &App->Font;
- f32 Height = Font->HeightPx + BroadcastView_ButtonPadding;
+ f32 Height = UiButtonHeight(App);
  v4 Dest = RectFromSize(*Cursor, V2(Width, Height));
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
- b32 Hot = IsInsideRectV2(MousePos, Dest);
+ b32 Hot = IsInsideRectV2(MousePos, Dest) && !UiMouseBlocked(App, MousePos);
 
- u32 Color = Active ? Panel_ColorTabActive : (Hot ? Panel_ColorRowHover : Panel_ColorTab);
- DrawRect(Dest, V4FromU32(Color), 5.f, 0.f, 0.f);
+ if(Active || Hot)
+ {
+  DrawRect(Dest, V4FromU32(Active ? Ui_ColorAccent : Ui_ColorButtonHot), Ui_ButtonRadius - 2.f, 0.f, 0.f);
+ }
  f32 TextWidth = PanelMeasure(App, Label);
- GraphDrawText(&App->FontAtlas, Font, V2(Dest.Min.X + .5f*(Width - TextWidth), Dest.Min.Y + .5f*BroadcastView_ButtonPadding),
-               Label, V4FromU32(Panel_ColorText));
+ UiText(App, V2(FloorF32(Dest.Min.X + .5f*(Width - TextWidth)), Dest.Min.Y + Ui_ButtonPadY),
+        Label, Active ? Ui_ColorOnAccent : Ui_ColorText);
 
- Cursor->X += Width + BroadcastView_ButtonGap;
+ Cursor->X += Width;
  b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
  return Result;
 }
@@ -560,10 +558,10 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
 {
  island_panel_state *Panel = &App->Panel;
  r3_state *R3 = &App->R3;
- font *Font = &App->Font;
- f32 LineHeight = Font->HeightPx;
+ f32 LineHeight = UiLineHeight(App);
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
+ f32 PanelTop = R3->TopBarRect.Max.Y + Ui_Gap;
 
  Panel->RowHoverPlusOne = 0;
 
@@ -580,31 +578,32 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
  if(Panel->Hidden)
  {
   str8 Label = S8("Show islands panel");
-  v2 Cursor = V2(BufferDim.X - Panel_Margin - PanelMeasure(App, Label) - 2.f*BroadcastView_ButtonPadding - BroadcastView_ButtonGap, Panel_Top);
-  Panel->LastRect = RectFromSize(Cursor, V2(PanelMeasure(App, Label) + 2.f*BroadcastView_ButtonPadding, LineHeight + BroadcastView_ButtonPadding));
-  if(BroadcastButton(App, Input, &Cursor, Label))
+  f32 Width = UiButtonWidth(App, Label, 0.f);
+  v4 Card = RectFromSize(V2(BufferDim.X - Panel_Margin - Width - 2.f*6.f, PanelTop), V2(Width + 2.f*6.f, UiButtonHeight(App) + 2.f*6.f));
+  UiCard(Card, Ui_CardRadius);
+  Panel->LastRect = Card;
+  v2 Cursor = V2(Card.Min.X + 6.f, Card.Min.Y + 6.f);
+  if(UiButtonEx(App, Input, &Cursor, Label, UiButton_Primary, "Lists of all islands, shortages and the opened island", 0.f))
   {
    Panel->Hidden = false;
   }
  }
  else
  {
-  v4 Box = RectFromSize(V2(BufferDim.X - Panel_Margin - Panel_Width, Panel_Top),
-                        V2(Panel_Width, Max(BufferDim.Y - Panel_Top - Panel_Margin, 6.f*LineHeight)));
+  v4 Box = RectFromSize(V2(BufferDim.X - Panel_Margin - Panel_Width, PanelTop),
+                        V2(Panel_Width, Max(BufferDim.Y - PanelTop - Panel_Margin, 6.f*LineHeight)));
   Panel->LastRect = Box;
-  DrawRect(Box, V4FromU32(Panel_ColorBg), 8.f, 0.f, 0.f);
-  DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 8.f, 1.f, 0.f);
+  UiCard(Box, Ui_CardRadius);
 
-  f32 ButtonHeight = LineHeight + BroadcastView_ButtonPadding;
+  f32 ButtonHeight = UiButtonHeight(App);
 
   //- Header: title and Hide
   v2 HeaderPos = V2(Box.Min.X + Panel_Pad, Box.Min.Y + Panel_Pad);
-  GraphDrawText(&App->FontAtlas, Font, V2(HeaderPos.X, HeaderPos.Y + .5f*BroadcastView_ButtonPadding),
-                S8("Islands"), V4FromU32(Panel_ColorText));
+  UiText(App, V2(HeaderPos.X, HeaderPos.Y + Ui_ButtonPadY), S8("Islands"), Ui_ColorTitle);
   {
    str8 HideLabel = S8("Hide");
-   v2 Cursor = V2(Box.Max.X - Panel_Pad - PanelMeasure(App, HideLabel) - 2.f*BroadcastView_ButtonPadding, HeaderPos.Y);
-   if(BroadcastButton(App, Input, &Cursor, HideLabel))
+   v2 Cursor = V2(Box.Max.X - Panel_Pad - UiButtonWidth(App, HideLabel, 0.f), HeaderPos.Y);
+   if(UiButtonEx(App, Input, &Cursor, HideLabel, UiButton_Normal, "Hide this panel to see more of the map", 0.f))
    {
     Panel->Hidden = true;
    }
@@ -614,8 +613,10 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
   {
    char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected"};
    f32 TabsWidth = Panel_Width - 2.f*Panel_Pad;
-   f32 TabWidth = (TabsWidth - 2.f*BroadcastView_ButtonGap)/(f32)PanelTab_Count;
-   v2 TabCursor = V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap);
+   v4 Track = RectFromSize(V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap), V2(TabsWidth, ButtonHeight + 6.f));
+   DrawRect(Track, V4FromU32(Ui_ColorButton), Ui_ButtonRadius, 0.f, 0.f);
+   f32 TabWidth = (TabsWidth - 6.f)/(f32)PanelTab_Count;
+   v2 TabCursor = V2(Track.Min.X + 3.f, Track.Min.Y + 3.f);
    for(u32 Tab = 0; Tab < PanelTab_Count; Tab += 1)
    {
     if(PanelTabButton(App, Input, &TabCursor, S8FromCString(TabNames[Tab]), TabWidth, (Panel->Tab == (panel_tab)Tab)))
@@ -627,7 +628,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
   }
 
   //- Content (clipped and scrollable)
-  f32 ContentTop = HeaderPos.Y + 2.f*ButtonHeight + BroadcastView_ButtonGap + .5f*Panel_Pad;
+  f32 ContentTop = HeaderPos.Y + 2.f*ButtonHeight + 6.f + BroadcastView_ButtonGap + .5f*Panel_Pad;
   f32 FooterHeight = ButtonHeight + 2.f*Panel_Pad;
   v4 Content = V4(Box.Min.X + Panel_Pad, ContentTop, Box.Max.X - Panel_Pad, Box.Max.Y - FooterHeight);
 

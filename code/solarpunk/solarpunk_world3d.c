@@ -184,7 +184,7 @@ W3ComputeStatus(app_state *App)
 internal b32
 W3PointOnUI(r3_state *R3, v2 P)
 {
- b32 Result = false;
+ b32 Result = R3->HelpOpen;
  for(u32 Idx = 0; Idx < R3->UIRectCount && !Result; Idx += 1)
  {
   Result = IsInsideRectV2(P, R3->UIRects[Idx]);

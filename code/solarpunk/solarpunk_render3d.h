@@ -93,10 +93,13 @@ struct r3_state
  u64 TotalProduced[ProductKind_Count];
  u64 TotalNeeded[ProductKind_Count];
 
- // 2D overlay: optional boxes, and the screen areas covered by UI this frame
- // (labels avoid them; clicks and hovers there do not reach the 3D view).
- b32 ShowLegend;
- b32 ShowControls;
+ // 2D overlay. The help card blocks the rest of the UI and the 3D view while open;
+ // it opens by itself on the first start.
+ b32 HelpOpen;
+ b32 HelpShownOnce;
+ v4 HelpButtonRect;   // the "?" button, which toggles the card
+ v4 TopBarRect;       // this frame
+ v4 ShortStripRect;   // products short worldwide, under the top bar (this frame)
 
  // Cluster whose island names are shown (0 = none, only the cluster names).
  s32 FocusedClusterPlusOne;
@@ -104,9 +107,11 @@ struct r3_state
  // Summary bar dropdown: 0 = closed, 1 + island_status = islands with that status,
  // R3_SummaryProductBase + product kind = islands that need/produce that product.
  s32 SummaryOpen;
- v4 SummaryBarRect;   // this frame
+ v4 SummaryBarRect;   // the status chips (this frame); clicks there keep the dropdown open
  v4 PopupRect;        // where the dropdown was drawn (zero when closed)
  s32 PopupHoverPlusOne; // island row under the mouse in the dropdown
+ // Screen areas covered by UI this frame (labels avoid them; clicks and hovers
+ // there do not reach the 3D view).
  v4 UIRects[R3_MaxUIRects];
  u32 UIRectCount;
 };
