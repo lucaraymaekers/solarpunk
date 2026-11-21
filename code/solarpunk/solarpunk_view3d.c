@@ -103,6 +103,8 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
  v4 Taken[R3_MaxUIRects];
  u32 TakenCount = R3->UIRectCount;
  for(u32 Idx = 0; Idx < TakenCount; Idx += 1) Taken[Idx] = R3->UIRects[Idx];
+ v4 Placed[WorldGen_ClusterCount];   // cluster labels drawn so far, so they do not overlap
+ u32 PlacedCount = 0;
 
  for(u32 Cluster = 0; Cluster < ClusterCount; Cluster += 1)
  {
@@ -151,9 +153,26 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
     }
    }
   }
+  // Not on top of another cluster's label: move just below it.
+  for(u32 Try = 0; Try < WorldGen_ClusterCount; Try += 1)
+  {
+   b32 Moved = false;
+   for(u32 Idx = 0; Idx < PlacedCount; Idx += 1)
+   {
+    if(V3RectsOverlap(Box, Placed[Idx]))
+    {
+     f32 Shift = (Placed[Idx].Max.Y - Box.Min.Y) + 4.f;
+     Box.Min.Y += Shift;
+     Box.Max.Y += Shift;
+     Moved = true;
+    }
+   }
+   if(!Moved) break;
+  }
   b32 Covered = (Box.Min.X < 0.f);
   for(u32 Idx = 0; Idx < TakenCount && !Covered; Idx += 1) Covered = V3RectsOverlap(Box, Taken[Idx]);
   if(Covered) continue;
+  if(PlacedCount < ArrayCount(Placed)) Placed[PlacedCount++] = Box;
 
   //- Draw and click
   b32 Focused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
@@ -512,62 +531,97 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
 }
 
 //~ Products short worldwide (under the top bar)
+// NOTE: Right edge the floating cards may use: the left edge of the islands panel when it is
+// shown (last frame's rect), else the window edge. Keeps the strip and dropdowns off the panel.
+internal f32
+V3UsableRight(app_state *App, f32 WindowRight)
+{
+ f32 Result = WindowRight;
+ v4 Panel = App->Panel.LastRect;
+ if(Panel.Max.X > Panel.Min.X && Panel.Min.X > 0.f)
+ {
+  Result = Min(Result, Panel.Min.X - Ui_Gap);
+ }
+ return Result;
+}
+
+// NOTE: A product is short when more is needed than is made and stays fresh (W3IsShort).
+// Chips wrap to more rows instead of running under the islands panel.
+#define V3D_MaxShortChips (ProductKind_Count)
 internal void
 V3DrawShortageStrip(app_state *App, app_input *Input)
 {
  r3_state *R3 = &App->R3;
  f32 ButtonHeight = UiButtonHeight(App);
- v2 Origin = V2(R3->TopBarRect.Min.X, R3->TopBarRect.Max.Y + Ui_Gap);
-
- // Measure first, so the card can be drawn under the chips.
- str8 Label = S8("Short worldwide:");
+ f32 RowGap = .5f*Ui_Gap;
  f32 Dot = UiLineHeight(App) - 8.f;
- f32 Width = Ui_Pad + UiMeasure(App, Label) + Ui_Gap;
- u32 ShortCount = 0;
- for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
+ v2 Origin = V2(R3->TopBarRect.Min.X, R3->TopBarRect.Max.Y + Ui_Gap);
+ f32 Right = V3UsableRight(App, R3->TopBarRect.Max.X);
+ 
+ str8 Label = S8("Short worldwide:");
+ f32 LabelWidth = UiMeasure(App, Label);
+ 
+ //- Lay the chips out first (rows), so the card can be drawn under them.
+ u32 Kinds[V3D_MaxShortChips];
+ str8 Texts[V3D_MaxShortChips];
+ v2 Offsets[V3D_MaxShortChips];   // from the card's top-left corner
+ u32 ChipCount = 0;
+ f32 ChipsLeft = Ui_Pad + LabelWidth + Ui_Gap;
+ f32 X = ChipsLeft;
+ f32 Y = 6.f;
+ f32 MaxRight = X;
+ f32 MaxWidth = Max(Right - Origin.X, ChipsLeft + 2.f*Ui_Pad);
+ for(u32 Kind = 1; Kind < ProductKind_Count && ChipCount < V3D_MaxShortChips; Kind += 1)
  {
   if(W3IsShort(R3, Kind))
   {
-   s64 Missing = W3ShortBy(R3, Kind);
    str8 Name = ProductNames[Kind];
-   Width += 2.f*V3D_ChipPadding + Dot + 6.f + UiMeasure(App, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing)) + Ui_Gap;
-   ShortCount += 1;
+   str8 Text = Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, W3ShortBy(R3, Kind));
+   f32 ChipWidth = V3ChipWidth(App, Text);
+   if(X > ChipsLeft && X + ChipWidth + Ui_Pad > MaxWidth)
+   {
+    X = ChipsLeft;
+    Y += ButtonHeight + RowGap;
+   }
+   Kinds[ChipCount] = Kind;
+   Texts[ChipCount] = Text;
+   Offsets[ChipCount] = V2(X, Y);
+   ChipCount += 1;
+   X += ChipWidth + Ui_Gap;
+   MaxRight = Max(MaxRight, X - Ui_Gap);
   }
  }
- if(ShortCount == 0)
+ 
+ if(ChipCount == 0)
  {
   Label = S8("No product is short worldwide");
-  Width = UiMeasure(App, Label) + 2.f*Ui_Pad + Dot + 6.f;
- }
- Width += Ui_Pad - Ui_Gap;
-
- v4 Box = RectFromSize(Origin, V2(Width, ButtonHeight + 2.f*6.f));
- UiCard(Box, Ui_CardRadius);
- V3AddUIRect(R3, Box);
-
- v2 Cursor = V2(Box.Min.X + Ui_Pad, Box.Min.Y + 6.f);
- if(ShortCount == 0)
- {
+  f32 Width = UiMeasure(App, Label) + 2.f*Ui_Pad + Dot + 6.f;
+  v4 Box = RectFromSize(Origin, V2(Width, ButtonHeight + 2.f*6.f));
+  UiCard(Box, Ui_CardRadius);
+  V3AddUIRect(R3, Box);
+  v2 Cursor = V2(Box.Min.X + Ui_Pad, Box.Min.Y + 6.f);
   UiDot(V2(Cursor.X, Cursor.Y + .5f*(ButtonHeight - Dot)), Dot, W3_ColorStatusOk);
   UiText(App, V2(Cursor.X + Dot + 6.f, Cursor.Y + Ui_ButtonPadY), Label, Ui_ColorOkText);
+  R3->SummaryBarRect.Max.Y = Box.Max.Y;
+  R3->ShortStripRect = Box;
   return;
  }
-
- UiText(App, V2(Cursor.X, Cursor.Y + Ui_ButtonPadY), Label, Ui_ColorTextDim);
- Cursor.X += UiMeasure(App, Label) + Ui_Gap;
- for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
+ 
+ v4 Box = RectFromSize(Origin, V2(MaxRight + Ui_Pad, Y + ButtonHeight + 6.f));
+ UiCard(Box, Ui_CardRadius);
+ V3AddUIRect(R3, Box);
+ UiText(App, V2(Box.Min.X + Ui_Pad, Box.Min.Y + 6.f + Ui_ButtonPadY), Label, Ui_ColorTextDim);
+ 
+ for(u32 Idx = 0; Idx < ChipCount; Idx += 1)
  {
-  if(W3IsShort(R3, Kind))
+  u32 Kind = Kinds[Idx];
+  s32 Which = R3_SummaryProductBase + (s32)Kind;
+  v2 Cursor = V2(Box.Min.X + Offsets[Idx].X, Box.Min.Y + Offsets[Idx].Y);
+  v2 ChipPos = Cursor;
+  if(V3Chip(App, Input, &Cursor, Texts[Idx], W3ProductColors[Kind], true, Ui_ColorShortText, (R3->SummaryOpen == Which),
+            "More is needed than there is fresh food for. Click to see who needs and makes it"))
   {
-   s64 Missing = W3ShortBy(R3, Kind);
-   str8 Name = ProductNames[Kind];
-   s32 Which = R3_SummaryProductBase + (s32)Kind;
-   v2 ChipPos = Cursor;
-   if(V3Chip(App, Input, &Cursor, Str8Fmt("%.*s -%lld", (s32)Name.Size, Name.Data, Missing), W3ProductColors[Kind], true,
-             Ui_ColorShortText, (R3->SummaryOpen == Which), "More is needed than made (food gone bad does not count). Click to see who needs and makes it"))
-   {
-    V3ToggleSummary(R3, Which, V2(ChipPos.X, Box.Max.Y + Ui_Gap));
-   }
+   V3ToggleSummary(R3, Which, V2(ChipPos.X, Box.Max.Y + Ui_Gap));
   }
  }
  // The chips open dropdowns too, so clicks here must not close them.
@@ -728,7 +782,7 @@ V3DrawClustersPopup(app_state *App, app_input *Input, v2 BufferDim)
  
  // Under its button, kept inside the window.
  v2 Min = R3->PopupRect.Min;
- Min.X = Max(V3D_Margin, Min(Min.X, BufferDim.X - V3D_Margin - Width));
+ Min.X = Max(V3D_Margin, Min(Min.X, V3UsableRight(App, BufferDim.X - V3D_Margin) - Width));
  v4 Box = RectFromSize(Min, V2(Width, Height));
  R3->PopupRect = Box;
  UiCard(Box, Ui_CardRadius);
@@ -884,6 +938,7 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
  u32 SectionRows = (IsProduct ? 3u : 0u);   // "Need it:", "Make it:" and the food line
  v2 Min = R3->PopupRect.Min;
  f32 Width = Max(V3D_PopupWidth*UiScale(App), Max(UiMeasure(App, Title), UiMeasure(App, FoodLine)) + 2.f*Pad);
+ Min.X = Max(V3D_Margin, Min(Min.X, V3UsableRight(App, BufferDim.X - V3D_Margin) - Width));   // stay off the panel
  f32 MaxHeight = BufferDim.Y - Min.Y - V3D_Margin;
  u32 MaxRows = (u32)Max(1.f, (MaxHeight - 2.f*Pad)/LineHeight - 3.f - (f32)SectionRows);
  u32 ShownRows = Min(RowCount, MaxRows);
