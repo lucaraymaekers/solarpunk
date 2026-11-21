@@ -81,6 +81,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   gladLoaderLoadGL();
  }
  
+ 
  if(!Memory->Initialized)
  {
   // Font init
@@ -89,6 +90,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
    InitFontFromKind(&App->Font, FontKind_Text);
    RenderBuildAtlas(&App->FontAtlas, ArrayCount(Fonts), Fonts, 20.f);
   }
+  RenderInit(&App->Render);
   
   Memory->Initialized = true;
  }
