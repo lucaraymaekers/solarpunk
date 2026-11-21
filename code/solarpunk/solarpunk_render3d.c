@@ -471,7 +471,9 @@ R3CameraEye(r3_camera *Camera)
 }
 
 //~ GL
-#define R3_MaxSkyVertices         1024
+// NOTE: Gradient 12 + sun 480 + moon 480 + moon shadow 120 = 1092 when both are up
+// (around sunrise and sunset); a full mesh silently drops the rest.
+#define R3_MaxSkyVertices         2048
 #define R3_MaxOpaqueVertices      (1024*1024)     // per frame: simple islands, cables, moving parts
 #define R3_MaxHeroOpaqueVertices  (6*1024*1024)   // the hand-built islands, cached (~3.5M)
 #define R3_MaxHeroTranslucentVertices (512*1024)
