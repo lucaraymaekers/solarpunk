@@ -88,6 +88,7 @@ enum hero_ground
  HeroGround_Path,
  HeroGround_Stream,
  HeroGround_Pool,
+ HeroGround_Sand,
 };
 
 // NOTE: The shape of one island's top: an optional harbour pool cut into the front,
@@ -115,6 +116,7 @@ struct hero_layout
  f32 ShoreScale;
  f32 ChannelX;
  f32 ChannelHalf;
+ b32 SandyShore;    // the shore is a sand beach, sloping down to the water
  b32 PlateauRight;
  b32 PlateauLeft;
  u32 StreamCount;
@@ -138,6 +140,7 @@ struct hero_ctx
  r3_state *R3;
  u32 Island;      // index of the island being built
  b32 Recording;   // building the cache: moving parts are recorded, not drawn
+ b32 GrassOnly;   // placement skips sand (fields and yards belong on grass)
 };
 
 //~ Helpers
@@ -219,7 +222,8 @@ HeroTerrain(hero_layout *L, f32 X, f32 Z, u32 *Type)
  else if(L->Lagoon && LagoonE < L->ShoreScale*L->ShoreScale)
  {
   Result = L->FrontLevel;
-  *Type = HeroGround_Grass;
+  *Type = L->SandyShore ? HeroGround_Sand : HeroGround_Grass;
+  if(L->SandyShore && LagoonE < 1.3f*1.3f) Result = L->FrontLevel - .22f;   // the beach by the water
   if(L->StreamCount && HeroPolylineDistance(X, Z, L->Stream, L->StreamCount) < .15f) *Type = HeroGround_Stream;
  }
  else if(L->Pool && Z > L->PoolZ0)
@@ -403,6 +407,7 @@ HeroPushTerrain(hero_ctx *H)
     case HeroGround_Path:   TopColor = HeroShade(H, Hero_ColorPath); break;
     case HeroGround_Stream: TopColor = R3Color(Hero_ColorStreamTop); break;
     case HeroGround_Pool:   TopColor = HeroShade(H, Hero_ColorPoolFloor); break;
+    case HeroGround_Sand:   TopColor = HeroShade(H, 0xFFEAD7A8); break;
     default:
     {
      TopColor = R3LerpColor(R3Color(Hero_ColorGrassA), R3Color(Hero_ColorGrassB), RandomUnilateral(&H->Series));
@@ -433,7 +438,8 @@ HeroPushTerrain(hero_ctx *H)
      f32 NeighbourLevel = HeroTerrain(H->Layout, -Hero_Half + ((f32)NI + .5f)*Cell, -Hero_Half + ((f32)NJ + .5f)*Cell, &NeighbourType);
      if(NeighbourLevel < Level - .001f)
      {
-      HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, NeighbourLevel, Level, 0.f, HeroShade(H, Hero_ColorWall));
+      u32 WallColor = (Type == HeroGround_Sand) ? 0xFFD9C495 : Hero_ColorWall;
+      HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, NeighbourLevel, Level, 0.f, HeroShade(H, WallColor));
       if(Type == HeroGround_Stream)
       {
        // Water falling over the terrace edge.
@@ -694,6 +700,7 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
   Wood = Grey[Variant % 3];
   Roof = Tin[(Variant/2) % 3];
  }
+ if(Variant & 128) Roof = 0xFFC9A86A;  // thatch
 
  //- Stone plinth (reaches down so houses on terrace edges do not float), or a
  // wooden floor on a deck
@@ -763,6 +770,12 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
  R3PushTri(O, V3(B.X - HX, RY0, B.Z - HZ), V3(B.X - HX, RY0, B.Z + HZ), V3(B.X - HX, RY1 - .02f, B.Z), R3Add(Inside, V3(1.f, 0.f, 0.f)), HeroShade(H, Wood));
  R3PushTri(O, V3(B.X + HX, RY0, B.Z - HZ), V3(B.X + HX, RY0, B.Z + HZ), V3(B.X + HX, RY1 - .02f, B.Z), R3Add(Inside, V3(-1.f, 0.f, 0.f)), HeroShade(H, Wood));
  R3PushCylinder(O, R3Add(R0, V3(0.f, .01f, 0.f)), R3Add(R1, V3(0.f, .01f, 0.f)), .018f, 4, R3Color(Hero_ColorWoodDark));
+ if(Variant & 128)
+ {
+  // Thatch: a shaggy fringe hanging over the eaves
+  R3PushBox(O, R3Lerp(F0, F1, .5f), V3(HX + Over, .018f, .02f), HeroShade(H, 0xFFB08E52));
+  R3PushBox(O, R3Lerp(A0, A1, .5f), V3(HX + Over, .018f, .02f), HeroShade(H, 0xFFB08E52));
+ }
  if(Variant & 32)
  {
   // Moss and ferns growing on the roof
@@ -1418,7 +1431,8 @@ HeroClaim(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
   {
    u32 Type;
    f32 CellLevel = HeroTerrain(H->Layout, HeroCellCenter(I), HeroCellCenter(J), &Type);
-   Result = (!H->Taken[J][I] && (Type == HeroGround_Grass || Type == HeroGround_Path) && AbsF32(CellLevel - Level) < .01f);
+   b32 GroundOk = (Type == HeroGround_Grass || Type == HeroGround_Path || (Type == HeroGround_Sand && !H->GrassOnly));
+   Result = (!H->Taken[J][I] && GroundOk && AbsF32(CellLevel - Level) < .01f);
   }
  }
  if(Result)

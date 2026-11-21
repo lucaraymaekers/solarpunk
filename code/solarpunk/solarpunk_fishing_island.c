@@ -132,8 +132,12 @@ FishingPushShed(hero_ctx *H, f32 X, f32 Z)
 }
 
 //~ Rim: rock, moss and kelp; the lagoon overflowing off the front edge
+global_variable u32 BeachStoneColors[] = {0xFFE3D7C1, 0xFFD2C3A8, 0xFFC4B293, 0xFFB8A684, 0xFFA89878};
+
+// NOTE: Beach = pale limestone with a sandy lip and green vines (Sunward Isles),
+// otherwise grey rock with moss and kelp.
 internal void
-FishingPushRim(hero_ctx *H)
+FishingPushRim(hero_ctx *H, b32 Beach)
 {
  r3_mesh *O = H->Opaque;
  hero_layout *L = H->Layout;
@@ -170,8 +174,10 @@ FishingPushRim(hero_ctx *H)
   for(u32 K = 0; K < Fishing_RimPoints; K += 1)
   {
    u32 Next = (K + 1) % Fishing_RimPoints;
-   u32 Color = HeroPick(H, HeroStoneColors, ArrayCount(HeroStoneColors));
-   if(RandomUnilateral(&H->Series) > ((Level == 0) ? .55f : .88f)) Color = 0xFF557F33;
+   u32 Color = Beach ? HeroPick(H, BeachStoneColors, ArrayCount(BeachStoneColors)) : HeroPick(H, HeroStoneColors, ArrayCount(HeroStoneColors));
+   f32 Roll = RandomUnilateral(&H->Series);
+   if(Roll > ((Level == 0) ? .55f : .88f)) Color = 0xFF557F33;
+   if(Beach && Level == 0 && Roll < .4f) Color = 0xFFE6D3A3;
    R3PushQuad(O, Ring[Level][K], Ring[Level][Next], Ring[Level + 1][Next], Ring[Level + 1][K], Center, HeroShade(H, Color));
   }
  }
@@ -231,16 +237,17 @@ FishingPushRim(hero_ctx *H)
  }
 
  //- Kelp and weed hanging off the rock
- for(u32 Strand = 0; Strand < 40; Strand += 1)
+ for(u32 Strand = 0; Strand < (Beach ? 18u : 40u); Strand += 1)
  {
   u32 K = RandomNext(&H->Series) % Fishing_RimPoints;
   if(PoolAt[K]) continue;
   v3 Out = R3Normalize(V3(Ring[0][K].X - H->Top.X, 0.f, Ring[0][K].Z - H->Top.Z));
   v3 Side = V3(-Out.Z, 0.f, Out.X);
   v3 P = R3Add(R3Lerp(Ring[0][K], Ring[1][K], .3f*RandomUnilateral(&H->Series)), R3Scale(Out, .05f));
-  f32 Length = .5f + 1.6f*RandomUnilateral(&H->Series);
+  f32 Length = (Beach ? .3f : .5f) + (Beach ? .9f : 1.6f)*RandomUnilateral(&H->Series);
   u32 Pieces = 3 + (u32)(Length*2.f);
   u32 Color = (Strand & 1) ? Fishing_ColorKelp : Fishing_ColorKelp2;
+  if(Beach) Color = (Strand & 1) ? Hero_ColorVine : Hero_ColorLeaf;
   f32 Phase = 6.f*RandomUnilateral(&H->Series);
   for(u32 Piece = 0; Piece < Pieces; Piece += 1)
   {
@@ -382,7 +389,7 @@ W3PushFishingIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Statu
  Layout.StreamCount = 4;
 
  HeroPushTerrain(H);
- FishingPushRim(H);
+ FishingPushRim(H, false);
 
  //- The lagoon is taken (claims only look at land, but keep the boardwalk ring free too)
  {

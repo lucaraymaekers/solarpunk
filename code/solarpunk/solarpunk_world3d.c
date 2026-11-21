@@ -850,6 +850,9 @@ W3PushClouds(r3_mesh *Mesh)
 #define W3_ForestCluster 0
 #define W3Style_Fishing 4   // Driftwood Shoals (solarpunk_fishing_island.c)
 #define W3_FishingCluster 2
+#define W3Style_Beach 5     // Sunward Isles (solarpunk_beach_island.c)
+#define W3_BeachCluster 1
+internal void W3PushBeachIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushFishingIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushForestIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void HeroReplayCommands(app_state *App);
@@ -967,6 +970,11 @@ W3PrepareIslands(app_state *App, app_input *Input)
    {
     R3->IslandStyle[Idx] = W3Style_Fishing;
    }
+   // Sunward Isles is a beach cluster
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_BeachCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Beach;
+   }
   }
  }
 
@@ -1079,6 +1087,11 @@ W3BuildWorld(app_state *App)
   {
    W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Beach)
+  {
+   W3PushBeachIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
   }
   else if(R3->IslandStyle[Index] == W3Style_Fishing)
   {
