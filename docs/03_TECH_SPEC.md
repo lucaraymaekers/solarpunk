@@ -14,7 +14,7 @@
 3. **Reserved cargo conservation.** For any pod, `ReservedQty` is never decremented by an intermediate island; intermediates may only claim from `FluidQty`.
 4. **No central server, no island admin.** No singleton coordinator, global scheduler, or privileged role inside the node layer. Terminal actions (drop, tap, craft change) are conflict-free local operations. (`WorldStep` is the *simulator's* loop, standing in for physics and time; it is not part of the network.)
 5. **Parameterize every open decision** via `engine_config` or the need-model switch.
-6. **Conservation of cargo.** Units are never created or destroyed by routing. At every tick: `Produced = InShed + InQueues + InFlight + DeliveredToDest + ClaimedEnRoute + Expired`. Violation hits `Assert` in dev builds and fails the test.
+6. **Conservation of cargo.** Units are never created or destroyed by routing. At every tick: `Produced = InShed + InQueues + InFlight + DeliveredToDest + ClaimedEnRoute + Expired`. `Produced` (`Stats.UnitsProduced`) counts only units that **entered a shed** (surplus drained from production plus villager drops); production kept at home (`OwnShare`, or stock below the surplus line) is outside the identity. Checked by `WorldCheckConservation`; violation hits `Assert` in dev builds and fails the test.
 7. **Hot-reload safe.** The whole simulation state is one `world` struct living in `app_state` in the permanent arena. It contains **no pointers** (use indices, `-1` = none) and no function pointers, so a DLL reload or a `memcpy` of the struct is always valid.
 
 ---
@@ -65,6 +65,7 @@ The node owns need state (`need_state`, section 4.2) and the router and sync lay
 #### Option A: `NeedModel_AbstractCadence`
 There is no stock. The *world* (not the node) drives a hidden ground-truth process per `(island, resource)`: a "household demand event" fires about every `TauTrue * (1 +/- jitter)` sim-seconds (seeded). The *node* only observes these events (`NeedOnDemandEvent`) and its own taps.
 
+- The hidden clock is **world-owned** (`world.DemandNextAt[island][r]`, `world.DemandTauTrue[island][r]`), never stored in the node, so a node cannot read its own ground truth. The world calls `NeedOnDemandEvent(Node, Config, r, Interval, SimTime)` when it fires.
 - Node tracks `ElapsedSec` since the last demand event, `TauHat` (learned interval), and manual urgency `U` (from taps, decays at `lambda_U`).
 - `N = Min(100, W_pro * powf(Min(1.25, ElapsedSec / TauHat), gamma) + U)`
 - **Important:** `TauHat` is learned from intervals between *demand events*, **not** between deliveries. A delivery that arrives before/around the demand event "absorbs" it (no shortage recorded) but the event still updates `TauHat`. Otherwise the system would only learn how often it happened to deliver.
@@ -129,7 +130,7 @@ code/solarpunk/
   engine/                        PURE C. includes only base/ and rl/rl_random.h
     engine.h                     the single include for the engine (types + API). The UI includes ONLY this.
     engine_types.h               all structs/enums in 4.2 and 4.3
-    engine_defaults.h            all constants in section 9 (#defines + DefaultConfig())
+    engine_defaults.h            all constants in section 9 as DEFAULT_* #defines (DefaultConfig() lives in engine_world.c and copies them into engine_config)
     engine_topology.c            island layout, neighbour graph, biconnectivity check
     engine_world.c               WorldInit, WorldStep (section 5), WorldDispatch*, conservation check, scenarios
     engine_scenarios.c           scenario presets (see 05_DEMO_PITCH.md)
@@ -147,11 +148,23 @@ code/solarpunk/
     solar_sim.c                  console app: `test` and `sim` commands (see section 12 and 04_BUILD_PLAN.md)
 ```
 
+`node.c`, `node_router.c` and `node_store.c` (L1) were created as placeholders by L4 so the contract builds; L1 replaces their bodies.
+
 All `.c` files are included from one translation unit (`solarpunk.c` for the app, `solar_sim.c` for the console tool), matching the rest of the codebase. `engine.h` plus the `.c` files in `engine/` form an include group that both entry points pull in with a single `#include "solarpunk/engine/engine_unity.c"` (a file that `#include`s all engine `.c` files; create it).
 
 UI to engine only through: reading `const world *World`, `WorldDispatchVillager(World, &Action)`, `WorldDispatchChaos(World, &Action)`, `WorldStep(World, Dt)`, and draining `WorldPopEvent(World, &Event)`.
 
 ### 4.2 Memory model and core types (`engine/engine_types.h`)
+
+> **Authoritative definitions are in `code/solarpunk/engine/engine_types.h` and `engine_defaults.h`.** The blocks below are the v3 design; differences made while writing the contract (2026-11-21):
+> - `knowledge_entry` also carries the island's neighbour list (`NeighborIds`, `NeighborDistances`, `NeighborCount`) so a node can build its belief graph (3.4) without seeing the world's link table.
+> - `need_state` has no `NextDemandAt` (moved to `world.DemandNextAt`, see 3.3) and gains `ProductionAccum` (fractional production between ticks).
+> - `pod` gains `Distance` (length of the active link); the claim record is a named `fluid_claim` struct.
+> - `engine_config` gains `ResourceCount` (D5), `IslandCount` (D13) and `Population`. `physics_constants` has one f32 per section-9 symbol plus the new ones listed there.
+> - `world` gains `DemandNextAt`, `DemandTauTrue` (hidden ground truth) and `NextGossipAt`. Event ring: `EventHead` = total pushed, `EventTail` = total popped, slot = index `% MAX_EVENTS`.
+> - `hold_reason` / `reroute_reason` start with a `_None = 0` value; all enums are typedef'd.
+> - New result structs `arrival_result` and `hop_decision` (section 4.5).
+> - Renames forced by the codebase: `MAX_PATH` is `MAX_POD_PATH` (clashes with `windows.h`), `island_node.E` is `Energy` (`E` is a macro in `base_math.h`).
 
 Fixed capacities (all in `engine_defaults.h`):
 
@@ -162,7 +175,7 @@ Fixed capacities (all in `engine_defaults.h`):
 #define MAX_MAKERS      16   // makers tracked per island (not all 100 villagers; see below)
 #define MAX_PODS       256   // pods alive in the world (static pool, free-list by Status)
 #define MAX_QUEUE       12   // per island, == maxQueueCapacity default
-#define MAX_PATH         MAX_ISLANDS
+#define MAX_POD_PATH         MAX_ISLANDS
 #define MAX_CLAIMS       MAX_ISLANDS
 #define MAX_EVENTS     1024  // ring buffer, oldest overwritten if the UI does not drain
 ```
@@ -279,8 +292,8 @@ struct pod
  island_id CustodianId, FromId, ToId;
  b32 WrapsGlobe;
  f32 Progress;                              // 0..1 on active link
- island_id Visited[MAX_PATH]; s32 VisitedCount;
- island_id PlannedPath[MAX_PATH]; s32 PlannedPathCount;   // advisory, for UI
+ island_id Visited[MAX_POD_PATH]; s32 VisitedCount;
+ island_id PlannedPath[MAX_POD_PATH]; s32 PlannedPathCount;   // advisory, for UI
  s32 RerouteCount;
  struct { island_id IslandId; s32 Qty; f32 Timestamp; } FluidClaims[MAX_CLAIMS]; s32 FluidClaimCount;
  knowledge_entry Carried[MAX_ISLANDS];      // sneakernet/hybrid ledger: a COPY made at launch
@@ -313,7 +326,7 @@ struct island_node
  s32 BiomeIndex;
  // physics state
  f32 Sun;                                   // I(t)
- f32 E;                                     // reserve 0..100
+ f32 Energy;                                     // reserve 0..100 (named Energy: `E` is a base_math.h macro)
  f32 EDelta;                                // last tick's dE/dt, for the UI
  power_state PowerState;
  f32 StormUntil;                            // sim time; 0 = no storm
@@ -425,15 +438,46 @@ struct chaos_action
 ### 4.4 Need model functions (`engine/node/node_need.c`)
 
 ```c
-internal void NeedTick(island_node *Node, engine_config *Config, f32 Dt, f32 SimTime);
-internal f32  NeedScore(island_node *Node, resource_id R);                 // 0..100
-internal void NeedOnDemandEvent(island_node *Node, resource_id R, f32 SimTime);   // Option A: called by the world's hidden clock
-internal void NeedOnDelivery(island_node *Node, resource_id R, s32 Qty, f32 SimTime, b32 IsFinal);
-internal void NeedOnFluidClaim(island_node *Node, resource_id R, s32 Qty);
-internal void NeedOnTap(island_node *Node, resource_id R, f32 SimTime);
-internal s32  NeedDrainToShed(island_node *Node, resource_id R);           // own-needs-first lives here
+internal void NeedInit(island_node *Self, const engine_config *Config);
+internal void NeedTick(island_node *Self, const engine_config *Config, f32 Dt, f32 SimTime);
+internal f32  NeedScore(const island_node *Self, const engine_config *Config, resource_id R);   // 0..100
+internal void NeedOnDemandEvent(island_node *Self, const engine_config *Config, resource_id R, f32 Interval, f32 SimTime); // Option A, fired by the hidden clock
+internal void NeedOnDelivery(island_node *Self, const engine_config *Config, resource_id R, s32 Qty, f32 SimTime, b32 IsFinal);
+internal void NeedOnFluidClaim(island_node *Self, const engine_config *Config, resource_id R, s32 Qty);
+internal void NeedOnTap(island_node *Self, const engine_config *Config, resource_id R, f32 SimTime);
+internal s32  NeedDrainToShed(island_node *Self, const engine_config *Config, resource_id R);  // own-needs-first lives here; adds to Shed, returns units added
 ```
-Each function does `switch(Config->NeedModel)`. `engine_config` is passed by const pointer: it is shared constants, not other nodes' state, so it does not break isolation (the isolation test does not forbid it).
+Each function does `switch(Config->NeedModel)`, so every one takes `const engine_config *Config`. Config is shared constants, not other nodes' state, so it does not break isolation (the isolation test does not forbid it).
+
+### 4.5 Node API and the L1/L4 boundary (decision D18, decided 2026-11-21)
+
+The node decides; the world acts, moves pods and emits events. Declared in `engine.h`:
+
+```c
+// Energy (node_energy.c, L4)
+internal void EnergyTick(island_node *Self, const engine_config *Config, f32 SimTime, f32 Dt); // E, EDelta, PowerState from Self->Sun / StormUntil
+internal b32  EnergyIsAwake(const island_node *Self);
+internal f32  EnergyLaunchCost(const island_node *Self, const engine_config *Config, f32 Distance);
+internal b32  EnergyCanLaunch(const island_node *Self, const engine_config *Config, f32 Distance);
+internal b32  EnergyTryLaunch(island_node *Self, const engine_config *Config, f32 Distance);   // guard + deduct
+
+// Node logic (node.c / node_router.c / node_store.c, L1)
+internal void NodeInit(island_node *Self, const engine_config *Config);
+internal void NodeStep(island_node *Self, const engine_config *Config, const neighbor_obs *Obs, s32 ObsCount, f32 SimTime);
+internal b32  NodeTryBuildPod(island_node *Self, const engine_config *Config, resource_id R,
+                              const neighbor_obs *Obs, s32 ObsCount, pod *Pod, f32 SimTime);
+internal hop_decision   NodeDecideNextHop(island_node *Self, const engine_config *Config, pod *Pod,
+                                          const neighbor_obs *Obs, s32 ObsCount, f32 SimTime);
+internal arrival_result NodeOnPodArrived(island_node *Self, const engine_config *Config, pod *Pod, f32 SimTime);
+internal void NodeMergeKnowledge(island_node *Self, const engine_config *Config, const knowledge_entry *Incoming, f32 SimTime);
+internal void NodeOnVillagerSetCraft(island_node *Self, s32 VillagerId, resource_id Craft, f32 SimTime);
+```
+
+Who does what:
+- **Pod creation:** the world finds a free pool slot and passes it zeroed. `NodeTryBuildPod` (L1) scores destinations or the scout rule, fills the pod and takes the units from `Self->Shed`. The world sets status and timestamps, enqueues it and emits `PodCreated`.
+- **Departure:** `NodeDecideNextHop` (L1) only chooses the hop (it may update `PlannedPath`, suppression and cooldowns). The world then calls `EnergyTryLaunch` (L4), which runs the 3.2 guard and deducts the cost; if it fails, the pod is held with `HoldReason_LowEnergy`. On launch the world appends `Visited`, copies `Self->Knowledge` into `Pod->Carried`, sets `FromId/ToId/Distance/Progress` and emits events.
+- **Arrival:** the world applies the mid-flight policy. Otherwise `NodeOnPodArrived` (L1) merges `Carried`, calls `NeedOnDelivery` on the final hop or claims Fluid (6.3), and reports the outcome in `arrival_result`. The world updates stats, status and the queue (queue push/pop and backpressure are world-side).
+- **Gossip:** the world passes a by-value copy of a neighbour's knowledge table to `NodeMergeKnowledge` (L1).
 
 ---
 
@@ -450,7 +494,9 @@ The UI calls `WorldStep` with a **fixed** `Dt = 0.05f` as many times as needed p
    - If `ToId` went offline mid-flight: `MidFlight_PassiveMechanicalLanding` puts the pod in `ToId`'s queue; `MidFlight_PrelaunchEnergyCheck` returns it to `FromId` (custody rollback, `SimEvent_PodReturned`).
    - Else `NodeOnPodArrived(Node, Pod, SimTime)`: merge `Pod->Carried`; if final destination deliver `Reserved + Fluid`, call `NeedOnDelivery`, mark Delivered; else try a Fluid claim (6.3), then enqueue for onward forwarding.
 6. **Departure drain:** for each awake island with queued pods (FIFO, urgent first): build a local `neighbor_obs Obs[MAX_NEIGHBORS]`, call `NodeDecideNextHop(Node, Pod, Obs, ObsCount, SimTime)`; if a valid awake hop exists and energy suffices: deduct energy, copy knowledge into `Pod->Carried`, launch (`SimEvent_PodLaunched`, plus `SimEvent_PodRerouted` if it differs from the previous plan). Else keep it (`SimEvent_PodHeldDtn`).
-7. **Conservation check** (always in debug/test builds), then recycle Delivered/Expired pods from the previous tick.
+7. **Conservation check** (always in debug/test builds).
+
+Delivered/Expired pods are recycled (set to `Free`) at the **start** of the next `WorldStep` (step 0), so the UI sees them for exactly one tick.
 
 ### 5.2 Island power state machine
 ```
@@ -544,7 +590,32 @@ Put these in `engine_defaults.h` (as `physics_constants` fields filled by `Defau
 | `attenuation` | 0.8 | need ripple decay per hop |
 | `OwnShare` | 0.5 | fraction of production kept home (Option A) |
 
+Added while writing the contract (not in v3; starting values, tune):
+
+| Symbol | Default | Meaning |
+|---|---|---|
+| `EInitial` | 50 | reserve at `WorldInit` |
+| `w_path` | 1 | 3.5 path-cost weight in destination scoring |
+| `SharpNeed` | 70 | 6.2 split threshold |
+| `delta_U` | 10 | `U` reduction per Fluid unit claimed (3.3) |
+| `TauTrueMin` / `TauTrueMax` | 90 / 360 | range of the hidden true demand cadence (Option A) |
+| `DemandJitter` | 0.2 | +/- fraction on each hidden demand interval |
+| `ProductionPerMaker` | 0.05 | units per sim-second per maker |
+| `TargetCoverDays` / `SurplusCoverDays` | 3 / 5 | Option B |
+| `PerCapita` / `PerCapitaBeta` / `TapPerCapitaNudge` | 0.01 / 0.2 / 1.1 | Option B |
+| `YMin` / `YMax` / `XJitter` | 0.15 / 0.85 / 0.02 | topology layout |
+
+Open-decision placeholders (D1 to D5, D9, D10, D13, D16) are grouped at the top of `engine_defaults.h`. They are not decisions.
+
 Sanity check behind these (verify with `SolarSim sim`): an idle island fills toward about 70 to 76 reserve over a day and loses about 50 over the night, so it survives; an island launching about 5 pods at night spends about 40 more and sleeps before dawn.
+
+**Measured (L4, 2026-11-21, `SolarSim test` energy group, default constants, launch distance 0.3):**
+- Idle, starting the day at E = 0: dusk 80.2, dawn 30.7 (night costs ~49.5). Survives.
+- Same start, night launches every 8 s: the reserve floor allows only 4 launches (34.8 energy), then the island sleeps before dawn.
+- Starting the day at E = 50: hits the cap (dusk 99.4), relays all 5 night launches and wakes with 6.3. This is the night-bridge effect.
+- With no traffic every island settles at dusk ~99 / dawn ~50, so all idle islands look the same; differences only appear once pods fly. If the halo needs more variety, lower `k_harvest` or raise `E_max`.
+
+State-machine details (5.2) as implemented: a `Sleeping` island stays asleep until sunrise; at dawn an island with E = 0 is `SolarHarvesting` (E stays near 0 until `k_harvest * I > P_idle`, i.e. I > 0.2); the island's state at `WorldInit` comes from the sun with `EInitial = 50`.
 
 ---
 

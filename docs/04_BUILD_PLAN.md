@@ -68,7 +68,7 @@ In `code/cling/cling.c`, next to the other `AddHelpAndBuildSource` lines (for ex
   //~ SolarSim (headless tests + tuning)
   AddHelpAndBuildSource(CmdLine, &Help, &BuildOptions, &DidWork, S8("SolarSim"), S8("../code/solarpunk/sim/solar_sim.c"));
 ```
-and give `solar_sim.c` the same console-app header as the other tools (see `code/compenhance/haversine_generator/haversine_generator.c` for the pattern: console application define plus `BASE_ENTRY_POINT()`). Then `code\build.bat -SolarSim` produces the exe in `build\`.
+and give `solar_sim.c` the same console-app header as the other tools (see `code/pp/pp.c` and `code/compenhance/haversine_generator/haversine_generator.c`: `#define BASE_CONSOLE_APPLICATION 1`, `#define BASE_FORCE_THREADS_COUNT 1`, then `ENTRY_POINT(EntryPoint)`; `BASE_ENTRY_POINT()` is the same thing with C linkage). Then `code\build.bat -SolarSim` produces `build\solar_sim.exe` (exe name comes from the source file name). **Done (L4, 2026-11-21).** Note: `build.bat` only builds `cling.exe` when it is missing, so delete `build\cling.exe` once after changing `cling.c`.
 
 ## 6. `SolarSim` commands
 - `SolarSim test`: runs the mandatory tests from spec section 12, prints pass/fail, exits with the failure count.

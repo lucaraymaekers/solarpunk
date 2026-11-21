@@ -22,7 +22,7 @@ This is the biggest open design question. Right now the specs only have an abstr
 | **Risk** | Feels "fake": nothing is really consumed, so *why* did they need shirts? | Needs balancing so the world doesn't collapse or sit idle. | Complexity. |
 | **"Own needs first, then share" story** | Fixed share of production stays home (`OwnShare`). | Naturally true: surplus = stock above safe cover. | Mixed. |
 
-**How the code handles not knowing yet:** the node talks to a need model through one small set of functions (`NeedModelTick`, `NeedScore`, `NeedOnDelivery`, ... see tech spec section 3.3 and 4.4) that switches on `Config.NeedModel`. Option A and B are both small implementations behind it, so the team can start the shared parts (energy, routing, DTN, rendering) today and decide this at the meeting without losing work. Until decided, the default config uses Option A.
+**How the code handles not knowing yet:** the node talks to a need model through one small set of functions (`NeedTick`, `NeedScore`, `NeedOnDelivery`, ... see tech spec section 3.3 and 4.4) that switches on `Config.NeedModel`. Option A and B are both small implementations behind it, so the team can start the shared parts (energy, routing, DTN, rendering) today and decide this at the meeting without losing work. Until decided, the default config uses Option A.
 
 **Questions to answer in the meeting:**
 - Do we want judges to *see* real stock levels on the tablet, or only need signals?
@@ -86,7 +86,7 @@ Pick 6 to 8 (the engine caps the catalog at `MAX_RESOURCES = 8`). Fewer items = 
 | D15 | Hosting / delivery | The app is a **native Windows/Linux program**, so a "hosted link for judges" is not possible with this stack. Options: run on one laptop (default), ship the `.exe` plus `data/` folder zipped, plus a recorded video. Confirm. | OPEN: confirm |
 | D16 | What happens when a pod arrives and the destination's need is already met | Default: deliver anyway. Option (`RebindOnSatisfied`, off by default): redirect to a needier island. | OPEN (low priority) |
 | D17 | How to draw mesh links, orbits and the sun arc | The renderer has **no lines, arcs or ellipses**. Options: (a) chains of small dots/rects along a link (zero renderer changes, looks dotted, which suits "supply route" well); (b) a small shader change in `rl_render.mdesk` for rotated rects (clean lines; touches Luca's code, ask first); (c) skip links and rely on pod motion. | OPEN |
-| D18 | Where the 4th lane (energy and world engine) draws the line with the routing lane | Boundary between `engine/node/energy` and `engine/node/router`. See `04_BUILD_PLAN.md` section 2. | OPEN: confirm |
+| D18 | Where the 4th lane (energy and world engine) draws the line with the routing lane | Decided, see table below and tech spec 4.5. | DECIDED |
 
 ---
 
@@ -111,4 +111,6 @@ Pick 6 to 8 (the engine caps the catalog at `MAX_RESOURCES = 8`). Fewer items = 
 | L7 | **Stack: C inside Luca's codebase** (base layer, OpenGL rect renderer `rl`, `rl_ui`, hot reload, `cling` build). Replaces the earlier TypeScript + React plan. | 2026-11-21 | Decided by the team lead; engine is plain C in `code/solarpunk/engine/`. |
 | L8 | Demo slot is 5 minutes; judged on creativity, idea, execution | 2026-11-21 | |
 | L9 | Team of 4, no fixed owners; work together | 2026-11-21 | |
+| D18 | L1/L4 boundary: `NodeDecideNextHop` (L1) only picks the hop; the world (L4) then calls `EnergyTryLaunch` in `node_energy.c`, which runs the launch guard and deducts energy, or the pod is held with `HoldReason_LowEnergy`. Pool, queue push/pop and events are world-side. L4 wrote the contract headers; L1 reviews the node signatures. | 2026-11-21 | Tech spec 4.5. |
+| (spec) | Option A hidden demand clock is world-owned (`world.DemandNextAt`), not in the node. `Produced` in the conservation identity counts only units that entered a shed. | 2026-11-21 | Tech spec 0.6, 3.3. |
 | L10 | Engine uses fixed-capacity arrays and arenas only (no `malloc`), all state in one `world` struct inside `app_state`, so hot reload keeps working and replays are deterministic | 2026-11-21 | Follows from L7. |
