@@ -45,6 +45,87 @@ BroadcastButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label)
  return Result;
 }
 
+//~ Tooltip
+#define BroadcastView_HoverRadius 40.f
+
+// NOTE: Shows the full production and needs of the island under the mouse,
+// since nodes only show their name when there are many islands.
+internal void
+DrawIslandTooltip(app_state *App, app_input *Input)
+{
+ font_atlas *Atlas = &App->FontAtlas;
+ font *Font = &App->Font;
+ f32 LineHeight = Font->HeightPx;
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ 
+ //- Find the closest island to the mouse
+ island *Hovered = 0;
+ f32 BestDistanceSq = BroadcastView_HoverRadius*BroadcastView_HoverRadius;
+ for(island *Island = App->FirstIsland; Island; Island = Island->Next)
+ {
+  f32 DX = Island->Pos.X - MousePos.X;
+  f32 DY = Island->Pos.Y - MousePos.Y;
+  f32 DistanceSq = DX*DX + DY*DY;
+  if(DistanceSq < BestDistanceSq)
+  {
+   BestDistanceSq = DistanceSq;
+   Hovered = Island;
+  }
+ }
+ 
+ if(Hovered)
+ {
+  str8 Lines[32];
+  v4 Colors[32];
+  s32 LineCount = 0;
+  
+  Lines[LineCount] = Hovered->Name;
+  Colors[LineCount] = V4FromU32(Graph_ColorTitle);
+  LineCount += 1;
+  
+  for(product *Product = Hovered->FirstProduct; Product && LineCount < (s32)ArrayCount(Lines); Product = Product->Next)
+  {
+   Lines[LineCount] = Str8Fmt("+ %.*s %llu", (s32)ProductNames[Product->Kind].Size, ProductNames[Product->Kind].Data, Product->Amount);
+   Colors[LineCount] = V4FromU32(Graph_ColorProduct);
+   LineCount += 1;
+  }
+  
+  for(product *Req = Hovered->FirstRequirement; Req && LineCount < (s32)ArrayCount(Lines); Req = Req->Next)
+  {
+   Lines[LineCount] = Str8Fmt("- %.*s %llu", (s32)ProductNames[Req->Kind].Size, ProductNames[Req->Kind].Data, Req->Amount);
+   Colors[LineCount] = V4FromU32(Graph_ColorRequirement);
+   LineCount += 1;
+  }
+  
+  if(LineCount < (s32)ArrayCount(Lines))
+  {
+   Lines[LineCount] = Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Hovered), App->Broadcast.IslandCount);
+   Colors[LineCount] = V4FromU32(Graph_ColorKnows);
+   LineCount += 1;
+  }
+  
+  f32 MaxWidth = 0.f;
+  for(s32 Idx = 0; Idx < LineCount; Idx += 1)
+  {
+   MaxWidth = Max(MaxWidth, GraphMeasureText(Atlas, Font, Lines[Idx]));
+  }
+  
+  v2 Size = V2(MaxWidth + 2.f*BroadcastView_ButtonPadding,
+               (f32)LineCount*LineHeight + 2.f*BroadcastView_ButtonPadding);
+  v2 Min = V2(MousePos.X + 16.f, MousePos.Y + 16.f);
+  v4 Box = RectFromSize(Min, Size);
+  DrawRect(Box, V4FromU32(Graph_ColorNodeBg), 6.f, 0.f, 0.f);
+  DrawRect(Box, V4FromU32(Graph_ColorCost), 6.f, 2.f, 0.f);
+  
+  v2 Cursor = V2(Min.X + BroadcastView_ButtonPadding, Min.Y + BroadcastView_ButtonPadding);
+  for(s32 Idx = 0; Idx < LineCount; Idx += 1)
+  {
+   GraphDrawText(Atlas, Font, Cursor, Lines[Idx], Colors[Idx]);
+   Cursor.Y += LineHeight;
+  }
+ }
+}
+
 //~ Controls
 internal void
 DrawBroadcastControls(app_state *App, app_input *Input)
@@ -115,4 +196,6 @@ DrawBroadcastControls(app_state *App, app_input *Input)
    Line.Y += LineHeight;
   }
  }
+ 
+ DrawIslandTooltip(App, Input);
 }

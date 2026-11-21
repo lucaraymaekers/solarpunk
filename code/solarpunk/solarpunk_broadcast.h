@@ -4,7 +4,7 @@
 #define SOLARPUNK_BROADCAST_H
 
 //~ Constants
-#define Broadcast_MaxIslands    16
+#define Broadcast_MaxIslands    64
 #define Broadcast_RoundSeconds  1.5f
 #define Broadcast_FlashSeconds  1.0f
 

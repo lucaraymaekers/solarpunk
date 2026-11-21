@@ -31,6 +31,7 @@
 #include "solarpunk/solarpunk_broadcast.h"
 #include "solarpunk/solarpunk.h"
 #include "solarpunk/solarpunk_world.c"
+#include "solarpunk/solarpunk_world_gen.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
 #include "solarpunk/solarpunk_broadcast_view.c"
@@ -103,7 +104,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  //- Update 
  {
   // TODO: Replace with real island generation/loading.
-  BuildHardcodedWorld(App);
+  // NOTE: BuildHardcodedWorld(App) builds the small 5-island world instead.
+  BuildGeneratedWorld(App, WorldGen_IslandCount);
   BroadcastUpdate(App, Input);
  }
  
