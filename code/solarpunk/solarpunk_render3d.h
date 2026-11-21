@@ -7,6 +7,7 @@
 #define R3_MaxIslands 64
 #define R3_MaxUIRects 20
 #define R3_SummaryProductBase 100
+#define R3_SummaryClusters    99   // the "All clusters" list
 
 // NOTE: How an island is doing, shown as the colour of its ring and label dot.
 enum island_status
@@ -109,6 +110,7 @@ struct r3_state
  // Summary bar dropdown: 0 = closed, 1 + island_status = islands with that status,
  // R3_SummaryProductBase + product kind = islands that need/produce that product.
  s32 SummaryOpen;
+ v4 ClustersButtonRect; // "All clusters" in the top bar (this frame)
  v4 SummaryBarRect;   // the status chips (this frame); clicks there keep the dropdown open
  v4 PopupRect;        // where the dropdown was drawn (zero when closed)
  s32 PopupHoverPlusOne; // island row under the mouse in the dropdown

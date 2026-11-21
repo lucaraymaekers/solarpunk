@@ -421,9 +421,9 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
   LeftWidth += V3ChipWidth(App, StatusTexts[Status]) + Ui_Gap;
  }
  
- b32 Focused = (R3->FocusedClusterPlusOne != 0);
+ b32 HasClusters = (V3ClusterCount(App) > 0);
  f32 RightWidth = UiButtonWidth(App, S8("?"), Square) + Ui_Gap;
- if(Focused) RightWidth += UiButtonWidth(App, S8("All clusters"), 0.f) + Ui_Gap;
+ if(HasClusters) RightWidth += UiButtonWidth(App, S8("All clusters"), 0.f) + 12.f + Ui_Gap;
  
  f32 Fixed = TimeControlsFixedWidth(App);
  f32 MinTimeline = 120.f*Scale;
@@ -456,15 +456,21 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
  f32 LeftEnd = Cursor.X;
  R3->SummaryBarRect = V4(Bar.Min.X, Bar.Min.Y, LeftEnd, Y + ButtonHeight + Ui_Pad);
  
- //- Right: "All clusters" (while one is open) and help, laid out from the right edge
+ //- Right: "All clusters" (a list of the clusters) and help, laid out from the right edge
  f32 RightStart = Bar.Max.X - Ui_Pad - RightWidth + Ui_Gap;
  Cursor = V2(RightStart, Y);
- if(Focused)
+ R3->ClustersButtonRect = V4(0.f, 0.f, 0.f, 0.f);
+ if(HasClusters)
  {
-  if(UiButtonEx(App, Input, &Cursor, S8("All clusters"), UiButton_Toggled, "Leave this cluster and see the whole world", 0.f))
+  v2 ButtonPos = Cursor;
+  b32 Open = (R3->SummaryOpen == R3_SummaryClusters);
+  if(UiButtonEx(App, Input, &Cursor, S8("All clusters"), Open ? UiButton_Toggled : UiButton_Normal,
+                "Every cluster: its islands and the products it lacks", 0.f))
   {
-   V3FocusCluster(App, 0);
+   V3ToggleSummary(R3, R3_SummaryClusters, V2(ButtonPos.X, Bar.Max.Y + Ui_Gap));
   }
+  R3->ClustersButtonRect = RectFromSize(ButtonPos, V2(UiButtonWidth(App, S8("All clusters"), 0.f), ButtonHeight));
+  Cursor.X += 12.f;
  }
  v2 HelpPos = Cursor;
  if(UiButtonEx(App, Input, &Cursor, S8("?"), R3->HelpOpen ? UiButton_Toggled : UiButton_Normal, "Help: what the colours mean, mouse and keys", Square))
@@ -597,6 +603,174 @@ V3PopupSwatch(app_state *App, v2 Line, f32 X, product_kind Kind)
  DrawRect(RectFromSize(V2(X, Line.Y + 3.f), V2(Size, Size)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
 }
 
+//~ Clusters dropdown ("All clusters" in the top bar)
+// NOTE: Every cluster with how many of its islands are ok / waiting / short, and the
+// products its islands need more of than the cluster itself makes. Clicking a cluster
+// flies to it and shows its island names.
+#define V3D_ClustersPopupWidth 760.f
+
+typedef struct v3d_cluster_info v3d_cluster_info;
+struct v3d_cluster_info
+{
+ u32 Counts[IslandStatus_Count];
+ u64 Produced[ProductKind_Count];
+ u64 Needed[ProductKind_Count];
+};
+
+internal v3d_cluster_info
+V3ClusterInfo(app_state *App, u32 Cluster)
+{
+ r3_state *R3 = &App->R3;
+ v3d_cluster_info Result = {0};
+ u32 Index = 0;
+ for(island *Island = App->FirstIsland; Island && Index < R3->IslandCount; Island = Island->Next)
+ {
+  if(WorldGenClusterOf(Index, R3->IslandCount) == Cluster)
+  {
+   if(R3->IslandStatus[Index] < IslandStatus_Count) Result.Counts[R3->IslandStatus[Index]] += 1;
+   for(product *Product = Island->FirstProduct; Product; Product = Product->Next) Result.Produced[Product->Kind] += Product->Amount;
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) Result.Needed[Req->Kind] += Req->Amount;
+  }
+  Index += 1;
+ }
+ return Result;
+}
+
+// NOTE: Lays out (and draws, when Draw) one cluster entry with its top-left at Pos.
+// Returns its height.
+internal f32
+V3ClusterEntry(app_state *App, u32 Cluster, v3d_cluster_info *Info, v2 Pos, f32 Width, b32 Draw, b32 Focused)
+{
+ f32 LineHeight = UiLineHeight(App);
+ f32 Dot = LineHeight - 10.f;
+ f32 Swatch = LineHeight - 8.f;
+ 
+ //- Name, and the status counts on the right
+ if(Draw)
+ {
+  str8 Name = S8FromCString(WorldGenClusterNames[Cluster]);
+  UiText(App, Pos, Name, Focused ? Ui_ColorAccentDown : Ui_ColorText);
+  f32 X = Pos.X + Width;
+  for(u32 Back = 0; Back < IslandStatus_Count; Back += 1)
+  {
+   u32 Status = IslandStatus_Count - 1 - Back;
+   str8 Number = Str8Fmt("%u %s", Info->Counts[Status], (Status == IslandStatus_Ok) ? "ok" : ((Status == IslandStatus_Waiting) ? "waiting" : "short"));
+   X -= UiMeasure(App, Number);
+   UiText(App, V2(X, Pos.Y), Number, (Info->Counts[Status] > 0) ? UiStatusText(Status) : Ui_ColorTextDim);
+   X -= Dot + 5.f;
+   UiDot(V2(X, Pos.Y + .5f*(LineHeight - Dot)), Dot, (Info->Counts[Status] > 0) ? W3StatusColor(Status) : Ui_ColorLine);
+   X -= 18.f;
+  }
+ }
+ f32 Y = Pos.Y + LineHeight;
+ 
+ //- Products it lacks, wrapped over as many lines as needed
+ f32 Indent = 16.f;
+ f32 X = Pos.X + Indent;
+ b32 Any = false;
+ for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
+ {
+  if(Info->Needed[Kind] > Info->Produced[Kind])
+  {
+   str8 Name = ProductNames[Kind];
+   str8 Text = Str8Fmt("%.*s -%llu", (s32)Name.Size, Name.Data, Info->Needed[Kind] - Info->Produced[Kind]);
+   f32 ItemWidth = Swatch + 6.f + UiMeasure(App, Text) + 18.f;
+   if(X + ItemWidth > Pos.X + Width + 18.f && X > Pos.X + Indent)
+   {
+    X = Pos.X + Indent;
+    Y += LineHeight;
+   }
+   if(Draw)
+   {
+    DrawRect(RectFromSize(V2(X, Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+    UiText(App, V2(X + Swatch + 6.f, Y), Text, Ui_ColorShortText);
+   }
+   X += ItemWidth;
+   Any = true;
+  }
+ }
+ if(!Any && Draw)
+ {
+  UiText(App, V2(X, Y), S8("makes everything its islands need"), Ui_ColorOkText);
+ }
+ Y += LineHeight;
+ 
+ f32 Result = Y - Pos.Y;
+ return Result;
+}
+
+internal void
+V3DrawClustersPopup(app_state *App, app_input *Input, v2 BufferDim)
+{
+ r3_state *R3 = &App->R3;
+ f32 LineHeight = UiLineHeight(App);
+ f32 Pad = Ui_Pad + 4.f;
+ f32 EntryGap = 6.f;
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ b32 Clicked = WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]);
+ u32 ClusterCount = V3ClusterCount(App);
+ b32 Focused = (R3->FocusedClusterPlusOne != 0);
+ 
+ f32 Width = Min(V3D_ClustersPopupWidth*UiScale(App), BufferDim.X - 2.f*V3D_Margin);
+ f32 Inner = Width - 2.f*Pad;
+ 
+ //- Measure
+ v3d_cluster_info Infos[WorldGen_ClusterCount];
+ f32 Heights[WorldGen_ClusterCount];
+ f32 Height = 2.f*Pad + 2.f*LineHeight + 6.f;
+ if(Focused) Height += LineHeight + EntryGap;
+ for(u32 Cluster = 0; Cluster < ClusterCount; Cluster += 1)
+ {
+  Infos[Cluster] = V3ClusterInfo(App, Cluster);
+  Heights[Cluster] = V3ClusterEntry(App, Cluster, &Infos[Cluster], V2(0.f, 0.f), Inner, false, false);
+  Height += Heights[Cluster] + EntryGap;
+ }
+ 
+ // Under its button, kept inside the window.
+ v2 Min = R3->PopupRect.Min;
+ Min.X = Max(V3D_Margin, Min(Min.X, BufferDim.X - V3D_Margin - Width));
+ v4 Box = RectFromSize(Min, V2(Width, Height));
+ R3->PopupRect = Box;
+ UiCard(Box, Ui_CardRadius);
+ 
+ v2 Line = V2(Box.Min.X + Pad, Box.Min.Y + Pad);
+ UiText(App, Line, S8("Clusters: their islands, and what each cluster lacks itself"), Ui_ColorTitle);
+ Line.Y += LineHeight;
+ UiText(App, Line, S8("Click a cluster to fly to it and show its island names"), Ui_ColorTextDim);
+ Line.Y += LineHeight + 6.f;
+ 
+ //- Back to the whole world, while a cluster is open
+ if(Focused)
+ {
+  v4 Row = RectFromSize(V2(Line.X - 6.f, Line.Y - 2.f), V2(Inner + 12.f, LineHeight + 4.f));
+  b32 Hot = IsInsideRectV2(MousePos, Row) && !R3->HelpOpen;
+  if(Hot) DrawRect(Row, V4FromU32(Ui_ColorRowHover), 6.f, 0.f, 0.f);
+  UiText(App, Line, S8("Show the whole world"), Ui_ColorAccentDown);
+  if(Hot && Clicked)
+  {
+   V3FocusCluster(App, 0);
+   R3->SummaryOpen = 0;
+  }
+  Line.Y += LineHeight + EntryGap;
+ }
+ 
+ //- One entry per cluster
+ for(u32 Cluster = 0; Cluster < ClusterCount; Cluster += 1)
+ {
+  v4 Row = RectFromSize(V2(Line.X - 6.f, Line.Y - 3.f), V2(Inner + 12.f, Heights[Cluster] + 6.f));
+  b32 Hot = IsInsideRectV2(MousePos, Row) && !R3->HelpOpen;
+  b32 IsFocused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
+  if(Hot || IsFocused) DrawRect(Row, V4FromU32(Hot ? Ui_ColorRowHover : Ui_ColorRowAlt), 6.f, 0.f, 0.f);
+  V3ClusterEntry(App, Cluster, &Infos[Cluster], Line, Inner, true, IsFocused);
+  if(Hot && Clicked)
+  {
+   if(!IsFocused) V3FocusCluster(App, (s32)Cluster + 1);
+   R3->SummaryOpen = 0;
+  }
+  Line.Y += Heights[Cluster] + EntryGap;
+ }
+}
+
 // NOTE: Draws the open dropdown (call after the panel, so it is on top of it).
 // Clicking a row opens that island in the panel; clicking outside closes the dropdown.
 internal void
@@ -617,10 +791,16 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  //- Close when clicking anywhere else (the chips toggle themselves)
  if(Clicked && !IsInsideRectV2(MousePos, R3->PopupRect) && !IsInsideRectV2(MousePos, R3->SummaryBarRect) &&
-    !IsInsideRectV2(MousePos, R3->ShortStripRect))
+    !IsInsideRectV2(MousePos, R3->ShortStripRect) && !IsInsideRectV2(MousePos, R3->ClustersButtonRect))
  {
   R3->SummaryOpen = 0;
   R3->PopupRect = V4(0.f, 0.f, 0.f, 0.f);
+  return;
+ }
+ 
+ if(R3->SummaryOpen == R3_SummaryClusters)
+ {
+  V3DrawClustersPopup(App, Input, BufferDim);
   return;
  }
 
