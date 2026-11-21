@@ -51,14 +51,14 @@
 global_variable u32 W3ProductColors[ProductKind_Count] =
 {
  0xFF808080, // None
- 0xFFD9B26F, // Seeds
- 0xFF5DADE2, // Fresh Water
- 0xFF34558F, // Solar Panels
- 0xFFE5C453, // Batteries
- 0xFFF08A5D, // Fish
- 0xFF3FB59B, // Algae
- 0xFFC46A3A, // Copper
- 0xFF8B5A2B, // Timber
+ 0xFFE0473A, // Apples
+ 0xFFC9D650, // Pears
+ 0xFF5FB55A, // Cabbage
+ 0xFFF08A2C, // Carrots
+ 0xFFE8C66A, // Wheat
+ 0xFF6FA8DC, // Fish
+ 0xFF9B3D33, // Meat
+ 0xFFB98A5E, // Eggs
 };
 
 //~ Helpers
@@ -406,69 +406,23 @@ W3PushIslandBody(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, v3 Top,
  }
 }
 
-//~ What an island makes, shown by its buildings
-// NOTE: The island's main product (the one it makes most of) fills the middle terrace;
-// a second product gets small buildings on the back corners of the lawn. An island
-// that makes fish also gets a dock with a sky boat.
-#define W3_ColorPaving    0xFFE8E2D6
-#define W3_ColorMetal     0xFF6B7280
+//~ What an island makes, shown on its terraces
+// NOTE: The island's main food (the one it makes most of) fills the middle terrace;
+// a second food gets something small on the back corners of the lawn. An island that
+// catches fish also gets a dock with a sky boat.
 #define W3_ColorDarkWood  0xFF6E4A2C
-#define W3_ColorPine      0xFF2F7D4F
-#define W3_ColorRock      0xFF9A8F86
 #define W3_ColorSail      0xFFFFF8EC
-#define W3_ColorBattery   0xFF3B3F4A
+#define W3_ColorBarn      0xFFB5523B
+#define W3_ColorRoof      0xFF6B4A3A
+#define W3_ColorCow       0xFFF4EFE6
+#define W3_ColorCowSpot   0xFF4A3A30
+#define W3_ColorHen       0xFFFFFFFF
+#define W3_ColorComb      0xFFE0453A
+#define W3_ColorFarmSoil  0xFF8A6A4A
+#define W3_ColorPasture   0xFF9BD27A
 
-internal void
-W3PushConifer(r3_mesh *Mesh, v3 Base, f32 Scale, random_series *Series)
-{
- v4 Green = W3Shade(R3Color(W3_ColorPine), Series);
- R3PushCylinder(Mesh, Base, R3Add(Base, V3(0.f, .35f*Scale, 0.f)), .07f*Scale, 5, R3Color(W3_ColorTrunk));
- R3PushCone(Mesh, R3Add(Base, V3(0.f, .3f*Scale, 0.f)), R3Add(Base, V3(0.f, 1.f*Scale, 0.f)), .38f*Scale, 7, Green);
- R3PushCone(Mesh, R3Add(Base, V3(0.f, .65f*Scale, 0.f)), R3Add(Base, V3(0.f, 1.35f*Scale, 0.f)), .28f*Scale, 7, Green);
-}
-
-internal void
-W3PushTube(r3_mesh *Opaque, r3_mesh *Translucent, v3 Base, f32 Height, f32 Radius)
-{
- v3 TopP = R3Add(Base, V3(0.f, Height, 0.f));
- R3PushCylinder(Translucent, Base, TopP, Radius, 8, R3WithAlpha(R3Color(W3ProductColors[ProductKind_Algae]), .6f));
- R3PushCylinder(Opaque, R3Add(TopP, V3(0.f, -.02f, 0.f)), R3Add(TopP, V3(0.f, .06f, 0.f)), Radius + .02f, 8, R3Color(W3_ColorPost));
- R3PushCylinder(Opaque, Base, R3Add(Base, V3(0.f, .06f, 0.f)), Radius + .02f, 8, R3Color(W3_ColorPost));
-}
-
-internal void
-W3PushBatteryCell(r3_mesh *Mesh, v3 Base, f32 Scale)
-{
- f32 Half = .16f*Scale;
- f32 Height = .55f*Scale;
- R3PushBox(Mesh, R3Add(Base, V3(0.f, .5f*Height, 0.f)), V3(Half, .5f*Height, Half), R3Color(W3_ColorBattery));
- R3PushBox(Mesh, R3Add(Base, V3(0.f, .7f*Height, 0.f)), V3(Half + .01f, .08f*Scale, Half + .01f), R3Color(W3ProductColors[ProductKind_Batteries]));
- R3PushCylinder(Mesh, R3Add(Base, V3(0.f, Height, 0.f)), R3Add(Base, V3(0.f, Height + .07f*Scale, 0.f)), .06f*Scale, 6, R3Color(W3_ColorPost));
-}
-
-internal void
-W3PushSolarPanel(r3_mesh *Mesh, v3 Base, f32 Scale)
-{
- v3 PanelCenter = R3Add(Base, V3(0.f, .45f*Scale, 0.f));
- R3PushCylinder(Mesh, Base, PanelCenter, .04f*Scale, 5, R3Color(W3_ColorPost));
- R3PushOrientedBox(Mesh, PanelCenter, V3(.36f*Scale, 0.f, 0.f), V3(0.f, .028f, -.016f), V3(0.f, .14f*Scale, .25f*Scale),
-                   R3Color(W3ProductColors[ProductKind_SolarPanels]));
-}
-
-internal void
-W3PushOreRocks(r3_mesh *Mesh, v3 Base, f32 Scale, random_series *Series)
-{
- R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .12f*Scale, 0.f)), V3(.38f*Scale, .3f*Scale, .32f*Scale), 4, 7, W3Shade(R3Color(W3_ColorRock), Series), false);
- for(u32 Nugget = 0; Nugget < 4; Nugget += 1)
- {
-  f32 Angle = 2.f*Pi32*RandomUnilateral(Series);
-  v3 P = R3Add(Base, V3(.3f*Scale*R3Cos(Angle), (.15f + .15f*RandomUnilateral(Series))*Scale, .26f*Scale*R3Sin(Angle)));
-  R3PushBox(Mesh, P, V3(.07f*Scale, .07f*Scale, .07f*Scale), R3Color(W3ProductColors[ProductKind_Copper]));
- }
-}
-
-// NOTE: The greenhouse terrace covers the back of the middle terrace, so buildings go
-// on the visible crescent: angles from about -30 to 210 degrees (0 = +X, 90 = front).
+// NOTE: The greenhouse terrace covers the back of the middle terrace, so things go on
+// the visible crescent: angles from about -30 to 210 degrees (0 = +X, 90 = front).
 internal v3
 W3TerracePoint(v3 T, f32 Degrees, f32 Distance)
 {
@@ -477,56 +431,136 @@ W3TerracePoint(v3 T, f32 Degrees, f32 Distance)
  return Result;
 }
 
-// NOTE: The middle terrace, filled for the island's main product. T is the centre of
-// the terrace's top.
+// NOTE: A round fruit tree; Pear makes the fruits pear-shaped.
 internal void
-W3PushMainProduct(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, product_kind Kind, v3 T, random_series *Series)
+W3PushFruitTree(r3_mesh *Mesh, v3 Base, f32 Scale, u32 LeafColor, product_kind Fruit, random_series *Series)
+{
+ R3PushCylinder(Mesh, Base, R3Add(Base, V3(0.f, .55f*Scale, 0.f)), .07f*Scale, 6, R3Color(W3_ColorTrunk));
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .8f*Scale, 0.f)), V3(.4f*Scale, .36f*Scale, .4f*Scale), 5, 8,
+                 W3Shade(R3Color(LeafColor), Series), false);
+ for(u32 Idx = 0; Idx < 5; Idx += 1)
+ {
+  f32 Angle = 2.f*Pi32*RandomUnilateral(Series);
+  v3 P = R3Add(Base, V3(.36f*Scale*R3Cos(Angle), (.7f + .25f*RandomUnilateral(Series))*Scale, .36f*Scale*R3Sin(Angle)));
+  v3 Radii = (Fruit == ProductKind_Pears) ? V3(.06f, .09f, .06f) : V3(.075f, .075f, .075f);
+  R3PushEllipsoid(Mesh, P, Radii, 3, 5, R3Color(W3ProductColors[Fruit]), false);
+ }
+}
+
+internal void
+W3PushCabbage(r3_mesh *Mesh, v3 Base, random_series *Series)
+{
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .1f, 0.f)), V3(.15f, .12f, .15f), 4, 7, W3Shade(R3Color(W3ProductColors[ProductKind_Cabbage]), Series), false);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .13f, 0.f)), V3(.09f, .09f, .09f), 3, 6, R3Color(0xFFA8DC7E), false);
+}
+
+internal void
+W3PushCarrot(r3_mesh *Mesh, v3 Base)
+{
+ R3PushCone(Mesh, R3Add(Base, V3(0.f, .08f, 0.f)), R3Add(Base, V3(0.f, -.1f, 0.f)), .06f, 5, R3Color(W3ProductColors[ProductKind_Carrots]));
+ R3PushCone(Mesh, R3Add(Base, V3(-.03f, .07f, 0.f)), R3Add(Base, V3(-.06f, .28f, 0.f)), .03f, 4, R3Color(0xFF4F9D3A));
+ R3PushCone(Mesh, R3Add(Base, V3(.03f, .07f, 0.f)), R3Add(Base, V3(.06f, .26f, .02f)), .03f, 4, R3Color(0xFF4F9D3A));
+}
+
+// NOTE: A cow, facing +X (or -X with Facing = -1).
+internal void
+W3PushCow(r3_mesh *Mesh, v3 Base, f32 Facing)
+{
+ v3 Body = R3Add(Base, V3(0.f, .3f, 0.f));
+ R3PushBox(Mesh, Body, V3(.24f, .12f, .12f), R3Color(W3_ColorCow));
+ R3PushBox(Mesh, R3Add(Body, V3(-.05f*Facing, .07f, 0.f)), V3(.08f, .06f, .125f), R3Color(W3_ColorCowSpot));
+ R3PushBox(Mesh, R3Add(Body, V3(.3f*Facing, .06f, 0.f)), V3(.08f, .08f, .08f), R3Color(W3_ColorCow));
+ R3PushBox(Mesh, R3Add(Body, V3(.37f*Facing, .03f, 0.f)), V3(.025f, .045f, .06f), R3Color(0xFFE8B4A6));
+ for(u32 Leg = 0; Leg < 4; Leg += 1)
+ {
+  f32 DX = (Leg & 1) ? .17f : -.17f;
+  f32 DZ = (Leg & 2) ? .08f : -.08f;
+  R3PushBox(Mesh, R3Add(Base, V3(DX, .09f, DZ)), V3(.03f, .09f, .03f), R3Color(W3_ColorCowSpot));
+ }
+}
+
+internal void
+W3PushHen(r3_mesh *Mesh, v3 Base, f32 Facing)
+{
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .1f, 0.f)), V3(.11f, .09f, .08f), 4, 6, R3Color(W3_ColorHen), false);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(.09f*Facing, .2f, 0.f)), V3(.05f, .05f, .05f), 3, 5, R3Color(W3_ColorHen), false);
+ R3PushBox(Mesh, R3Add(Base, V3(.09f*Facing, .26f, 0.f)), V3(.02f, .02f, .01f), R3Color(W3_ColorComb));
+ R3PushCone(Mesh, R3Add(Base, V3(.13f*Facing, .2f, 0.f)), R3Add(Base, V3(.18f*Facing, .19f, 0.f)), .02f, 4, R3Color(0xFFF2B33D));
+}
+
+// NOTE: A little house: walls and a pitched roof, ridge along X.
+internal void
+W3PushHut(r3_mesh *Mesh, v3 Base, v3 Half, u32 WallColor)
+{
+ v3 Center = R3Add(Base, V3(0.f, Half.Y, 0.f));
+ R3PushBox(Mesh, Center, Half, R3Color(WallColor));
+ f32 Y0 = Base.Y + 2.f*Half.Y;
+ f32 Y1 = Y0 + .8f*Half.Z;
+ v3 A0 = V3(Base.X - Half.X - .04f, Y0, Base.Z - Half.Z - .05f);
+ v3 A1 = V3(Base.X + Half.X + .04f, Y0, Base.Z - Half.Z - .05f);
+ v3 B0 = V3(Base.X - Half.X - .04f, Y0, Base.Z + Half.Z + .05f);
+ v3 B1 = V3(Base.X + Half.X + .04f, Y0, Base.Z + Half.Z + .05f);
+ v3 R0 = V3(Base.X - Half.X - .04f, Y1, Base.Z);
+ v3 R1 = V3(Base.X + Half.X + .04f, Y1, Base.Z);
+ v3 Inside = V3(Base.X, Y0, Base.Z);
+ R3PushQuad(Mesh, A0, A1, R1, R0, Inside, R3Color(W3_ColorRoof));
+ R3PushQuad(Mesh, B0, B1, R1, R0, Inside, R3Color(W3_ColorRoof));
+ R3PushTri(Mesh, A0, B0, R0, R3Add(Inside, V3(1.f, 0.f, 0.f)), R3Color(WallColor));
+ R3PushTri(Mesh, A1, B1, R1, R3Add(Inside, V3(-1.f, 0.f, 0.f)), R3Color(WallColor));
+}
+
+// NOTE: The middle terrace, filled for the island's main food. T is the centre of the
+// terrace's top.
+internal void
+W3PushMainProduct(r3_mesh *Opaque, w3_theme *Theme, product_kind Kind, v3 T, random_series *Series)
 {
  f32 R = W3_Terrace1Radius;
  f32 Wall = W3_TerraceWall + .05f;
  v4 WallColor = R3Color(Theme->Wall);
- v4 Water = R3Color(W3_ColorWater);
 
  switch(Kind)
  {
-  case ProductKind_FreshWater:
+  case ProductKind_Apples:
+  case ProductKind_Pears:
   {
-   // A pond and a water tower.
-   W3PushTerrace(Opaque, T, R, Wall, 16, Water, WallColor);
-   v3 Tower = W3TerracePoint(T, 10.f, 1.f);
-   for(u32 Leg = 0; Leg < 4; Leg += 1)
+   // An orchard.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(Theme->Lawn), WallColor);
+   u32 Leaves = (Kind == ProductKind_Pears) ? 0xFF6FAE4A : 0xFF3F8E4A;
+   for(u32 Tree = 0; Tree < 5; Tree += 1)
    {
-    f32 DX = (Leg & 1) ? .2f : -.2f;
-    f32 DZ = (Leg & 2) ? .2f : -.2f;
-    R3PushCylinder(Opaque, R3Add(Tower, V3(DX, 0.f, DZ)), R3Add(Tower, V3(.6f*DX, .8f, .6f*DZ)), .035f, 4, R3Color(W3_ColorPost));
-   }
-   R3PushCylinder(Opaque, R3Add(Tower, V3(0.f, .8f, 0.f)), R3Add(Tower, V3(0.f, 1.25f, 0.f)), .3f, 10, R3Color(0xFF8FC9E8));
-   R3PushCone(Opaque, R3Add(Tower, V3(0.f, 1.25f, 0.f)), R3Add(Tower, V3(0.f, 1.5f, 0.f)), .34f, 10, R3Color(W3_ColorDomeRim));
-  } break;
-
-  case ProductKind_SolarPanels:
-  {
-   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorPaving), WallColor);
-   for(u32 Panel = 0; Panel < 5; Panel += 1)
-   {
-    W3PushSolarPanel(Opaque, W3TerracePoint(T, -10.f + 50.f*(f32)Panel, .95f), .8f);
+    W3PushFruitTree(Opaque, W3TerracePoint(T, -15.f + 52.f*(f32)Tree, (Tree & 1) ? .7f : 1.05f), 1.f + .25f*RandomUnilateral(Series), Leaves, Kind, Series);
    }
   } break;
 
-  case ProductKind_Batteries:
+  case ProductKind_Cabbage:
   {
-   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorPaving), WallColor);
-   for(u32 Cell = 0; Cell < 7; Cell += 1)
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
+   for(u32 Ring = 0; Ring < 2; Ring += 1)
    {
-    W3PushBatteryCell(Opaque, W3TerracePoint(T, -15.f + 35.f*(f32)Cell, (Cell & 1) ? .75f : 1.05f), 1.15f);
+    for(u32 Head = 0; Head < 8; Head += 1)
+    {
+     W3PushCabbage(Opaque, W3TerracePoint(T, -20.f + 31.f*(f32)Head + 15.f*(f32)Ring, Ring ? .75f : 1.1f), Series);
+    }
+   }
+  } break;
+
+  case ProductKind_Carrots:
+  {
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
+   for(u32 Ring = 0; Ring < 3; Ring += 1)
+   {
+    for(u32 Carrot = 0; Carrot < 11; Carrot += 1)
+    {
+     W3PushCarrot(Opaque, W3TerracePoint(T, -20.f + 22.f*(f32)Carrot + 8.f*(f32)Ring, .7f + .2f*(f32)Ring));
+    }
    }
   } break;
 
   case ProductKind_Fish:
   {
    // A fish pond, with fish.
-   W3PushTerrace(Opaque, T, R, Wall, 16, Water, WallColor);
-   for(u32 Fish = 0; Fish < 6; Fish += 1)
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorWater), WallColor);
+   for(u32 Fish = 0; Fish < 7; Fish += 1)
    {
     v3 P = W3TerracePoint(T, -20.f + 220.f*RandomUnilateral(Series), .85f + .3f*RandomUnilateral(Series));
     P.Y += .04f;
@@ -534,89 +568,73 @@ W3PushMainProduct(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, produc
    }
   } break;
 
-  case ProductKind_Algae:
+  case ProductKind_Meat:
   {
-   // A teal pool with glass algae tubes.
-   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(0xFF7FD6C0), WallColor);
-   for(u32 Tube = 0; Tube < 5; Tube += 1)
+   // A pasture with cows and a barn.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorPasture), WallColor);
+   W3PushHut(Opaque, W3TerracePoint(T, 170.f, .95f), V3(.32f, .22f, .26f), W3_ColorBarn);
+   W3PushCow(Opaque, W3TerracePoint(T, 10.f, .95f), -1.f);
+   W3PushCow(Opaque, W3TerracePoint(T, 60.f, 1.f), 1.f);
+   W3PushCow(Opaque, W3TerracePoint(T, 110.f, .9f), -1.f);
+  } break;
+
+  case ProductKind_Eggs:
+  {
+   // A hen house with hens around it.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorPasture), WallColor);
+   W3PushHut(Opaque, W3TerracePoint(T, 15.f, .95f), V3(.25f, .18f, .2f), 0xFFE9C98F);
+   for(u32 Hen = 0; Hen < 6; Hen += 1)
    {
-    W3PushTube(Opaque, Translucent, W3TerracePoint(T, -10.f + 50.f*(f32)Tube, 1.f), .9f + .25f*(f32)(Tube & 1), .14f);
+    W3PushHen(Opaque, W3TerracePoint(T, 50.f + 28.f*(f32)Hen, (Hen & 1) ? .8f : 1.1f), (Hen & 1) ? 1.f : -1.f);
    }
   } break;
 
-  case ProductKind_Copper:
-  {
-   // A mine: a rock heap with copper ore, a headframe and a cart.
-   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorRock), WallColor);
-   v3 Heap = W3TerracePoint(T, 90.f, .8f);
-   R3PushCone(Opaque, Heap, R3Add(Heap, V3(0.f, .65f, 0.f)), .5f, 7, W3Shade(R3Color(W3_ColorRock), Series));
-   W3PushOreRocks(Opaque, W3TerracePoint(T, 15.f, 1.f), 1.f, Series);
-   v3 Frame = W3TerracePoint(T, 165.f, 1.f);
-   R3PushCylinder(Opaque, R3Add(Frame, V3(-.25f, 0.f, 0.f)), R3Add(Frame, V3(0.f, 1.1f, 0.f)), .04f, 4, R3Color(W3_ColorDarkWood));
-   R3PushCylinder(Opaque, R3Add(Frame, V3(.25f, 0.f, 0.f)), R3Add(Frame, V3(0.f, 1.1f, 0.f)), .04f, 4, R3Color(W3_ColorDarkWood));
-   R3PushCylinder(Opaque, R3Add(Frame, V3(-.15f, 1.05f, 0.f)), R3Add(Frame, V3(.15f, 1.05f, 0.f)), .12f, 8, R3Color(W3ProductColors[ProductKind_Copper]));
-   R3PushBox(Opaque, R3Add(W3TerracePoint(T, 125.f, 1.05f), V3(0.f, .14f, 0.f)), V3(.22f, .12f, .15f), R3Color(W3_ColorMetal));
-  } break;
-
-  case ProductKind_Timber:
-  {
-   // A pine grove and a log pile.
-   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(Theme->Lawn), WallColor);
-   f32 TreeAngles[6] = {-20.f, 20.f, 55.f, 125.f, 160.f, 200.f};
-   for(u32 Tree = 0; Tree < 6; Tree += 1)
-   {
-    W3PushConifer(Opaque, W3TerracePoint(T, TreeAngles[Tree], 1.05f), .9f + .4f*RandomUnilateral(Series), Series);
-   }
-   for(u32 Log = 0; Log < 3; Log += 1)
-   {
-    f32 Y = (Log == 2) ? .26f : .1f;
-    f32 Z = (Log == 2) ? 0.f : ((Log == 0) ? -.1f : .1f);
-    v3 P = R3Add(T, V3(0.f, Y, .85f + Z));
-    R3PushCylinder(Opaque, R3Add(P, V3(-.35f, 0.f, 0.f)), R3Add(P, V3(.35f, 0.f, 0.f)), .09f, 7, R3Color(W3ProductColors[ProductKind_Timber]));
-   }
-  } break;
-
-  case ProductKind_Seeds:
+  case ProductKind_Wheat:
   default:
   {
-   // Crop rows, alternating wheat and greens.
-   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorCropSoil), WallColor);
+   // A wheat field with a windmill.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
    for(u32 Row = 0; Row < 4; Row += 1)
    {
     f32 Z = T.Z - .78f + .52f*(f32)Row;
     f32 HalfLength = .8f*R3Sqrt(Max(R*R - (Z - T.Z)*(Z - T.Z), .01f));
-    u32 Color = (Row & 1) ? W3_ColorCropGreen : W3_ColorCropWheat;
-    R3PushBox(Opaque, V3(T.X, T.Y + .07f, Z), V3(HalfLength, .07f, .12f), R3Color(Color));
+    R3PushBox(Opaque, V3(T.X, T.Y + .1f, Z), V3(HalfLength, .1f, .14f), W3Shade(R3Color(W3ProductColors[ProductKind_Wheat]), Series));
+   }
+   v3 Mill = W3TerracePoint(T, 170.f, 1.f);
+   R3PushCone(Opaque, Mill, R3Add(Mill, V3(0.f, 1.3f, 0.f)), .28f, 8, R3Color(0xFFF4EBDD));
+   v3 Hub = R3Add(Mill, V3(0.f, 1.05f, .25f));
+   for(u32 Blade = 0; Blade < 4; Blade += 1)
+   {
+    f32 Angle = .4f + .5f*Pi32*(f32)Blade;
+    v3 Dir = V3(R3Cos(Angle), R3Sin(Angle), 0.f);
+    R3PushOrientedBox(Opaque, R3Add(Hub, R3Scale(Dir, .32f)), R3Scale(Dir, .3f), V3(-Dir.Y*.07f, Dir.X*.07f, 0.f), V3(0.f, 0.f, .015f), R3Color(0xFFD9C4A0));
    }
   } break;
  }
 }
 
-// NOTE: Small building for a second product (or a bush when there is none), on one of
+// NOTE: Something small for a second food (or a bush when there is none), on one of
 // the back corners of the lawn.
 internal void
-W3PushSmallProduct(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, product_kind Kind, v3 Base, random_series *Series)
+W3PushSmallProduct(r3_mesh *Opaque, w3_theme *Theme, product_kind Kind, v3 Base, random_series *Series)
 {
  switch(Kind)
  {
-  case ProductKind_Seeds:
+  case ProductKind_Apples:  W3PushFruitTree(Opaque, Base, 1.f, 0xFF3F8E4A, ProductKind_Apples, Series); break;
+  case ProductKind_Pears:   W3PushFruitTree(Opaque, Base, 1.f, 0xFF6FAE4A, ProductKind_Pears, Series); break;
+  case ProductKind_Cabbage:
   {
-   for(u32 Row = 0; Row < 3; Row += 1)
-   {
-    u32 Color = (Row & 1) ? W3_ColorCropGreen : W3_ColorCropWheat;
-    R3PushBox(Opaque, R3Add(Base, V3(0.f, .06f, -.25f + .25f*(f32)Row)), V3(.3f, .06f, .08f), R3Color(Color));
-   }
+   for(u32 Head = 0; Head < 3; Head += 1) W3PushCabbage(Opaque, R3Add(Base, V3(-.3f + .3f*(f32)Head, 0.f, .1f*(f32)(Head & 1))), Series);
   } break;
-  case ProductKind_FreshWater:
+  case ProductKind_Carrots:
   {
-   R3PushCylinder(Opaque, Base, R3Add(Base, V3(0.f, .55f, 0.f)), .25f, 10, R3Color(0xFF8FC9E8));
-   R3PushCone(Opaque, R3Add(Base, V3(0.f, .55f, 0.f)), R3Add(Base, V3(0.f, .8f, 0.f)), .29f, 10, R3Color(W3_ColorDomeRim));
+   for(u32 Carrot = 0; Carrot < 6; Carrot += 1) W3PushCarrot(Opaque, R3Add(Base, V3(-.3f + .12f*(f32)Carrot, 0.f, (Carrot & 1) ? .1f : -.1f)));
   } break;
-  case ProductKind_SolarPanels: W3PushSolarPanel(Opaque, Base, 1.f); break;
-  case ProductKind_Batteries:
+  case ProductKind_Wheat:
   {
-   W3PushBatteryCell(Opaque, R3Add(Base, V3(-.18f, 0.f, 0.f)), 1.f);
-   W3PushBatteryCell(Opaque, R3Add(Base, V3(.18f, 0.f, 0.f)), 1.f);
+   // Hay bales.
+   R3PushCylinder(Opaque, R3Add(Base, V3(-.2f, .17f, -.15f)), R3Add(Base, V3(-.2f, .17f, .15f)), .17f, 8, R3Color(W3ProductColors[ProductKind_Wheat]));
+   R3PushCylinder(Opaque, R3Add(Base, V3(.2f, .17f, -.15f)), R3Add(Base, V3(.2f, .17f, .15f)), .17f, 8, W3Shade(R3Color(W3ProductColors[ProductKind_Wheat]), Series));
   } break;
   case ProductKind_Fish:
   {
@@ -629,13 +647,12 @@ W3PushSmallProduct(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, produ
     R3PushEllipsoid(Opaque, R3Add(Base, V3(-.18f + .18f*(f32)Fish, .42f, 0.f)), V3(.05f, .13f, .03f), 3, 5, R3Color(W3ProductColors[ProductKind_Fish]), false);
    }
   } break;
-  case ProductKind_Algae:
+  case ProductKind_Meat:  W3PushCow(Opaque, Base, 1.f); break;
+  case ProductKind_Eggs:
   {
-   W3PushTube(Opaque, Translucent, R3Add(Base, V3(-.15f, 0.f, 0.f)), .7f, .11f);
-   W3PushTube(Opaque, Translucent, R3Add(Base, V3(.15f, 0.f, .05f)), .55f, .11f);
+   W3PushHen(Opaque, R3Add(Base, V3(-.15f, 0.f, 0.f)), 1.f);
+   W3PushHen(Opaque, R3Add(Base, V3(.18f, 0.f, .1f)), -1.f);
   } break;
-  case ProductKind_Copper: W3PushOreRocks(Opaque, Base, .9f, Series); break;
-  case ProductKind_Timber: W3PushConifer(Opaque, Base, 1.f, Series); break;
   default:
   {
    // A flowering bush.
@@ -673,8 +690,8 @@ W3PushDock(r3_mesh *Mesh, v3 Top, f32 Radius, f32 SideSign)
            R3Add(Boat, V3(.2f, .4f, 1.f)), R3Color(W3_ColorSail));
 }
 
-// NOTE: Trees on both sides (in the cluster's colours), the product buildings, and a
-// dock when the island makes fish. The front of the lawn holds the crates.
+// NOTE: Trees on both sides (in the cluster's colours), what the island makes, and a
+// dock when it catches fish. The front of the lawn holds the crates.
 internal void
 W3PushDecorations(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, island *Island, v3 Top, f32 Radius, u32 Index)
 {
@@ -699,21 +716,22 @@ W3PushDecorations(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, island
   }
  }
 
- W3PushMainProduct(Opaque, Translucent, Theme, Main, R3Add(Top, W3_Terrace1Offset), &Series);
+ W3PushMainProduct(Opaque, Theme, Main, R3Add(Top, W3_Terrace1Offset), &Series);
 
  b32 MakesFish = (Main == ProductKind_Fish || Second == ProductKind_Fish);
  for(u32 Corner = 0; Corner < 2; Corner += 1)
  {
   f32 SideSign = (Corner == 0) ? -1.f : 1.f;
   v3 Base = V3(Top.X + SideSign*.62f*Radius, Top.Y, Top.Z - .6f*Radius);
-  W3PushSmallProduct(Opaque, Translucent, Theme, (Second == ProductKind_Fish) ? ProductKind_None : Second, Base, &Series);
+  W3PushSmallProduct(Opaque, Theme, (Second == ProductKind_Fish) ? ProductKind_None : Second, Base, &Series);
  }
  if(MakesFish)
  {
   W3PushDock(Opaque, Top, Radius, (Index & 1) ? 1.f : -1.f);
  }
 
- //- Round trees on both sides
+ //- Shade trees on both sides, in the cluster's colours (no fruit, so they are not
+ // mistaken for an orchard)
  for(u32 Tree = 0; Tree < 2; Tree += 1)
  {
   f32 SideSign = (Tree == 0) ? -1.f : 1.f;
@@ -722,13 +740,6 @@ W3PushDecorations(r3_mesh *Opaque, r3_mesh *Translucent, w3_theme *Theme, island
   R3PushCylinder(Opaque, Base, R3Add(Base, V3(0.f, .75f*Scale, 0.f)), .09f*Scale, 6, R3Color(W3_ColorTrunk));
   R3PushEllipsoid(Opaque, R3Add(Base, V3(0.f, 1.05f*Scale, 0.f)), V3(.5f*Scale, .45f*Scale, .5f*Scale), 5, 8,
                   W3Shade(R3Color(Theme->Leaves), &Series), false);
-
-  for(u32 Fruit = 0; Fruit < 3; Fruit += 1)
-  {
-   f32 Angle = 2.f*Pi32*RandomUnilateral(&Series);
-   v3 P = R3Add(Base, V3(.42f*Scale*R3Cos(Angle), (.95f + .25f*RandomUnilateral(&Series))*Scale, .42f*Scale*R3Sin(Angle)));
-   R3PushEllipsoid(Opaque, P, V3(.07f, .07f, .07f), 3, 5, R3Color(Theme->Fruit), false);
-  }
  }
 }
 

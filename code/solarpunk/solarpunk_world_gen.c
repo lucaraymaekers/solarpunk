@@ -168,33 +168,75 @@ WorldGenIsLinked(island *A, island *B)
  return Result;
 }
 
-internal void
-WorldGenProductsAndNeeds(app_state *App, random_series *Series, island *Island)
+// NOTE: What each cluster grows or catches, in the same order as the clusters. Islands
+// only make their cluster's foods and only need foods their cluster does not make, so
+// every need is traded in from another cluster.
+#define WorldGen_MaxSpecialties 3
+global_variable product_kind WorldGenClusterFoods[WorldGen_ClusterCount][WorldGen_MaxSpecialties] =
 {
- // Production: 1 or 2 different kinds.
+ {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Cabbage}, // Verdant Reach: orchards
+ {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_None},    // Sunward Isles: fields and hens
+ {ProductKind_Fish,    ProductKind_None,    ProductKind_None},    // Driftwood Shoals: fishing
+ {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},    // Ember Archipelago: herds
+ {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},    // Crystal Spires: vegetables
+ {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},    // Mistral Keys: fishing, hens
+ {ProductKind_Fish,    ProductKind_Carrots, ProductKind_Wheat},   // Saltglass Atolls
+};
+
+// NOTE: Scarce foods: made in smaller amounts than the others, so the world as a whole
+// does not have enough of them and islands needing them turn red.
+internal b32
+WorldGenIsScarce(product_kind Kind)
+{
+ b32 Result = (Kind == ProductKind_Meat || Kind == ProductKind_Pears);
+ return Result;
+}
+
+internal b32
+WorldGenClusterMakes(u32 Cluster, product_kind Kind)
+{
+ b32 Result = false;
+ for(u32 Idx = 0; Idx < WorldGen_MaxSpecialties; Idx += 1)
+ {
+  Result = Result || (WorldGenClusterFoods[Cluster][Idx] == Kind && Kind != ProductKind_None);
+ }
+ return Result;
+}
+
+internal void
+WorldGenProductsAndNeeds(app_state *App, random_series *Series, island *Island, u32 Cluster)
+{
+ //- Makes: 1 or 2 of its cluster's foods
+ u32 FoodCount = 0;
+ for(u32 Idx = 0; Idx < WorldGen_MaxSpecialties; Idx += 1)
+ {
+  if(WorldGenClusterFoods[Cluster][Idx] != ProductKind_None) FoodCount += 1;
+ }
  b32 Produces[ProductKind_Count] = {0};
- u32 ProduceCount = WorldGenRandomInt(Series, 1, 2);
+ u32 ProduceCount = Min(WorldGenRandomInt(Series, 1, 2), FoodCount);
  for(u32 Produced = 0; Produced < ProduceCount; )
  {
-  product_kind Kind = WorldGenRandomKind(Series);
+  product_kind Kind = WorldGenClusterFoods[Cluster][WorldGenRandomInt(Series, 0, FoodCount - 1)];
   if(!Produces[Kind])
   {
    Produces[Kind] = true;
-   PushProduct(App, Island, Kind, 10*(u64)WorldGenRandomInt(Series, 2, 20));
+   u64 Amount = 10*(u64)WorldGenRandomInt(Series, 6, 16);
+   if(WorldGenIsScarce(Kind)) Amount = 10*(u64)WorldGenRandomInt(Series, 2, 5);
+   PushProduct(App, Island, Kind, Amount);
    Produced += 1;
   }
  }
-
- // Needs: 2 or 3 kinds it does not produce itself, so every island must trade.
+ 
+ //- Needs: 2 or 3 foods its cluster does not make, so they come from other clusters
  b32 Needs[ProductKind_Count] = {0};
  u32 NeedCount = WorldGenRandomInt(Series, 2, 3);
- for(u32 Needed = 0; Needed < NeedCount; )
+ for(u32 Needed = 0, Tries = 0; Needed < NeedCount && Tries < 100; Tries += 1)
  {
   product_kind Kind = WorldGenRandomKind(Series);
-  if(!Produces[Kind] && !Needs[Kind])
+  if(!WorldGenClusterMakes(Cluster, Kind) && !Needs[Kind])
   {
    Needs[Kind] = true;
-   PushRequirement(App, Island, Kind, 5*(u64)WorldGenRandomInt(Series, 1, 12));
+   PushRequirement(App, Island, Kind, 5*(u64)WorldGenRandomInt(Series, 2, 10));
    Needed += 1;
   }
  }
@@ -266,7 +308,7 @@ BuildGeneratedWorld(app_state *App, u32 IslandCount)
    }
    Island->MapPos = Pos;
 
-   WorldGenProductsAndNeeds(App, &Series, Island);
+   WorldGenProductsAndNeeds(App, &Series, Island, Cluster);
   }
  }
 

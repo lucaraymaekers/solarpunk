@@ -972,8 +972,8 @@ StaticAssert(ArrayCount(V3HelpKeys) == ArrayCount(V3HelpActions), V3HelpKeysMatc
 // NOTE: What an island that makes each product looks like (its middle terrace).
 global_variable char *V3HelpProductLooks[ProductKind_Count] =
 {
- "", "crop rows", "pond, water tower", "panel rows", "battery cells",
- "fish pond, dock", "glass tubes", "mine", "pine forest",
+ "", "apple orchard", "pear orchard", "cabbage patch", "carrot rows",
+ "wheat field, windmill", "fish pond, dock", "cows, barn", "hens, hen house",
 };
 
 #define V3D_HelpWidth   760.f
