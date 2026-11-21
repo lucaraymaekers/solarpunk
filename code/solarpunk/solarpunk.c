@@ -28,9 +28,12 @@
 #include "rl/rl_ui.c"
 #include "rl/rl_widgets.c"
 
+#include "solarpunk/solarpunk_broadcast.h"
 #include "solarpunk/solarpunk.h"
 #include "solarpunk/solarpunk_world.c"
+#include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
+#include "solarpunk/solarpunk_broadcast_view.c"
 
 //~ Macros
 #if OS_WINDOWS
@@ -101,12 +104,14 @@ UPDATE_AND_RENDER(UpdateAndRender)
  {
   // TODO: Replace with real island generation/loading.
   BuildHardcodedWorld(App);
+  BroadcastUpdate(App, Input);
  }
  
  //- Rendering 
  { 
   RenderClear();
   DrawIslandGraph(App, BufferDim);
+  DrawBroadcastControls(App, Input);
   RenderDrawAllRectangles(&App->Render, BufferDim, &App->FontAtlas);
  }
  

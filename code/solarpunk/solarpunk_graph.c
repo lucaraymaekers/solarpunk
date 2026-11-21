@@ -13,6 +13,8 @@
 #define Graph_ColorRequirement  0xFFD08770
 #define Graph_ColorLink         0xFF4C566A
 #define Graph_ColorCost         0xFFEBCB8B
+#define Graph_ColorLinkFlash    0xFFEBCB8B
+#define Graph_ColorKnows        0xFF81A1C1
 
 //~ Text
 internal f32
@@ -101,7 +103,13 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
    {
     v2 A = Link->Start->Pos;
     v2 B = Link->Dest->Pos;
-    GraphDrawLine(A, B, Graph_LineThickness, V4FromU32(Graph_ColorLink));
+    // Links light up while they carry news about an island the receiver did not know yet.
+    f32 Flash = BroadcastLinkFlash(App, Link->Start, Link->Dest);
+    v4 Quiet = V4FromU32(Graph_ColorLink);
+    v4 Lit = V4FromU32(Graph_ColorLinkFlash);
+    v4 LinkColor = V4(Lerp(Quiet.X, Lit.X, Flash), Lerp(Quiet.Y, Lit.Y, Flash),
+                      Lerp(Quiet.Z, Lit.Z, Flash), Lerp(Quiet.W, Lit.W, Flash));
+    GraphDrawLine(A, B, Graph_LineThickness*(1.f + 1.5f*Flash), LinkColor);
     
     str8 CostText = Str8Fmt("%d", Link->Cost);
     f32 TextWidth = GraphMeasureText(Atlas, Font, CostText);
@@ -137,6 +145,13 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
   {
    Lines[LineCount] = Str8Fmt("- %.*s %llu", (s32)ProductNames[Req->Kind].Size, ProductNames[Req->Kind].Data, Req->Amount);
    Colors[LineCount] = V4FromU32(Graph_ColorRequirement);
+   LineCount += 1;
+  }
+  
+  if(LineCount < (s32)ArrayCount(Lines))
+  {
+   Lines[LineCount] = Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount);
+   Colors[LineCount] = V4FromU32(Graph_ColorKnows);
    LineCount += 1;
   }
   
