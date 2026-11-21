@@ -122,6 +122,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
   DrawWorld3D(App, Input, BufferDim);
   DrawIslandPanel(App, Input, BufferDim);
   DrawBroadcastControls(App, Input);
+  DrawSummaryPopup(App, Input, BufferDim);
   RenderDrawAllRectangles(&App->Render, BufferDim, &App->FontAtlas);
  }
 

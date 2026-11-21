@@ -29,7 +29,8 @@ BroadcastButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label)
 
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
- b32 IsHot = IsInsideRectV2(MousePos, Dest);
+ // NOTE: The summary dropdown (drawn on top) takes the mouse when it is over it.
+ b32 IsHot = IsInsideRectV2(MousePos, Dest) && !IsInsideRectV2(MousePos, App->R3.PopupRect);
  b32 Result = (IsHot && WasPressed(MouseLeft));
 
  u32 Color = BroadcastView_ColorButton;
@@ -148,7 +149,7 @@ DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Height)
  //- Input
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
- if(IsInsideRectV2(MousePos, Track) && WasPressed(MouseLeft))
+ if(IsInsideRectV2(MousePos, Track) && !IsInsideRectV2(MousePos, App->R3.PopupRect) && WasPressed(MouseLeft))
  {
   Broadcast->TimelineDragging = true;
  }

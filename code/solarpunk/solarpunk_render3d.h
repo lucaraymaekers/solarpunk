@@ -6,6 +6,7 @@
 //~ Constants
 #define R3_MaxIslands 64
 #define R3_MaxUIRects 12
+#define R3_SummaryProductBase 100
 
 // NOTE: How an island is doing, shown as the colour of its ring and label dot.
 enum island_status
@@ -93,6 +94,13 @@ struct r3_state
  // (labels avoid them; clicks and hovers there do not reach the 3D view).
  b32 ShowLegend;
  b32 ShowControls;
+
+ // Summary bar dropdown: 0 = closed, 1 + island_status = islands with that status,
+ // R3_SummaryProductBase + product kind = islands that need/produce that product.
+ s32 SummaryOpen;
+ v4 SummaryBarRect;   // this frame
+ v4 PopupRect;        // where the dropdown was drawn (zero when closed)
+ s32 PopupHoverPlusOne; // island row under the mouse in the dropdown
  v4 UIRects[R3_MaxUIRects];
  u32 UIRectCount;
 };

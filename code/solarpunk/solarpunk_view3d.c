@@ -183,9 +183,23 @@ V3DrawHoveredCableCosts(app_state *App)
 }
 
 //~ Summary bar (top left)
-// NOTE: A chip: rounded background, optional coloured dot or product swatch, text.
-internal void
-V3Chip(app_state *App, v2 *Cursor, str8 Text, u32 DotColor, b32 HasDot, b32 Square, u32 TextColor)
+// NOTE: Each chip is a button: it opens a dropdown listing the islands behind the number.
+
+internal void PanelSelect(app_state *App, s32 IslandIdx);
+
+#define V3D_PopupWidth     360.f
+#define V3D_ColorChipHot   0xE64C566A
+#define V3D_ColorChipOpen  0xE65E81AC
+#define V3D_ColorPopupBg   0xF02E3440
+#define V3D_ColorRowHover  0xFF4C566A
+#define V3D_ColorSection   0xFFEBCB8B
+#define V3D_ColorDim       0xFF9AA3B5
+#define V3D_ColorGood      0xFFA3BE8C
+
+// NOTE: A chip: rounded background, optional coloured dot (or product swatch), text.
+// Clickable chips highlight on hover and return true when clicked.
+internal b32
+V3Chip(app_state *App, app_input *Input, v2 *Cursor, str8 Text, u32 DotColor, b32 HasDot, b32 Square, u32 TextColor, b32 Clickable, b32 Open)
 {
  font *Font = &App->Font;
  f32 Height = Font->HeightPx + BroadcastView_ButtonPadding;
@@ -194,27 +208,51 @@ V3Chip(app_state *App, v2 *Cursor, str8 Text, u32 DotColor, b32 HasDot, b32 Squa
  f32 Width = 2.f*V3D_ChipPadding + DotSpace + V3Measure(App, Text);
  v4 Box = RectFromSize(*Cursor, V2(Width, Height));
 
- DrawRect(Box, V4FromU32(V3D_ColorChip), .5f*Height, 0.f, 0.f);
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ b32 Hot = Clickable && IsInsideRectV2(MousePos, Box);
+ u32 Background = Open ? V3D_ColorChipOpen : (Hot ? V3D_ColorChipHot : V3D_ColorChip);
+
+ DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, 0.f);
  if(HasDot)
  {
   v2 DotPos = V2(Box.Min.X + V3D_ChipPadding, Box.Min.Y + .5f*(Height - Dot));
   DrawRect(RectFromSize(DotPos, V2(Dot, Dot)), V4FromU32(DotColor), Square ? 3.f : .5f*Dot, 0.f, 0.f);
  }
+ // White text on the open (blue) chip, so coloured text stays readable.
  GraphDrawText(&App->FontAtlas, Font, V2(Box.Min.X + V3D_ChipPadding + DotSpace, Box.Min.Y + .5f*BroadcastView_ButtonPadding),
-               Text, V4FromU32(TextColor));
+               Text, V4FromU32(Open ? Graph_ColorTitle : TextColor));
  Cursor->X += Width + BroadcastView_ButtonGap;
+ 
+ b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
+ return Result;
+}
+
+// NOTE: Clicking a chip opens its list; clicking the open chip closes it.
+internal void
+V3ToggleSummary(r3_state *R3, s32 Which, v2 ChipBottomLeft)
+{
+ if(R3->SummaryOpen == Which)
+ {
+  R3->SummaryOpen = 0;
+ }
+ else
+ {
+  R3->SummaryOpen = Which;
+  R3->PopupRect = RectFromSize(ChipBottomLeft, V2(0.f, 0.f)); // real size set when drawn
+ }
 }
 
 internal void
-V3DrawSummaryBar(app_state *App)
+V3DrawSummaryBar(app_state *App, app_input *Input)
 {
  r3_state *R3 = &App->R3;
  broadcast_state *Broadcast = &App->Broadcast;
+ f32 Height = App->Font.HeightPx + BroadcastView_ButtonPadding;
  v2 Cursor = V2(V3D_Margin, V3D_Margin);
 
- //- Time
- V3Chip(App, &Cursor, Str8Fmt("Round %llu   %s", Broadcast->Round, BroadcastSpeedLabels[BroadcastSpeedIdx(Broadcast)]),
-        0, false, false, Graph_ColorTitle);
+ //- Time (not a button)
+ V3Chip(App, Input, &Cursor, Str8Fmt("Round %llu   %s", Broadcast->Round, BroadcastSpeedLabels[BroadcastSpeedIdx(Broadcast)]),
+        0, false, false, Graph_ColorTitle, false, false);
  Cursor.X += 10.f;
 
  //- Islands per status
@@ -223,9 +261,21 @@ V3DrawSummaryBar(app_state *App)
  {
   if(R3->IslandStatus[Idx] < IslandStatus_Count) Counts[R3->IslandStatus[Idx]] += 1;
  }
- V3Chip(App, &Cursor, Str8Fmt("%u ok", Counts[IslandStatus_Ok]), W3_ColorStatusOk, true, false, Graph_ColorTitle);
- V3Chip(App, &Cursor, Str8Fmt("%u waiting for news", Counts[IslandStatus_Waiting]), W3_ColorStatusWaiting, true, false, Graph_ColorTitle);
- V3Chip(App, &Cursor, Str8Fmt("%u short", Counts[IslandStatus_Short]), W3_ColorStatusShort, true, false, Graph_ColorTitle);
+
+ // NOTE: Plain C strings: MSVC warns (C4204) about non-constant aggregate initializers.
+ char *StatusFormats[IslandStatus_Count] = {"%u ok", "%u waiting for news", "%u short"};
+ u32 Order[IslandStatus_Count] = {IslandStatus_Ok, IslandStatus_Waiting, IslandStatus_Short};
+ for(u32 OrderIdx = 0; OrderIdx < IslandStatus_Count; OrderIdx += 1)
+ {
+  u32 Status = Order[OrderIdx];
+  s32 Which = 1 + (s32)Status;
+  v2 ChipPos = Cursor;
+  if(V3Chip(App, Input, &Cursor, Str8Fmt(StatusFormats[Status], Counts[Status]), W3StatusColor(Status), true, false,
+            Graph_ColorTitle, true, (R3->SummaryOpen == Which)))
+  {
+   V3ToggleSummary(R3, Which, V2(ChipPos.X, ChipPos.Y + Height + BroadcastView_ButtonGap));
+  }
+ }
  Cursor.X += 10.f;
 
  //- Products that are short worldwide
@@ -236,19 +286,218 @@ V3DrawSummaryBar(app_state *App)
   {
    s64 Missing = (s64)R3->TotalNeeded[Kind] - (s64)R3->TotalProduced[Kind];
    str8 Name = ProductNames[Kind];
-   V3Chip(App, &Cursor, Str8Fmt("%.*s short by %lld", (s32)Name.Size, Name.Data, Missing),
-          W3ProductColors[Kind], true, true, W3_ColorStatusShort);
+   s32 Which = R3_SummaryProductBase + (s32)Kind;
+   v2 ChipPos = Cursor;
+   if(V3Chip(App, Input, &Cursor, Str8Fmt("%.*s short by %lld", (s32)Name.Size, Name.Data, Missing),
+             W3ProductColors[Kind], true, true, W3_ColorStatusShort, true, (R3->SummaryOpen == Which)))
+   {
+    V3ToggleSummary(R3, Which, V2(ChipPos.X, ChipPos.Y + Height + BroadcastView_ButtonGap));
+   }
    AnyShort = true;
   }
  }
  if(!AnyShort)
  {
-  V3Chip(App, &Cursor, S8("no product shortages"), 0, false, false, W3_ColorStatusOk);
+  V3Chip(App, Input, &Cursor, S8("no product shortages"), 0, false, false, W3_ColorStatusOk, false, false);
  }
 
- // The summary bar can be wider than the time controls under it.
- f32 Height = App->Font.HeightPx + BroadcastView_ButtonPadding;
- V3AddUIRect(R3, RectFromSize(V2(0.f, 0.f), V2(Cursor.X, V3D_Margin + Height)));
+ R3->SummaryBarRect = RectFromSize(V2(0.f, 0.f), V2(Cursor.X, V3D_Margin + Height));
+ V3AddUIRect(R3, R3->SummaryBarRect);
+}
+
+//~ Summary dropdown
+// NOTE: A row in the dropdown: island name with its status dot; returns true when clicked.
+internal b32
+V3PopupIslandRow(app_state *App, app_input *Input, v2 *Line, f32 Width, u32 IslandIdx, island *Island)
+{
+ r3_state *R3 = &App->R3;
+ f32 LineHeight = App->Font.HeightPx;
+ f32 Dot = LineHeight - 10.f;
+ v4 Row = RectFromSize(V2(Line->X - 4.f, Line->Y), V2(Width + 8.f, LineHeight));
+ b32 Hot = IsInsideRectV2(V2V2S32(Input->Mouse.Pos), Row);
+ if(Hot)
+ {
+  DrawRect(Row, V4FromU32(V3D_ColorRowHover), 3.f, 0.f, 0.f);
+  R3->PopupHoverPlusOne = (s32)IslandIdx + 1;
+ }
+ V3StatusDot(V2(Line->X, Line->Y + .5f*(LineHeight - Dot)), Dot, W3StatusColor(R3->IslandStatus[IslandIdx]));
+ GraphDrawText(&App->FontAtlas, &App->Font, V2(Line->X + Dot + 6.f, Line->Y), Island->Name, V4FromU32(Graph_ColorTitle));
+ b32 Result = (Hot && WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]));
+ return Result;
+}
+
+internal void
+V3PopupSwatch(app_state *App, v2 Line, f32 X, product_kind Kind)
+{
+ f32 Size = App->Font.HeightPx - 6.f;
+ DrawRect(RectFromSize(V2(X, Line.Y + 3.f), V2(Size, Size)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+}
+
+// NOTE: Draws the open dropdown (call last, so it is on top of the other controls).
+// Clicking a row opens that island in the panel; clicking outside closes the dropdown.
+internal void
+DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
+{
+ r3_state *R3 = &App->R3;
+ font_atlas *Atlas = &App->FontAtlas;
+ font *Font = &App->Font;
+ f32 LineHeight = Font->HeightPx;
+ f32 Pad = BroadcastView_ButtonPadding;
+ v2 MousePos = V2V2S32(Input->Mouse.Pos);
+ b32 Clicked = WasPressed(Input->Mouse.Buttons[PlatformMouseButton_Left]);
+
+ if(R3->SummaryOpen == 0)
+ {
+  R3->PopupRect = V4(0.f, 0.f, 0.f, 0.f);
+  return;
+ }
+
+ //- Close when clicking anywhere else (the chips toggle themselves)
+ if(Clicked && !IsInsideRectV2(MousePos, R3->PopupRect) && !IsInsideRectV2(MousePos, R3->SummaryBarRect))
+ {
+  R3->SummaryOpen = 0;
+  R3->PopupRect = V4(0.f, 0.f, 0.f, 0.f);
+  return;
+ }
+
+ //- Collect the rows
+ b32 IsProduct = (R3->SummaryOpen >= R3_SummaryProductBase);
+ product_kind Kind = (product_kind)(IsProduct ? R3->SummaryOpen - R3_SummaryProductBase : 0);
+ u32 Status = (u32)(IsProduct ? 0 : R3->SummaryOpen - 1);
+ if(IsProduct && (u32)Kind >= ProductKind_Count) return;
+
+ island *Islands[R3_MaxIslands];
+ u32 Indices[R3_MaxIslands];
+ u64 Amounts[R3_MaxIslands];
+ b32 Produces[R3_MaxIslands];
+ u32 RowCount = 0;
+ u32 NeedCount = 0;
+ {
+  // Product view: first the islands that need it, then the ones that produce it.
+  for(u32 Pass = 0; Pass < (IsProduct ? 2u : 1u); Pass += 1)
+  {
+   u32 Index = 0;
+   for(island *Island = App->FirstIsland; Island && Index < R3->IslandCount; Island = Island->Next)
+   {
+    b32 Include = false;
+    u64 Amount = 0;
+    if(!IsProduct)
+    {
+     Include = (R3->IslandStatus[Index] == Status);
+    }
+    else
+    {
+     product *List = (Pass == 0) ? Island->FirstRequirement : Island->FirstProduct;
+     for(product *Product = List; Product; Product = Product->Next)
+     {
+      if(Product->Kind == Kind) { Include = true; Amount += Product->Amount; }
+     }
+    }
+    if(Include && RowCount < R3_MaxIslands)
+    {
+     Islands[RowCount] = Island;
+     Indices[RowCount] = Index;
+     Amounts[RowCount] = Amount;
+     Produces[RowCount] = (Pass == 1);
+     RowCount += 1;
+     if(Pass == 0) NeedCount += 1;
+    }
+    Index += 1;
+   }
+  }
+ }
+
+ //- Title and layout
+ str8 Title = {0};
+ str8 Hint = S8("click an island to open it");
+ if(IsProduct)
+ {
+  str8 Name = ProductNames[Kind];
+  Title = Str8Fmt("%.*s: %llu needed, %llu produced", (s32)Name.Size, Name.Data, R3->TotalNeeded[Kind], R3->TotalProduced[Kind]);
+ }
+ else
+ {
+  char *Titles[IslandStatus_Count] =
+  {
+   "Ok: a supplier known for every need",
+   "Waiting for news of a supplier for:",
+   "Short: needs a product the world lacks:",
+  };
+  Title = S8FromCString(Titles[Status]);
+ }
+
+ u32 SectionRows = (IsProduct ? 2u : 0u);
+ v2 Min = R3->PopupRect.Min;
+ f32 Width = Max(V3D_PopupWidth, V3Measure(App, Title) + 2.f*Pad);
+ f32 MaxHeight = BufferDim.Y - Min.Y - V3D_Margin;
+ u32 MaxRows = (u32)Max(1.f, (MaxHeight - 2.f*Pad)/LineHeight - 3.f - (f32)SectionRows);
+ u32 ShownRows = Min(RowCount, MaxRows);
+ f32 Height = (f32)(ShownRows + 2 + SectionRows + (RowCount > ShownRows ? 1 : 0))*LineHeight + 2.f*Pad;
+ if(RowCount == 0) Height += LineHeight;
+ v4 Box = RectFromSize(Min, V2(Width, Height));
+ R3->PopupRect = Box;
+
+ DrawRect(Box, V4FromU32(V3D_ColorPopupBg), 8.f, 0.f, 0.f);
+ DrawRect(Box, V4FromU32(Graph_ColorNodeBorder), 8.f, 1.f, 0.f);
+
+ v2 Line = V2(Box.Min.X + Pad, Box.Min.Y + Pad);
+ f32 Inner = Width - 2.f*Pad;
+ GraphDrawText(Atlas, Font, Line, Title, V4FromU32(V3D_ColorSection));
+ Line.Y += LineHeight;
+ GraphDrawText(Atlas, Font, Line, Hint, V4FromU32(V3D_ColorDim));
+ Line.Y += LineHeight;
+
+ if(RowCount == 0)
+ {
+  GraphDrawText(Atlas, Font, Line, S8("none"), V4FromU32(V3D_ColorDim));
+ }
+
+ for(u32 Row = 0; Row < ShownRows; Row += 1)
+ {
+  if(IsProduct && (Row == 0 || (Row == NeedCount)))
+  {
+   str8 Section = (Row == 0 && NeedCount > 0) ? S8("Need it:") : S8("Produce it:");
+   GraphDrawText(Atlas, Font, Line, Section, V4FromU32(V3D_ColorDim));
+   Line.Y += LineHeight;
+  }
+
+  u32 IslandIdx = Indices[Row];
+  island *Island = Islands[Row];
+  if(V3PopupIslandRow(App, Input, &Line, Inner, IslandIdx, Island))
+  {
+   PanelSelect(App, (s32)IslandIdx);
+   R3->SummaryOpen = 0;
+  }
+
+  // Right side: what makes it waiting / short, or the amount of the product.
+  f32 Right = Line.X + Inner;
+  if(IsProduct)
+  {
+   str8 Amount = Produces[Row] ? Str8Fmt("+%llu", Amounts[Row]) : Str8Fmt("-%llu", Amounts[Row]);
+   GraphDrawText(Atlas, Font, V2(Right - V3Measure(App, Amount), Line.Y), Amount,
+                 V4FromU32(Produces[Row] ? V3D_ColorGood : W3_ColorNeedPad));
+  }
+  else if(Status != IslandStatus_Ok)
+  {
+   f32 X = Right;
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
+   {
+    b32 Show = (Status == IslandStatus_Waiting) ? !W3KnowsSupplier(App, IslandIdx, Req->Kind)
+     : (R3->TotalNeeded[Req->Kind] > R3->TotalProduced[Req->Kind]);
+    if(Show)
+    {
+     X -= LineHeight;
+     V3PopupSwatch(App, Line, X, Req->Kind);
+    }
+   }
+  }
+  Line.Y += LineHeight;
+ }
+
+ if(RowCount > ShownRows)
+ {
+  GraphDrawText(Atlas, Font, Line, Str8Fmt("+%u more (see the Islands tab)", RowCount - ShownRows), V4FromU32(V3D_ColorDim));
+ }
 }
 
 //~ Camera controls (top right)
@@ -424,7 +673,8 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
  R3->UIRectCount = 0;
  V3AddUIRect(R3, RectFromSize(V2(0.f, 0.f), V2(V3D_ControlsAreaWidth, V3D_ControlsAreaHeight)));
  V3AddUIRect(R3, App->Panel.LastRect);
- V3DrawSummaryBar(App);
+ V3AddUIRect(R3, R3->PopupRect);   // summary dropdown, drawn last (see DrawSummaryPopup)
+ V3DrawSummaryBar(App, Input);
  V3DrawCameraControls(App, Input, BufferDim);
  V3DrawHelpButtons(App, Input, BufferDim);
 

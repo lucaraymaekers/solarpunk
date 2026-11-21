@@ -495,6 +495,10 @@ W3PrepareIslands(app_state *App, app_input *Input)
  {
   R3->HoveredIdx = App->Panel.RowHoverPlusOne - 1;
  }
+ else if(IsInsideRectV2(V2V2S32(Input->Mouse.Pos), R3->PopupRect))
+ {
+  R3->HoveredIdx = R3->PopupHoverPlusOne - 1;
+ }
  else if(W3PointOnUI(R3, V2V2S32(Input->Mouse.Pos)))
  {
   // Over buttons, the legend, ...: no island is hovered.
