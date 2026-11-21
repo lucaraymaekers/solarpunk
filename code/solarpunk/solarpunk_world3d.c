@@ -848,6 +848,9 @@ W3PushClouds(r3_mesh *Mesh)
 #define W3Style_Themed 2
 #define W3Style_Forest 3   // Verdant Reach (solarpunk_forest_island.c)
 #define W3_ForestCluster 0
+#define W3Style_Fishing 4   // Driftwood Shoals (solarpunk_fishing_island.c)
+#define W3_FishingCluster 2
+internal void W3PushFishingIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushForestIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void HeroReplayCommands(app_state *App);
 
@@ -958,6 +961,11 @@ W3PrepareIslands(app_state *App, app_input *Input)
    if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_ForestCluster)
    {
     R3->IslandStyle[Idx] = W3Style_Forest;
+   }
+   // Driftwood Shoals is a fishing cluster: all its islands are fishing villages
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_FishingCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Fishing;
    }
   }
  }
@@ -1071,6 +1079,11 @@ W3BuildWorld(app_state *App)
   {
    W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Fishing)
+  {
+   W3PushFishingIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                       Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
   }
   else if(R3->IslandStyle[Index] == W3Style_Forest)
   {

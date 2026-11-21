@@ -72,6 +72,7 @@ enum hero_command_kind
  HeroCmd_Flames,      // P = campfire base
  HeroCmd_Crystal,     // knowledge crystal: P = centre, A = size
  HeroCmd_Ring,        // status/hover ring: P = island top, A = radius (0 = square slab)
+ HeroCmd_Trawler,     // fishing boat with a cabin: P = hull centre, A = facing, B = phase
 };
 
 typedef struct hero_command hero_command;

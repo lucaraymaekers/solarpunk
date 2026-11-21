@@ -42,6 +42,7 @@
 #include "solarpunk/solarpunk_world3d.c"
 #include "solarpunk/solarpunk_hero_island.c"
 #include "solarpunk/solarpunk_forest_island.c"
+#include "solarpunk/solarpunk_fishing_island.c"
 #include "solarpunk/solarpunk_view3d.c"
 #include "solarpunk/solarpunk_panel.c"
 

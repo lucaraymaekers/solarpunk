@@ -107,6 +107,14 @@ struct hero_layout
  f32 FrontLevel;    // height of the ground beside the harbour pool
  b32 Round;         // a round island of this Radius (else the square slab)
  f32 Radius;
+ b32 Lagoon;        // an oval harbour (centre, radii), a channel from it to the front
+ f32 LagoonX;       // edge, and a low shore (FrontLevel) out to ShoreScale x the radii
+ f32 LagoonZ;
+ f32 LagoonRX;
+ f32 LagoonRZ;
+ f32 ShoreScale;
+ f32 ChannelX;
+ f32 ChannelHalf;
  b32 PlateauRight;
  b32 PlateauLeft;
  u32 StreamCount;
@@ -199,7 +207,22 @@ HeroTerrain(hero_layout *L, f32 X, f32 Z, u32 *Type)
    Z *= Scale;
   }
  }
- if(L->Pool && Z > L->PoolZ0)
+ f32 LagoonDX = L->Lagoon ? (X - L->LagoonX)/L->LagoonRX : 0.f;
+ f32 LagoonDZ = L->Lagoon ? (Z - L->LagoonZ)/L->LagoonRZ : 0.f;
+ f32 LagoonE = LagoonDX*LagoonDX + LagoonDZ*LagoonDZ;
+ b32 InChannel = L->Lagoon && Z > L->LagoonZ && AbsF32(X - L->ChannelX) < L->ChannelHalf;
+ if(L->Lagoon && (LagoonE < 1.f || InChannel))
+ {
+  *Type = HeroGround_Pool;
+  Result = Hero_PoolFloor;
+ }
+ else if(L->Lagoon && LagoonE < L->ShoreScale*L->ShoreScale)
+ {
+  Result = L->FrontLevel;
+  *Type = HeroGround_Grass;
+  if(L->StreamCount && HeroPolylineDistance(X, Z, L->Stream, L->StreamCount) < .15f) *Type = HeroGround_Stream;
+ }
+ else if(L->Pool && Z > L->PoolZ0)
  {
   if(X > L->PoolX0 && X < L->PoolX1)
   {
@@ -663,6 +686,14 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
  u32 Roof = HeroRoofColors[(Variant/2) % ArrayCount(HeroRoofColors)];
  if(Variant & 8) Wood = 0xFFB5523B;   // a red barn
  if(Variant & 32) Roof = 0xFF5E8A3A;  // moss
+ if(Variant & 64)
+ {
+  // Weathered grey boards under a rusty tin roof (fishing villages)
+  u32 Grey[3] = {0xFF8C8478, 0xFF9C9284, 0xFF7E766B};
+  u32 Tin[3] = {0xFF8E6A4E, 0xFF9A8676, 0xFF7C5A44};
+  Wood = Grey[Variant % 3];
+  Roof = Tin[(Variant/2) % 3];
+ }
 
  //- Stone plinth (reaches down so houses on terrace edges do not float), or a
  // wooden floor on a deck
@@ -1864,6 +1895,8 @@ HeroPushRings(hero_ctx *H, app_state *App, f32 Radius)
  }
 }
 
+internal void FishingPushTrawlerAt(hero_ctx *H, v3 Base, f32 Facing, f32 Phase);   // solarpunk_fishing_island.c
+
 // NOTE: Draws the moving parts of all hand-built islands for this frame.
 internal void
 HeroReplayCommands(app_state *App)
@@ -1891,6 +1924,7 @@ HeroReplayCommands(app_state *App)
    case HeroCmd_Flames:     HeroPushFlames(H, Command->P); break;
    case HeroCmd_Crystal:    HeroPushCrystal(H, Command->P, Command->A); break;
    case HeroCmd_Ring:       HeroPushRings(H, App, Command->A); break;
+   case HeroCmd_Trawler:    FishingPushTrawlerAt(H, Command->P, Command->A, Command->B); break;
    default: break;
   }
  }
