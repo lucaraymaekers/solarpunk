@@ -98,6 +98,7 @@
 #define DEFAULT_PER_CAPITA          0.01f   // units per person per sim-day (tune)
 #define DEFAULT_PER_CAPITA_BETA     0.2f
 #define DEFAULT_TAP_PER_CAPITA_NUDGE 1.1f
+#define DEFAULT_CONSUME_PER_EVENT   1.0f    // units a household demand event takes from stock
 // Topology (10)
 #define DEFAULT_POPULATION          100
 #define DEFAULT_Y_MIN               0.15f

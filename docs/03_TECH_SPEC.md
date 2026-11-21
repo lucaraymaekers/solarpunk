@@ -87,6 +87,16 @@ Real stock per resource.
 
 > Until D1 is decided, ship **Option A** as the default config (smallest) while keeping the switch clean.
 
+**As implemented (L4, 2026-11-21, `engine/node/node_need.c`). Choices the text above leaves open:**
+- **One hidden demand clock drives both options.** `world.DemandNextAt/DemandTauTrue/DemandLastAt` fire `NeedOnDemandEvent(Node, Config, r, Interval, SimTime)` per `(island, r)` every `TauTrue * (1 +/- DemandJitter)`. Option A learns `TauHat` from `Interval`. Option B consumes `ConsumePerEvent` (1) units of stock per event and learns `PerCapitaHat = EWMA(ConsumePerEvent * DayLength / (Interval * Population))`. So in B too, the node never reads its true consumption rate.
+- **Option A `ElapsedSec`** = time since the last *final* delivery. A demand event never resets it. It sets `Covered = false` and counts a **shortage** (`need_state.Shortages`) if no delivery arrived since the previous event; otherwise the delivery "absorbed" it.
+- **`U` decays linearly** at `lambda_U` per second (a 60-point tap fades in 120 s, one sim-day). Taps cap `U` at 100. Deliveries and claims reduce `U` by `delta_U * qty`.
+- **Fluid claim (A):** `ElapsedSec *= 1 - qty/BatchSize`.
+- **Production:** each maker with `Craft == r` produces `ProductionPerMaker` units/s. Option A: `(1 - OwnShare)` of it accumulates in `ProductionAccum`, and whole units drain to the shed (only while awake). Option B: production goes into `Stock`, and stock above `SurplusCoverDays` of the island's own learned use drains to the shed.
+- **Option B starting state:** `Stock = TargetCoverDays * PerCapita * Population`, `PerCapitaHat = PerCapita` (the prior).
+
+Measured with `SolarSim test` (12 sim-days, default seed, no deliveries): Option A's mean relative error of `TauHat` vs the hidden cadence drops **0.70 -> 0.05**; Option B's `PerCapitaHat` error drops **0.85 -> 0.33** (slower: one event per cadence and a lower EWMA weight). For D1 balancing: with no deliveries every Option A need saturates near 94 (the 1.25 cap), and with 2 makers per island the sheds fill at about 6 units per sim-day per maker resource.
+
 ### 3.4 Hop-by-hop edge cost
 When island `u` evaluates edge `(a, b)` using its *own belief* about `b` (direct observation if `a == u`, else `u.Knowledge[b]`):
 

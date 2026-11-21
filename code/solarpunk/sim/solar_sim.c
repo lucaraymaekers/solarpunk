@@ -692,6 +692,173 @@ TestConservationStress(void)
  Check(Ok, "conservation + every pod accounted for at every tick under stress");
 }
 
+//- Need model (spec 3.3). Node-level, both D1 options.
+internal void
+SimNeedTicks(island_node *Node, const engine_config *Config, f32 Seconds)
+{
+ s32 Ticks = (s32)(Seconds/ENGINE_TICK_SECONDS + 0.5f);
+ for(s32 T = 0; T < Ticks; T += 1)
+ {
+  NeedTick(Node, Config, ENGINE_TICK_SECONDS, 0.0f);
+ }
+}
+
+internal void
+TestNeedCadence(void)
+{
+ engine_config Config = DefaultConfig();
+ Config.NeedModel = NeedModel_AbstractCadence;
+ const physics_constants *K = &Config.K;
+ island_node Node = {0};
+ Node.Population = 100;
+ Node.Makers[0].Used = true;
+ Node.Makers[0].Craft = 1;
+ Node.Makers[1].Used = true;
+ Node.Makers[1].Craft = 1;
+ NeedInit(&Node, &Config);
+ need_state *Need = &Node.Need[0];
+
+ Check(NeedScore(&Node, &Config, 0) < 0.01f, "fresh island has no need");
+ SimNeedTicks(&Node, &Config, Need->TauHat);
+ Check(fabsf(NeedScore(&Node, &Config, 0) - K->WPro) < 1.5f, "after one learned cadence N ~ W_pro");
+ SimNeedTicks(&Node, &Config, Need->TauHat);
+ f32 Capped = K->WPro*powf(1.25f, K->Gamma);
+ Check(fabsf(NeedScore(&Node, &Config, 0) - Capped) < 0.5f, "N saturates at the 1.25 cadence cap");
+
+ NeedOnDelivery(&Node, &Config, 0, 10, 0.0f, true);
+ Check(NeedScore(&Node, &Config, 0) < 0.01f && Need->Covered, "final delivery satisfies the need");
+ NeedOnDemandEvent(&Node, &Config, 0, -1.0f, 0.0f);
+ Check(Need->Shortages == 0, "a delivery absorbs the next demand event");
+ NeedOnDemandEvent(&Node, &Config, 0, -1.0f, 0.0f);
+ Check(Need->Shortages == 1, "a demand event with nothing delivered is a shortage");
+
+ f32 TauBefore = Need->TauHat;
+ for(s32 I = 0; I < 10; I += 1) NeedOnDemandEvent(&Node, &Config, 0, 100.0f, 0.0f);
+ Check(Need->TauHat < TauBefore && fabsf(Need->TauHat - 100.0f) < 5.0f, "TauHat learns the demand interval");
+
+ Need->ElapsedSec = 80.0f;
+ TauBefore = Need->TauHat;
+ NeedOnFluidClaim(&Node, &Config, 0, Config.BatchSize/2);
+ Check(fabsf(Need->ElapsedSec - 40.0f) < 0.01f && Need->TauHat == TauBefore,
+       "Fluid claim of half a batch halves ElapsedSec, TauHat untouched");
+
+ NeedOnTap(&Node, &Config, 0, 0.0f);
+ Check(fabsf(Need->U - K->TapBoost) < 0.01f, "tap adds TapBoost urgency");
+ Check(fabsf(Need->TauHat - Clamp(K->TauMin, TauBefore*K->TapTauNudge, K->TauMax)) < 0.01f, "tap nudges TauHat down");
+ Check(NeedScore(&Node, &Config, 0) >= K->TapBoost, "tap shows up in the score at once");
+ SimNeedTicks(&Node, &Config, 60.0f);
+ Check(fabsf(Need->U - (K->TapBoost - 60.0f*K->LambdaU)) < 0.1f, "urgency decays linearly at lambda_U");
+
+ // Own needs first: OwnShare of 2 makers x 100 s stays home, the rest drains to the shed.
+ NeedDrainToShed(&Node, &Config, 1);           // empty what the earlier ticks produced
+ Node.Shed[1] = 0;
+ Node.Need[1].ProductionAccum = 0.0f;
+ SimNeedTicks(&Node, &Config, 100.0f);
+ f32 Expected = 2.0f*K->ProductionPerMaker*100.0f*(1.0f - K->OwnShare);
+ f32 Accum = Node.Need[1].ProductionAccum;
+ s32 Drained = NeedDrainToShed(&Node, &Config, 1);
+ Check(Node.Shed[1] == Drained && Drained >= (s32)Expected - 1 && Drained <= (s32)Expected, "surplus drains to the shed");
+ Check(fabsf((f32)Drained + Node.Need[1].ProductionAccum - Accum) < 0.001f, "drain keeps the fraction for later");
+ Check(NeedDrainToShed(&Node, &Config, 0) == 0, "no makers, no surplus");
+}
+
+internal void
+TestNeedStock(void)
+{
+ engine_config Config = DefaultConfig();
+ Config.NeedModel = NeedModel_StockBased;
+ const physics_constants *K = &Config.K;
+ island_node Node = {0};
+ Node.Population = 100;
+ NeedInit(&Node, &Config);
+ need_state *Need = &Node.Need[0];
+
+ Check(fabsf(Need->Stock - K->TargetCoverDays*K->PerCapita*100.0f) < 0.001f, "starts with target cover");
+ Check(NeedScore(&Node, &Config, 0) < 0.01f, "full cover means no need");
+
+ // Households use 1 unit per 60 s: 0.02 units/person/sim-day at 100 people, 120 s days.
+ for(s32 I = 0; I < 12; I += 1) NeedOnDemandEvent(&Node, &Config, 0, 60.0f, 0.0f);
+ f32 TrueRate = K->ConsumePerEvent*Config.DayLengthSeconds/(60.0f*100.0f);
+ Check(fabsf(Need->PerCapitaHat - TrueRate) < 0.002f, "PerCapitaHat learns the consumption rate");
+ Check(Need->Stock == 0.0f && Need->Shortages > 0, "stock runs out and shortages are counted");
+ Check(NeedScore(&Node, &Config, 0) > 99.0f, "empty stock means maximum need");
+
+ f32 Daily = Need->PerCapitaHat*100.0f;
+ s32 Fill = (s32)ceilf(K->SurplusCoverDays*Daily);
+ NeedOnDelivery(&Node, &Config, 0, Fill, 0.0f, true);
+ Check(NeedScore(&Node, &Config, 0) < 0.01f, "delivery restores cover");
+ Check(NeedDrainToShed(&Node, &Config, 0) == 0, "stock below the surplus line stays home");
+ NeedOnDelivery(&Node, &Config, 0, 5, 0.0f, true);
+ Check(NeedDrainToShed(&Node, &Config, 0) == 5 && Node.Shed[0] == 5, "only stock above SurplusCoverDays leaves");
+
+ f32 RateBefore = Need->PerCapitaHat;
+ NeedOnTap(&Node, &Config, 0, 0.0f);
+ Check(fabsf(Need->PerCapitaHat - RateBefore*K->TapPerCapitaNudge) < 0.0001f && Need->U > 0.0f,
+       "tap raises PerCapitaHat and urgency");
+}
+
+// "Learns each island's rhythm": run the world and compare the learned estimate with the hidden truth.
+internal void
+TestNeedLearning(need_model_kind Model)
+{
+ world *World = SimAllocWorld();
+ engine_config Config = DefaultConfig();
+ Config.NeedModel = Model;
+ WorldInit(World, &Config);
+
+ f32 ErrorStart = 0.0f, ErrorEnd = 0.0f;
+ b32 ScoresOk = true;
+ s32 Ticks = (s32)(12.0f*Config.DayLengthSeconds/ENGINE_TICK_SECONDS);
+ for(s32 Pass = 0; Pass < 2; Pass += 1)
+ {
+  f32 Error = 0.0f;
+  for(s32 I = 0; I < World->IslandCount; I += 1)
+  {
+   for(s32 R = 0; R < Config.ResourceCount; R += 1)
+   {
+    need_state *Need = &World->Islands[I].Need[R];
+    f32 TrueTau = World->DemandTauTrue[I][R];
+    if(Model == NeedModel_AbstractCadence)
+    {
+     Error += fabsf(Need->TauHat - TrueTau)/TrueTau;
+    }
+    else
+    {
+     f32 TrueRate = Config.K.ConsumePerEvent*Config.DayLengthSeconds/(TrueTau*(f32)World->Islands[I].Population);
+     Error += fabsf(Need->PerCapitaHat - TrueRate)/TrueRate;
+    }
+   }
+  }
+  Error /= (f32)(World->IslandCount*Config.ResourceCount);
+  if(Pass == 0)
+  {
+   ErrorStart = Error;
+   for(s32 T = 0; T < Ticks; T += 1)
+   {
+    WorldStep(World, ENGINE_TICK_SECONDS);
+    for(s32 I = 0; I < World->IslandCount; I += 1)
+    {
+     for(s32 R = 0; R < Config.ResourceCount; R += 1)
+     {
+      f32 N = World->Islands[I].Need[R].Score;
+      ScoresOk = ScoresOk && N >= 0.0f && N <= 100.0f && World->Islands[I].Need[R].Stock >= 0.0f;
+     }
+    }
+    ScoresOk = ScoresOk && WorldCheckConservation(World);
+   }
+  }
+  else
+  {
+   ErrorEnd = Error;
+  }
+ }
+ Log("  %s: mean relative error of learned rhythm %.2f -> %.2f after 12 days, %d units produced\n",
+     (Model == NeedModel_AbstractCadence) ? "Option A TauHat" : "Option B PerCapitaHat",
+     ErrorStart, ErrorEnd, World->Stats.UnitsProduced);
+ Check(ErrorEnd < 0.5f*ErrorStart, "islands learn the hidden rhythm");
+ Check(ScoresOk, "scores stay in [0,100], stock >= 0, conservation holds");
+}
+
 internal s32
 RunTests(cmd_line *CmdLine)
 {
@@ -705,6 +872,9 @@ RunTests(cmd_line *CmdLine)
   {"transport: mid-flight return to sender (D3 option 1)", 106},
   {"transport: TTL expiry + queue capacity", 107},
   {"sync: gossip timer vs sneakernet", 108},
+  {"need: Option A abstract cadence", 110}, {"need: Option B stock", 111},
+  {"need: Option A learns the hidden rhythm (world)", 112},
+  {"need: Option B learns the hidden rhythm (world)", 113},
   {"8 conservation (drops)", 8}, {"8 conservation (stress with pods)", 109},
   {"7 determinism (storms + pods)", 7},
  };
@@ -726,6 +896,10 @@ RunTests(cmd_line *CmdLine)
    case 107: TestExpiryAndQueue(); break;
    case 108: TestGossipTimer(); break;
    case 109: TestConservationStress(); break;
+   case 110: TestNeedCadence(); break;
+   case 111: TestNeedStock(); break;
+   case 112: TestNeedLearning(NeedModel_AbstractCadence); break;
+   case 113: TestNeedLearning(NeedModel_StockBased); break;
    case 8:   TestConservation(); break;
    case 7:   TestDeterminism(); break;
   }

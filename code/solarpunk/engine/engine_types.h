@@ -108,7 +108,7 @@ struct physics_constants
  f32 Beta, TauMin, TauMax, TapTauNudge, OwnShare;
  f32 TauTrueMin, TauTrueMax, DemandJitter, ProductionPerMaker;
  // Need model B
- f32 TargetCoverDays, SurplusCoverDays, PerCapita, PerCapitaBeta, TapPerCapitaNudge;
+ f32 TargetCoverDays, SurplusCoverDays, PerCapita, PerCapitaBeta, TapPerCapitaNudge, ConsumePerEvent;
  // Topology
  f32 YMin, YMax, XJitter;
 };
@@ -188,6 +188,8 @@ struct need_state                               // per resource; fields used dep
  // Option A (abstract cadence)
  f32 ElapsedSec, TauHat, U;
  f32 ProductionAccum;                           // fractional production carried between ticks
+ b32 Covered;                                    // a delivery arrived since the last demand event
+ s32 Shortages;                                 // demand events with nothing delivered (for UI/stats)
  // Option B (stock)
  f32 Stock, PerCapitaHat;
  // both

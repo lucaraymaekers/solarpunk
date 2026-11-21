@@ -80,6 +80,7 @@ DefaultConfig(void)
  K->PerCapita = DEFAULT_PER_CAPITA;
  K->PerCapitaBeta = DEFAULT_PER_CAPITA_BETA;
  K->TapPerCapitaNudge = DEFAULT_TAP_PER_CAPITA_NUDGE;
+ K->ConsumePerEvent = DEFAULT_CONSUME_PER_EVENT;
  K->YMin = DEFAULT_Y_MIN;
  K->YMax = DEFAULT_Y_MAX;
  K->XJitter = DEFAULT_X_JITTER;
@@ -749,8 +750,7 @@ WorldStep(world *World, f32 Dt)
 
   NeedTick(Node, Config, Dt, World->SimTime);
 
-  // Hidden household demand clock (Option A ground truth, spec 3.3). World-owned.
-  if(Config->NeedModel == NeedModel_AbstractCadence)
+  // Hidden household demand clock (ground truth for both need models, spec 3.3). World-owned.
   {
    for(s32 R = 0; R < Config->ResourceCount; R += 1)
    {
