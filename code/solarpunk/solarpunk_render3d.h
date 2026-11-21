@@ -60,6 +60,32 @@ struct r3_camera
  v2 LastMousePos;
 };
 
+// NOTE: A moving part of a hand-built island, replayed every frame while the rest of
+// the island stays cached on the GPU (see solarpunk_hero_island.c).
+#define R3_MaxHeroCommands 2048
+enum hero_command_kind
+{
+ HeroCmd_Rotor,       // windmill rotor: P = hub, A = phase
+ HeroCmd_Sails,       // tower mill sails: P = hub, A = phase
+ HeroCmd_WaterWheel,  // P = centre, A = radius
+ HeroCmd_Boat,        // P = hull centre, A = facing, B = phase, C = rower
+ HeroCmd_Flames,      // P = campfire base
+ HeroCmd_Crystal,     // knowledge crystal: P = centre, A = size
+ HeroCmd_Ring,        // status/hover ring: P = island top, A = radius (0 = square slab)
+ HeroCmd_Trawler,     // fishing boat with a cabin: P = hull centre, A = facing, B = phase
+};
+
+typedef struct hero_command hero_command;
+struct hero_command
+{
+ u32 Kind;
+ u32 Island;
+ v3 P;
+ f32 A;
+ f32 B;
+ f32 C;
+};
+
 typedef struct r3_state r3_state;
 struct r3_state
 {
@@ -89,6 +115,31 @@ struct r3_state
 
  // Island under the mouse, found by its projected position. -1 = none.
  s32 HoveredIdx;
+
+ // The hand-built hero island (the one nearest the map centre). -1 = none.
+ s32 HeroIdx;
+ // How each island is drawn: W3Style_Normal, W3Style_Hero or W3Style_Themed (the
+ // hero island's neighbours, built the same way with their own contents).
+ u8 IslandStyle[R3_MaxIslands];
+ // Seconds, for windmills, water wheels, boats and the campfire.
+ f32 AnimTime;
+
+ // Hand-built islands: their still geometry is cached on the GPU and only rebuilt when
+ // the islands change (HeroCacheKey); the moving parts are replayed from HeroCommands
+ // every frame.
+ gl_uint HeroVAO;
+ gl_uint HeroVBO;
+ b32 HeroCacheValid;
+ u64 HeroCacheKey;
+ u32 HeroOpaqueCount;
+ u32 HeroTranslucentCount;
+ u32 HeroCommandCount;
+ hero_command HeroCommands[R3_MaxHeroCommands];
+ f32 IslandKnown[R3_MaxIslands];   // knowledge fraction per island, this frame
+ // Set only while the cache is being built: where the islands put their geometry.
+ r3_mesh *HeroOpaque;
+ r3_mesh *HeroTranslucent;
+ b32 HeroRecording;
 
  // Island status (island_status) and world totals, computed every frame.
  u32 IslandStatus[R3_MaxIslands];

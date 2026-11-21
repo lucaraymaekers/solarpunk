@@ -44,6 +44,13 @@
 #include "solarpunk/solarpunk_broadcast_view.c"
 #include "solarpunk/solarpunk_render3d.c"
 #include "solarpunk/solarpunk_world3d.c"
+#include "solarpunk/solarpunk_hero_island.c"
+#include "solarpunk/solarpunk_forest_island.c"
+#include "solarpunk/solarpunk_fishing_island.c"
+#include "solarpunk/solarpunk_beach_island.c"
+#include "solarpunk/solarpunk_ruins_island.c"
+#include "solarpunk/solarpunk_ice_island.c"
+#include "solarpunk/solarpunk_crystal_island.c"
 #include "solarpunk/solarpunk_view3d.c"
 #include "solarpunk/solarpunk_panel.c"
 
@@ -83,7 +90,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  // Arenas init
  {
   App->FontAtlas.Arena = PushArena(PermanentArena, MB(100), false);
-  FrameArena = PushArena(PermanentArena, MB(64), true);
+  FrameArena = PushArena(PermanentArena, MB(380), true);   // up to ~320 MB of 3D meshes on a frame that rebuilds the island cache
   SetStringsScratch(FrameArena);
 
   App->LinksArena = PushArena(PermanentArena, MB(16), false);

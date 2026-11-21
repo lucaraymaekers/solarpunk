@@ -3,7 +3,7 @@
 //-
 
 //~ Constants
-#define W3_WorldSize        92.f   // map 0..1 is spread over this many world units
+#define W3_WorldSize        150.f   // map 0..1 is spread over this many world units
 #define W3_IslandRadius     2.5f
 #define W3_IslandHeightVary 1.4f   // islands float at slightly different heights
 #define W3_IslandSides      24
@@ -861,9 +861,9 @@ W3PushClouds(r3_mesh *Mesh)
  v4 Color = R3WithAlpha(R3Color(W3_ColorCloud), .42f);
  for(u32 Cloud = 0; Cloud < W3_CloudCount; Cloud += 1)
  {
-  v3 Center = V3(80.f*RandomBilateral(&Series),
+  v3 Center = V3(130.f*RandomBilateral(&Series),
                  -14.f - 3.f*RandomUnilateral(&Series),
-                 80.f*RandomBilateral(&Series));
+                 130.f*RandomBilateral(&Series));
   u32 Puffs = 3 + RandomNext(&Series) % 3;
   for(u32 Puff = 0; Puff < Puffs; Puff += 1)
   {
@@ -875,18 +875,175 @@ W3PushClouds(r3_mesh *Mesh)
 }
 
 //~ World
+// NOTE: The hand-built hero island lives in solarpunk_hero_island.c.
+#define Hero_Radius 3.f   // used for cables, hovering and the camera
+#define W3_HeroNeighbours 8
+#define W3Style_Normal 0
+#define W3Style_Hero   1
+#define W3Style_Themed 2
+#define W3Style_Forest 3   // Verdant Reach (solarpunk_forest_island.c)
+#define W3_ForestCluster 0
+#define W3Style_Fishing 4   // Driftwood Shoals (solarpunk_fishing_island.c)
+#define W3_FishingCluster 2
+#define W3Style_Beach 5     // Sunward Isles (solarpunk_beach_island.c)
+#define W3_BeachCluster 1
+#define W3Style_Ruins 6     // Ember Archipelago (solarpunk_ruins_island.c)
+#define W3_RuinsCluster 3
+#define W3Style_Ice 7       // Saltglass Atolls (solarpunk_ice_island.c)
+#define W3_IceCluster 6
+#define W3Style_Crystal 8   // Mistral Keys (solarpunk_crystal_island.c)
+#define W3_CrystalCluster 5
+internal void W3PushCrystalIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushIceIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushRuinsIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushBeachIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushFishingIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushForestIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void HeroReplayCommands(app_state *App);
+
+// NOTE: Identifies the hand-built islands and everything they are built from (which
+// islands, where, what they make and need), so their cached geometry is rebuilt exactly
+// when one of these changes.
+internal u64
+W3HeroCacheKey(app_state *App)
+{
+ r3_state *R3 = &App->R3;
+ u64 Key = 1469598103934665603ull;
+#define W3HeroMix(Value) Key = (Key ^ (u64)(Value))*1099511628211ull
+ u32 Idx = 0;
+ for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+ {
+  if(R3->IslandStyle[Idx] != W3Style_Normal)
+  {
+   u32 BitsX, BitsY, BitsZ;
+   MemoryCopy(&BitsX, &R3->IslandTop[Idx].X, sizeof(BitsX));
+   MemoryCopy(&BitsY, &R3->IslandTop[Idx].Y, sizeof(BitsY));
+   MemoryCopy(&BitsZ, &R3->IslandTop[Idx].Z, sizeof(BitsZ));
+   W3HeroMix(Idx);
+   W3HeroMix(R3->IslandStyle[Idx]);
+   W3HeroMix(BitsX);
+   W3HeroMix(BitsY);
+   W3HeroMix(BitsZ);
+   for(product *Product = Island->FirstProduct; Product; Product = Product->Next) { W3HeroMix(Product->Kind); W3HeroMix(Product->Amount); }
+   W3HeroMix(0xFFFF);
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) { W3HeroMix(Req->Kind); W3HeroMix(Req->Amount); }
+  }
+  Idx += 1;
+ }
+ W3HeroMix(Idx);
+#undef W3HeroMix
+ return Key;
+}
+internal void W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+
 // NOTE: Positions, screen projections and the hovered island, before building geometry.
 internal void
 W3PrepareIslands(app_state *App, app_input *Input)
 {
  r3_state *R3 = &App->R3;
 
+ R3->AnimTime += Input->dtForFrame;
+ if(R3->AnimTime > 3600.f) R3->AnimTime -= 3600.f;
+
+ //- The hero island: the one nearest the map centre
+ R3->HeroIdx = -1;
+ {
+  f32 BestDistanceSq = 1e9f;
+  u32 Idx = 0;
+  for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+  {
+   f32 DX = Island->MapPos.X - .5f;
+   f32 DY = Island->MapPos.Y - .5f;
+   if(DX*DX + DY*DY < BestDistanceSq)
+   {
+    BestDistanceSq = DX*DX + DY*DY;
+    R3->HeroIdx = (s32)Idx;
+   }
+   Idx += 1;
+  }
+ }
+
+ //- Its nearest neighbours on the map are built the same way, each with its own contents
+ MemorySet(R3->IslandStyle, 0, sizeof(R3->IslandStyle));
+ if(R3->HeroIdx >= 0)
+ {
+  R3->IslandStyle[R3->HeroIdx] = W3Style_Hero;
+  v2 HeroPos = V2(.5f, .5f);
+  {
+   u32 Idx = 0;
+   for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+   {
+    if(Idx == (u32)R3->HeroIdx) HeroPos = Island->MapPos;
+    Idx += 1;
+   }
+  }
+  for(u32 Pick = 0; Pick < W3_HeroNeighbours; Pick += 1)
+  {
+   s32 Best = -1;
+   f32 BestDistanceSq = 1e9f;
+   u32 Idx = 0;
+   for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+   {
+    f32 DX = Island->MapPos.X - HeroPos.X;
+    f32 DY = Island->MapPos.Y - HeroPos.Y;
+    if(R3->IslandStyle[Idx] == W3Style_Normal && DX*DX + DY*DY < BestDistanceSq)
+    {
+     BestDistanceSq = DX*DX + DY*DY;
+     Best = (s32)Idx;
+    }
+    Idx += 1;
+   }
+   if(Best >= 0) R3->IslandStyle[Best] = W3Style_Themed;
+  }
+ }
+
+ //- Verdant Reach is a forest cluster: all its islands are forest islands
+ if(App->HasMapLayout)
+ {
+  u32 Count = 0;
+  for(island *Island = App->FirstIsland; Island && Count < R3_MaxIslands; Island = Island->Next) Count += 1;
+  for(u32 Idx = 0; Idx < Count; Idx += 1)
+  {
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_ForestCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Forest;
+   }
+   // Driftwood Shoals is a fishing cluster: all its islands are fishing villages
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_FishingCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Fishing;
+   }
+   // Sunward Isles is a beach cluster
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_BeachCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Beach;
+   }
+   // Ember Archipelago is an overgrown ruined city
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_RuinsCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Ruins;
+   }
+   // Saltglass Atolls is frozen: an icy working yard
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_IceCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Ice;
+   }
+   // Mistral Keys: crystals and shimmering water
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_CrystalCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Crystal;
+   }
+  }
+ }
+
+
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3_MaxIslands; Island = Island->Next)
  {
   v3 Top = W3IslandTopFromMap(Island->MapPos, Index);
   R3->IslandTop[Index] = Top;
-  R3->IslandRadius[Index] = W3_IslandRadius;
+  R3->IslandRadius[Index] = (R3->IslandStyle[Index] != W3Style_Normal) ? Hero_Radius : W3_IslandRadius;
 
   v2 Screen = V2(-1000.f, -1000.f);
   R3->IslandVisible[Index] = R3ProjectToScreen(R3, R3Add(Top, W3_LabelOffset), &Screen);
@@ -948,6 +1105,22 @@ W3BuildWorld(app_state *App)
  r3_state *R3 = &App->R3;
  broadcast_state *Broadcast = &App->Broadcast;
 
+ //- The hand-built islands are cached on the GPU and rebuilt only when they change;
+ // their moving parts are replayed every frame (HeroReplayCommands, below).
+ u64 HeroKey = W3HeroCacheKey(App);
+ b32 RebuildHero = (!R3->HeroCacheValid || R3->HeroCacheKey != HeroKey);
+ r3_mesh HeroOpaque = {0};
+ r3_mesh HeroTranslucent = {0};
+ if(RebuildHero)
+ {
+  HeroOpaque = R3MeshAlloc(FrameArena, R3_MaxHeroOpaqueVertices);
+  HeroTranslucent = R3MeshAlloc(FrameArena, R3_MaxHeroTranslucentVertices);
+  R3->HeroCommandCount = 0;
+  R3->HeroOpaque = &HeroOpaque;
+  R3->HeroTranslucent = &HeroTranslucent;
+  R3->HeroRecording = true;
+ }
+
  //- Islands
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3->IslandCount; Island = Island->Next)
@@ -957,21 +1130,81 @@ W3BuildWorld(app_state *App)
 
   b32 Hovered = (R3->HoveredIdx == (s32)Index);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
-  w3_theme *Theme = W3ThemeFor(App, Index, R3->IslandCount);
-  W3PushIslandBody(&R3->Opaque, &R3->Translucent, Theme, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
-                   Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected);
-  W3PushDecorations(&R3->Opaque, &R3->Translucent, Theme, Island, Top, Radius, Index);
-  W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
-
   f32 KnownFraction = 0.f;
   if(Broadcast->IslandCount > 1)
   {
    KnownFraction = ((f32)BroadcastKnownCount(App, Island) - 1.f)/((f32)Broadcast->IslandCount - 1.f);
   }
-  W3PushKnowledgeCrystal(&R3->Opaque, Top, Clamp(0.f, KnownFraction, 1.f));
+  KnownFraction = Clamp(0.f, KnownFraction, 1.f);
+  R3->IslandKnown[Index] = KnownFraction;
+
+  if(R3->IslandStyle[Index] != W3Style_Normal && !RebuildHero)
+  {
+   // Cached: nothing to build this frame.
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Hero)
+  {
+   W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                    Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Crystal)
+  {
+   W3PushCrystalIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                       Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Ice)
+  {
+   W3PushIceIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                   Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Ruins)
+  {
+   W3PushRuinsIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Beach)
+  {
+   W3PushBeachIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Fishing)
+  {
+   W3PushFishingIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                       Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Forest)
+  {
+   W3PushForestIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                      Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Themed)
+  {
+   W3PushThemedIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                      Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else
+  {
+   w3_theme *Theme = W3ThemeFor(App, Index, R3->IslandCount);
+   W3PushIslandBody(&R3->Opaque, &R3->Translucent, Theme, Top, Radius, Index, W3StatusColor(R3->IslandStatus[Index]),
+                    Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected);
+   W3PushDecorations(&R3->Opaque, &R3->Translucent, Theme, Island, Top, Radius, Index);
+   W3PushProductsAndNeeds(&R3->Opaque, &R3->Translucent, Island, Top);
+   W3PushKnowledgeCrystal(&R3->Opaque, Top, KnownFraction);
+  }
 
   Index += 1;
  }
+
+ if(RebuildHero)
+ {
+  R3UploadHeroCache(R3, &HeroOpaque, &HeroTranslucent);
+  R3->HeroCacheValid = true;
+  R3->HeroCacheKey = HeroKey;
+  R3->HeroOpaque = 0;
+  R3->HeroTranslucent = 0;
+  R3->HeroRecording = false;
+ }
+ HeroReplayCommands(App);
 
  //- Cables and news pulses
  u32 FromIdx = 0;
@@ -1028,4 +1261,6 @@ W3BuildWorld(app_state *App)
 
  //- Clouds below the islands
  W3PushClouds(&R3->Translucent);
+
+
 }
