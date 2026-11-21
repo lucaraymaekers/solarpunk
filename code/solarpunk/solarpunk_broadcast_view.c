@@ -108,7 +108,7 @@ DrawIslandTooltip(app_state *App, app_input *Input)
   v2 Min = V2(MousePos.X + 18.f, MousePos.Y + 18.f);
   v4 Box = RectFromSize(Min, Size);
   UiCard(Box, 8.f);
-  DrawRect(RectFromSize(V2(Box.Min.X + 3.f, Box.Min.Y + 6.f), V2(Stripe, Size.Y - 12.f)), V4FromU32(W3StatusColor(Status)), 2.f, 0.f, 0.f);
+  DrawRect(RectFromSize(V2(Box.Min.X + 3.f, Box.Min.Y + 6.f), V2(Stripe, Size.Y - 12.f)), V4FromU32(W3StatusColor(Status)), 2.f, 0.f, .5f);
 
   v2 Cursor = V2(Min.X + Ui_Pad + Stripe, Min.Y + Ui_Pad);
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)
@@ -161,14 +161,14 @@ DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Width, f
  f32 TrackY = Track.Min.Y + .5f*Height;
  v4 Bar = RectFromSize(V2(Track.Min.X, TrackY - 3.f), V2(Width, 6.f));
  v4 Fill = RectFromSize(V2(Track.Min.X, TrackY - 3.f), V2(Max(Done*Width, 1.f), 6.f));
- DrawRect(Bar, V4FromU32(Ui_ColorButtonDown), 3.f, 0.f, 0.f);
- DrawRect(Fill, V4FromU32(Ui_ColorAccent), 3.f, 0.f, 0.f);
+ DrawRect(Bar, V4FromU32(Ui_ColorButtonDown), 3.f, 0.f, .5f);
+ DrawRect(Fill, V4FromU32(Ui_ColorAccent), 3.f, 0.f, .5f);
 
  f32 Knob = BroadcastView_KnobSize;
  v2 KnobMin = V2(Track.Min.X + Done*Width - .5f*Knob, TrackY - .5f*Knob);
  b32 KnobHot = (Hot || Broadcast->TimelineDragging);
- DrawRect(RectFromSize(KnobMin, V2(Knob, Knob)), V4FromU32(Ui_ColorCard), .5f*Knob, 0.f, 0.f);
- DrawRect(RectFromSize(KnobMin, V2(Knob, Knob)), V4FromU32(KnobHot ? Ui_ColorAccentDown : Ui_ColorAccent), .5f*Knob, 3.f, 0.f);
+ DrawRect(RectFromSize(KnobMin, V2(Knob, Knob)), V4FromU32(Ui_ColorCard), .5f*Knob, 0.f, .5f);
+ DrawRect(RectFromSize(KnobMin, V2(Knob, Knob)), V4FromU32(KnobHot ? Ui_ColorAccentDown : Ui_ColorAccent), .5f*Knob, 3.f, .5f);
 
  Cursor->X = Track.Max.X + Ui_Gap;
 }

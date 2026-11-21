@@ -42,7 +42,7 @@ V3Measure(app_state *App, str8 Text)
 internal void
 V3StatusDot(v2 Pos, f32 Size, u32 Color)
 {
- DrawRect(RectFromSize(Pos, V2(Size, Size)), V4FromU32(Color), .5f*Size, 0.f, 0.f);
+ DrawRect(RectFromSize(Pos, V2(Size, Size)), V4FromU32(Color), .5f*Size, 0.f, .5f);
 }
 
 //~ Clusters
@@ -160,7 +160,7 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
   b32 Hot = IsInsideRectV2(MousePos, Box) && !IsInsideRectV2(MousePos, R3->PopupRect);
   u32 Background = Focused ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorCard);
   UiCard(Box, .5f*Height);
-  DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, 0.f);
+  DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, .5f);
   if(Hot)
   {
    UiSetHint(Focused ? "Click to see all clusters again" : "Click to fly here and show the island names",
@@ -276,10 +276,10 @@ V3DrawIslandLabels(app_state *App)
    Placed[PlacedCount] = Box;
    PlacedCount += 1;
 
-   DrawRect(Box, V4FromU32(V3D_ColorLabelBg), .5f*Height, 0.f, 0.f);
+   DrawRect(Box, V4FromU32(V3D_ColorLabelBg), .5f*Height, 0.f, .5f);
    if(Hovered || Selected)
    {
-    DrawRect(Box, V4FromU32(Hovered ? Ui_ColorAccent : Ui_ColorSelected), .5f*Height, 2.f, 0.f);
+    DrawRect(Box, V4FromU32(Hovered ? Ui_ColorAccent : Ui_ColorSelected), .5f*Height, 2.f, .5f);
    }
    V3StatusDot(V2(Min.X + V3D_LabelPadding + 2.f, Min.Y + .5f*(Height - Dot)), Dot, W3StatusColor(R3->IslandStatus[Index]));
    UiText(App, V2(Min.X + V3D_LabelPadding + Dot + 8.f, Min.Y + V3D_LabelPadding), Island->Name, Ui_ColorText);
@@ -316,7 +316,7 @@ V3DrawHoveredCableCosts(app_state *App)
        f32 Width = V3Measure(App, Text) + 2.f*V3D_LabelPadding;
        v2 Min = V2(FloorF32(Screen.X - .5f*Width), FloorF32(Screen.Y - .5f*LineHeight));
        v4 Box = RectFromSize(Min, V2(Width, LineHeight + 2.f));
-       DrawRect(Box, V4FromU32(V3D_ColorLabelBg), 5.f, 0.f, 0.f);
+       DrawRect(Box, V4FromU32(V3D_ColorLabelBg), 5.f, 0.f, .5f);
        UiText(App, V2(Min.X + V3D_LabelPadding, Min.Y + 1.f), Text, Ui_ColorTitle);
       }
      }
@@ -348,11 +348,11 @@ V3Chip(app_state *App, app_input *Input, v2 *Cursor, str8 Text, u32 DotColor, b3
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  b32 Hot = IsInsideRectV2(MousePos, Box) && !UiMouseBlocked(App, MousePos);
  u32 Background = Open ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorButton);
- DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, 0.f);
+ DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, .5f);
 
  v2 DotPos = V2(Box.Min.X + V3D_ChipPadding, Box.Min.Y + .5f*(Height - Dot));
- if(Open) DrawRect(RectFromSize(V2(DotPos.X - 2.f, DotPos.Y - 2.f), V2(Dot + 4.f, Dot + 4.f)), V4FromU32(Ui_ColorCard), Square ? 4.f : .5f*Dot + 2.f, 0.f, 0.f);
- DrawRect(RectFromSize(DotPos, V2(Dot, Dot)), V4FromU32(DotColor), Square ? 3.f : .5f*Dot, 0.f, 0.f);
+ if(Open) DrawRect(RectFromSize(V2(DotPos.X - 2.f, DotPos.Y - 2.f), V2(Dot + 4.f, Dot + 4.f)), V4FromU32(Ui_ColorCard), Square ? 4.f : .5f*Dot + 2.f, 0.f, .5f);
+ DrawRect(RectFromSize(DotPos, V2(Dot, Dot)), V4FromU32(DotColor), Square ? 3.f : .5f*Dot, 0.f, .5f);
  UiText(App, V2(DotPos.X + Dot + 6.f, Box.Min.Y + Ui_ButtonPadY), Text, Open ? Ui_ColorOnAccent : TextColor);
 
  if(Hot && Hint)
@@ -587,7 +587,7 @@ V3PopupIslandRow(app_state *App, app_input *Input, v2 *Line, f32 Width, u32 Isla
  b32 Hot = IsInsideRectV2(V2V2S32(Input->Mouse.Pos), Row) && !R3->HelpOpen;
  if(Hot)
  {
-  DrawRect(Row, V4FromU32(Ui_ColorRowHover), 4.f, 0.f, 0.f);
+  DrawRect(Row, V4FromU32(Ui_ColorRowHover), 4.f, 0.f, .5f);
   R3->PopupHoverPlusOne = (s32)IslandIdx + 1;
  }
  V3StatusDot(V2(Line->X, Line->Y + .5f*(LineHeight - Dot)), Dot, W3StatusColor(R3->IslandStatus[IslandIdx]));
@@ -600,7 +600,7 @@ internal void
 V3PopupSwatch(app_state *App, v2 Line, f32 X, product_kind Kind)
 {
  f32 Size = UiLineHeight(App) - 6.f;
- DrawRect(RectFromSize(V2(X, Line.Y + 3.f), V2(Size, Size)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+ DrawRect(RectFromSize(V2(X, Line.Y + 3.f), V2(Size, Size)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, .5f);
 }
 
 //~ Clusters dropdown ("All clusters" in the top bar)
@@ -682,7 +682,7 @@ V3ClusterEntry(app_state *App, u32 Cluster, v3d_cluster_info *Info, v2 Pos, f32 
    }
    if(Draw)
    {
-    DrawRect(RectFromSize(V2(X, Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+    DrawRect(RectFromSize(V2(X, Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, .5f);
     UiText(App, V2(X + Swatch + 6.f, Y), Text, Ui_ColorShortText);
    }
    X += ItemWidth;
@@ -744,7 +744,7 @@ V3DrawClustersPopup(app_state *App, app_input *Input, v2 BufferDim)
  {
   v4 Row = RectFromSize(V2(Line.X - 6.f, Line.Y - 2.f), V2(Inner + 12.f, LineHeight + 4.f));
   b32 Hot = IsInsideRectV2(MousePos, Row) && !R3->HelpOpen;
-  if(Hot) DrawRect(Row, V4FromU32(Ui_ColorRowHover), 6.f, 0.f, 0.f);
+  if(Hot) DrawRect(Row, V4FromU32(Ui_ColorRowHover), 6.f, 0.f, .5f);
   UiText(App, Line, S8("Show the whole world"), Ui_ColorAccentDown);
   if(Hot && Clicked)
   {
@@ -760,7 +760,7 @@ V3DrawClustersPopup(app_state *App, app_input *Input, v2 BufferDim)
   v4 Row = RectFromSize(V2(Line.X - 6.f, Line.Y - 3.f), V2(Inner + 12.f, Heights[Cluster] + 6.f));
   b32 Hot = IsInsideRectV2(MousePos, Row) && !R3->HelpOpen;
   b32 IsFocused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
-  if(Hot || IsFocused) DrawRect(Row, V4FromU32(Hot ? Ui_ColorRowHover : Ui_ColorRowAlt), 6.f, 0.f, 0.f);
+  if(Hot || IsFocused) DrawRect(Row, V4FromU32(Hot ? Ui_ColorRowHover : Ui_ColorRowAlt), 6.f, 0.f, .5f);
   V3ClusterEntry(App, Cluster, &Infos[Cluster], Line, Inner, true, IsFocused);
   if(Hot && Clicked)
   {
@@ -961,11 +961,13 @@ global_variable char *V3HelpKeys[] =
 {
  "Click",        "Right drag",   "Middle drag", "Mouse wheel",
  "Up / Down",    "Right",        "Left",        "Ctrl + / Ctrl -",
+ "F11 / Alt+Enter",
 };
 global_variable char *V3HelpActions[] =
 {
  "open an island", "move the map", "turn the map", "zoom",
  "faster / slower",             "next round",   "restart",      "text size",
+ "fullscreen",
 };
 StaticAssert(ArrayCount(V3HelpKeys) == ArrayCount(V3HelpActions), V3HelpKeysMatch);
 
@@ -1052,8 +1054,8 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
  for EachElement(Idx, V3HelpMapNotes)
  {
   v4 Dot = RectFromSize(V2(X, Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch));
-  DrawRect(Dot, V4FromU32(V3HelpMapColors[Idx]), 3.f, 0.f, 0.f);
-  DrawRect(Dot, V4FromU32(Ui_ColorCardBorder), 3.f, 1.f, 0.f);
+  DrawRect(Dot, V4FromU32(V3HelpMapColors[Idx]), 3.f, 0.f, .5f);
+  DrawRect(Dot, V4FromU32(Ui_ColorCardBorder), 3.f, 1.f, .5f);
   UiText(App, V2(X + Swatch + 8.f, Y), S8FromCString(V3HelpMapNotes[Idx]), Ui_ColorText);
   Y += LineHeight;
  }
@@ -1067,7 +1069,7 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
   {
    u32 Item = Kind - 1;
    v2 Pos = V2(X + (f32)(Item/ProductRows)*ColumnWidth, Y + (f32)(Item % ProductRows)*LineHeight);
-   DrawRect(RectFromSize(V2(Pos.X, Pos.Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, 0.f);
+   DrawRect(RectFromSize(V2(Pos.X, Pos.Y + .5f*(LineHeight - Swatch)), V2(Swatch, Swatch)), V4FromU32(W3ProductColors[Kind]), 3.f, 0.f, .5f);
    UiText(App, V2(Pos.X + Swatch + 8.f, Pos.Y), ProductNames[Kind], Ui_ColorText);
    UiText(App, V2(Pos.X + Swatch + 8.f + UiMeasure(App, ProductNames[Kind]) + 10.f, Pos.Y),
           S8FromCString(V3HelpProductLooks[Kind]), Ui_ColorTextDim);
@@ -1086,7 +1088,7 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
   {
    v2 Pos = V2(X + (f32)((u32)Idx/Rows)*.5f*Inner, Y + (f32)((u32)Idx % Rows)*LineHeight);
    str8 Key = S8FromCString(V3HelpKeys[Idx]);
-   DrawRect(RectFromSize(V2(Pos.X - 4.f, Pos.Y + 1.f), V2(UiMeasure(App, Key) + 8.f, LineHeight - 2.f)), V4FromU32(Ui_ColorButton), 4.f, 0.f, 0.f);
+   DrawRect(RectFromSize(V2(Pos.X - 4.f, Pos.Y + 1.f), V2(UiMeasure(App, Key) + 8.f, LineHeight - 2.f)), V4FromU32(Ui_ColorButton), 4.f, 0.f, .5f);
    UiText(App, Pos, Key, Ui_ColorText);
    UiText(App, V2(Pos.X + KeyWidth, Pos.Y), S8FromCString(V3HelpActions[Idx]), Ui_ColorTextDim);
   }
@@ -1099,7 +1101,7 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
   f32 ButtonWidth = UiMeasure(App, Label) + 2.f*Ui_ButtonPadX + 20.f;
   v4 Button = RectFromSize(V2(Box.Max.X - Pad - ButtonWidth, Box.Max.Y - Pad - UiButtonHeight(App)), V2(ButtonWidth, UiButtonHeight(App)));
   b32 Hot = IsInsideRectV2(MousePos, Button);
-  DrawRect(Button, V4FromU32(Hot ? Ui_ColorAccentHot : Ui_ColorAccent), Ui_ButtonRadius, 0.f, 0.f);
+  DrawRect(Button, V4FromU32(Hot ? Ui_ColorAccentHot : Ui_ColorAccent), Ui_ButtonRadius, 0.f, .5f);
   UiText(App, V2(FloorF32(Button.Min.X + .5f*(ButtonWidth - UiMeasure(App, Label))), Button.Min.Y + Ui_ButtonPadY), Label, Ui_ColorOnAccent);
   UiText(App, V2(X, Button.Min.Y + Ui_ButtonPadY), S8("Open this again with the ? button, top right."), Ui_ColorTextDim);
   if(Hot && Clicked)
