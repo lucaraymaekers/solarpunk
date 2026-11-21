@@ -910,6 +910,7 @@ W3PrepareIslands(app_state *App, app_input *Input)
   }
  }
 
+
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3_MaxIslands; Island = Island->Next)
  {
@@ -1071,4 +1072,5 @@ W3BuildWorld(app_state *App)
 
  //- Clouds below the islands
  W3PushClouds(&R3->Translucent);
+
 }

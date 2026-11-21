@@ -77,8 +77,8 @@ global_variable f32 HeroTakenRects[][4] =
  {-.5f, -1.85f, .2f, -1.25f},   {-1.55f, -1.7f, -.85f, -1.1f}, {-2.15f, -.8f, -1.35f, -.1f},
  {-1.6f, .1f, -1.f, .6f},       {-.85f, -.9f, -.15f, -.3f},    {-.1f, -1.2f, .4f, -.7f},
  {1.2f, -.85f, 2.f, -.15f},     {1.25f, -2.f, 1.95f, -1.4f},   {.8f, -1.4f, 1.3f, -.9f},
- {1.f, -.05f, 1.8f, .75f},      {1.75f, .15f, 2.25f, .75f},    {-2.25f, .3f, -1.65f, .8f},
- {-1.f, .35f, -.6f, .75f},      {-.25f, .25f, .45f, .7f},      {-2.3f, -2.3f, -.6f, -1.75f},
+ {1.75f, .15f, 2.25f, .75f},    {-2.25f, .3f, -1.65f, .8f},
+ {-1.f, .35f, -.6f, .75f},      {-2.3f, -2.3f, -.6f, -1.75f},  {-1.05f, -.15f, -.4f, .05f},
  {1.7f, -2.3f, 2.3f, -.95f},    {0.f, -2.2f, .6f, -1.6f},
 };
 
@@ -1275,7 +1275,123 @@ HeroPlace(hero_ctx *H, f32 HX, f32 HZ, f32 ZMin, f32 ZMax, f32 *X, f32 *Z)
  return Result;
 }
 
+// NOTE: Like HeroPlace, but near a preferred spot (tries the spot itself first). The
+// rectangle shrinks a little when nothing fits.
+internal b32
+HeroPlaceNear(hero_ctx *H, f32 PreferX, f32 PreferZ, f32 Radius, f32 *HX, f32 *HZ, f32 *X, f32 *Z)
+{
+ b32 Result = false;
+ for(u32 Try = 0; Try < 150 && !Result; Try += 1)
+ {
+  if(Try > 0 && (Try % 30) == 0)
+  {
+   *HX *= .85f;
+   *HZ *= .85f;
+  }
+  f32 PX = PreferX;
+  f32 PZ = PreferZ;
+  if(Try > 0)
+  {
+   PX += Radius*RandomBilateral(&H->Series);
+   PZ += Radius*RandomBilateral(&H->Series);
+  }
+  if(HeroClaim(H, PX, PZ, *HX, *HZ))
+  {
+   *X = PX;
+   *Z = PZ;
+   Result = true;
+  }
+ }
+ return Result;
+}
+
+// NOTE: Where to put one block of a product: near Prefer (when given) or anywhere free
+// between ZMin and ZMax. The size may shrink to fit.
+typedef struct hero_spot hero_spot;
+struct hero_spot
+{
+ b32 HasPrefer;
+ f32 PreferX;
+ f32 PreferZ;
+};
+
+internal b32
+HeroFindSpot(hero_ctx *H, hero_spot *Spot, f32 *HX, f32 *HZ, f32 ZMin, f32 ZMax, f32 *X, f32 *Z)
+{
+ b32 Result = false;
+ if(Spot && Spot->HasPrefer)
+ {
+  Result = HeroPlaceNear(H, Spot->PreferX, Spot->PreferZ, .7f, HX, HZ, X, Z);
+ }
+ for(u32 Shrink = 0; Shrink < 4 && !Result; Shrink += 1)
+ {
+  Result = HeroPlace(H, *HX, *HZ, ZMin, ZMax, X, Z);
+  if(!Result)
+  {
+   *HX *= .85f;
+   *HZ *= .85f;
+  }
+ }
+ return Result;
+}
+
 //~ Farm pieces for the themed islands
+// NOTE: A vegetable field: a tilled plot with furrows, planted with cabbage heads or
+// carrots (orange shoulders under feathery tops), and a crate of the harvest.
+internal void
+HeroPushVegField(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, product_kind Kind)
+{
+ r3_mesh *O = H->Opaque;
+ v3 C = HeroOn(H, X, Z);
+ R3PushBox(O, R3Add(C, V3(0.f, .02f, 0.f)), V3(HX, .022f, HZ), R3Color(Hero_ColorWoodDark));
+ R3PushBox(O, R3Add(C, V3(0.f, .024f, 0.f)), V3(HX - .025f, .022f, HZ - .025f), R3Color(Hero_ColorSoil));
+
+ b32 Cabbage = (Kind == ProductKind_Cabbage);
+ f32 RowGap = Cabbage ? .14f : .12f;
+ f32 PlantGap = Cabbage ? .11f : .075f;
+ u32 Rows = Max(1, (u32)((2.f*HZ - .06f)/RowGap));
+ u32 Plants = Max(1, (u32)((2.f*HX - .08f)/PlantGap));
+ f32 RowStart = -.5f*RowGap*(f32)(Rows - 1);
+ f32 PlantStart = -.5f*PlantGap*(f32)(Plants - 1);
+ for(u32 Row = 0; Row < Rows; Row += 1)
+ {
+  f32 DZ = RowStart + RowGap*(f32)Row;
+  R3PushBox(O, R3Add(C, V3(0.f, .05f, DZ)), V3(HX - .04f, .01f, .028f), R3Color(0xFF6E5038));
+  for(u32 Plant = 0; Plant < Plants; Plant += 1)
+  {
+   f32 DX = PlantStart + PlantGap*(f32)Plant + ((Row & 1) ? .25f*PlantGap : 0.f);
+   if(DX > HX - .04f) continue;
+   v3 P = R3Add(C, V3(DX, .06f, DZ));
+   if(Cabbage)
+   {
+    R3PushEllipsoid(O, R3Add(P, V3(0.f, .025f, 0.f)), V3(.045f, .032f, .045f), 3, 6, HeroShade(H, 0xFF4E9A48), false);
+    R3PushEllipsoid(O, R3Add(P, V3(0.f, .04f, 0.f)), V3(.028f, .026f, .028f), 3, 6, R3Color(0xFFA8DC7E), false);
+   }
+   else
+   {
+    R3PushEllipsoid(O, R3Add(P, V3(0.f, .006f, 0.f)), V3(.016f, .014f, .016f), 2, 5, R3Color(W3ProductColors[ProductKind_Carrots]), false);
+    for(u32 Leaf = 0; Leaf < 3; Leaf += 1)
+    {
+     f32 A = 2.1f*(f32)Leaf + (f32)Plant;
+     R3PushCone(O, R3Add(P, V3(0.f, .012f, 0.f)), R3Add(P, V3(.03f*R3Cos(A), .1f + .02f*(f32)(Leaf & 1), .03f*R3Sin(A))), .012f, 3, R3Color(0xFF4F9D3A));
+    }
+   }
+  }
+ }
+
+ // A farmer at work beside the field
+ HeroPushPerson(H, R3Add(C, V3(-HX + .06f, 0.f, HZ + .07f)), HeroShirtColors[RandomNext(&H->Series) % ArrayCount(HeroShirtColors)]);
+
+ // Harvest crate at the front corner
+ v3 Crate = R3Add(C, V3(HX - .08f, .045f, HZ + .07f));
+ R3PushBox(O, R3Add(Crate, V3(0.f, .03f, 0.f)), V3(.055f, .035f, .04f), HeroShade(H, Hero_ColorWoodLight));
+ for(u32 Item = 0; Item < 4; Item += 1)
+ {
+  v3 P = R3Add(Crate, V3(-.03f + .02f*(f32)Item, .07f, ((Item & 1) ? .012f : -.012f)));
+  if(Cabbage) R3PushEllipsoid(O, P, V3(.022f, .02f, .022f), 3, 5, R3Color(W3ProductColors[ProductKind_Cabbage]), false);
+  else        R3PushEllipsoid(O, P, V3(.03f, .01f, .01f), 2, 5, R3Color(W3ProductColors[ProductKind_Carrots]), false);
+ }
+}
 internal void
 HeroPushFence(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
 {
@@ -1382,48 +1498,91 @@ HeroPushTowerMill(hero_ctx *H, f32 X, f32 Z, f32 Phase)
  }
 }
 
-// NOTE: One block of what an island makes. Big = the island's main food.
+// NOTE: Everything an island makes of one product, sized by the amount it makes:
+//   Cabbage, Carrots : vegetable fields (area grows with the amount), a greenhouse for big harvests
+//   Apples, Pears    : orchard trees, about one per 10 units
+//   Wheat            : wheat fields (area grows with the amount), a tower mill for big harvests
+//   Fish             : drying racks (boats are added in the harbour, see the caller)
+//   Meat             : cows in a fenced pasture, about one per 10 units, a barn for a herd
+//   Eggs             : hens in fenced yards, about one per 12 units, with coops
+// Spot (optional) is a preferred place for the first block.
 internal void
-HeroPushThemeBlock(hero_ctx *H, product_kind Kind, b32 Big)
+HeroPushProduct(hero_ctx *H, product_kind Kind, u64 Amount, hero_spot *Spot)
 {
  f32 X, Z;
  switch(Kind)
  {
-  case ProductKind_Apples:
-  case ProductKind_Pears:
-  {
-   f32 HX = Big ? .62f : .36f;
-   f32 HZ = Big ? .46f : .3f;
-   if(HeroPlace(H, HX, HZ, -1.9f, 1.9f, &X, &Z)) HeroPushOrchard(H, X, Z, HX, HZ, Kind);
-   if(Big && HeroPlace(H, HX, HZ, -1.9f, 1.9f, &X, &Z)) HeroPushOrchard(H, X, Z, HX, HZ, Kind);
-  } break;
-
   case ProductKind_Cabbage:
   case ProductKind_Carrots:
   {
-   u32 Beds = Big ? 5 : 2;
-   for(u32 Bed = 0; Bed < Beds; Bed += 1)
+   f32 Area = .0045f*(f32)Amount;
+   u32 Fields = (Amount >= 110) ? 2 : 1;
+   for(u32 Field = 0; Field < Fields; Field += 1)
    {
-    if(HeroPlace(H, .3f, .1f, -1.8f, 1.9f, &X, &Z)) HeroPushBed(H, X, Z, .27f, .085f, W3ProductColors[Kind]);
+    f32 FieldArea = Area/(f32)Fields;
+    f32 HX = .5f*R3Sqrt(FieldArea*1.4f);
+    f32 HZ = FieldArea/(4.f*HX);
+    if(HeroFindSpot(H, (Field == 0) ? Spot : 0, &HX, &HZ, -1.8f, 1.9f, &X, &Z))
+    {
+     HeroPushVegField(H, X, Z, HX - .02f, HZ - .06f, Kind);
+    }
    }
-   if(Big && HeroPlace(H, .27f, .23f, -1.8f, 1.9f, &X, &Z)) HeroPushGreenhouse(H, X, Z, .24f, .2f);
+   if(Amount >= 120)
+   {
+    f32 HX = .27f, HZ = .23f;
+    if(HeroFindSpot(H, 0, &HX, &HZ, -1.8f, 1.9f, &X, &Z)) HeroPushGreenhouse(H, X, Z, HX - .03f, HZ - .03f);
+   }
+  } break;
+
+  case ProductKind_Apples:
+  case ProductKind_Pears:
+  {
+   u32 Trees = Max(2, (u32)(Amount/10));
+   b32 First = true;
+   while(Trees > 0)
+   {
+    u32 Block = Min(Trees, 8);
+    u32 Columns = Min(Block, 4);
+    u32 RowsInBlock = (Block + 3)/4;
+    f32 HX = .15f*(f32)Columns;
+    f32 HZ = .15f*(f32)RowsInBlock;
+    if(HeroFindSpot(H, First ? Spot : 0, &HX, &HZ, -1.9f, 1.9f, &X, &Z))
+    {
+     HeroPushOrchard(H, X, Z, HX, HZ, Kind);
+    }
+    Trees -= Block;
+    First = false;
+   }
   } break;
 
   case ProductKind_Wheat:
   {
-   f32 HX = Big ? .6f : .38f;
-   f32 HZ = Big ? .42f : .28f;
-   if(HeroPlace(H, HX + .1f, HZ + .1f, -1.8f, 1.9f, &X, &Z)) HeroPushWheatField(H, X, Z, HX, HZ);
-   if(Big && HeroPlace(H, HX + .1f, HZ + .1f, -1.8f, 1.9f, &X, &Z)) HeroPushWheatField(H, X, Z, HX, HZ);
-   if(Big && HeroPlace(H, .26f, .26f, -2.f, 1.f, &X, &Z)) HeroPushTowerMill(H, X, Z, 6.f*RandomUnilateral(&H->Series));
+   f32 Area = .005f*(f32)Amount;
+   u32 Fields = (Amount >= 110) ? 2 : 1;
+   for(u32 Field = 0; Field < Fields; Field += 1)
+   {
+    f32 FieldArea = Area/(f32)Fields;
+    f32 HX = .5f*R3Sqrt(FieldArea*1.5f);
+    f32 HZ = FieldArea/(4.f*HX);
+    if(HeroFindSpot(H, (Field == 0) ? Spot : 0, &HX, &HZ, -1.8f, 1.9f, &X, &Z))
+    {
+     HeroPushWheatField(H, X, Z, HX - .1f, HZ - .1f);
+    }
+   }
+   if(Amount >= 100)
+   {
+    f32 HX = .26f, HZ = .26f;
+    if(HeroFindSpot(H, 0, &HX, &HZ, -2.f, 1.f, &X, &Z)) HeroPushTowerMill(H, X, Z, 6.f*RandomUnilateral(&H->Series));
+   }
   } break;
 
   case ProductKind_Fish:
   {
-   u32 Racks = Big ? 3 : 1;
+   u32 Racks = 1 + (u32)(Amount/60);
    for(u32 Rack = 0; Rack < Racks; Rack += 1)
    {
-    if(HeroPlace(H, .34f, .08f, -1.5f, 2.f, &X, &Z))
+    f32 HX = .34f, HZ = .08f;
+    if(HeroFindSpot(H, (Rack == 0) ? Spot : 0, &HX, &HZ, -1.5f, 2.f, &X, &Z))
     {
      W3PushSmallProduct(H->Opaque, 0, ProductKind_Fish, HeroOn(H, X, Z), &H->Series);
     }
@@ -1432,12 +1591,15 @@ HeroPushThemeBlock(hero_ctx *H, product_kind Kind, b32 Big)
 
   case ProductKind_Meat:
   {
-   f32 HX = Big ? .62f : .42f;
-   f32 HZ = Big ? .46f : .32f;
-   if(HeroPlace(H, HX + .04f, HZ + .04f, -1.8f, 1.9f, &X, &Z))
+   u32 Cows = Max(1, (u32)(Amount/10));
+   f32 HX = .26f + .07f*(f32)Cows;
+   f32 HZ = .22f + .04f*(f32)Cows;
+   f32 ClaimHX = HX + .04f, ClaimHZ = HZ + .04f;
+   if(HeroFindSpot(H, Spot, &ClaimHX, &ClaimHZ, -1.8f, 1.9f, &X, &Z))
    {
+    HX = ClaimHX - .04f;
+    HZ = ClaimHZ - .04f;
     HeroPushFence(H, X, Z, HX, HZ);
-    u32 Cows = Big ? 3 : 2;
     for(u32 Cow = 0; Cow < Cows; Cow += 1)
     {
      f32 CX = X + (HX - .2f)*RandomBilateral(&H->Series);
@@ -1448,35 +1610,71 @@ HeroPushThemeBlock(hero_ctx *H, product_kind Kind, b32 Big)
     v3 Trough = HeroOn(H, X - HX + .12f, Z - HZ + .08f);
     R3PushBox(H->Opaque, R3Add(Trough, V3(0.f, .03f, 0.f)), V3(.08f, .03f, .03f), R3Color(Hero_ColorWoodDark));
    }
-   if(Big && HeroPlace(H, .38f, .34f, -1.9f, 1.5f, &X, &Z)) HeroPushHouse(H, X, Z, .3f, .24f, 1, 8);
+   if(Cows >= 3)
+   {
+    f32 BX = .38f, BZ = .34f;
+    if(HeroFindSpot(H, 0, &BX, &BZ, -1.9f, 1.5f, &X, &Z)) HeroPushHouse(H, X, Z, BX - .08f, BZ - .1f, 1, 8);
+   }
   } break;
 
   case ProductKind_Eggs:
   {
-   f32 HX = Big ? .46f : .32f;
-   f32 HZ = Big ? .34f : .26f;
-   if(HeroPlace(H, HX + .04f, HZ + .04f, -1.8f, 1.9f, &X, &Z))
+   u32 Hens = Max(2, (u32)(Amount/12));
+   u32 Yards = (Hens > 8) ? 2 : 1;
+   for(u32 Yard = 0; Yard < Yards; Yard += 1)
    {
-    HeroPushFence(H, X, Z, HX, HZ);
-    W3PushHut(H->Opaque, HeroOn(H, X - .45f*HX, Z - .3f*HZ), V3(.14f, .1f, .11f), 0xFFE9C98F);
-    u32 Hens = Big ? 7 : 4;
-    for(u32 Hen = 0; Hen < Hens; Hen += 1)
+    u32 YardHens = Hens/Yards + ((Yard == 0) ? Hens % Yards : 0);
+    f32 HX = .25f + .025f*(f32)YardHens;
+    f32 HZ = .22f + .012f*(f32)YardHens;
+    f32 ClaimHX = HX + .04f, ClaimHZ = HZ + .04f;
+    if(HeroFindSpot(H, (Yard == 0) ? Spot : 0, &ClaimHX, &ClaimHZ, -1.8f, 1.9f, &X, &Z))
     {
-     f32 PX = X + (HX - .07f)*RandomBilateral(&H->Series);
-     f32 PZ = Z + .2f*HZ + (.7f*HZ)*RandomBilateral(&H->Series);
-     HeroPushHen(H, HeroOn(H, PX, PZ), (Hen & 1) ? 1.f : -1.f);
+     HX = ClaimHX - .04f;
+     HZ = ClaimHZ - .04f;
+     HeroPushFence(H, X, Z, HX, HZ);
+     W3PushHut(H->Opaque, HeroOn(H, X - .45f*HX, Z - .3f*HZ), V3(.14f, .1f, .11f), 0xFFE9C98F);
+     for(u32 Hen = 0; Hen < YardHens; Hen += 1)
+     {
+      f32 PX = X + (HX - .07f)*RandomBilateral(&H->Series);
+      f32 PZ = Z + .2f*HZ + (.7f*HZ)*RandomBilateral(&H->Series);
+      HeroPushHen(H, HeroOn(H, PX, PZ), (Hen & 1) ? 1.f : -1.f);
+     }
     }
    }
   } break;
 
-  default:
-  {
-   for(u32 Bed = 0; Bed < 2; Bed += 1)
-   {
-    if(HeroPlace(H, .3f, .1f, -1.8f, 1.9f, &X, &Z)) HeroPushBed(H, X, Z, .27f, .085f, 0);
-   }
-  } break;
+  default: break;
  }
+}
+
+// NOTE: An island's products, largest amount first (at most 4).
+internal u32
+HeroSortedProducts(island *Island, product **Out, u32 MaxCount)
+{
+ u32 Count = 0;
+ for(product *Product = Island->FirstProduct; Product && Count < MaxCount; Product = Product->Next)
+ {
+  u32 At = Count;
+  while(At > 0 && Out[At - 1]->Amount < Product->Amount)
+  {
+   Out[At] = Out[At - 1];
+   At -= 1;
+  }
+  Out[At] = Product;
+  Count += 1;
+ }
+ return Count;
+}
+
+internal u64
+HeroAmountOf(island *Island, product_kind Kind)
+{
+ u64 Result = 0;
+ for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
+ {
+  if(Product->Kind == Kind) Result += Product->Amount;
+ }
+ return Result;
 }
 
 //~ Shared by all hand-built islands
@@ -1601,13 +1799,24 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
  HeroPushHouse(H, 1.6f, -.5f, .34f, .27f, 2, 5|2);
  HeroPushHouse(H, 1.6f, -1.7f, .28f, .23f, 2, 1);
 
- //- Greenhouses, gardens, water tower
+ //- Greenhouses and water tower
  HeroPushGreenhouse(H, -1.95f, .55f, .26f, .21f);
  HeroPushGreenhouse(H, 2.f, .45f, .22f, .25f);
- HeroPushBed(H, 1.38f, .08f, .27f, .085f, 0);
- HeroPushBed(H, 1.38f, .34f, .27f, .085f, 0);
- HeroPushBed(H, 1.38f, .6f, .27f, .085f, 0);
  HeroPushWaterTower(H, 1.05f, -1.15f);
+
+ //- What the island makes, sized by the amounts: the biggest on the right plateau,
+ // the next in the middle of the village, any others wherever there is room.
+ {
+  product *Products[4];
+  u32 ProductCount = HeroSortedProducts(Island, Products, ArrayCount(Products));
+  for(u32 Idx = 0; Idx < ProductCount; Idx += 1)
+  {
+   hero_spot Spot = {0};
+   if(Idx == 0) { Spot.HasPrefer = true; Spot.PreferX = 1.4f; Spot.PreferZ = .33f; }
+   if(Idx == 1) { Spot.HasPrefer = true; Spot.PreferX = .1f;  Spot.PreferZ = .5f; }
+   HeroPushProduct(H, Products[Idx]->Kind, Products[Idx]->Amount, &Spot);
+  }
+ }
 
  //- Windmills along the back, pines on the sides
  HeroPushWindmill(H, -2.f, -1.95f, 1.45f, 0.f);
@@ -1655,9 +1864,6 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
  //- Village life
  HeroPushCampfire(H, -.8f, .55f);
  HeroPushLaundry(H, -1.f, -.5f, -.05f);
- HeroPushAnimal(H, -.05f, .45f, .8f, 0xFFF4EFE6, 0xFF6B4A35, 1.f);
- HeroPushAnimal(H, .3f, .58f, .75f, 0xFFB98A5E, 0xFF5A3D26, -1.f);
- HeroPushAnimal(H, -.2f, -.15f, .55f, 0xFFEDE6DA, 0xFF8A7A6A, 1.f);
  HeroPushBarrel(H, 1.25f, -.12f);
  HeroPushBarrel(H, 1.36f, -.08f);
  HeroPushBarrel(H, -.2f, -.3f);
@@ -1667,7 +1873,7 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
   f32 People[][2] =
   {
    {-.92f, .64f}, {-.66f, .44f}, {-1.45f, 1.3f}, {-.9f, 1.45f}, {1.75f, 1.12f},
-   {1.25f, .46f}, {-.65f, -.2f}, {1.95f, 1.85f}, {-1.75f, 1.9f}, {.05f, .05f},
+   {-.65f, -.25f}, {1.95f, 1.85f}, {-1.75f, 1.9f},
   };
   for(u32 Person = 0; Person < ArrayCount(People); Person += 1)
   {
@@ -1692,34 +1898,20 @@ W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Status
  HeroBegin(H, App, &Layout, Top, W3_Seed*23 + 601*(u64)Index);
  random_series *S = &H->Series;
 
- //- Main and second product (main = the one it makes most of)
- product_kind Main = ProductKind_None;
- product_kind Second = ProductKind_None;
- u64 MainAmount = 0;
- for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
- {
-  if(Main == ProductKind_None || Product->Amount > MainAmount)
-  {
-   Second = Main;
-   Main = Product->Kind;
-   MainAmount = Product->Amount;
-  }
-  else if(Second == ProductKind_None)
-  {
-   Second = Product->Kind;
-  }
- }
+ //- What it makes, largest amount first
+ product *Products[4];
+ u32 ProductCount = HeroSortedProducts(Island, Products, ArrayCount(Products));
+ u64 FishAmount = HeroAmountOf(Island, ProductKind_Fish);
 
- //- Layout
- b32 FishMain = (Main == ProductKind_Fish);
- Layout.Pool = FishMain || Second == ProductKind_Fish || RandomUnilateral(S) < .4f;
+ //- Layout: a harbour only when the island catches fish, bigger for a bigger catch
+ Layout.Pool = (FishAmount > 0);
  if(Layout.Pool)
  {
-  f32 Width = FishMain ? 2.4f + .8f*RandomUnilateral(S) : 1.2f + .7f*RandomUnilateral(S);
+  f32 Width = Min(3.4f, 1.3f + (f32)FishAmount/80.f);
   f32 Center = (Hero_Half - .5f*Width - .25f)*RandomBilateral(S);
   Layout.PoolX0 = Center - .5f*Width;
   Layout.PoolX1 = Center + .5f*Width;
-  Layout.PoolZ0 = (FishMain ? .6f : .85f) + .4f*RandomUnilateral(S);
+  Layout.PoolZ0 = ((FishAmount >= 100) ? .6f : .85f) + .4f*RandomUnilateral(S);
  }
  Layout.HillX = 1.1f*RandomBilateral(S);
  Layout.HillZ = -1.75f + .6f*RandomUnilateral(S);
@@ -1765,9 +1957,11 @@ W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Status
  //- Crest with the knowledge crystal on the hill
  HeroPushCrest(H, Layout.HillX - .2f, Layout.HillZ, KnownFraction);
 
- //- What it makes (these need the most room, so they go first)
- HeroPushThemeBlock(H, Main, true);
- if(Second != ProductKind_None) HeroPushThemeBlock(H, Second, false);
+ //- Everything it makes, sized by the amounts (these need the most room, so they go first)
+ for(u32 Idx = 0; Idx < ProductCount; Idx += 1)
+ {
+  HeroPushProduct(H, Products[Idx]->Kind, Products[Idx]->Amount, 0);
+ }
 
  //- Houses
  f32 X, Z;
@@ -1802,7 +1996,7 @@ W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Status
   f32 DockZ = .5f*(Layout.PoolZ0 + Hero_Half) + .1f;
   HeroPushDock(H, Layout.PoolX0, Layout.PoolX0 + Min(.8f, .4f*PoolWidth), DockZ, .11f);
   if(PoolWidth > 1.6f) HeroPushDock(H, Layout.PoolX1, Layout.PoolX1 - Min(.8f, .35f*PoolWidth), DockZ - .3f, .11f);
-  u32 Boats = FishMain ? 4 : 2;
+  u32 Boats = Min(5, 1 + (u32)(FishAmount/40));
   for(u32 Boat = 0; Boat < Boats; Boat += 1)
   {
    f32 BX = Layout.PoolX0 + .3f + (PoolWidth - .6f)*((f32)Boat + .5f)/(f32)Boats;

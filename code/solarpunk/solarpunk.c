@@ -80,7 +80,7 @@ UPDATE_AND_RENDER(UpdateAndRender)
  // Arenas init
  {
   App->FontAtlas.Arena = PushArena(PermanentArena, MB(100), false);
-  FrameArena = PushArena(PermanentArena, MB(64), true);
+  FrameArena = PushArena(PermanentArena, MB(160), true);   // 3D meshes take up to ~100 MB
   SetStringsScratch(FrameArena);
 
   App->LinksArena = PushArena(PermanentArena, MB(16), false);

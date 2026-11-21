@@ -472,8 +472,8 @@ R3CameraEye(r3_camera *Camera)
 
 //~ GL
 #define R3_MaxSkyVertices         1024
-#define R3_MaxOpaqueVertices      (640*1024)
-#define R3_MaxTranslucentVertices (192*1024)
+#define R3_MaxOpaqueVertices      (2*1024*1024)   // the 9 hand-built islands need ~1M
+#define R3_MaxTranslucentVertices (512*1024)
 
 // NOTE: Golden hour: gold at the horizon, coral in the middle, soft violet at the top.
 #define R3_ColorSkyTop     0xFF5C4D8C
