@@ -61,6 +61,7 @@ global_variable s32 GlobalBufferHeight;
 global_variable b32 GlobalWindowIsFocused;
 // NOTE(kainy): Mouse wheel movement since the last frame, in WHEEL_DELTA units (120 = one notch).
 global_variable s32 GlobalMouseWheelDelta;
+global_variable WINDOWPLACEMENT GlobalWindowPlacement = {(UINT)sizeof(WINDOWPLACEMENT)};
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 global_variable win32_midi_notes_queue *NotesQueue;
 global_variable WasapiAudio GlobalAudioBuffer;
@@ -612,6 +613,40 @@ P_UPDATE_IMAGE()
  }
 }
 
+// NOTE: Borderless fullscreen on the window's monitor, and back to the window it was
+// before (position, size and maximized state).
+internal void
+Win32ToggleFullscreen(HWND Window)
+{
+ LONG Style = GetWindowLongA(Window, GWL_STYLE);
+ if(Style & WS_CAPTION)
+ {
+  MONITORINFO MonitorInfo = {(DWORD)sizeof(MONITORINFO)};
+  if(GetWindowPlacement(Window, &GlobalWindowPlacement) &&
+     GetMonitorInfoA(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+  {
+   SetWindowLongA(Window, GWL_STYLE, Style & ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX));
+   SetWindowPos(Window, HWND_TOP,
+                MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+                MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  }
+ }
+ else
+ {
+  LONG Windowed = (WS_CAPTION | WS_SYSMENU
+#if RL_PLATFORM_WIN32_DO_RESIZING
+                   | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+#endif
+                   );
+  SetWindowLongA(Window, GWL_STYLE, Style | Windowed);
+  SetWindowPlacement(Window, &GlobalWindowPlacement);
+  SetWindowPos(Window, 0, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+ }
+}
+
 P_PROCESS_MESSAGES()
 {
  win32_context *Win32 = (win32_context *)Context;
@@ -796,6 +831,14 @@ P_PROCESS_MESSAGES()
       if((VKCode == VK_F4) && Alt)
       {
        *GlobalRunning = false;
+      }
+      
+      // NOTE: F11 or Alt+Enter toggles fullscreen. Bit 29 of lParam is set while Alt is
+      // held (WM_SYSKEYDOWN).
+      b32 AltHeld = ((Message.lParam & (1 << 29)) != 0);
+      if(!WasDown && (VKCode == VK_F11 || (VKCode == VK_RETURN && AltHeld)))
+      {
+       Win32ToggleFullscreen(Win32->Window);
       }
       
       if((VKCode == VK_F2) && Alt)
