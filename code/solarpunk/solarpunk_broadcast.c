@@ -199,6 +199,21 @@ BroadcastJumpBy(app_state *App, s64 Delta)
  BroadcastJumpToRound(App, (u64)Max(Target, 1));
 }
 
+//~ Clock (visual only, see L14)
+// NOTE: Day number (1 = first day) and hour (0..23) of a round, and the time of day
+// (0..1, 0 = midnight). RoundFraction (0..1) is how much of the round has passed, so the
+// sky can move smoothly; at 0 the time is exactly the round's hour.
+internal u64
+BroadcastDayOfRound(u64 Round, f32 RoundFraction, u32 *Hour, f32 *TimeOfDay)
+{
+ u64 RoundsDone = (Round > 0) ? Round - 1 : 0;
+ u64 Hours = Broadcast_SkyStartHour + RoundsDone;
+ *Hour = (u32)(Hours % Broadcast_SkyRoundsPerDay);
+ *TimeOfDay = ((f32)*Hour + Clamp(0.f, RoundFraction, 1.f))/(f32)Broadcast_SkyRoundsPerDay;
+ u64 Result = Hours/Broadcast_SkyRoundsPerDay + 1;
+ return Result;
+}
+
 //~ Actions (used by both the keyboard and the on-screen buttons)
 internal b32
 BroadcastIsPaused(broadcast_state *Broadcast)

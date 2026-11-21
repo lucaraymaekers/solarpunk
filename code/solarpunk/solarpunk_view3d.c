@@ -1182,6 +1182,33 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
  }
 }
 
+//~ Clock
+// NOTE: Bottom-left card with the day and time of day of the current round (L14), the
+// time the sky shows. The dot is the sun by day and the moon by night.
+#define V3D_ColorClockSun  0xFFF2B33D
+#define V3D_ColorClockMoon 0xFF8FA3D9
+
+internal void
+V3DrawClock(app_state *App, v2 BufferDim)
+{
+ r3_state *R3 = &App->R3;
+ u32 Hour = 0;
+ f32 TimeOfDay = 0.f;
+ u64 Day = BroadcastDayOfRound(App->Broadcast.Round, 0.f, &Hour, &TimeOfDay);
+ b32 Daytime = (Hour >= 6 && Hour < 18);
+ str8 Text = Str8Fmt("Day %llu, %02u:00", Day, Hour);
+
+ f32 Height = UiButtonHeight(App);
+ f32 Dot = UiLineHeight(App) - 8.f;
+ f32 Width = 2.f*V3D_ChipPadding + Dot + 6.f + UiMeasure(App, Text);
+ v4 Box = RectFromSize(V2(V3D_Margin, BufferDim.Y - V3D_Margin - Height), V2(Width, Height));
+ UiCard(Box, .5f*Height);
+ V3AddUIRect(R3, Box);
+ v2 Cursor = V2(Box.Min.X + V3D_ChipPadding, Box.Min.Y);
+ UiDot(V2(Cursor.X, Cursor.Y + .5f*(Height - Dot)), Dot, Daytime ? V3D_ColorClockSun : V3D_ColorClockMoon);
+ UiText(App, V2(Cursor.X + Dot + 6.f, Cursor.Y + Ui_ButtonPadY), Text, Ui_ColorText);
+}
+
 //~ Entry point
 // NOTE: Call after RenderClear() and before DrawIslandPanel, so the panel, the dropdown,
 // the help card and the hover tooltip end up on top.
@@ -1206,6 +1233,14 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
   R3->LensShift.X += (Target.X - R3->LensShift.X)*t;
   R3->LensShift.Y += (Target.Y - R3->LensShift.Y)*t;
  }
+ // Sky follows the clock, moving smoothly through each round (and stopping when paused).
+ {
+  broadcast_state *Broadcast = &App->Broadcast;
+  u32 Hour = 0;
+  f32 TimeOfDay = 0.f;
+  BroadcastDayOfRound(Broadcast->Round, Broadcast->Timer/Broadcast_RoundSeconds, &Hour, &TimeOfDay);
+  R3UpdateDayPhase(R3, TimeOfDay, Input->dtForFrame);
+ }
  R3BeginFrame(R3, FrameArena, BufferDim);
  W3ComputeStatus(App);
  W3PrepareIslands(App, Input);   // uses last frame's UI areas for hovering
@@ -1222,6 +1257,7 @@ DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
  V3AddUIRect(R3, R3->PopupRect);   // summary dropdown, drawn later (see DrawSummaryPopup)
  V3DrawTopBar(App, Input, BufferDim);
  V3DrawShortageStrip(App, Input);
+ V3DrawClock(App, BufferDim);
 
  V3DrawClusterLabels(App, Input);
  V3DrawIslandLabels(App);
