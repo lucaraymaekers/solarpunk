@@ -59,6 +59,8 @@ global_variable LPSTR GlobalCursor;
 global_variable s32 GlobalBufferWidth;
 global_variable s32 GlobalBufferHeight;
 global_variable b32 GlobalWindowIsFocused;
+// NOTE(kainy): Mouse wheel movement since the last frame, in WHEEL_DELTA units (120 = one notch).
+global_variable s32 GlobalMouseWheelDelta;
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 global_variable win32_midi_notes_queue *NotesQueue;
 global_variable WasapiAudio GlobalAudioBuffer;
@@ -735,6 +737,11 @@ P_PROCESS_MESSAGES()
      *GlobalRunning = false;
     } break;
     
+    case WM_MOUSEWHEEL:
+    {
+     GlobalMouseWheelDelta += GET_WHEEL_DELTA_WPARAM(Message.wParam);
+    } break;
+    
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP:
     case WM_KEYDOWN:
@@ -930,8 +937,10 @@ P_PROCESS_MESSAGES()
    ScreenToClient(Win32->Window, &MouseP);
    Input->Mouse.Pos.X = MouseP.x;
    Input->Mouse.Pos.Y = MouseP.y;
-   // TODO(luca): Support mousewheel
-   Input->Mouse.Z = 0; 
+   // NOTE(kainy): Whole wheel notches since last frame (positive = away from the user);
+   // the remainder is kept for high-resolution wheels.
+   Input->Mouse.Z = GlobalMouseWheelDelta/WHEEL_DELTA;
+   GlobalMouseWheelDelta -= Input->Mouse.Z*WHEEL_DELTA;
    
    ProcessKeyPress(&Input->Mouse.Buttons[PlatformMouseButton_Left], GetKeyState(VK_LBUTTON) & (1 << 15));
    ProcessKeyPress(&Input->Mouse.Buttons[PlatformMouseButton_Middle], GetKeyState(VK_MBUTTON) & (1 << 15));

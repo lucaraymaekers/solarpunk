@@ -23,13 +23,15 @@
 #include "rl/rl_ui.h"
 #include "rl/rl_midi.h"
 
-//- C Includes 
+//- C Includes
 #include "rl/rl_renderer.c"
 #include "rl/rl_ui.c"
 #include "rl/rl_widgets.c"
 
 #include "solarpunk/solarpunk_broadcast.h"
 #include "solarpunk/solarpunk_food.h"
+#include "solarpunk/solarpunk_render3d.h"
+#include "solarpunk/solarpunk_panel.h"
 #include "solarpunk/solarpunk.h"
 #include "solarpunk/solarpunk_food.c"
 #include "solarpunk/solarpunk_world.c"
@@ -38,6 +40,10 @@
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
 #include "solarpunk/solarpunk_broadcast_view.c"
+#include "solarpunk/solarpunk_render3d.c"
+#include "solarpunk/solarpunk_world3d.c"
+#include "solarpunk/solarpunk_view3d.c"
+#include "solarpunk/solarpunk_panel.c"
 
 //~ Macros
 #if OS_WINDOWS
@@ -49,16 +55,16 @@
 UPDATE_AND_RENDER(UpdateAndRender)
 {
  b32 ShouldQuit = false;
- 
+
  v2 BufferDim = V2V2S32(Buffer->Dim);
- 
+
  // Globals
  {
   GlobalDebuggerIsAttached = Memory->IsDebuggerAttached;
   ExeDirPath = Memory->ExeDirPath;
   ThreadContext = Memory->ThreadCtx;
  }
- 
+
  //- Initialization
  arena *PermanentArena;
  {
@@ -69,62 +75,65 @@ UPDATE_AND_RENDER(UpdateAndRender)
   PermanentArena->Size = (Memory->MemorySize - Arena.Pos);
   PermanentArena->Pos = 0;
  }
- 
+
  app_state *App = PushArray(PermanentArena, app_state, 1);
- 
+
  // Arenas init
- { 
+ {
   App->FontAtlas.Arena = PushArena(PermanentArena, MB(100), false);
   FrameArena = PushArena(PermanentArena, MB(64), true);
   SetStringsScratch(FrameArena);
-  
+
   App->LinksArena = PushArena(PermanentArena, MB(16), false);
   App->IslandsArena = PushArena(PermanentArena, MB(16), false);
   App->ProductsArena = PushArena(PermanentArena, MB(16), false);
  }
- 
+
  if(Memory->Reloaded)
  {
   gladLoaderLoadGL();
  }
- 
- 
+
+
  if(!Memory->Initialized)
  {
   // Font init
-  {  
+  {
    font *Fonts[] = {&App->Font};
    InitFontFromKind(&App->Font, FontKind_Text);
    RenderBuildAtlas(&App->FontAtlas, ArrayCount(Fonts), Fonts, 20.f);
   }
   RenderInit(&App->Render);
-  
+
   Memory->Initialized = true;
  }
- 
+
  RenderBeginFrame(FrameArena, 0, 0, V2Arg(Buffer->Dim));
- 
- //- Update 
+
+ //- Update
  {
   // TODO: Replace with real island generation/loading.
-  // NOTE: The small 5-island world, so each island's food and dates fit on screen.
-  // BuildGeneratedWorld(App, WorldGen_IslandCount) builds the 32-island world instead.
-  BuildHardcodedWorld(App);
+  // NOTE: BuildHardcodedWorld(App) builds the small 5-island world instead (2D view only:
+  // it sets no MapPos, so the 3D view would stack its islands).
+  BuildGeneratedWorld(App, WorldGen_IslandCount);
   BroadcastUpdate(App, Input);
  }
- 
- //- Rendering 
- { 
+
+ //- Rendering
+ {
   RenderClear();
-  DrawIslandGraph(App, BufferDim);
+  // NOTE: DrawIslandGraph(App, BufferDim) is the old 2D view.
+  DrawWorld3D(App, Input, BufferDim);
+  DrawIslandPanel(App, Input, BufferDim);
   DrawBroadcastControls(App, Input);
+  DrawSummaryPopup(App, Input, BufferDim);
   RenderDrawAllRectangles(&App->Render, BufferDim, &App->FontAtlas);
  }
- 
+
  return ShouldQuit;
 }
 
 GET_AUDIO_SAMPLES(GetAudioSamples)
 {
- 
+
 }
