@@ -2,6 +2,7 @@
 // SolarSim: headless console tool for the food module (solarpunk_food.c).
 //   SolarSim test                       runs the food tests, exits with the failure count
 //   SolarSim sim [--seed 7] [--days 10] prints waste and shortage with and without sharing
+//   SolarSim supply                     prints the world's supply plan and harvest waves
 // Sharing here is a test-only stand-in for the routing engine (FoodTake -> FoodGive to a
 // neighbour). It shows what the router gains by moving soonest-expiring food first.
 //-
@@ -18,6 +19,7 @@
 #include "solarpunk/generated/solarpunk.meta.c"
 #include "solarpunk/solarpunk_food.h"
 #include "solarpunk/solarpunk_food.c"
+#include "solarpunk/solarpunk_supply.c"
 
 //~ Test harness
 global_variable s32 GlobalCheckCount;
@@ -306,6 +308,138 @@ TestDeterminismAndSharing(void)
  Check(Shared.Wasted < Alone.Wasted && Shared.Shortage < Alone.Shortage, "sharing food before it spoils cuts waste and shortage");
 }
 
+//~ Supply plan (solarpunk_supply.c)
+#define Sim_SupplyIslands 48
+
+internal void
+SimSupplyPlan(supply_plan *Plan)
+{
+ u32 ClusterOf[Supply_MaxIslands] = {0};
+ for(u32 I = 0; I < Sim_SupplyIslands; I += 1)
+ {
+  ClusterOf[I] = (I*Supply_ClusterCount)/Sim_SupplyIslands;
+ }
+ SupplyMakePlan(Plan, Sim_SupplyIslands, ClusterOf);
+}
+
+internal void
+TestSupplyPlan(void)
+{
+ supply_plan *A = (supply_plan *)OS_Allocate(sizeof(supply_plan));
+ supply_plan *B = (supply_plan *)OS_Allocate(sizeof(supply_plan));
+ SimSupplyPlan(A);
+ SimSupplyPlan(B);
+ Check(memcmp(A, B, sizeof(supply_plan)) == 0, "same inputs give the same supply plan");
+
+ //- Every climate together covers every food
+ b32 Covered = true;
+ for(u32 K = 1; K < ProductKind_Count; K += 1)
+ {
+  b32 Any = false;
+  for(u32 C = 0; C < Supply_ClusterCount; C += 1) Any = Any || SupplyIsClimateFood(C, (product_kind)K);
+  Covered = Covered && Any;
+ }
+ Check(Covered, "every food is some cluster's climate food");
+
+ b32 AllMade = true, AllNeeded = true, Balanced = true, ClimateMore = true, ClimateEverywhere = true, OthersToo = true;
+ for(u32 K = 1; K < ProductKind_Count; K += 1)
+ {
+  u64 Made = 0, Needed = 0, MinClimate = ~0ull, MaxOther = 0;
+  u32 Makers = 0;
+  for(u32 I = 0; I < A->IslandCount; I += 1)
+  {
+   Made += A->Make[I][K];
+   Needed += A->Need[I][K];
+   Makers += (A->Make[I][K] > 0);
+   if(SupplyIsClimateFood(A->Cluster[I], (product_kind)K))
+   {
+    MinClimate = Min(MinClimate, A->Make[I][K]);
+    ClimateEverywhere = ClimateEverywhere && (A->Make[I][K] > 0);
+   }
+   else
+   {
+    MaxOther = Max(MaxOther, A->Make[I][K]);
+   }
+  }
+  AllMade = AllMade && (Makers >= 1);
+  AllNeeded = AllNeeded && (Needed > 0);
+  Balanced = Balanced && (Made == (Needed*(100 + Supply_BufferPercent) + 99)/100);
+  if(MinClimate != ~0ull) ClimateMore = ClimateMore && (MinClimate >= MaxOther);
+ }
+ for(u32 I = 0; I < A->IslandCount; I += 1)
+ {
+  u32 Others = 0;
+  for(u32 K = 1; K < ProductKind_Count; K += 1) Others += (A->Make[I][K] > 0 && !SupplyIsClimateFood(A->Cluster[I], (product_kind)K));
+  OthersToo = OthersToo && (Others >= Supply_MinOtherFoods);
+ }
+ Check(AllMade, "every food is made by at least one island");
+ Check(AllNeeded, "every food is needed by at least one island");
+ Check(Balanced, "per food, world makes = world needs + buffer, exactly");
+ Check(ClimateEverywhere, "every island makes all of its climate's foods");
+ Check(ClimateMore, "per food, every climate maker makes at least as much as any other maker");
+ Check(OthersToo, "every island also makes at least one non-climate food");
+}
+
+internal void
+TestHarvestWaves(void)
+{
+ b32 Averages = true, InRange = true, Moves = true;
+ for(u32 I = 0; I < Sim_SupplyIslands; I += 1)
+ {
+  u32 Cluster = (I*Supply_ClusterCount)/Sim_SupplyIslands;
+  for(u64 Start = 0; Start < 3; Start += 1)
+  {
+   f64 Sum = 0;
+   f32 Lo = 10.f, Hi = 0.f;
+   for(u64 R = 1; R <= Supply_WavePeriodRounds; R += 1)
+   {
+    f32 F = SupplyHarvestFactor(Cluster, I, Start*7 + R);
+    Sum += F;
+    Lo = Min(Lo, F);
+    Hi = Max(Hi, F);
+   }
+   f64 Mean = Sum/(f64)Supply_WavePeriodRounds;
+   Averages = Averages && (Mean > .9999 && Mean < 1.0001);
+   InRange = InRange && (Lo >= 1.f - (f32)Supply_WaveAmplitude - .001f) && (Hi <= 1.f + (f32)Supply_WaveAmplitude + .001f);
+   Moves = Moves && (Hi - Lo > (f32)Supply_WaveAmplitude);
+  }
+ }
+ Check(Averages, "a harvest wave averages to 1 over any full period");
+ Check(InRange, "harvest stays within 1 +- amplitude");
+ Check(Moves, "harvest really goes up and down");
+
+ //- Run the food rounds over whole waves: the food round makes what the plan says
+ supply_plan *Plan = (supply_plan *)OS_Allocate(sizeof(supply_plan));
+ SimSupplyPlan(Plan);
+ food_state *Food = SimAllocFood();
+ u64 Rounds = 4*Supply_WavePeriodRounds;
+ for(u64 Round = 1; Round <= Rounds; Round += 1)
+ {
+  for(u32 I = 0; I < Plan->IslandCount; I += 1)
+  {
+   f32 Harvest = SupplyHarvestFactor(Plan->Cluster[I], I, Round);
+   for(u32 K = 1; K < ProductKind_Count; K += 1)
+   {
+    FoodIslandRound(Food, I, (product_kind)K, Harvest*(f32)Plan->Make[I][K], 0.f, Round);
+   }
+  }
+ }
+ b32 MatchesPlan = true;
+ for(u32 K = 1; K < ProductKind_Count; K += 1)
+ {
+  u64 Made = 0, Planned = 0;
+  for(u32 I = 0; I < Plan->IslandCount; I += 1)
+  {
+   Made += Food->Counts[I][K].Produced;
+   Planned += Plan->Make[I][K]*Rounds/Food_RoundsPerDay;
+  }
+  f64 Ratio = (f64)Made/(f64)Max(Planned, 1);
+  MatchesPlan = MatchesPlan && Ratio > .98 && Ratio < 1.02;
+ }
+ Check(MatchesPlan, "over whole waves, the food round makes what the plan says (within 2%)");
+ Check(SimAllConserved(Food, Plan->IslandCount), "conserved with harvest waves");
+}
+
 internal s32
 RunTests(void)
 {
@@ -316,6 +450,8 @@ RunTests(void)
   {"eat soonest-expiring first, shortages, fractions", 3},
   {"routing API: FoodTake / FoodGive keep expiry, lot cap", 4},
   {"determinism, replay, sharing cuts waste", 5},
+  {"supply plan: balanced, every food made, climate makes more", 6},
+  {"harvest waves: average 1, go up and down", 7},
  };
  for EachIndex(T, ArrayCount(Tests))
  {
@@ -327,6 +463,8 @@ RunTests(void)
    case 3: TestEat(); break;
    case 4: TestTakeGive(); break;
    case 5: TestDeterminismAndSharing(); break;
+   case 6: TestSupplyPlan(); break;
+   case 7: TestHarvestWaves(); break;
   }
   Log("[%s] %s\n", (GlobalFailCount == FailsBefore) ? "PASS" : "FAIL", Tests[T].Name);
  }
@@ -367,6 +505,41 @@ RunSim(u64 Seed, s32 Days)
  }
 }
 
+//~ Supply report
+internal void
+RunSupply(void)
+{
+ supply_plan *Plan = (supply_plan *)OS_Allocate(sizeof(supply_plan));
+ SimSupplyPlan(Plan);
+ Log("SolarSim supply: %u islands, %d clusters, buffer %d%%, climate weight %dx\n\n",
+     Plan->IslandCount, Supply_ClusterCount, Supply_BufferPercent, Supply_ClimateWeight);
+ Log("   kind        needed/day  made/day  ratio  makers (climate)\n");
+ for(u32 K = 1; K < ProductKind_Count; K += 1)
+ {
+  u64 Made = 0, Needed = 0;
+  u32 Makers = 0, Climate = 0;
+  for(u32 I = 0; I < Plan->IslandCount; I += 1)
+  {
+   Made += Plan->Make[I][K];
+   Needed += Plan->Need[I][K];
+   Makers += (Plan->Make[I][K] > 0);
+   Climate += (Plan->Make[I][K] > 0 && SupplyIsClimateFood(Plan->Cluster[I], (product_kind)K));
+  }
+  Log("   %-10.*s  %10llu  %8llu  %5.2f  %3u (%u)\n", (s32)ProductNames[K].Size, ProductNames[K].Data,
+      Needed, Made, (f64)Made/(f64)Max(Needed, 1), Makers, Climate);
+ }
+
+ Log("\nHarvest per cluster over one wave (%d rounds), %% of average:\n   round", Supply_WavePeriodRounds);
+ for(u32 C = 0; C < Supply_ClusterCount; C += 1) Log("  cl%u", C);
+ Log("\n");
+ for(u64 R = 1; R <= Supply_WavePeriodRounds; R += 2)
+ {
+  Log("   %5llu", R);
+  for(u32 C = 0; C < Supply_ClusterCount; C += 1) Log("  %3.0f", 100.0*SupplyHarvestFactor(C, 0, R));
+  Log("\n");
+ }
+}
+
 //~ Entry
 internal char *
 SimArgValue(int ArgCount, char **Args, char *Flag, char *Default)
@@ -396,10 +569,15 @@ ENTRY_POINT(EntryPoint)
   s32 Days = atoi(SimArgValue(Params->ArgCount, Params->Args, "--days", "10"));
   RunSim(Seed, Days);
  }
+ else if(strcmp(Command, "supply") == 0)
+ {
+  RunSupply();
+ }
  else
  {
   Log("usage: SolarSim test\n"
-      "       SolarSim sim [--seed 7] [--days 10]\n");
+      "       SolarSim sim [--seed 7] [--days 10]\n"
+      "       SolarSim supply\n");
  }
  fflush(stdout);
  exit(ExitCode);

@@ -7,18 +7,21 @@
 internal u32 BroadcastIslandIndex(app_state *App, island *Target);
 
 // NOTE(L4): Called once per round, right after Broadcast->Round += 1. Product and requirement
-// Amounts are per day; FoodIslandRound turns them into per-round units.
+// Amounts are per day; FoodIslandRound turns them into per-round units. Product Amounts are
+// averages: this round's harvest wave scales them (WorldGenHarvestFactor).
 internal void
 FoodRoundFromApp(app_state *App, u64 Round)
 {
  u32 Idx = 0;
+ u32 IslandCount = App->Broadcast.IslandCount;
  for(island *Island = App->FirstIsland; Island && Idx < Food_MaxIslands; Island = Island->Next)
  {
   f32 Produce[ProductKind_Count] = {0};
   f32 Need[ProductKind_Count] = {0};
+  f32 Harvest = WorldGenHarvestFactor(App, Idx, IslandCount, Round);
   for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
   {
-   Produce[Product->Kind] += (f32)Product->Amount;
+   Produce[Product->Kind] += Harvest*(f32)Product->Amount;
   }
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
   {

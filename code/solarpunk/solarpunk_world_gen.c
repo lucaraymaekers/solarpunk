@@ -9,7 +9,7 @@
 #define WorldGen_Seed           20261121
 #define WorldGen_MaxIslands     64
 
-#define WorldGen_ClusterCount   7
+#define WorldGen_ClusterCount   Supply_ClusterCount
 #define WorldGen_ClusterRadius  .155f // in 0..1 map units, for a cluster of 8 islands
 #define WorldGen_MinIslandGap   .07f  // islands closer than this are re-rolled
 #define WorldGen_PlaceAttempts  64
@@ -108,14 +108,6 @@ WorldGenRandomInt(random_series *Series, u32 Min, u32 Max)
  return Result;
 }
 
-internal product_kind
-WorldGenRandomKind(random_series *Series)
-{
- // NOTE: Skip ProductKind_None.
- product_kind Result = (product_kind)WorldGenRandomInt(Series, 1, ProductKind_Count - 1);
- return Result;
-}
-
 internal f32
 WorldGenDistanceSq(v2 A, v2 B)
 {
@@ -168,78 +160,30 @@ WorldGenIsLinked(island *A, island *B)
  return Result;
 }
 
-// NOTE: What each cluster grows or catches, in the same order as the clusters. Islands
-// only make their cluster's foods and only need foods their cluster does not make, so
-// every need is traded in from another cluster.
-#define WorldGen_MaxSpecialties 3
-global_variable product_kind WorldGenClusterFoods[WorldGen_ClusterCount][WorldGen_MaxSpecialties] =
-{
- {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Cabbage}, // Verdant Reach: orchards
- {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_None},    // Sunward Isles: fields and hens
- {ProductKind_Fish,    ProductKind_None,    ProductKind_None},    // Driftwood Shoals: fishing
- {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},    // Ember Archipelago: herds
- {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},    // Crystal Spires: vegetables
- {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},    // Mistral Keys: fishing, hens
- {ProductKind_Fish,    ProductKind_Carrots, ProductKind_Wheat},   // Saltglass Atolls
-};
-
-// NOTE: Scarce foods: made in smaller amounts than the others, so the world as a whole
-// does not have enough of them and islands needing them turn red.
-internal b32
-WorldGenIsScarce(product_kind Kind)
-{
- b32 Result = (Kind == ProductKind_Meat || Kind == ProductKind_Pears);
- return Result;
-}
-
-internal b32
-WorldGenClusterMakes(u32 Cluster, product_kind Kind)
-{
- b32 Result = false;
- for(u32 Idx = 0; Idx < WorldGen_MaxSpecialties; Idx += 1)
- {
-  Result = Result || (WorldGenClusterFoods[Cluster][Idx] == Kind && Kind != ProductKind_None);
- }
- return Result;
-}
-
+// NOTE: Pushes the supply plan's makes and needs (solarpunk_supply.c) onto an island.
 internal void
-WorldGenProductsAndNeeds(app_state *App, random_series *Series, island *Island, u32 Cluster)
+WorldGenProductsAndNeeds(app_state *App, supply_plan *Plan, island *Island, u32 IslandIdx)
 {
- //- Makes: 1 or 2 of its cluster's foods
- u32 FoodCount = 0;
- for(u32 Idx = 0; Idx < WorldGen_MaxSpecialties; Idx += 1)
+ for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  if(WorldGenClusterFoods[Cluster][Idx] != ProductKind_None) FoodCount += 1;
+  if(Plan->Make[IslandIdx][Kind] > 0) PushProduct(App, Island, (product_kind)Kind, Plan->Make[IslandIdx][Kind]);
  }
- b32 Produces[ProductKind_Count] = {0};
- u32 ProduceCount = Min(WorldGenRandomInt(Series, 1, 2), FoodCount);
- for(u32 Produced = 0; Produced < ProduceCount; )
+ for(u32 Kind = 1; Kind < ProductKind_Count; Kind += 1)
  {
-  product_kind Kind = WorldGenClusterFoods[Cluster][WorldGenRandomInt(Series, 0, FoodCount - 1)];
-  if(!Produces[Kind])
-  {
-   Produces[Kind] = true;
-   u64 Amount = 10*(u64)WorldGenRandomInt(Series, 6, 16);
-   if(WorldGenIsScarce(Kind)) Amount = 10*(u64)WorldGenRandomInt(Series, 2, 5);
-   PushProduct(App, Island, Kind, Amount);
-   Produced += 1;
-  }
+  if(Plan->Need[IslandIdx][Kind] > 0) PushRequirement(App, Island, (product_kind)Kind, Plan->Need[IslandIdx][Kind]);
  }
- 
- //- Needs: 2 or 3 foods its cluster does not make, so they come from other clusters
- b32 Needs[ProductKind_Count] = {0};
- u32 NeedCount = WorldGenRandomInt(Series, 2, 3);
- for(u32 Needed = 0, Tries = 0; Needed < NeedCount && Tries < 100; Tries += 1)
+}
+
+// NOTE: This round's harvest wave for an island (solarpunk_supply.c); 1 without the map layout.
+internal f32
+WorldGenHarvestFactor(app_state *App, u32 IslandIdx, u32 IslandCount, u64 Round)
+{
+ f32 Result = 1.f;
+ if(App->HasMapLayout)
  {
-  product_kind Kind = WorldGenRandomKind(Series);
-  if(!WorldGenClusterMakes(Cluster, Kind) && !Needs[Kind])
-  {
-   Needs[Kind] = true;
-   PushRequirement(App, Island, Kind, 5*(u64)WorldGenRandomInt(Series, 2, 10));
-   Needed += 1;
-  }
+  Result = SupplyHarvestFactor(WorldGenClusterOf(IslandIdx, IslandCount), IslandIdx, Round);
  }
+ return Result;
 }
 
 //~ World
@@ -266,6 +210,16 @@ BuildGeneratedWorld(app_state *App, u32 IslandCount)
  {
   ClusterFirst[Cluster] = WorldGenClusterFirst(Cluster, IslandCount);
  }
+
+ //- What every island makes and needs, balanced over the whole world
+ u32 ClusterOf[WorldGen_MaxIslands] = {0};
+ for(u32 Idx = 0; Idx < IslandCount; Idx += 1)
+ {
+  ClusterOf[Idx] = WorldGenClusterOf(Idx, IslandCount);
+ }
+ supply_plan PlanStorage;
+ supply_plan *Plan = &PlanStorage;
+ SupplyMakePlan(Plan, IslandCount, ClusterOf);
 
  //- Islands: position inside their cluster, production and needs
  for(u32 Cluster = 0; Cluster < WorldGen_ClusterCount; Cluster += 1)
@@ -308,7 +262,7 @@ BuildGeneratedWorld(app_state *App, u32 IslandCount)
    }
    Island->MapPos = Pos;
 
-   WorldGenProductsAndNeeds(App, &Series, Island, Cluster);
+   WorldGenProductsAndNeeds(App, Plan, Island, Idx);
   }
  }
 
