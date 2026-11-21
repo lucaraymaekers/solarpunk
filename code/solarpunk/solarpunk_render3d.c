@@ -473,7 +473,7 @@ R3CameraEye(r3_camera *Camera)
 //~ GL
 #define R3_MaxSkyVertices         1024
 #define R3_MaxOpaqueVertices      (1024*1024)     // per frame: simple islands, cables, moving parts
-#define R3_MaxHeroOpaqueVertices  (4*1024*1024)   // the hand-built islands, cached (~2M)
+#define R3_MaxHeroOpaqueVertices  (6*1024*1024)   // the hand-built islands, cached (~3.5M)
 #define R3_MaxHeroTranslucentVertices (512*1024)
 #define R3_MaxTranslucentVertices (512*1024)
 

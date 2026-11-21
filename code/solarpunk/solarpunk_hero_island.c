@@ -117,6 +117,7 @@ struct hero_layout
  f32 ChannelX;
  f32 ChannelHalf;
  b32 SandyShore;    // the shore is a sand beach, sloping down to the water
+ b32 Snowy;         // snow on the ground, ice on the water (Saltglass Atolls)
  b32 PlateauRight;
  b32 PlateauLeft;
  u32 StreamCount;
@@ -413,6 +414,12 @@ HeroPushTerrain(hero_ctx *H)
      TopColor = R3LerpColor(R3Color(Hero_ColorGrassA), R3Color(Hero_ColorGrassB), RandomUnilateral(&H->Series));
     } break;
    }
+   if(H->Layout->Snowy)
+   {
+    if(Type == HeroGround_Grass)        TopColor = R3LerpColor(R3Color(0xFFEEF3F8), R3Color(0xFFDCE5EE), RandomUnilateral(&H->Series));
+    else if(Type == HeroGround_Path)    TopColor = HeroShade(H, 0xFFC4CDD6);
+    else if(Type == HeroGround_Stream)  TopColor = R3Color(0xFFCDEBF5);
+   }
    R3PushQuad(H->Opaque, HeroP(H, CX[0], Level, CZ[0]), HeroP(H, CX[1], Level, CZ[1]), HeroP(H, CX[2], Level, CZ[2]), HeroP(H, CX[3], Level, CZ[3]),
               HeroP(H, X0 + .5f*Cell, Level - 1.f, Z0 + .5f*Cell), TopColor);
    if(H->Layout->Round && Type == HeroGround_Pool)
@@ -438,13 +445,13 @@ HeroPushTerrain(hero_ctx *H)
      f32 NeighbourLevel = HeroTerrain(H->Layout, -Hero_Half + ((f32)NI + .5f)*Cell, -Hero_Half + ((f32)NJ + .5f)*Cell, &NeighbourType);
      if(NeighbourLevel < Level - .001f)
      {
-      u32 WallColor = (Type == HeroGround_Sand) ? 0xFFD9C495 : Hero_ColorWall;
+      u32 WallColor = (Type == HeroGround_Sand) ? 0xFFD9C495 : (H->Layout->Snowy ? 0xFFB7C1CA : Hero_ColorWall);
       HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, NeighbourLevel, Level, 0.f, HeroShade(H, WallColor));
       if(Type == HeroGround_Stream)
       {
        // Water falling over the terrace edge.
        f32 Bottom = (NeighbourType == HeroGround_Pool) ? Hero_WaterLevel : NeighbourLevel;
-       HeroEdgeWall(H, H->Translucent, Dir, X0, X1, Z0, Z1, Bottom, Level + .01f, .025f, R3WithAlpha(R3Color(Hero_ColorFall), .72f));
+       HeroEdgeWall(H, H->Translucent, Dir, X0, X1, Z0, Z1, Bottom, Level + .01f, .025f, R3WithAlpha(R3Color(H->Layout->Snowy ? 0xFFD6F0FA : Hero_ColorFall), H->Layout->Snowy ? .9f : .72f));
       }
      }
     }
@@ -454,7 +461,7 @@ HeroPushTerrain(hero_ctx *H)
      {
       HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, 0.f, Level, 0.f, HeroShade(H, Hero_ColorWall));
      }
-     HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, Hero_DirtBottom, Min(Level, 0.f), 0.f, HeroShade(H, Hero_ColorDirt));
+     HeroEdgeWall(H, H->Opaque, Dir, X0, X1, Z0, Z1, Hero_DirtBottom, Min(Level, 0.f), 0.f, HeroShade(H, H->Layout->Snowy ? 0xFF7A6E64 : Hero_ColorDirt));
     }
    }
   }
@@ -464,8 +471,8 @@ HeroPushTerrain(hero_ctx *H)
  hero_layout *L = H->Layout;
  if(L->Pool && !L->Round)
  {
-  v4 Water = R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
-  v4 Deep = R3WithAlpha(R3Color(Hero_ColorPoolDeep), .7f);
+  v4 Water = L->Snowy ? R3WithAlpha(R3Color(0xFFD6EEF7), .88f) : R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
+  v4 Deep = L->Snowy ? R3WithAlpha(R3Color(0xFF9CCFE3), .82f) : R3WithAlpha(R3Color(Hero_ColorPoolDeep), .7f);
   v3 W0 = HeroP(H, L->PoolX0, Hero_WaterLevel, L->PoolZ0);
   v3 W1 = HeroP(H, L->PoolX1, Hero_WaterLevel, L->PoolZ0);
   v3 W2 = HeroP(H, L->PoolX1, Hero_WaterLevel, Hero_Half);
@@ -701,6 +708,7 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
   Roof = Tin[(Variant/2) % 3];
  }
  if(Variant & 128) Roof = 0xFFC9A86A;  // thatch
+ if(Variant & 256) Roof = 0xFFF2F6FA;  // snow
 
  //- Stone plinth (reaches down so houses on terrace edges do not float), or a
  // wooden floor on a deck
@@ -770,6 +778,16 @@ HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
  R3PushTri(O, V3(B.X - HX, RY0, B.Z - HZ), V3(B.X - HX, RY0, B.Z + HZ), V3(B.X - HX, RY1 - .02f, B.Z), R3Add(Inside, V3(1.f, 0.f, 0.f)), HeroShade(H, Wood));
  R3PushTri(O, V3(B.X + HX, RY0, B.Z - HZ), V3(B.X + HX, RY0, B.Z + HZ), V3(B.X + HX, RY1 - .02f, B.Z), R3Add(Inside, V3(-1.f, 0.f, 0.f)), HeroShade(H, Wood));
  R3PushCylinder(O, R3Add(R0, V3(0.f, .01f, 0.f)), R3Add(R1, V3(0.f, .01f, 0.f)), .018f, 4, R3Color(Hero_ColorWoodDark));
+ if(Variant & 256)
+ {
+  // Snow overhanging the eaves, icicles hanging from it
+  R3PushBox(O, R3Lerp(F0, F1, .5f), V3(HX + Over, .02f, .025f), R3Color(0xFFF2F6FA));
+  for(u32 Icicle = 0; Icicle < 9; Icicle += 1)
+  {
+   v3 P = R3Lerp(F0, F1, ((f32)Icicle + .5f)/9.f);
+   R3PushCone(O, R3Add(P, V3(0.f, -.01f, .01f)), R3Add(P, V3(0.f, -.05f - .07f*RandomUnilateral(&H->Series), .01f)), .012f, 4, R3Color(0xFFD8F0FA));
+  }
+ }
  if(Variant & 128)
  {
   // Thatch: a shaggy fringe hanging over the eaves
@@ -1990,8 +2008,9 @@ HeroFinish(hero_ctx *H, app_state *App, u32 StatusColor, b32 Highlight, u32 High
   if(Type == HeroGround_Grass && !HeroCellTaken(H, X, Z) && OnIsland)
   {
    f32 Size = .05f + .06f*RandomUnilateral(&H->Series);
-   R3PushEllipsoid(H->Opaque, HeroP(H, X, Y + .6f*Size, Z), V3(Size*1.2f, Size, Size*1.2f), 3, 6, HeroShade(H, (Bush & 1) ? Hero_ColorLeaf : Hero_ColorVine), false);
-   if((Bush % 5) == 0)
+   u32 BushColor = H->Layout->Snowy ? 0xFFF2F6FA : ((Bush & 1) ? Hero_ColorLeaf : Hero_ColorVine);   // snow drifts on snowy islands
+   R3PushEllipsoid(H->Opaque, HeroP(H, X, Y + .6f*Size, Z), V3(Size*1.2f, Size, Size*1.2f), 3, 6, HeroShade(H, BushColor), false);
+   if((Bush % 5) == 0 && !H->Layout->Snowy)
    {
     R3PushEllipsoid(H->Opaque, HeroP(H, X + .03f, Y + 1.3f*Size, Z + .02f), V3(.018f, .018f, .018f), 3, 4, R3Color((Bush & 2) ? 0xFFF2D04E : 0xFFE87FA6), false);
    }
