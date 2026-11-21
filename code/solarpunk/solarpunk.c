@@ -29,9 +29,12 @@
 #include "rl/rl_widgets.c"
 
 #include "solarpunk/solarpunk_broadcast.h"
+#include "solarpunk/solarpunk_food.h"
 #include "solarpunk/solarpunk.h"
+#include "solarpunk/solarpunk_food.c"
 #include "solarpunk/solarpunk_world.c"
 #include "solarpunk/solarpunk_world_gen.c"
+#include "solarpunk/solarpunk_food_app.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
 #include "solarpunk/solarpunk_broadcast_view.c"

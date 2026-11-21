@@ -186,6 +186,13 @@ DrawIslandGraph(app_state *App, v2 BufferDim)
    LineCount += 1;
   }
   
+  if(!Compact && LineCount < (s32)ArrayCount(Lines))
+  {
+   Lines[LineCount] = FoodStatusLine(App, Island);
+   Colors[LineCount] = V4FromU32(Graph_ColorKnows);
+   LineCount += 1;
+  }
+  
   f32 MaxWidth = 0.f;
   for(s32 Idx = 0; Idx < LineCount; Idx += 1)
   {

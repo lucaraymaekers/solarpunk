@@ -66,6 +66,9 @@ struct app_state
  
  // Announcements of production and needs between islands
  broadcast_state Broadcast;
+ 
+ // Food lots and their expiry rounds, per island and product (solarpunk_food.h)
+ food_state Food;
 };
 
 global_variable product *AllProducts;

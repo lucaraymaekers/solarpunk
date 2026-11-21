@@ -1,5 +1,7 @@
 # Technical, Protocol & Architecture Specification (v3, C)
 
+> **2026-11-21 direction change (team):** there is **no solar energy, no day/night, no energy reserve and no sleeping islands**. The app on `main` (`solarpunk_world_gen.c`, `solarpunk_broadcast.c`) is the base: islands, products, links and announcements, with time in **rounds** (timeline slider, speed controls). The new mechanic is **food that spoils** (section 13 below). Sections 0-12 describe the earlier engine design and are kept for reference only; energy, sun, power states and the launch guard (3.1, 3.2, 5.2, parts of 9) no longer apply. Routing and transport of goods are built by another teammate.
+
 > **Audience:** Claude Code and the 4 humans. This is the engineering source of truth.
 > **v3 changes:** ported from TypeScript to C inside Luca's codebase. Math, protocol and tests are unchanged from v2.1; types, memory model, file layout, build targets and tests are new.
 > **Open decisions** live in `02_DECISIONS_TBD.md`. **Never hardcode an open decision; expose it through `engine_config` or the need-model switch.**
@@ -591,3 +593,20 @@ Tests live in `code/solarpunk/sim/solar_sim.c` and run with `SolarSim test`. A t
 
 ## 13. Build order
 See `04_BUILD_PLAN.md`: contract and mock first, thin vertical slice early, then widen. The gate for merging is "`SolarSim test` passes and the app builds"; UI is built in parallel against `MockWorld()` (a function in `engine_world.c` that fills a `world` with a fake but contract-correct state, no stepping needed).
+
+---
+
+## 13. Food expiry (2026-11-21, current)
+
+Files: `code/solarpunk/solarpunk_food.h` / `solarpunk_food.c` (core, pure data, tested headless) and `solarpunk_food_app.c` (glue to the app's islands, rounds and announcements).
+
+- **Time:** the app's round counter (`Broadcast.Round`). Product and requirement `Amount`s are **per day**; one day = `Food_RoundsPerDay` (10) rounds, so each round an island produces `Amount/10` and eats `Need/10` (fractions carry over).
+- **What spoils:** Seeds, Fresh Water, Fish, Algae. Shelf life in days per kind in `FoodShelfLifeDays` (starting values 20 / 6 / 2 / 4, tune with `SolarSim sim`). Solar Panels, Batteries, Copper, Timber never spoil and are not tracked.
+- **Lots:** food is stored per (island, kind) as lots `{Qty, ExpiresRound}` sorted by expiry. A new lot within `Food_MergeRounds` of the newest one merges into it; at `Food_MaxLots` lots the new one merges into the closest. Merging always keeps the **earlier** date, so food never lasts longer than it should.
+- **Each round, per island and kind, in this order:** (1) lots whose `ExpiresRound <= Round` are thrown away (`Wasted`); (2) production adds a lot expiring after the shelf life; (3) eating takes the soonest-expiring food first, and what is missing counts as `Shortage`.
+- **Where it runs:** `BroadcastRound` calls `FoodRoundFromApp` right after `Round += 1`, before the announcements are made. `BroadcastRestart` calls `FoodReset`. The food state lives in `app_state.Food`, has no pointers and changes only per round, so the timeline slider's restart-and-replay reproduces the same food history exactly.
+- **Announcements:** each island's own `island_ad` carries `FoodStock[kind]` and `FoodExpiringSoon[kind]` (units that go bad within `Food_SoonRounds` = 1 day), so neighbours and the routing engine can see what must move first.
+- **API for the routing engine (not built here):** `FoodTake(Food, Island, Kind, Qty, Out, OutCap, &OutCount)` removes food soonest-expiring first and returns it as lots with their dates; `FoodGive(Food, Island, Kind, Lots, Count, Round)` hands lots to an island, and lots already bad on arrival count as waste there. Food keeps ageing in transit.
+- **Conservation, per (island, kind), always:** `Produced + Received == Eaten + Wasted + Sent + InStock` (`FoodIsConserved`).
+- **View:** each island box shows `food <stock> (<expiring soon> soon) wasted <total>`.
+- **Tests:** `code\build.bat -SolarSim`, then `build\solar_sim.exe test` (catalog, spoiling, eat order, shortages, take/give dates, lot cap, conservation, byte-identical replay, sharing cuts waste). `build\solar_sim.exe sim [--seed 7] [--days 10]` prints waste and shortage per kind with and without a test-only "share soonest-expiring food with a short neighbour" stand-in for the router. Seed 7, 10 days, 16 islands: waste 15660 -> 8753 and shortage 14431 -> 7170 with sharing.

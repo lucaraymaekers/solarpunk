@@ -25,6 +25,9 @@ struct island_ad
  u64 Round;      // round in which the origin made it; newer wins
  u64 Produces[ProductKind_Count];
  u64 Needs[ProductKind_Count];
+ // Food (solarpunk_food.h): units in stock, and units that go bad within a day.
+ u64 FoodStock[ProductKind_Count];
+ u64 FoodExpiringSoon[ProductKind_Count];
 };
 
 typedef struct broadcast_state broadcast_state;
