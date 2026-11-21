@@ -66,6 +66,9 @@ struct app_state
  
  // Announcements of production and needs between islands
  broadcast_state Broadcast;
+ 
+ // 3D view: camera and GL objects
+ r3_state R3;
 };
 
 global_variable product *AllProducts;

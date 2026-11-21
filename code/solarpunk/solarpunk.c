@@ -29,12 +29,16 @@
 #include "rl/rl_widgets.c"
 
 #include "solarpunk/solarpunk_broadcast.h"
+#include "solarpunk/solarpunk_render3d.h"
 #include "solarpunk/solarpunk.h"
 #include "solarpunk/solarpunk_world.c"
 #include "solarpunk/solarpunk_world_gen.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
 #include "solarpunk/solarpunk_broadcast_view.c"
+#include "solarpunk/solarpunk_render3d.c"
+#include "solarpunk/solarpunk_world3d.c"
+#include "solarpunk/solarpunk_view3d.c"
 
 //~ Macros
 #if OS_WINDOWS
@@ -112,7 +116,8 @@ UPDATE_AND_RENDER(UpdateAndRender)
  //- Rendering 
  { 
   RenderClear();
-  DrawIslandGraph(App, BufferDim);
+  // NOTE: DrawIslandGraph(App, BufferDim) is the old 2D view.
+  DrawWorld3D(App, Input, BufferDim);
   DrawBroadcastControls(App, Input);
   RenderDrawAllRectangles(&App->Render, BufferDim, &App->FontAtlas);
  }
