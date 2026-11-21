@@ -1023,9 +1023,9 @@ global_variable char *V3HelpMapNotes[] =
 {
  "Solid crates on a green pad: what an island makes",
  "Crate frames on an orange pad: what it needs",
- "Light pulse on a cable: news travelling",
+ "Train on a rail: news travelling",
 };
-global_variable u32 V3HelpMapColors[] = {W3_ColorProducePad, W3_ColorNeedPad, W3_ColorPulse};
+global_variable u32 V3HelpMapColors[] = {W3_ColorProducePad, W3_ColorNeedPad, W3_ColorTrainGlow};
 StaticAssert(ArrayCount(V3HelpMapNotes) == ArrayCount(V3HelpMapColors), V3HelpMapNotesMatch);
 
 global_variable char *V3HelpKeys[] =
