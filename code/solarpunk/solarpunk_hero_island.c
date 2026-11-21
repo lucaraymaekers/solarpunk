@@ -103,6 +103,10 @@ struct hero_layout
  f32 HillZ;
  f32 HillStretch;   // > 1 = wider along X
  f32 HillPeak;      // raw height at the hill centre
+ f32 HillCap;       // > 0: the hill is flat-topped at this height
+ f32 FrontLevel;    // height of the ground beside the harbour pool
+ b32 Round;         // a round island of this Radius (else the square slab)
+ f32 Radius;
  b32 PlateauRight;
  b32 PlateauLeft;
  u32 StreamCount;
@@ -123,6 +127,9 @@ struct hero_ctx
  random_series Series;
  hero_layout *Layout;
  u8 Taken[Hero_Cells][Hero_Cells];   // terrain cells used by something (themed islands)
+ r3_state *R3;
+ u32 Island;      // index of the island being built
+ b32 Recording;   // building the cache: moving parts are recorded, not drawn
 };
 
 //~ Helpers
@@ -180,6 +187,18 @@ HeroTerrain(hero_layout *L, f32 X, f32 Z, u32 *Type)
 {
  f32 Result = 0.f;
  *Type = HeroGround_Grass;
+ if(L->Round)
+ {
+  // Outside the circle: the ground at the rim.
+  f32 RadiusSq = X*X + Z*Z;
+  f32 Rim = .995f*L->Radius;
+  if(RadiusSq > Rim*Rim)
+  {
+   f32 Scale = Rim/R3Sqrt(RadiusSq);
+   X *= Scale;
+   Z *= Scale;
+  }
+ }
  if(L->Pool && Z > L->PoolZ0)
  {
   if(X > L->PoolX0 && X < L->PoolX1)
@@ -189,7 +208,7 @@ HeroTerrain(hero_layout *L, f32 X, f32 Z, u32 *Type)
   }
   else
   {
-   Result = Hero_FrontLevel;
+   Result = L->FrontLevel;
    *Type = (X < L->PoolX0) ? HeroGround_Path : HeroGround_Grass;
   }
  }
@@ -199,6 +218,7 @@ HeroTerrain(hero_layout *L, f32 X, f32 Z, u32 *Type)
   f32 DZ = Z - L->HillZ;
   f32 Raw = L->HillPeak - .8f*R3Sqrt(DX*DX + DZ*DZ);
   Result = (Raw > 0.f) ? Hero_Step*floorf(Raw/Hero_Step) : 0.f;
+  if(L->HillCap > 0.f) Result = Min(Result, L->HillCap);
   if(L->PlateauRight && X > .95f && Z < .75f)  Result = Max(Result, Hero_Step);
   if(L->PlateauLeft && X < -1.15f && Z < .2f)  Result = Max(Result, Hero_Step);
 
@@ -264,6 +284,25 @@ HeroGlowRect(r3_mesh *Mesh, v3 Center, v3 U, v3 V, v4 Color)
  R3PushTriUnlit(Mesh, P0, P2, P3, Color);
 }
 
+// NOTE: While the cache is built, a moving part is recorded (to be drawn every frame by
+// HeroReplayCommands) instead of drawn. Returns true when it was recorded.
+internal b32
+HeroDefer(hero_ctx *H, u32 Kind, v3 P, f32 A, f32 B, f32 C)
+{
+ b32 Result = H->Recording;
+ if(Result && H->R3->HeroCommandCount < R3_MaxHeroCommands)
+ {
+  hero_command *Command = &H->R3->HeroCommands[H->R3->HeroCommandCount++];
+  Command->Kind = Kind;
+  Command->Island = H->Island;
+  Command->P = P;
+  Command->A = A;
+  Command->B = B;
+  Command->C = C;
+ }
+ return Result;
+}
+
 //~ Terrain
 // NOTE: A vertical wall on one edge of a terrain cell. Dir: 0 = +X, 1 = -X, 2 = +Z, 3 = -Z.
 internal void
@@ -305,6 +344,35 @@ HeroPushTerrain(hero_ctx *H)
    u32 Type;
    f32 Level = HeroTerrain(H->Layout, X0 + .5f*Cell, Z0 + .5f*Cell, &Type);
 
+   // Corners of the top; on a round island, corners outside the circle move onto it
+   // and cells fully outside are skipped.
+   f32 CX[4];
+   f32 CZ[4];
+   CX[0] = X0; CZ[0] = Z0;
+   CX[1] = X1; CZ[1] = Z0;
+   CX[2] = X1; CZ[2] = Z1;
+   CX[3] = X0; CZ[3] = Z1;
+   if(H->Layout->Round)
+   {
+    f32 Radius = H->Layout->Radius;
+    u32 Inside = 0;
+    for(u32 Corner = 0; Corner < 4; Corner += 1)
+    {
+     f32 RadiusSq = CX[Corner]*CX[Corner] + CZ[Corner]*CZ[Corner];
+     if(RadiusSq <= Radius*Radius)
+     {
+      Inside += 1;
+     }
+     else
+     {
+      f32 Scale = Radius/R3Sqrt(RadiusSq);
+      CX[Corner] *= Scale;
+      CZ[Corner] *= Scale;
+     }
+    }
+    if(Inside == 0) continue;
+   }
+
    //- Top
    v4 TopColor;
    switch(Type)
@@ -317,8 +385,19 @@ HeroPushTerrain(hero_ctx *H)
      TopColor = R3LerpColor(R3Color(Hero_ColorGrassA), R3Color(Hero_ColorGrassB), RandomUnilateral(&H->Series));
     } break;
    }
-   R3PushQuad(H->Opaque, HeroP(H, X0, Level, Z0), HeroP(H, X1, Level, Z0), HeroP(H, X1, Level, Z1), HeroP(H, X0, Level, Z1),
+   R3PushQuad(H->Opaque, HeroP(H, CX[0], Level, CZ[0]), HeroP(H, CX[1], Level, CZ[1]), HeroP(H, CX[2], Level, CZ[2]), HeroP(H, CX[3], Level, CZ[3]),
               HeroP(H, X0 + .5f*Cell, Level - 1.f, Z0 + .5f*Cell), TopColor);
+   if(H->Layout->Round && Type == HeroGround_Pool)
+   {
+    // Round islands get their pond surface cell by cell, so it follows the rim.
+    v4 Water = R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
+    v3 P0 = HeroP(H, CX[0], Hero_WaterLevel, CZ[0]);
+    v3 P1 = HeroP(H, CX[1], Hero_WaterLevel, CZ[1]);
+    v3 P2 = HeroP(H, CX[2], Hero_WaterLevel, CZ[2]);
+    v3 P3 = HeroP(H, CX[3], Hero_WaterLevel, CZ[3]);
+    R3PushTriUnlit(H->Translucent, P0, P1, P2, Water);
+    R3PushTriUnlit(H->Translucent, P0, P2, P3, Water);
+   }
 
    //- Walls down to lower neighbours, and the outside of the slab
    for(u32 Dir = 0; Dir < 4; Dir += 1)
@@ -340,7 +419,7 @@ HeroPushTerrain(hero_ctx *H)
       }
      }
     }
-    else if(Type != HeroGround_Pool)
+    else if(Type != HeroGround_Pool && !H->Layout->Round)
     {
      if(Level > 0.f)
      {
@@ -354,7 +433,7 @@ HeroPushTerrain(hero_ctx *H)
 
  //- Harbour water: the surface and the see-through cut at the front of the slab
  hero_layout *L = H->Layout;
- if(L->Pool)
+ if(L->Pool && !L->Round)
  {
   v4 Water = R3WithAlpha(R3Color(Hero_ColorPoolWater), .62f);
   v4 Deep = R3WithAlpha(R3Color(Hero_ColorPoolDeep), .7f);
@@ -571,20 +650,30 @@ HeroPushWindow(hero_ctx *H, v3 Center, v3 Out, v3 Along, f32 HalfW, f32 HalfH)
 // NOTE: A timber house on a stone plinth: Floors storeys, a pitched roof with its ridge
 // along X, solar panels on the front slope, glowing windows and climbing vines.
 // Variant bits: 1 = chimney, 2 = balcony, 4 = two panels.
+// Variant bits (continued): 8 = red barn, 16 = on a deck (wooden floor, no stone
+// plinth), 32 = mossy roof.
 internal void
-HeroPushHouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, u32 Floors, u32 Variant)
+HeroPushHouseAt(hero_ctx *H, v3 B, f32 HX, f32 HZ, u32 Floors, u32 Variant)
 {
  r3_mesh *O = H->Opaque;
- v3 B = HeroOn(H, X, Z);
- f32 Plinth = .14f;
+ f32 Plinth = (Variant & 16) ? .04f : .14f;
  f32 FloorH = .34f;
  f32 WallH = FloorH*(f32)Floors;
  u32 Wood = HeroWoodColors[Variant % ArrayCount(HeroWoodColors)];
  u32 Roof = HeroRoofColors[(Variant/2) % ArrayCount(HeroRoofColors)];
  if(Variant & 8) Wood = 0xFFB5523B;   // a red barn
+ if(Variant & 32) Roof = 0xFF5E8A3A;  // moss
 
- //- Stone plinth (reaches down so houses on terrace edges do not float)
- R3PushBox(O, R3Add(B, V3(0.f, .5f*Plinth - .25f, 0.f)), V3(HX + .035f, .5f*Plinth + .25f, HZ + .035f), HeroShade(H, Hero_ColorStone));
+ //- Stone plinth (reaches down so houses on terrace edges do not float), or a
+ // wooden floor on a deck
+ if(Variant & 16)
+ {
+  R3PushBox(O, R3Add(B, V3(0.f, .5f*Plinth, 0.f)), V3(HX + .04f, .5f*Plinth, HZ + .04f), HeroShade(H, Hero_ColorWoodLight));
+ }
+ else
+ {
+  R3PushBox(O, R3Add(B, V3(0.f, .5f*Plinth - .25f, 0.f)), V3(HX + .035f, .5f*Plinth + .25f, HZ + .035f), HeroShade(H, Hero_ColorStone));
+ }
 
  //- Walls, corner posts and floor beams
  f32 Y0 = B.Y + Plinth;
@@ -643,6 +732,18 @@ HeroPushHouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, u32 Floors, u32 Variant
  R3PushTri(O, V3(B.X - HX, RY0, B.Z - HZ), V3(B.X - HX, RY0, B.Z + HZ), V3(B.X - HX, RY1 - .02f, B.Z), R3Add(Inside, V3(1.f, 0.f, 0.f)), HeroShade(H, Wood));
  R3PushTri(O, V3(B.X + HX, RY0, B.Z - HZ), V3(B.X + HX, RY0, B.Z + HZ), V3(B.X + HX, RY1 - .02f, B.Z), R3Add(Inside, V3(-1.f, 0.f, 0.f)), HeroShade(H, Wood));
  R3PushCylinder(O, R3Add(R0, V3(0.f, .01f, 0.f)), R3Add(R1, V3(0.f, .01f, 0.f)), .018f, 4, R3Color(Hero_ColorWoodDark));
+ if(Variant & 32)
+ {
+  // Moss and ferns growing on the roof
+  for(u32 Tuft = 0; Tuft < 7; Tuft += 1)
+  {
+   f32 TX = RandomUnilateral(&H->Series);
+   f32 TY = RandomUnilateral(&H->Series);
+   v3 Low = R3Lerp((Tuft & 1) ? F0 : A0, (Tuft & 1) ? F1 : A1, TX);
+   v3 High = R3Lerp(R0, R1, TX);
+   R3PushEllipsoid(O, R3Lerp(Low, High, .2f + .6f*TY), V3(.07f, .03f, .07f), 3, 6, HeroShade(H, Hero_ColorLeaf), false);
+  }
+ }
 
  //- Solar panels on the front slope
  v3 SlopeUp = R3Normalize(R3Sub(R0, F0));
@@ -696,6 +797,12 @@ HeroPushHouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, u32 Floors, u32 Variant
 }
 
 internal void
+HeroPushHouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, u32 Floors, u32 Variant)
+{
+ HeroPushHouseAt(H, HeroOn(H, X, Z), HX, HZ, Floors, Variant);
+}
+
+internal void
 HeroPushGreenhouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
 {
  r3_mesh *O = H->Opaque;
@@ -740,6 +847,26 @@ HeroPushGreenhouse(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
  R3PushTriUnlit(H->Translucent, V3(B.X + HX, Y1, B.Z - HZ), V3(B.X + HX, Y1, B.Z + HZ), V3(B.X + HX, Y2, B.Z), Glass);
 }
 
+// NOTE: A windmill's six-bladed rotor, turning with time (a moving part).
+internal void
+HeroPushRotor(hero_ctx *H, v3 Hub, f32 Phase)
+{
+ if(HeroDefer(H, HeroCmd_Rotor, Hub, Phase, 0.f, 0.f)) return;
+ r3_mesh *O = H->Opaque;
+ v4 Wood = R3Color(Hero_ColorWoodDark);
+ R3PushEllipsoid(O, Hub, V3(.03f, .03f, .03f), 3, 6, R3Color(0xFF8A7A6A), false);
+ f32 Spin = 1.6f*H->Time + Phase;
+ for(u32 Blade = 0; Blade < 6; Blade += 1)
+ {
+  f32 Angle = Spin + 2.f*Pi32*(f32)Blade/6.f;
+  v3 Dir = V3(R3Cos(Angle), R3Sin(Angle), 0.f);
+  v3 Side = V3(-Dir.Y, Dir.X, 0.f);
+  u32 Color = (Blade & 1) ? 0xFFC79A6A : 0xFFE6D6BC;
+  R3PushOrientedBox(O, R3Add(Hub, R3Scale(Dir, .2f)), R3Scale(Dir, .17f), R3Scale(Side, .04f), V3(0.f, 0.f, .006f), R3Color(Color));
+  R3PushCylinder(O, Hub, R3Add(Hub, R3Scale(Dir, .36f)), .006f, 3, Wood);
+ }
+}
+
 // NOTE: A wooden lattice windmill whose rotor faces the front and turns with time.
 internal void
 HeroPushWindmill(hero_ctx *H, f32 X, f32 Z, f32 Height, f32 Phase)
@@ -778,18 +905,7 @@ HeroPushWindmill(hero_ctx *H, f32 X, f32 Z, f32 Height, f32 Phase)
  R3PushOrientedBox(O, R3Add(Head, V3(0.f, .02f, -.25f)), V3(.006f, 0.f, 0.f), V3(0.f, .07f, 0.f), V3(0.f, 0.f, .14f), R3Color(Hero_ColorWoodLight));
  R3PushCylinder(O, R3Add(Head, V3(0.f, 0.f, -.08f)), R3Add(Head, V3(0.f, .02f, -.14f)), .008f, 4, Wood);
 
- v3 Hub = R3Add(Head, V3(0.f, 0.f, .11f));
- R3PushEllipsoid(O, Hub, V3(.03f, .03f, .03f), 3, 6, R3Color(0xFF8A7A6A), false);
- f32 Spin = 1.6f*H->Time + Phase;
- for(u32 Blade = 0; Blade < 6; Blade += 1)
- {
-  f32 Angle = Spin + 2.f*Pi32*(f32)Blade/6.f;
-  v3 Dir = V3(R3Cos(Angle), R3Sin(Angle), 0.f);
-  v3 Side = V3(-Dir.Y, Dir.X, 0.f);
-  u32 Color = (Blade & 1) ? 0xFFC79A6A : 0xFFE6D6BC;
-  R3PushOrientedBox(O, R3Add(Hub, R3Scale(Dir, .2f)), R3Scale(Dir, .17f), R3Scale(Side, .04f), V3(0.f, 0.f, .006f), R3Color(Color));
-  R3PushCylinder(O, Hub, R3Add(Hub, R3Scale(Dir, .36f)), .006f, 3, Wood);
- }
+ HeroPushRotor(H, R3Add(Head, V3(0.f, 0.f, .11f)), Phase);
 }
 
 internal void
@@ -943,12 +1059,14 @@ HeroPushDock(hero_ctx *H, f32 XFrom, f32 XTo, f32 Z, f32 HalfWidth)
  }
 }
 
+// NOTE: A rowing boat bobbing on the water (a moving part). Base = hull centre at rest.
 internal void
-HeroPushBoat(hero_ctx *H, f32 X, f32 Z, f32 Facing, f32 Phase, b32 Rower)
+HeroPushBoatAt(hero_ctx *H, v3 Base, f32 Facing, f32 Phase, b32 Rower)
 {
+ if(HeroDefer(H, HeroCmd_Boat, Base, Facing, Phase, Rower ? 1.f : 0.f)) return;
  r3_mesh *O = H->Opaque;
  f32 Bob = .012f*R3Sin(1.3f*H->Time + Phase);
- v3 C = HeroP(H, X, Hero_WaterLevel + .02f + Bob, Z);
+ v3 C = R3Add(Base, V3(0.f, Bob, 0.f));
  R3PushEllipsoid(O, C, V3(.2f, .06f, .085f), 4, 9, R3Color(0xFF8A5A36), false);
  R3PushBox(O, R3Add(C, V3(0.f, .045f, 0.f)), V3(.15f, .01f, .06f), R3Color(0xFFC79A6A));
  R3PushBox(O, R3Add(C, V3(.03f*Facing, .065f, 0.f)), V3(.02f, .01f, .065f), R3Color(Hero_ColorWoodDark));
@@ -965,10 +1083,17 @@ HeroPushBoat(hero_ctx *H, f32 X, f32 Z, f32 Facing, f32 Phase, b32 Rower)
  R3PushEllipsoid(H->Translucent, R3Add(C, V3(0.f, -.015f, 0.f)), V3(.26f, .004f, .12f), 2, 10, R3WithAlpha(R3Color(0xFFFFFFFF), .35f), true);
 }
 
+internal void
+HeroPushBoat(hero_ctx *H, f32 X, f32 Z, f32 Facing, f32 Phase, b32 Rower)
+{
+ HeroPushBoatAt(H, HeroP(H, X, Hero_WaterLevel + .02f, Z), Facing, Phase, Rower);
+}
+
 // NOTE: A water wheel with its axle along X, turning with time.
 internal void
 HeroPushWaterWheel(hero_ctx *H, v3 C, f32 Radius)
 {
+ if(HeroDefer(H, HeroCmd_WaterWheel, C, Radius, 0.f, 0.f)) return;
  r3_mesh *O = H->Opaque;
  v4 Wood = R3Color(Hero_ColorWoodDark);
  f32 Spin = -1.2f*H->Time;
@@ -1036,6 +1161,18 @@ HeroPushBarrel(hero_ctx *H, f32 X, f32 Z)
  R3PushCylinder(H->Opaque, R3Add(B, V3(0.f, .09f, 0.f)), R3Add(B, V3(0.f, .102f, 0.f)), .058f, 8, R3Color(0xFF4A4038));
 }
 
+// NOTE: Flickering campfire flames and their glow (a moving part).
+internal void
+HeroPushFlames(hero_ctx *H, v3 B)
+{
+ if(HeroDefer(H, HeroCmd_Flames, B, 0.f, 0.f, 0.f)) return;
+ r3_mesh *O = H->Opaque;
+ f32 Flicker = 1.f + .15f*R3Sin(9.f*H->Time) + .08f*R3Sin(23.f*H->Time);
+ R3PushEllipsoid(O, R3Add(B, V3(0.f, .07f*Flicker, 0.f)), V3(.045f, .07f*Flicker, .045f), 4, 6, R3Color(Hero_ColorFire), true);
+ R3PushEllipsoid(O, R3Add(B, V3(0.f, .055f*Flicker, 0.f)), V3(.025f, .045f*Flicker, .025f), 3, 6, R3Color(Hero_ColorFireCore), true);
+ R3PushEllipsoid(H->Translucent, R3Add(B, V3(0.f, .08f, 0.f)), V3(.22f, .16f, .22f), 4, 8, R3WithAlpha(R3Color(Hero_ColorFire), .18f), true);
+}
+
 internal void
 HeroPushCampfire(hero_ctx *H, f32 X, f32 Z)
 {
@@ -1052,10 +1189,7 @@ HeroPushCampfire(hero_ctx *H, f32 X, f32 Z)
   v3 Dir = V3(R3Cos(A), 0.f, R3Sin(A));
   R3PushOrientedBox(O, R3Add(B, V3(0.f, .02f, 0.f)), R3Scale(Dir, .07f), V3(0.f, .012f, 0.f), R3Scale(V3(-Dir.Z, 0.f, Dir.X), .012f), R3Color(0xFF5A3D26));
  }
- f32 Flicker = 1.f + .15f*R3Sin(9.f*H->Time) + .08f*R3Sin(23.f*H->Time);
- R3PushEllipsoid(O, R3Add(B, V3(0.f, .07f*Flicker, 0.f)), V3(.045f, .07f*Flicker, .045f), 4, 6, R3Color(Hero_ColorFire), true);
- R3PushEllipsoid(O, R3Add(B, V3(0.f, .055f*Flicker, 0.f)), V3(.025f, .045f*Flicker, .025f), 3, 6, R3Color(Hero_ColorFireCore), true);
- R3PushEllipsoid(H->Translucent, R3Add(B, V3(0.f, .08f, 0.f)), V3(.22f, .16f, .22f), 4, 8, R3WithAlpha(R3Color(Hero_ColorFire), .18f), true);
+ HeroPushFlames(H, B);
 }
 
 internal void
@@ -1234,6 +1368,13 @@ HeroClaim(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
 {
  b32 Result = (X - HX > -Hero_Half + .12f && X + HX < Hero_Half - .12f &&
                Z - HZ > -Hero_Half + .12f && Z + HZ < Hero_Half - .12f);
+ if(H->Layout->Round)
+ {
+  f32 FarX = AbsF32(X) + HX;
+  f32 FarZ = AbsF32(Z) + HZ;
+  f32 Limit = H->Layout->Radius - .12f;
+  Result = Result && (FarX*FarX + FarZ*FarZ < Limit*Limit);
+ }
  u32 CenterType;
  f32 Level = HeroGroundY(H->Layout, X, Z, &CenterType);
  s32 I0 = HeroCellIndex(X - HX);
@@ -1475,6 +1616,8 @@ HeroPushWheatField(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ)
  R3PushCylinder(O, R3Add(Bale, V3(-.06f, 0.f, 0.f)), R3Add(Bale, V3(.06f, 0.f, 0.f)), .06f, 8, R3Color(W3ProductColors[ProductKind_Wheat]));
 }
 
+internal void HeroPushSails(hero_ctx *H, v3 Hub, f32 Phase);
+
 // NOTE: A white tower mill with four cloth sails, turning with time.
 internal void
 HeroPushTowerMill(hero_ctx *H, f32 X, f32 Z, f32 Phase)
@@ -1485,7 +1628,15 @@ HeroPushTowerMill(hero_ctx *H, f32 X, f32 Z, f32 Phase)
  R3PushCone(O, R3Add(B, V3(0.f, .82f, 0.f)), R3Add(B, V3(0.f, 1.1f, 0.f)), .15f, 10, R3Color(0xFF6A4E3A));
  R3PushBox(O, R3Add(B, V3(0.f, .1f, .2f)), V3(.05f, .1f, .012f), R3Color(Hero_ColorWoodDark));
  HeroGlowRect(O, R3Add(B, V3(0.f, .45f, .155f)), V3(.03f, 0.f, 0.f), V3(0.f, .035f, 0.f), R3Color(Hero_ColorWindow));
- v3 Hub = R3Add(B, V3(0.f, .92f, .17f));
+ HeroPushSails(H, R3Add(B, V3(0.f, .92f, .17f)), Phase);
+}
+
+// NOTE: A tower mill's four cloth sails, turning with time (a moving part).
+internal void
+HeroPushSails(hero_ctx *H, v3 Hub, f32 Phase)
+{
+ if(HeroDefer(H, HeroCmd_Sails, Hub, Phase, 0.f, 0.f)) return;
+ r3_mesh *O = H->Opaque;
  R3PushEllipsoid(O, Hub, V3(.035f, .035f, .035f), 3, 6, R3Color(Hero_ColorWoodDark), false);
  f32 Spin = 1.1f*H->Time + Phase;
  for(u32 Sail = 0; Sail < 4; Sail += 1)
@@ -1678,6 +1829,72 @@ HeroAmountOf(island *Island, product_kind Kind)
 }
 
 //~ Shared by all hand-built islands
+// NOTE: The knowledge crystal: grey -> cyan as the island learns about more islands (a
+// moving part: its colour changes as news arrives).
+internal void
+HeroPushCrystal(hero_ctx *H, v3 Center, f32 Size)
+{
+ if(HeroDefer(H, HeroCmd_Crystal, Center, Size, 0.f, 0.f)) return;
+ f32 Known = (H->Island < R3_MaxIslands) ? H->R3->IslandKnown[H->Island] : 0.f;
+ v4 Color = R3LerpColor(R3Color(W3_ColorCrystalLow), R3Color(W3_ColorCrystalHigh), Known);
+ R3PushCone(H->Opaque, Center, R3Add(Center, V3(0.f, 1.3f*Size, 0.f)), Size, 4, Color);
+ R3PushCone(H->Opaque, Center, R3Add(Center, V3(0.f, -1.3f*Size, 0.f)), Size, 4, Color);
+}
+
+// NOTE: The status ring round the island and, when hovered or selected, a second ring
+// outside it (a moving part). Radius 0 = the square slab.
+internal void
+HeroPushRings(hero_ctx *H, app_state *App, f32 Radius)
+{
+ if(HeroDefer(H, HeroCmd_Ring, H->Top, Radius, 0.f, 0.f)) return;
+ r3_state *R3 = &App->R3;
+ b32 Hovered = (R3->HoveredIdx == (s32)H->Island);
+ b32 Selected = (App->Panel.SelectedPlusOne == (s32)H->Island + 1);
+ v4 Status = R3Color(W3StatusColor(R3->IslandStatus[H->Island]));
+ v4 Highlight = R3Color(Hovered ? W3_ColorHover : W3_ColorSelected);
+ if(Radius > 0.f)
+ {
+  W3PushRing(H->Opaque, H->Top, Radius + .12f, Radius + .3f, Status);
+  if(Hovered || Selected) W3PushRing(H->Opaque, H->Top, Radius + .36f, Radius + .48f, Highlight);
+ }
+ else
+ {
+  HeroPushSquareRing(H, Hero_Half + .12f, Hero_Half + .3f, Status);
+  if(Hovered || Selected) HeroPushSquareRing(H, Hero_Half + .36f, Hero_Half + .48f, Highlight);
+ }
+}
+
+// NOTE: Draws the moving parts of all hand-built islands for this frame.
+internal void
+HeroReplayCommands(app_state *App)
+{
+ r3_state *R3 = &App->R3;
+ hero_ctx Ctx;
+ hero_ctx *H = &Ctx;
+ MemorySet(H, 0, sizeof(*H));
+ H->Opaque = &R3->Opaque;
+ H->Translucent = &R3->Translucent;
+ H->Time = R3->AnimTime;
+ H->R3 = R3;
+ RandomSeed(&H->Series, W3_Seed);
+ for(u32 Idx = 0; Idx < R3->HeroCommandCount; Idx += 1)
+ {
+  hero_command *Command = &R3->HeroCommands[Idx];
+  H->Island = Command->Island;
+  H->Top = Command->P;
+  switch(Command->Kind)
+  {
+   case HeroCmd_Rotor:      HeroPushRotor(H, Command->P, Command->A); break;
+   case HeroCmd_Sails:      HeroPushSails(H, Command->P, Command->A); break;
+   case HeroCmd_WaterWheel: HeroPushWaterWheel(H, Command->P, Command->A); break;
+   case HeroCmd_Boat:       HeroPushBoatAt(H, Command->P, Command->A, Command->B, Command->C > .5f); break;
+   case HeroCmd_Flames:     HeroPushFlames(H, Command->P); break;
+   case HeroCmd_Crystal:    HeroPushCrystal(H, Command->P, Command->A); break;
+   case HeroCmd_Ring:       HeroPushRings(H, App, Command->A); break;
+   default: break;
+  }
+ }
+}
 // NOTE: Rocky crest with the knowledge crystal on a mast (grey -> cyan as the island
 // learns about more islands).
 internal void
@@ -1692,28 +1909,28 @@ HeroPushCrest(hero_ctx *H, f32 X, f32 Z, f32 KnownFraction)
  v3 MastBase = R3Add(Crest, V3(.05f, .5f, -.05f));
  v3 Crystal = R3Add(MastBase, V3(0.f, .65f, 0.f));
  R3PushCylinder(H->Opaque, MastBase, Crystal, .025f, 5, R3Color(W3_ColorPost));
- v4 Color = R3LerpColor(R3Color(W3_ColorCrystalLow), R3Color(W3_ColorCrystalHigh), KnownFraction);
- f32 Size = .2f;
- R3PushCone(H->Opaque, Crystal, R3Add(Crystal, V3(0.f, 1.3f*Size, 0.f)), Size, 4, Color);
- R3PushCone(H->Opaque, Crystal, R3Add(Crystal, V3(0.f, -1.3f*Size, 0.f)), Size, 4, Color);
+ HeroPushCrystal(H, Crystal, .2f);
 }
 
 internal void
-HeroBegin(hero_ctx *H, app_state *App, hero_layout *Layout, v3 Top, u64 Seed)
+HeroBegin(hero_ctx *H, app_state *App, hero_layout *Layout, v3 Top, u64 Seed, u32 Index)
 {
  r3_state *R3 = &App->R3;
  MemorySet(H, 0, sizeof(*H));
- H->Opaque = &R3->Opaque;
- H->Translucent = &R3->Translucent;
+ H->Opaque = R3->HeroOpaque ? R3->HeroOpaque : &R3->Opaque;
+ H->Translucent = R3->HeroTranslucent ? R3->HeroTranslucent : &R3->Translucent;
  H->Top = Top;
  H->Time = R3->AnimTime;
  H->Layout = Layout;
+ H->R3 = R3;
+ H->Island = Index;
+ H->Recording = R3->HeroRecording;
  RandomSeed(&H->Series, Seed);
 }
 
 // NOTE: Bushes on free grass, clouds around the base and the status rings.
 internal void
-HeroFinish(hero_ctx *H, u32 StatusColor, b32 Highlight, u32 HighlightColor)
+HeroFinish(hero_ctx *H, app_state *App, u32 StatusColor, b32 Highlight, u32 HighlightColor)
 {
  for(u32 Bush = 0; Bush < 70; Bush += 1)
  {
@@ -1721,7 +1938,8 @@ HeroFinish(hero_ctx *H, u32 StatusColor, b32 Highlight, u32 HighlightColor)
   f32 Z = (Hero_Half - .1f)*RandomBilateral(&H->Series);
   u32 Type;
   f32 Y = HeroGroundY(H->Layout, X, Z, &Type);
-  if(Type == HeroGround_Grass && !HeroCellTaken(H, X, Z))
+  b32 OnIsland = !H->Layout->Round || (X*X + Z*Z < (H->Layout->Radius - .1f)*(H->Layout->Radius - .1f));
+  if(Type == HeroGround_Grass && !HeroCellTaken(H, X, Z) && OnIsland)
   {
    f32 Size = .05f + .06f*RandomUnilateral(&H->Series);
    R3PushEllipsoid(H->Opaque, HeroP(H, X, Y + .6f*Size, Z), V3(Size*1.2f, Size, Size*1.2f), 3, 6, HeroShade(H, (Bush & 1) ? Hero_ColorLeaf : Hero_ColorVine), false);
@@ -1741,11 +1959,7 @@ HeroFinish(hero_ctx *H, u32 StatusColor, b32 Highlight, u32 HighlightColor)
   R3PushEllipsoid(H->Translucent, P, Radii, 5, 9, R3WithAlpha(R3Color(Hero_ColorCloud), .5f), true);
  }
 
- HeroPushSquareRing(H, Hero_Half + .12f, Hero_Half + .3f, R3Color(StatusColor));
- if(Highlight)
- {
-  HeroPushSquareRing(H, Hero_Half + .36f, Hero_Half + .48f, R3Color(HighlightColor));
- }
+ HeroPushRings(H, App, H->Layout->Round ? H->Layout->Radius : 0.f);
 }
 
 //~ The hero island
@@ -1757,6 +1971,7 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
  Layout.PoolX0 = Hero_PoolX0;
  Layout.PoolX1 = Hero_PoolX1;
  Layout.PoolZ0 = Hero_PoolZ0;
+ Layout.FrontLevel = Hero_FrontLevel;
  Layout.HillX = -.15f;
  Layout.HillZ = -1.45f;
  Layout.HillStretch = 1.3f;
@@ -1772,7 +1987,7 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
 
  hero_ctx Ctx;
  hero_ctx *H = &Ctx;
- HeroBegin(H, App, &Layout, Top, W3_Seed*17 + 389*(u64)Index);
+ HeroBegin(H, App, &Layout, Top, W3_Seed*17 + 389*(u64)Index, Index);
  for(u32 Idx = 0; Idx < ArrayCount(HeroTakenRects); Idx += 1)
  {
   HeroMarkRect(H, HeroTakenRects[Idx][0], HeroTakenRects[Idx][1], HeroTakenRects[Idx][2], HeroTakenRects[Idx][3]);
@@ -1883,7 +2098,7 @@ W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusCo
   HeroPushPerson(H, HeroP(H, 1.f, Hero_WaterLevel + .105f, 1.45f), HeroShirtColors[4]);
  }
 
- HeroFinish(H, StatusColor, Highlight, HighlightColor);
+ HeroFinish(H, App, StatusColor, Highlight, HighlightColor);
 }
 
 //~ Themed islands: the hero island's neighbours, built the same way, with contents
@@ -1895,7 +2110,7 @@ W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Status
  hero_layout Layout = {0};
  hero_ctx Ctx;
  hero_ctx *H = &Ctx;
- HeroBegin(H, App, &Layout, Top, W3_Seed*23 + 601*(u64)Index);
+ HeroBegin(H, App, &Layout, Top, W3_Seed*23 + 601*(u64)Index, Index);
  random_series *S = &H->Series;
 
  //- What it makes, largest amount first
@@ -1904,6 +2119,7 @@ W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Status
  u64 FishAmount = HeroAmountOf(Island, ProductKind_Fish);
 
  //- Layout: a harbour only when the island catches fish, bigger for a bigger catch
+ Layout.FrontLevel = Hero_FrontLevel;
  Layout.Pool = (FishAmount > 0);
  if(Layout.Pool)
  {
@@ -2053,5 +2269,5 @@ W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 Status
   }
  }
 
- HeroFinish(H, StatusColor, Highlight, HighlightColor);
+ HeroFinish(H, App, StatusColor, Highlight, HighlightColor);
 }

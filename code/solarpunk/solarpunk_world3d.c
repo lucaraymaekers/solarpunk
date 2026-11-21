@@ -846,6 +846,44 @@ W3PushClouds(r3_mesh *Mesh)
 #define W3Style_Normal 0
 #define W3Style_Hero   1
 #define W3Style_Themed 2
+#define W3Style_Forest 3   // Verdant Reach (solarpunk_forest_island.c)
+#define W3_ForestCluster 0
+internal void W3PushForestIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
+internal void HeroReplayCommands(app_state *App);
+
+// NOTE: Identifies the hand-built islands and everything they are built from (which
+// islands, where, what they make and need), so their cached geometry is rebuilt exactly
+// when one of these changes.
+internal u64
+W3HeroCacheKey(app_state *App)
+{
+ r3_state *R3 = &App->R3;
+ u64 Key = 1469598103934665603ull;
+#define W3HeroMix(Value) Key = (Key ^ (u64)(Value))*1099511628211ull
+ u32 Idx = 0;
+ for(island *Island = App->FirstIsland; Island && Idx < R3_MaxIslands; Island = Island->Next)
+ {
+  if(R3->IslandStyle[Idx] != W3Style_Normal)
+  {
+   u32 BitsX, BitsY, BitsZ;
+   MemoryCopy(&BitsX, &R3->IslandTop[Idx].X, sizeof(BitsX));
+   MemoryCopy(&BitsY, &R3->IslandTop[Idx].Y, sizeof(BitsY));
+   MemoryCopy(&BitsZ, &R3->IslandTop[Idx].Z, sizeof(BitsZ));
+   W3HeroMix(Idx);
+   W3HeroMix(R3->IslandStyle[Idx]);
+   W3HeroMix(BitsX);
+   W3HeroMix(BitsY);
+   W3HeroMix(BitsZ);
+   for(product *Product = Island->FirstProduct; Product; Product = Product->Next) { W3HeroMix(Product->Kind); W3HeroMix(Product->Amount); }
+   W3HeroMix(0xFFFF);
+   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) { W3HeroMix(Req->Kind); W3HeroMix(Req->Amount); }
+  }
+  Idx += 1;
+ }
+ W3HeroMix(Idx);
+#undef W3HeroMix
+ return Key;
+}
 internal void W3PushHeroIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushThemedIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 
@@ -907,6 +945,20 @@ W3PrepareIslands(app_state *App, app_input *Input)
     Idx += 1;
    }
    if(Best >= 0) R3->IslandStyle[Best] = W3Style_Themed;
+  }
+ }
+
+ //- Verdant Reach is a forest cluster: all its islands are forest islands
+ if(App->HasMapLayout)
+ {
+  u32 Count = 0;
+  for(island *Island = App->FirstIsland; Island && Count < R3_MaxIslands; Island = Island->Next) Count += 1;
+  for(u32 Idx = 0; Idx < Count; Idx += 1)
+  {
+   if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_ForestCluster)
+   {
+    R3->IslandStyle[Idx] = W3Style_Forest;
+   }
   }
  }
 
@@ -978,6 +1030,22 @@ W3BuildWorld(app_state *App)
  r3_state *R3 = &App->R3;
  broadcast_state *Broadcast = &App->Broadcast;
 
+ //- The hand-built islands are cached on the GPU and rebuilt only when they change;
+ // their moving parts are replayed every frame (HeroReplayCommands, below).
+ u64 HeroKey = W3HeroCacheKey(App);
+ b32 RebuildHero = (!R3->HeroCacheValid || R3->HeroCacheKey != HeroKey);
+ r3_mesh HeroOpaque = {0};
+ r3_mesh HeroTranslucent = {0};
+ if(RebuildHero)
+ {
+  HeroOpaque = R3MeshAlloc(FrameArena, R3_MaxHeroOpaqueVertices);
+  HeroTranslucent = R3MeshAlloc(FrameArena, R3_MaxHeroTranslucentVertices);
+  R3->HeroCommandCount = 0;
+  R3->HeroOpaque = &HeroOpaque;
+  R3->HeroTranslucent = &HeroTranslucent;
+  R3->HeroRecording = true;
+ }
+
  //- Islands
  u32 Index = 0;
  for(island *Island = App->FirstIsland; Island && Index < R3->IslandCount; Island = Island->Next)
@@ -993,11 +1061,21 @@ W3BuildWorld(app_state *App)
    KnownFraction = ((f32)BroadcastKnownCount(App, Island) - 1.f)/((f32)Broadcast->IslandCount - 1.f);
   }
   KnownFraction = Clamp(0.f, KnownFraction, 1.f);
+  R3->IslandKnown[Index] = KnownFraction;
 
-  if(R3->IslandStyle[Index] == W3Style_Hero)
+  if(R3->IslandStyle[Index] != W3Style_Normal && !RebuildHero)
+  {
+   // Cached: nothing to build this frame.
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Hero)
   {
    W3PushHeroIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
                     Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
+  }
+  else if(R3->IslandStyle[Index] == W3Style_Forest)
+  {
+   W3PushForestIsland(App, Island, Top, Index, W3StatusColor(R3->IslandStatus[Index]),
+                      Hovered || Selected, Hovered ? W3_ColorHover : W3_ColorSelected, KnownFraction);
   }
   else if(R3->IslandStyle[Index] == W3Style_Themed)
   {
@@ -1016,6 +1094,17 @@ W3BuildWorld(app_state *App)
 
   Index += 1;
  }
+
+ if(RebuildHero)
+ {
+  R3UploadHeroCache(R3, &HeroOpaque, &HeroTranslucent);
+  R3->HeroCacheValid = true;
+  R3->HeroCacheKey = HeroKey;
+  R3->HeroOpaque = 0;
+  R3->HeroTranslucent = 0;
+  R3->HeroRecording = false;
+ }
+ HeroReplayCommands(App);
 
  //- Cables and news pulses
  u32 FromIdx = 0;
@@ -1072,5 +1161,6 @@ W3BuildWorld(app_state *App)
 
  //- Clouds below the islands
  W3PushClouds(&R3->Translucent);
+
 
 }

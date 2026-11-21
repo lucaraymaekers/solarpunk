@@ -472,7 +472,9 @@ R3CameraEye(r3_camera *Camera)
 
 //~ GL
 #define R3_MaxSkyVertices         1024
-#define R3_MaxOpaqueVertices      (2*1024*1024)   // the 9 hand-built islands need ~1M
+#define R3_MaxOpaqueVertices      (1024*1024)     // per frame: simple islands, cables, moving parts
+#define R3_MaxHeroOpaqueVertices  (4*1024*1024)   // the hand-built islands, cached (~2M)
+#define R3_MaxHeroTranslucentVertices (512*1024)
 #define R3_MaxTranslucentVertices (512*1024)
 
 // NOTE: Golden hour: gold at the horizon, coral in the middle, soft violet at the top.
@@ -570,6 +572,38 @@ R3InitGL(r3_state *R3)
  glVertexAttribPointer(2, 4, GL_FLOAT, false, sizeof(r3_vertex), (void *)offsetof(r3_vertex, Color));
 
  R3->GLReady = true;
+}
+
+// NOTE: The cached buffer for the hand-built islands (same vertex layout).
+internal void
+R3InitHeroGL(r3_state *R3)
+{
+ glGenVertexArrays(1, &R3->HeroVAO);
+ glGenBuffers(1, &R3->HeroVBO);
+ glBindVertexArray(R3->HeroVAO);
+ glBindBuffer(GL_ARRAY_BUFFER, R3->HeroVBO);
+ glEnableVertexAttribArray(0);
+ glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(r3_vertex), (void *)offsetof(r3_vertex, Pos));
+ glEnableVertexAttribArray(1);
+ glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(r3_vertex), (void *)offsetof(r3_vertex, Normal));
+ glEnableVertexAttribArray(2);
+ glVertexAttribPointer(2, 4, GL_FLOAT, false, sizeof(r3_vertex), (void *)offsetof(r3_vertex, Color));
+}
+
+// NOTE: Uploads the hand-built islands' still geometry once; drawn every frame by R3EndFrame.
+internal void
+R3UploadHeroCache(r3_state *R3, r3_mesh *Opaque, r3_mesh *Translucent)
+{
+ if(!R3->GLReady) R3InitGL(R3);
+ if(!R3->HeroVAO) R3InitHeroGL(R3);
+ glBindVertexArray(R3->HeroVAO);
+ glBindBuffer(GL_ARRAY_BUFFER, R3->HeroVBO);
+ u32 Total = Opaque->Count + Translucent->Count;
+ glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(Total*sizeof(r3_vertex)), 0, GL_STATIC_DRAW);
+ glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(Opaque->Count*sizeof(r3_vertex)), Opaque->Vertices);
+ glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)(Opaque->Count*sizeof(r3_vertex)), (GLsizeiptr)(Translucent->Count*sizeof(r3_vertex)), Translucent->Vertices);
+ R3->HeroOpaqueCount = Opaque->Count;
+ R3->HeroTranslucentCount = Translucent->Count;
 }
 
 // NOTE: Start a 3D frame: camera matrices and empty meshes.
@@ -704,8 +738,19 @@ R3EndFrame(r3_state *R3, gl_render_state *RectRender)
  glDepthFunc(GL_LESS);
  glDepthMask(true);
  glDrawArrays(GL_TRIANGLES, (gl_int)SkyCount, (gl_int)OpaqueCount);
+ b32 HeroCache = (R3->HeroVAO && R3->HeroCacheValid);
+ if(HeroCache)
+ {
+  glBindVertexArray(R3->HeroVAO);
+  glDrawArrays(GL_TRIANGLES, 0, (gl_int)R3->HeroOpaqueCount);
+ }
 
  glDepthMask(false);
+ if(HeroCache)
+ {
+  glDrawArrays(GL_TRIANGLES, (gl_int)R3->HeroOpaqueCount, (gl_int)R3->HeroTranslucentCount);
+  glBindVertexArray(R3->VAO);
+ }
  glDrawArrays(GL_TRIANGLES, (gl_int)(SkyCount + OpaqueCount), (gl_int)TranslucentCount);
 
  //- Restore what the rectangle renderer expects
