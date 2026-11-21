@@ -475,15 +475,12 @@ R3CameraEye(r3_camera *Camera)
 #define R3_MaxOpaqueVertices      (640*1024)
 #define R3_MaxTranslucentVertices (192*1024)
 
-// NOTE: Golden hour: gold at the horizon, coral in the middle, soft violet at the top.
-#define R3_ColorSkyTop     0xFF5C4D8C
-#define R3_ColorSkyMiddle  0xFFE3906C
-#define R3_ColorSkyHorizon 0xFFF7C97E
 #define R3_ColorFog        0xFFF0BC8E
 #define R3_FogStart        90.f
 #define R3_FogEnd          320.f
 
 // NOTE: Warm, low sun from the left; violet-tinted ambient light in the shadows.
+// The islands always get this light, day or night, so their colours never change.
 #define R3_SunDirX  -.85f
 #define R3_SunDirY   .42f
 #define R3_SunDirZ   .32f
@@ -494,12 +491,45 @@ R3CameraEye(r3_camera *Camera)
 #define R3_AmbientG  .6f
 #define R3_AmbientB  .68f
 
-// NOTE: The sun in the sky (screen space, -1..1), in the open sky between the controls.
-#define R3_SunScreenX  .14f
-#define R3_SunScreenY  .78f
-#define R3_SunRadius   .075f
-#define R3_ColorSunCore 0xFFFFF6DC
-#define R3_ColorSunGlow 0xFFFFD58A
+//~ Day and night (visual only, L14): only the sky changes
+// NOTE: The time of day comes from BroadcastDayOfRound (0 = midnight, .25 = 06:00
+// sunrise, .5 = noon, .75 = 18:00 sunset) and moves smoothly through each round.
+#define R3_DayEaseRate     3.f     // after a jump: higher = the sky turns faster
+#define R3_DaySnap         .02f    // smaller changes (normal running) are followed exactly
+
+// NOTE: Three skies (top, middle, horizon). Everything is blended from the sun's height,
+// which changes a little every frame, so the sky never holds still and never jumps:
+//   night <-> day follows the height (midnight = night, noon = day),
+//   the golden sky glows in around sunrise and sunset (sun near the horizon).
+#define R3_ColorNightTop     0xFF151B3E
+#define R3_ColorNightMiddle  0xFF263168
+#define R3_ColorNightHorizon 0xFF3C4A80
+#define R3_ColorDayTop       0xFF4A82C4
+#define R3_ColorDayMiddle    0xFF8CBCE6
+#define R3_ColorDayHorizon   0xFFD2E8F4
+#define R3_ColorGoldTop      0xFF5C4D8C
+#define R3_ColorGoldMiddle   0xFFE3906C
+#define R3_ColorGoldHorizon  0xFFF7C97E
+#define R3_GoldWidth         .55f   // sun height range (0..1) over which the golden glow fades
+#define R3_BodyFadeLow       -.3f   // sun/moon height where the disc starts to show
+#define R3_BodyFadeHigh      .35f   // ... and is fully visible
+
+// NOTE: Sun and moon travel on an arc across the open sky (the part of the window the
+// top bar and the panel leave free, see LensShift): up on the left, down on the right.
+// The camera looks down on the islands, so the open sky is the band under the top bar;
+// the arc lives there.
+#define R3_SkyArcHalfWidth .85f   // of the free width
+#define R3_SkyArcTopGap    .2f    // clip space kept free under the top bar (shortage strip)
+#define R3_SkyArcDrop      .35f   // clip space from the arc's top down to its horizon
+#define R3_SunRadius       .075f
+#define R3_MoonRadius      .05f
+#define R3_ColorSunCore    0xFFFFF6DC
+#define R3_ColorSunGlow    0xFFFFD58A
+#define R3_ColorMoonCore   0xFFEEF1FA
+#define R3_ColorMoonGlow   0xFFB4C4F0
+#define R3_MoonShadowSize   .85f  // of the moon's radius
+#define R3_MoonShadowOffset .55f  // of the moon's radius, up and to the right
+#define R3_SkyMiddleY       .2f   // where the sky gradient's middle colour sits (clip space)
 
 global_variable char *R3VertexShaderSource =
 "#version 330 core\n"
@@ -572,6 +602,162 @@ R3InitGL(r3_state *R3)
  R3->GLReady = true;
 }
 
+//~ Day and night
+// NOTE: t = 0 gives A, t = 1 gives B. (base Lerp, and so R3LerpColor, has them the other
+// way round, which is easy to trip over.)
+internal v4
+R3MixColor(v4 A, v4 B, f32 t)
+{
+ v4 Result = V4(A.X + (B.X - A.X)*t, A.Y + (B.Y - A.Y)*t, A.Z + (B.Z - A.Z)*t, A.W + (B.W - A.W)*t);
+ return Result;
+}
+
+internal f32
+R3SmoothStep(f32 Edge0, f32 Edge1, f32 X)
+{
+ f32 t = Clamp(0.f, (X - Edge0)/(Edge1 - Edge0), 1.f);   // base Clamp is (Low, X, High)
+ f32 Result = t*t*(3.f - 2.f*t);
+ return Result;
+}
+
+// NOTE: Eases the shown time of day towards Target (0..1) the short way round the
+// clock, so stepping or jumping on the timeline turns the sky smoothly.
+internal void
+R3UpdateDayPhase(r3_state *R3, f32 Target, f32 dt)
+{
+ if(!R3->DayPhaseSet)
+ {
+  R3->DayPhase = Target;
+  R3->DayPhaseSet = true;
+ }
+ f32 Diff = Target - R3->DayPhase;
+ Diff -= floorf(Diff + .5f);   // -.5 .. .5
+ // Normal running moves a little each frame: follow exactly. Jumps turn smoothly.
+ f32 Step = (Diff*Diff < R3_DaySnap*R3_DaySnap) ? Diff : Diff*Min(1.f, R3_DayEaseRate*dt);
+ R3->DayPhase += Step;
+ R3->DayPhase -= floorf(R3->DayPhase);
+}
+
+// NOTE: A round disc with soft glow rings around it, in clip space (round on screen,
+// so the horizontal radius is divided by the aspect ratio).
+internal void
+R3PushSkyDisc(r3_mesh *Sky, v3 Center, f32 Radius, f32 Aspect, v4 Core, v4 Glow, f32 Alpha)
+{
+ f32 Radii[4] = {4.f, 2.4f, 1.5f, 1.f};
+ f32 Alphas[4] = {.08f, .16f, .32f, 1.f};
+ u32 Sides = 40;
+ for(u32 Layer = 0; Layer < 4; Layer += 1)
+ {
+  v4 Color = (Layer == 3) ? Core : Glow;
+  Color = R3WithAlpha(Color, Alphas[Layer]*Alpha);
+  f32 RadiusY = Radius*Radii[Layer];
+  f32 RadiusX = RadiusY/Aspect;
+  for(u32 Side = 0; Side < Sides; Side += 1)
+  {
+   f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)Sides;
+   f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)Sides;
+   R3PushTriUnlit(Sky, Center,
+                  V3(Center.X + RadiusX*R3Cos(Angle0), Center.Y + RadiusY*R3Sin(Angle0), 0.f),
+                  V3(Center.X + RadiusX*R3Cos(Angle1), Center.Y + RadiusY*R3Sin(Angle1), 0.f),
+                  Color);
+  }
+ }
+}
+
+// NOTE: Builds the sky (gradient, sun, moon) for R3->DayPhase.
+internal void
+R3BuildSky(r3_state *R3, f32 Aspect)
+{
+ f32 Phase = R3->DayPhase;
+
+ //- Sun and moon on opposite sides of the clock
+ f32 SunAngle = 2.f*Pi32*(Phase - .25f);
+ f32 SunHeight = R3Sin(SunAngle);    // -1 midnight .. 0 at 06:00/18:00 .. 1 noon
+ f32 SunSide = -R3Cos(SunAngle);     // -1 = rising (left), 1 = setting (right)
+
+ //- How much day and how much golden glow (both smooth in the time of day)
+ f32 Daylight = .5f + .5f*SunHeight;
+ f32 Gold = 1.f - Min(1.f, (SunHeight*SunHeight)/(R3_GoldWidth*R3_GoldWidth));
+ Gold *= Gold;
+#define R3_BlendKey(Field) R3MixColor(R3MixColor(R3Color(R3_ColorNight##Field), R3Color(R3_ColorDay##Field), Daylight), \
+R3Color(R3_ColorGold##Field), Gold)
+
+ //- Gradient: two bands, horizon -> middle (bottom 60% of the screen), middle -> top.
+ // Drawn with an identity matrix (positions are in clip space).
+ r3_mesh *Sky = &R3->Sky;
+ v4 Colors[3];
+ Colors[0] = R3_BlendKey(Horizon);
+ Colors[1] = R3_BlendKey(Middle);
+ Colors[2] = R3_BlendKey(Top);
+ f32 Ys[3] = {-1.f, R3_SkyMiddleY, 1.f};
+ {
+  v3 Zero = V3(0.f, 0.f, 0.f);
+  for(u32 Band = 0; Band < 2; Band += 1)
+  {
+   f32 Y0 = Ys[Band];
+   f32 Y1 = Ys[Band + 1];
+   R3PushVertex(Sky, V3(-1.f, Y0, 0.f), Zero, Colors[Band]);
+   R3PushVertex(Sky, V3( 1.f, Y0, 0.f), Zero, Colors[Band]);
+   R3PushVertex(Sky, V3( 1.f, Y1, 0.f), Zero, Colors[Band + 1]);
+   R3PushVertex(Sky, V3(-1.f, Y0, 0.f), Zero, Colors[Band]);
+   R3PushVertex(Sky, V3( 1.f, Y1, 0.f), Zero, Colors[Band + 1]);
+   R3PushVertex(Sky, V3(-1.f, Y1, 0.f), Zero, Colors[Band + 1]);
+  }
+ }
+#undef R3_BlendKey
+
+ //- Discs: they rise at the left edge, set at the right edge, and fade in and out
+ // slowly around the horizon (about three hours) so they never pop.
+ for(u32 Body = 0; Body < 2; Body += 1)
+ {
+  b32 IsSun = (Body == 0);
+  f32 Height = IsSun ? SunHeight : -SunHeight;
+  f32 Side = IsSun ? SunSide : -SunSide;
+  f32 Alpha = R3SmoothStep(R3_BodyFadeLow, R3_BodyFadeHigh, Height);
+  if(Alpha > 0.f)
+  {
+   // Free area in clip space: x from -1 to 1 + 2*LensShift.X, y up to 1 + 2*LensShift.Y.
+   f32 FreeCenterX = R3->LensShift.X;
+   f32 FreeHalfWidth = 1.f + R3->LensShift.X;
+   f32 ArcTop = 1.f + 2.f*R3->LensShift.Y - R3_SkyArcTopGap;
+   v3 Center = V3(FreeCenterX + Side*R3_SkyArcHalfWidth*FreeHalfWidth,
+                  ArcTop - R3_SkyArcDrop*(1.f - Height), 0.f);
+   if(IsSun)
+   {
+    R3PushSkyDisc(Sky, Center, R3_SunRadius, Aspect, R3Color(R3_ColorSunCore), R3Color(R3_ColorSunGlow), Alpha);
+   }
+   else
+   {
+    v4 Glow = R3Color(R3_ColorMoonGlow);
+    R3PushSkyDisc(Sky, Center, R3_MoonRadius, Aspect, R3Color(R3_ColorMoonCore), Glow, Alpha);
+
+    // Crescent: cover part of the moon with a disc of exactly what is behind it there
+    // (the sky at this height under the moon's glow rings), offset to the upper right.
+    f32 t = (Center.Y < Ys[1]) ? (Center.Y - Ys[0])/(Ys[1] - Ys[0]) : (Center.Y - Ys[1])/(Ys[2] - Ys[1]);
+    v4 Behind = (Center.Y < Ys[1]) ? R3MixColor(Colors[0], Colors[1], t) : R3MixColor(Colors[1], Colors[2], t);
+    Behind = R3MixColor(Behind, Glow, .08f*Alpha);
+    Behind = R3MixColor(Behind, Glow, .16f*Alpha);
+    Behind = R3MixColor(Behind, Glow, .32f*Alpha);
+    Behind.W = 1.f;
+    f32 ShadowRadiusY = R3_MoonRadius*R3_MoonShadowSize;
+    f32 ShadowRadiusX = ShadowRadiusY/Aspect;
+    v3 ShadowCenter = V3(Center.X + R3_MoonShadowOffset*R3_MoonRadius/Aspect,
+                         Center.Y + R3_MoonShadowOffset*R3_MoonRadius, 0.f);
+    u32 Sides = 40;
+    for(u32 Side2 = 0; Side2 < Sides; Side2 += 1)
+    {
+     f32 Angle0 = 2.f*Pi32*(f32)Side2/(f32)Sides;
+     f32 Angle1 = 2.f*Pi32*(f32)(Side2 + 1)/(f32)Sides;
+     R3PushTriUnlit(Sky, ShadowCenter,
+                    V3(ShadowCenter.X + ShadowRadiusX*R3Cos(Angle0), ShadowCenter.Y + ShadowRadiusY*R3Sin(Angle0), 0.f),
+                    V3(ShadowCenter.X + ShadowRadiusX*R3Cos(Angle1), ShadowCenter.Y + ShadowRadiusY*R3Sin(Angle1), 0.f),
+                    Behind);
+    }
+   }
+  }
+ }
+}
+
 // NOTE: Start a 3D frame: camera matrices and empty meshes.
 internal void
 R3BeginFrame(r3_state *R3, arena *Arena, v2 ViewportDim)
@@ -591,52 +777,7 @@ R3BeginFrame(r3_state *R3, arena *Arena, v2 ViewportDim)
  Projection.e[2][1] = -R3->LensShift.Y;
  R3->ViewProj = M4Mul(Projection, View);
 
- // Sky: a screen-filling gradient, drawn with an identity matrix (positions are in clip space).
- {
-  // Two bands: horizon -> middle (bottom 60% of the screen), middle -> top.
-  v4 Colors[3];
-  Colors[0] = R3Color(R3_ColorSkyHorizon);
-  Colors[1] = R3Color(R3_ColorSkyMiddle);
-  Colors[2] = R3Color(R3_ColorSkyTop);
-  f32 Ys[3] = {-1.f, .2f, 1.f};
-  v3 Zero = V3(0.f, 0.f, 0.f);
-  r3_mesh *Sky = &R3->Sky;
-  for(u32 Band = 0; Band < 2; Band += 1)
-  {
-   f32 Y0 = Ys[Band];
-   f32 Y1 = Ys[Band + 1];
-   R3PushVertex(Sky, V3(-1.f, Y0, 0.f), Zero, Colors[Band]);
-   R3PushVertex(Sky, V3( 1.f, Y0, 0.f), Zero, Colors[Band]);
-   R3PushVertex(Sky, V3( 1.f, Y1, 0.f), Zero, Colors[Band + 1]);
-   R3PushVertex(Sky, V3(-1.f, Y0, 0.f), Zero, Colors[Band]);
-   R3PushVertex(Sky, V3( 1.f, Y1, 0.f), Zero, Colors[Band + 1]);
-   R3PushVertex(Sky, V3(-1.f, Y1, 0.f), Zero, Colors[Band + 1]);
-  }
-
-  // Sun: a bright disc with soft glow rings around it (round on screen, so the
-  // horizontal radius is divided by the aspect ratio).
-  {
-   f32 Radii[4] = {4.f, 2.4f, 1.5f, 1.f};
-   f32 Alphas[4] = {.08f, .16f, .32f, 1.f};
-   u32 SunSides = 40;
-   v3 SunCenter = V3(R3_SunScreenX, R3_SunScreenY, 0.f);
-   for(u32 Layer = 0; Layer < 4; Layer += 1)
-   {
-    v4 Color = (Layer == 3) ? R3Color(R3_ColorSunCore) : R3WithAlpha(R3Color(R3_ColorSunGlow), Alphas[Layer]);
-    f32 RadiusY = R3_SunRadius*Radii[Layer];
-    f32 RadiusX = RadiusY/Aspect;
-    for(u32 Side = 0; Side < SunSides; Side += 1)
-    {
-     f32 Angle0 = 2.f*Pi32*(f32)Side/(f32)SunSides;
-     f32 Angle1 = 2.f*Pi32*(f32)(Side + 1)/(f32)SunSides;
-     R3PushTriUnlit(Sky, SunCenter,
-                    V3(SunCenter.X + RadiusX*R3Cos(Angle0), SunCenter.Y + RadiusY*R3Sin(Angle0), 0.f),
-                    V3(SunCenter.X + RadiusX*R3Cos(Angle1), SunCenter.Y + RadiusY*R3Sin(Angle1), 0.f),
-                    Color);
-    }
-   }
-  }
- }
+ R3BuildSky(R3, Aspect);
 }
 
 internal void
