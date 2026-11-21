@@ -96,6 +96,7 @@ struct r3_state
  // 2D overlay. The help card blocks the rest of the UI and the 3D view while open;
  // it opens by itself on the first start.
  b32 HelpOpen;
+ s32 TextSizeIdxPlusOne;  // 0 = default size (see UiTextSizes)
  b32 HelpShownOnce;
  v4 HelpButtonRect;   // the "?" button, which toggles the card
  v4 TopBarRect;       // this frame

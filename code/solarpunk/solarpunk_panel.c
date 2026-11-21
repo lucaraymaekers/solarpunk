@@ -9,7 +9,8 @@
 //-
 
 //~ Constants
-#define Panel_Width        440.f
+#define Panel_Width        440.f    // at the base text size; scales with it
+#define Panel_MaxScreenPart .42f    // never wider than this part of the window
 #define Panel_Margin       Ui_Margin
 #define Panel_Pad          12.f
 #define Panel_ScrollStep   160.f
@@ -25,7 +26,6 @@
 #define Panel_ColorShortage  Ui_ColorShortText
 #define Panel_ColorSelected  Ui_ColorSelected
 #define Panel_TintAlpha      0x2Cu    // status tint over a row
-#define Panel_DotSpace       16.f     // room for a status dot before a name
 
 //~ Helpers
 internal island *
@@ -102,6 +102,14 @@ PanelStatusDot(panel_cursor *Cursor, f32 Column, u32 Status)
  f32 Size = Cursor->LineHeight - 10.f;
  DrawRect(RectFromSize(V2(Cursor->X + Column, Cursor->Y + .5f*(Cursor->LineHeight - Size)), V2(Size, Size)),
           V4FromU32(W3StatusColor(Status)), .5f*Size, 0.f, 0.f);
+}
+
+// NOTE: Room for a status dot before a name.
+internal f32
+PanelDotSpace(panel_cursor *Cursor)
+{
+ f32 Result = Cursor->LineHeight - 2.f;
+ return Result;
 }
 
 internal void
@@ -341,7 +349,7 @@ PanelDrawShortages(panel_cursor *Cursor)
     PanelIslandRow(Cursor, Index);
     PanelTintRow(Cursor, IslandStatus_Waiting);
     PanelStatusDot(Cursor, 0.f, IslandStatus_Waiting);
-    PanelText(Cursor, Panel_DotSpace, Island->Name, Panel_ColorText);
+    PanelText(Cursor, PanelDotSpace(Cursor), Island->Name, Panel_ColorText);
     f32 Column = .5f*W;
     for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
     {
@@ -382,7 +390,7 @@ PanelDrawIslands(panel_cursor *Cursor)
   PanelTintRow(Cursor, Status);
   PanelStatusDot(Cursor, 0.f, Status);
   b32 Selected = (App->Panel.SelectedPlusOne == (s32)Index + 1);
-  PanelText(Cursor, Panel_DotSpace, Island->Name, Selected ? Panel_ColorSelected : Panel_ColorText);
+  PanelText(Cursor, PanelDotSpace(Cursor), Island->Name, Selected ? Panel_ColorSelected : Panel_ColorText);
 
   f32 Column = .42f*W;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
@@ -425,7 +433,7 @@ PanelDrawSelected(panel_cursor *Cursor)
  u32 Status = App->R3.IslandStatus[SelectedIdx];
  Cursor->Y += 4.f;
  PanelStatusDot(Cursor, 0.f, Status);
- PanelText(Cursor, Panel_DotSpace, Island->Name, Panel_ColorSelected);
+ PanelText(Cursor, PanelDotSpace(Cursor), Island->Name, Panel_ColorSelected);
  PanelTextRight(Cursor, W, Str8Fmt("knows %u/%u islands", BroadcastKnownCount(App, Island), App->Broadcast.IslandCount), Panel_ColorDim);
  PanelNewLine(Cursor);
  {
@@ -522,7 +530,7 @@ PanelDrawSelected(panel_cursor *Cursor)
    u32 NeighbourStatus = (NeighbourIdx < R3_MaxIslands) ? App->R3.IslandStatus[NeighbourIdx] : IslandStatus_Ok;
    PanelTintRow(Cursor, NeighbourStatus);
    PanelStatusDot(Cursor, 0.f, NeighbourStatus);
-   PanelText(Cursor, Panel_DotSpace, Link->Dest->Name, Panel_ColorText);
+   PanelText(Cursor, PanelDotSpace(Cursor), Link->Dest->Name, Panel_ColorText);
    PanelTextRight(Cursor, W, Str8Fmt("%d", Link->Cost), Ui_ColorTitle);
    PanelNewLine(Cursor);
   }
@@ -562,6 +570,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  app_button_state MouseLeft = Input->Mouse.Buttons[PlatformMouseButton_Left];
  f32 PanelTop = R3->TopBarRect.Max.Y + Ui_Gap;
+ f32 PanelWidth = Min(Panel_Width*UiScale(App), Panel_MaxScreenPart*BufferDim.X);
 
  Panel->RowHoverPlusOne = 0;
 
@@ -590,8 +599,8 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
  }
  else
  {
-  v4 Box = RectFromSize(V2(BufferDim.X - Panel_Margin - Panel_Width, PanelTop),
-                        V2(Panel_Width, Max(BufferDim.Y - PanelTop - Panel_Margin, 6.f*LineHeight)));
+  v4 Box = RectFromSize(V2(BufferDim.X - Panel_Margin - PanelWidth, PanelTop),
+                        V2(PanelWidth, Max(BufferDim.Y - PanelTop - Panel_Margin, 6.f*LineHeight)));
   Panel->LastRect = Box;
   UiCard(Box, Ui_CardRadius);
 
@@ -612,7 +621,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
   //- Tabs
   {
    char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected"};
-   f32 TabsWidth = Panel_Width - 2.f*Panel_Pad;
+   f32 TabsWidth = PanelWidth - 2.f*Panel_Pad;
    v4 Track = RectFromSize(V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap), V2(TabsWidth, ButtonHeight + 6.f));
    DrawRect(Track, V4FromU32(Ui_ColorButton), Ui_ButtonRadius, 0.f, 0.f);
    f32 TabWidth = (TabsWidth - 6.f)/(f32)PanelTab_Count;

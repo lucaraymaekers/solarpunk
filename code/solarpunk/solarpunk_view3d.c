@@ -380,27 +380,32 @@ V3ToggleSummary(r3_state *R3, s32 Which, v2 TopLeft)
  }
 }
 
+internal f32
+V3ChipWidth(app_state *App, str8 Text)
+{
+ f32 Dot = UiLineHeight(App) - 8.f;
+ f32 Result = 2.f*V3D_ChipPadding + Dot + 6.f + V3Measure(App, Text);
+ return Result;
+}
+
+// NOTE: When the text is big and everything does not fit in one row, the time controls
+// move to a second row of the bar.
 internal void
 V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
  r3_camera *Camera = &R3->Camera;
  f32 ButtonHeight = UiButtonHeight(App);
- v4 Bar = RectFromSize(V2(Ui_Margin, Ui_Margin), V2(BufferDim.X - 2.f*Ui_Margin, ButtonHeight + 2.f*Ui_Pad));
- UiCard(Bar, Ui_CardRadius);
- R3->TopBarRect = Bar;
- V3AddUIRect(R3, Bar);
- f32 Y = Bar.Min.Y + Ui_Pad;
- // Status lists open under the shortage strip (see V3DrawShortageStrip), so it stays visible.
- f32 PopupY = Bar.Max.Y + Ui_Gap + (ButtonHeight + 2.f*6.f) + Ui_Gap;
-
- //- Left: islands per status
+ f32 Square = ButtonHeight;
+ f32 Scale = UiScale(App);
+ 
+ //- Islands per status, and the width of each group
  u32 Counts[IslandStatus_Count] = {0};
  for(u32 Idx = 0; Idx < R3->IslandCount; Idx += 1)
  {
   if(R3->IslandStatus[Idx] < IslandStatus_Count) Counts[R3->IslandStatus[Idx]] += 1;
  }
-
+ 
  // NOTE: Plain C strings: MSVC warns (C4204) about non-constant aggregate initializers.
  char *StatusFormats[IslandStatus_Count] = {"%u ok", "%u waiting", "%u short"};
  char *StatusHints[IslandStatus_Count] =
@@ -409,27 +414,54 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
   "Islands still waiting for news of a supplier. Click for the list",
   "Islands that need a product the world lacks. Click for the list",
  };
+ str8 StatusTexts[IslandStatus_Count];
+ f32 LeftWidth = 0.f;
+ for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
+ {
+  StatusTexts[Status] = Str8Fmt(StatusFormats[Status], Counts[Status]);
+  LeftWidth += V3ChipWidth(App, StatusTexts[Status]) + Ui_Gap;
+ }
+ 
+ b32 Focused = (R3->FocusedClusterPlusOne != 0);
+ f32 RightWidth = (UiButtonWidth(App, S8("A-"), Square) + UiButtonWidth(App, S8("A+"), Square) +
+                   UiButtonWidth(App, S8("+"), Square) + UiButtonWidth(App, S8("-"), Square) +
+                   UiButtonWidth(App, S8("Reset view"), 0.f) + UiButtonWidth(App, S8("?"), Square) +
+                   6.f*Ui_Gap + 2.f*12.f);
+ if(Focused) RightWidth += UiButtonWidth(App, S8("All clusters"), 0.f) + Ui_Gap;
+ 
+ f32 Fixed = TimeControlsFixedWidth(App);
+ f32 MinTimeline = 120.f*Scale;
+ f32 MaxTimeline = 340.f*Scale;
+ f32 Inner = BufferDim.X - 2.f*Ui_Margin - 2.f*Ui_Pad;
+ b32 OneRow = (LeftWidth + 16.f + Fixed + MinTimeline + 16.f + RightWidth <= Inner);
+ 
+ //- The bar
+ f32 BarHeight = (OneRow ? ButtonHeight : 2.f*ButtonHeight + Ui_Gap) + 2.f*Ui_Pad;
+ v4 Bar = RectFromSize(V2(Ui_Margin, Ui_Margin), V2(BufferDim.X - 2.f*Ui_Margin, BarHeight));
+ UiCard(Bar, Ui_CardRadius);
+ R3->TopBarRect = Bar;
+ V3AddUIRect(R3, Bar);
+ f32 Y = Bar.Min.Y + Ui_Pad;
+ // Status lists open under the shortage strip (see V3DrawShortageStrip), so it stays visible.
+ f32 PopupY = Bar.Max.Y + Ui_Gap + (ButtonHeight + 2.f*6.f) + Ui_Gap;
+ 
+ //- Left: islands per status
  v2 Cursor = V2(Bar.Min.X + Ui_Pad, Y);
  for(u32 Status = 0; Status < IslandStatus_Count; Status += 1)
  {
   s32 Which = 1 + (s32)Status;
   v2 ChipPos = Cursor;
-  if(V3Chip(App, Input, &Cursor, Str8Fmt(StatusFormats[Status], Counts[Status]), W3StatusColor(Status), false,
+  if(V3Chip(App, Input, &Cursor, StatusTexts[Status], W3StatusColor(Status), false,
             Ui_ColorText, (R3->SummaryOpen == Which), StatusHints[Status]))
   {
    V3ToggleSummary(R3, Which, V2(ChipPos.X, PopupY));
   }
  }
  f32 LeftEnd = Cursor.X;
- R3->SummaryBarRect = V4(Bar.Min.X, Bar.Min.Y, LeftEnd, Bar.Max.Y);
-
- //- Right: camera and help, laid out from the right edge
- b32 Focused = (R3->FocusedClusterPlusOne != 0);
- f32 RightWidth = (UiButtonWidth(App, S8("+"), 34.f) + UiButtonWidth(App, S8("-"), 34.f) +
-                   UiButtonWidth(App, S8("Reset view"), 0.f) + UiButtonWidth(App, S8("?"), 34.f) + 4.f*Ui_Gap + 12.f);
- if(Focused) RightWidth += UiButtonWidth(App, S8("All clusters"), 0.f) + Ui_Gap;
+ R3->SummaryBarRect = V4(Bar.Min.X, Bar.Min.Y, LeftEnd, Y + ButtonHeight + Ui_Pad);
+ 
+ //- Right: text size, camera and help, laid out from the right edge
  f32 RightStart = Bar.Max.X - Ui_Pad - RightWidth + Ui_Gap;
-
  Cursor = V2(RightStart, Y);
  if(Focused)
  {
@@ -438,8 +470,11 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
    V3FocusCluster(App, 0);
   }
  }
- if(UiButtonEx(App, Input, &Cursor, S8("+"), UiButton_Normal, "Zoom in (mouse wheel)", 34.f))  R3CameraZoom(Camera, 1.f/R3_CameraZoomStep);
- if(UiButtonEx(App, Input, &Cursor, S8("-"), UiButton_Normal, "Zoom out (mouse wheel)", 34.f)) R3CameraZoom(Camera, R3_CameraZoomStep);
+ if(UiButtonEx(App, Input, &Cursor, S8("A-"), UiButton_Normal, "Smaller text", Square)) UiChangeTextSize(R3, -1);
+ if(UiButtonEx(App, Input, &Cursor, S8("A+"), UiButton_Normal, "Bigger text", Square))  UiChangeTextSize(R3, 1);
+ Cursor.X += 12.f;
+ if(UiButtonEx(App, Input, &Cursor, S8("+"), UiButton_Normal, "Zoom in (mouse wheel)", Square))  R3CameraZoom(Camera, 1.f/R3_CameraZoomStep);
+ if(UiButtonEx(App, Input, &Cursor, S8("-"), UiButton_Normal, "Zoom out (mouse wheel)", Square)) R3CameraZoom(Camera, R3_CameraZoomStep);
  if(UiButtonEx(App, Input, &Cursor, S8("Reset view"), UiButton_Normal, "Back to the starting view", 0.f))
  {
   R3CameraReset(Camera);
@@ -447,27 +482,41 @@ V3DrawTopBar(app_state *App, app_input *Input, v2 BufferDim)
  }
  Cursor.X += 12.f;
  v2 HelpPos = Cursor;
- if(UiButtonEx(App, Input, &Cursor, S8("?"), R3->HelpOpen ? UiButton_Toggled : UiButton_Normal, "Help: what the colours mean, mouse and keys", 34.f))
+ if(UiButtonEx(App, Input, &Cursor, S8("?"), R3->HelpOpen ? UiButton_Toggled : UiButton_Normal, "Help: what the colours mean, mouse and keys", Square))
  {
   R3->HelpOpen = !R3->HelpOpen;
   R3->SummaryOpen = 0;
  }
- R3->HelpButtonRect = RectFromSize(HelpPos, V2(34.f, ButtonHeight));
-
- //- Middle: time controls, centred on the bar when there is room
- f32 Fixed = TimeControlsFixedWidth(App);
- f32 Space = (RightStart - 16.f) - (LeftEnd + 16.f);
- f32 TimelineWidth = Clamp(100.f, Space - Fixed, 340.f);
+ R3->HelpButtonRect = RectFromSize(HelpPos, V2(UiButtonWidth(App, S8("?"), Square), ButtonHeight));
+ 
+ //- Time controls: in the middle of the row, or centred on a second row
+ f32 RowY = Y;
+ f32 SpaceMin = LeftEnd + 16.f;
+ f32 SpaceMax = RightStart - 16.f;
+ if(!OneRow)
+ {
+  RowY = Y + ButtonHeight + Ui_Gap;
+  SpaceMin = Bar.Min.X + Ui_Pad;
+  SpaceMax = Bar.Max.X - Ui_Pad;
+ }
+ f32 TimelineWidth = Clamp(60.f, (SpaceMax - SpaceMin) - Fixed, MaxTimeline);
  f32 Total = Fixed + TimelineWidth;
  f32 Start = .5f*(Bar.Min.X + Bar.Max.X) - .5f*Total;
- Start = Min(Start, RightStart - 16.f - Total);
- Start = Max(Start, LeftEnd + 16.f);
-
- // Thin dividers between the three groups.
- DrawRect(RectFromSize(V2(Start - 9.f, Y + 4.f), V2(1.f, ButtonHeight - 8.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
- DrawRect(RectFromSize(V2(RightStart - 9.f, Y + 4.f), V2(1.f, ButtonHeight - 8.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
-
- Cursor = V2(Start, Y);
+ Start = Min(Start, SpaceMax - Total);
+ Start = Max(Start, SpaceMin);
+ 
+ // Thin dividers between the groups.
+ if(OneRow)
+ {
+  DrawRect(RectFromSize(V2(Start - 9.f, Y + 4.f), V2(1.f, ButtonHeight - 8.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+  DrawRect(RectFromSize(V2(RightStart - 9.f, Y + 4.f), V2(1.f, ButtonHeight - 8.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+ }
+ else
+ {
+  DrawRect(RectFromSize(V2(Bar.Min.X + Ui_Pad, RowY - .5f*Ui_Gap), V2(Bar.Max.X - Bar.Min.X - 2.f*Ui_Pad, 1.f)), V4FromU32(Ui_ColorLine), 0.f, 0.f, 0.f);
+ }
+ 
+ Cursor = V2(Start, RowY);
  DrawTimeControls(App, Input, &Cursor, TimelineWidth);
 }
 
@@ -658,7 +707,7 @@ DrawSummaryPopup(app_state *App, app_input *Input, v2 BufferDim)
 
  u32 SectionRows = (IsProduct ? 2u : 0u);
  v2 Min = R3->PopupRect.Min;
- f32 Width = Max(V3D_PopupWidth, UiMeasure(App, Title) + 2.f*Pad);
+ f32 Width = Max(V3D_PopupWidth*UiScale(App), UiMeasure(App, Title) + 2.f*Pad);
  f32 MaxHeight = BufferDim.Y - Min.Y - V3D_Margin;
  u32 MaxRows = (u32)Max(1.f, (MaxHeight - 2.f*Pad)/LineHeight - 3.f - (f32)SectionRows);
  u32 ShownRows = Min(RowCount, MaxRows);
@@ -788,7 +837,7 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
  u32 ProductRows = (ProductCount + V3D_HelpColumns - 1)/V3D_HelpColumns;
  u32 KeyRows = (u32)ArrayCount(V3HelpKeys);
 
- f32 Width = Min(V3D_HelpWidth, BufferDim.X - 2.f*Ui_Margin);
+ f32 Width = Min(V3D_HelpWidth*UiScale(App), BufferDim.X - 2.f*Ui_Margin);
  f32 Inner = Width - 2.f*Pad;
  f32 Height = (3.f*LineHeight + 10.f) +                                          // title, intro
   3.f*(LineHeight + 12.f) +                                                      // section titles
@@ -893,6 +942,7 @@ internal void
 DrawWorld3D(app_state *App, app_input *Input, v2 BufferDim)
 {
  r3_state *R3 = &App->R3;
+ UiUpdateTextSize(App);   // before any text this frame
 
  // NOTE: Over the panel the wheel scrolls the panel instead of zooming.
  b32 MouseOverUI = (IsInsideRectV2(V2V2S32(Input->Mouse.Pos), App->Panel.LastRect) || R3->HelpOpen);

@@ -174,24 +174,24 @@ DrawBroadcastTimeline(app_state *App, app_input *Input, v2 *Cursor, f32 Width, f
 }
 
 //~ Time controls (in the top bar)
-// NOTE: Labels and hints of the time buttons. Plain C strings: MSVC warns (C4204)
-// about arrays initialized with S8(...).
-#define TimeControls_SpeedWidth  52.f
-#define TimeControls_RoundWidth  96.f
-#define TimeControls_PlayWidth   74.f
+// NOTE: Fixed widths, measured from the widest text they hold, so they grow with the text size.
+internal f32 TimeControlsPlayWidth(app_state *App)  { return UiButtonWidth(App, S8("Pause"), 0.f); }
+internal f32 TimeControlsSpeedWidth(app_state *App) { return UiMeasure(App, S8("0.25x")) + 12.f; }
+internal f32 TimeControlsRoundWidth(app_state *App) { return UiMeasure(App, S8("Round 999")) + 8.f; }
 
 // NOTE: Width of everything in the time controls except the timeline track.
 internal f32
 TimeControlsFixedWidth(app_state *App)
 {
+ f32 Square = UiButtonHeight(App);
  f32 Result = 0.f;
  Result += UiButtonWidth(App, S8("<< 5"), 0.f) + UiButtonWidth(App, S8("< 1"), 0.f);
- Result += TimeControls_PlayWidth;
+ Result += TimeControlsPlayWidth(App);
  Result += UiButtonWidth(App, S8("1 >"), 0.f) + UiButtonWidth(App, S8("5 >>"), 0.f);
  Result += 5.f*Ui_Gap + 12.f;
- Result += UiButtonWidth(App, S8("-"), 30.f) + TimeControls_SpeedWidth + UiButtonWidth(App, S8("+"), 30.f) + 3.f*Ui_Gap + 12.f;
- Result += TimeControls_RoundWidth + Ui_Gap;
- Result += UiButtonWidth(App, S8("Restart"), 0.f) + Ui_Gap;
+ Result += Square + TimeControlsSpeedWidth(App) + Square + 3.f*Ui_Gap + 12.f;
+ Result += TimeControlsRoundWidth(App) + Ui_Gap;
+ Result += UiButtonWidth(App, S8("Restart"), 0.f);
  return Result;
 }
 
@@ -207,20 +207,21 @@ DrawTimeControls(app_state *App, app_input *Input, v2 *Cursor, f32 TimelineWidth
  if(UiButtonEx(App, Input, Cursor, S8("< 1"), UiButton_Normal, "Go back 1 round", 0.f))        BroadcastJumpBy(App, -1);
  b32 Paused = BroadcastIsPaused(Broadcast);
  if(UiButtonEx(App, Input, Cursor, Paused ? S8("Play") : S8("Pause"), UiButton_Primary,
-               Paused ? "Let time run" : "Stop time", TimeControls_PlayWidth))                  BroadcastTogglePause(Broadcast);
+               Paused ? "Let time run" : "Stop time", TimeControlsPlayWidth(App)))                  BroadcastTogglePause(Broadcast);
  if(UiButtonEx(App, Input, Cursor, S8("1 >"), UiButton_Normal, "Go forward 1 round", 0.f))     BroadcastJumpBy(App, 1);
  if(UiButtonEx(App, Input, Cursor, S8("5 >>"), UiButton_Normal, "Go forward 5 rounds", 0.f))   BroadcastJumpBy(App, 5);
  Cursor->X += 12.f;
 
  //- Speed: [-] 1x [+]
- if(UiButtonEx(App, Input, Cursor, S8("-"), UiButton_Normal, "Slower", 30.f)) BroadcastSlower(Broadcast);
+ if(UiButtonEx(App, Input, Cursor, S8("-"), UiButton_Normal, "Slower", Height)) BroadcastSlower(Broadcast);
  {
   str8 Speed = S8FromCString(BroadcastSpeedLabels[BroadcastSpeedIdx(Broadcast)]);
-  f32 TextX = Cursor->X + .5f*(TimeControls_SpeedWidth - UiMeasure(App, Speed));
+  f32 SpeedWidth = TimeControlsSpeedWidth(App);
+  f32 TextX = Cursor->X + .5f*(SpeedWidth - UiMeasure(App, Speed));
   UiText(App, V2(FloorF32(TextX), Cursor->Y + Ui_ButtonPadY), Speed, Ui_ColorText);
-  Cursor->X += TimeControls_SpeedWidth + Ui_Gap;
+  Cursor->X += SpeedWidth + Ui_Gap;
  }
- if(UiButtonEx(App, Input, Cursor, S8("+"), UiButton_Normal, "Faster", 30.f)) BroadcastFaster(Broadcast);
+ if(UiButtonEx(App, Input, Cursor, S8("+"), UiButton_Normal, "Faster", Height)) BroadcastFaster(Broadcast);
  Cursor->X += 12.f;
 
  //- Timeline and round
@@ -228,7 +229,7 @@ DrawTimeControls(app_state *App, app_input *Input, v2 *Cursor, f32 TimelineWidth
  {
   str8 Round = Str8Fmt("Round %llu", Broadcast->Round);
   UiText(App, V2(Cursor->X + 4.f, Cursor->Y + Ui_ButtonPadY), Round, Ui_ColorText);
-  Cursor->X += TimeControls_RoundWidth + Ui_Gap;
+  Cursor->X += TimeControlsRoundWidth(App) + Ui_Gap;
  }
 
  if(UiButtonEx(App, Input, Cursor, S8("Restart"), UiButton_Normal, "Start again from round 1", 0.f)) BroadcastRestart(App);

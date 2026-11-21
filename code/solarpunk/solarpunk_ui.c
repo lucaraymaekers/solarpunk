@@ -12,7 +12,7 @@
 #define Ui_ButtonPadX    10.f
 #define Ui_ButtonPadY    5.f
 
-#define Ui_ColorCard        0xF5FFF9EF   // warm cream
+#define Ui_ColorCard        0xFFFFF9EF   // warm cream
 #define Ui_ColorCardBorder  0xFFE6D2B0
 #define Ui_ColorShadow      0x50402810
 #define Ui_ColorText        0xFF3D3228   // dark warm brown
@@ -35,6 +35,53 @@
 #define Ui_ColorOkText      0xFF2E8B4F
 #define Ui_ColorWaitingText 0xFFC46F15
 #define Ui_ColorShortText   0xFFC23B3B
+
+//~ Text size
+// NOTE: Chosen with the A- / A+ buttons in the top bar; big by default so it reads well
+// on a projector. The atlas is rebuilt at the start of a frame (UiUpdateTextSize), never
+// in the middle, so the text already queued this frame stays valid.
+global_variable f32 UiTextSizes[] = {20.f, 24.f, 28.f, 32.f, 36.f, 42.f};
+#define Ui_DefaultTextSizeIdx 2
+#define Ui_BaseTextSize       20.f   // the sizes below were designed for this
+// NOTE: Only ASCII is drawn, so only those glyphs go in the atlas: all 2048 of them do
+// not fit in the 1024x1024 atlas at the bigger sizes.
+#define Ui_AtlasCodepoints    (0x7F - 0x20)
+
+internal s32
+UiTextSizeIdx(r3_state *R3)
+{
+ s32 Result = (R3->TextSizeIdxPlusOne > 0) ? R3->TextSizeIdxPlusOne - 1 : Ui_DefaultTextSizeIdx;
+ Result = Clamp(0, Result, (s32)ArrayCount(UiTextSizes) - 1);
+ return Result;
+}
+
+internal void
+UiChangeTextSize(r3_state *R3, s32 Delta)
+{
+ R3->TextSizeIdxPlusOne = 1 + Clamp(0, UiTextSizeIdx(R3) + Delta, (s32)ArrayCount(UiTextSizes) - 1);
+}
+
+// NOTE: Call at the start of the frame, before any text is drawn or measured.
+internal void
+UiUpdateTextSize(app_state *App)
+{
+ f32 Want = UiTextSizes[UiTextSizeIdx(&App->R3)];
+ if(App->Font.HeightPx != Want && App->Font.Initialized)
+ {
+  App->Font.CodepointCount = Min(App->Font.CodepointCount, Ui_AtlasCodepoints);
+  font *Fonts[1];
+  Fonts[0] = &App->Font;
+  RenderBuildAtlas(&App->FontAtlas, ArrayCount(Fonts), Fonts, Want);
+ }
+}
+
+// NOTE: How much bigger the text is than the base size; fixed widths scale with it.
+internal f32
+UiScale(app_state *App)
+{
+ f32 Result = App->Font.HeightPx/Ui_BaseTextSize;
+ return Result;
+}
 
 internal f32
 UiLineHeight(app_state *App)
