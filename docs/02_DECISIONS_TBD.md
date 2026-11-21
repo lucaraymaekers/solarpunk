@@ -112,6 +112,6 @@ Pick 6 to 8 (the engine caps the catalog at `MAX_RESOURCES = 8`). Fewer items = 
 | L8 | Demo slot is 5 minutes; judged on creativity, idea, execution | 2026-11-21 | |
 | L9 | Team of 4, no fixed owners; work together | 2026-11-21 | |
 | L11 | **No solar energy, no day/night, no energy reserve.** Food spoils instead: food and seeds have an expiry date, and the network should share food before it goes bad. Time = the app's rounds and timeline slider on `main`. | 2026-11-21 | Team decision. Tech spec section 13. Energy sections of the spec are obsolete. |
-| L12 | Spoilage model: lots with an expiry round, eaten soonest-expiring first. Perishable: Seeds, Fish, Algae (water does not go bad). Product Amounts are per day (`Food_RoundsPerDay` rounds). | 2026-11-21 | Shelf lives are starting values, still to tune. |
+| L12 | Spoilage model: lots with an expiry round, eaten soonest-expiring first. Perishable: every product in the food catalog (Apples, Pears, Cabbage, Carrots, Wheat, Fish, Meat, Eggs). Product Amounts are per day (`Food_RoundsPerDay` rounds). | 2026-11-21 | Shelf lives are starting values, still to tune. |
 | L13 | Routing/transport of goods is built by another teammate; the food module only offers `FoodTake`/`FoodGive` and "expiring soon" in announcements. | 2026-11-21 | |
 | L10 | Engine uses fixed-capacity arrays and arenas only (no `malloc`), all state in one `world` struct inside `app_state`, so hot reload keeps working and replays are deterministic | 2026-11-21 | Follows from L7. |

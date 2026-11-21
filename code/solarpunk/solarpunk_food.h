@@ -17,13 +17,19 @@
 #define Food_MergeRounds    3   // a new lot within this many rounds of the newest one is merged into it
 #define Food_SoonRounds    Food_RoundsPerDay  // "expiring soon" = within one day
 
-// NOTE(L4): Shelf life in days per product kind; 0 = never spoils, not tracked (Fresh Water too).
-// Starting values, tune with SolarSim.
+// NOTE(L4): Shelf life in days per product kind; 0 = never spoils, not tracked.
+// Every product in the catalog is a food now (solarpunk.mdesk). Starting values, roughly in
+// real-world order (fish and meat first, grain last); tune with SolarSim.
 global_variable const f32 FoodShelfLifeDays[ProductKind_Count] =
 {
- [ProductKind_Seeds]      = 20.f,
- [ProductKind_Fish]       =  2.f,
- [ProductKind_Algae]      =  4.f,
+ [ProductKind_Fish]    =  2.f,
+ [ProductKind_Meat]    =  3.f,
+ [ProductKind_Eggs]    =  5.f,
+ [ProductKind_Pears]   =  6.f,
+ [ProductKind_Cabbage] =  8.f,
+ [ProductKind_Apples]  = 10.f,
+ [ProductKind_Carrots] = 12.f,
+ [ProductKind_Wheat]   = 30.f,
 };
 
 //~ Types

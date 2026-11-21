@@ -79,19 +79,21 @@ SimLotsSorted(food_state *Food, u32 Island, product_kind Kind)
 internal void
 TestCatalog(void)
 {
- Check(FoodIsPerishable(ProductKind_Fish) && FoodIsPerishable(ProductKind_Algae) &&
-       FoodIsPerishable(ProductKind_Seeds), "fish, algae and seeds spoil");
- Check(!FoodIsPerishable(ProductKind_FreshWater), "water does not go bad");
- Check(!FoodIsPerishable(ProductKind_Copper) && !FoodIsPerishable(ProductKind_Timber) &&
-       !FoodIsPerishable(ProductKind_SolarPanels) && !FoodIsPerishable(ProductKind_Batteries) &&
-       !FoodIsPerishable(ProductKind_None), "non-food never spoils");
+ b32 AllFood = true;
+ for(u32 Kind = ProductKind_None + 1; Kind < ProductKind_Count; Kind += 1)
+ {
+  AllFood = AllFood && FoodIsPerishable((product_kind)Kind);
+ }
+ Check(AllFood, "every product in the catalog is food and spoils");
+ Check(!FoodIsPerishable(ProductKind_None), "ProductKind_None is not tracked");
+ Check(FoodShelfLifeRounds(ProductKind_Fish) < FoodShelfLifeRounds(ProductKind_Wheat), "fish goes bad before wheat");
  Check(FoodShelfLifeRounds(ProductKind_Fish) == (u64)(FoodShelfLifeDays[ProductKind_Fish]*Food_RoundsPerDay),
        "shelf life in rounds = days * rounds per day");
-
+ 
  food_state *Food = SimAllocFood();
- FoodIslandRound(Food, 0, ProductKind_Copper, 100.f, 50.f, 1);
- Check(FoodStockQty(Food, 0, ProductKind_Copper) == 0 && Food->Counts[0][ProductKind_Copper].Produced == 0,
-       "non-food is not tracked by the food module");
+ FoodIslandRound(Food, 0, ProductKind_None, 100.f, 50.f, 1);
+ Check(FoodStockQty(Food, 0, ProductKind_None) == 0 && Food->Counts[0][ProductKind_None].Produced == 0,
+       "ProductKind_None is ignored");
 }
 
 // Fish produced and never eaten goes bad exactly after its shelf life.
@@ -128,23 +130,23 @@ TestEat(void)
  food_lot Lots[2];
  Lots[0].Qty = 5; Lots[0].ExpiresRound = 50;
  Lots[1].Qty = 5; Lots[1].ExpiresRound = 20;
- FoodGive(Food, 0, ProductKind_Algae, Lots, 2, 1);
- Check(Food->Stock[0][ProductKind_Algae].Lots[0].ExpiresRound == 20, "received lots are inserted by expiry");
+ FoodGive(Food, 0, ProductKind_Carrots, Lots, 2, 1);
+ Check(Food->Stock[0][ProductKind_Carrots].Lots[0].ExpiresRound == 20, "received lots are inserted by expiry");
 
- FoodIslandRound(Food, 0, ProductKind_Algae, 0.f, 3.f*(f32)Food_RoundsPerDay, 2);   // eat 3
- Check(Food->Stock[0][ProductKind_Algae].Lots[0].ExpiresRound == 20 && Food->Stock[0][ProductKind_Algae].Lots[0].Qty == 2,
+ FoodIslandRound(Food, 0, ProductKind_Carrots, 0.f, 3.f*(f32)Food_RoundsPerDay, 2);   // eat 3
+ Check(Food->Stock[0][ProductKind_Carrots].Lots[0].ExpiresRound == 20 && Food->Stock[0][ProductKind_Carrots].Lots[0].Qty == 2,
        "eats the soonest-expiring lot first");
- FoodIslandRound(Food, 0, ProductKind_Algae, 0.f, 9.f*(f32)Food_RoundsPerDay, 3);   // wants 9, has 7
- Check(FoodStockQty(Food, 0, ProductKind_Algae) == 0, "eats everything there is");
- Check(Food->Counts[0][ProductKind_Algae].Shortage == 2, "the rest is a shortage");
+ FoodIslandRound(Food, 0, ProductKind_Carrots, 0.f, 9.f*(f32)Food_RoundsPerDay, 3);   // wants 9, has 7
+ Check(FoodStockQty(Food, 0, ProductKind_Carrots) == 0, "eats everything there is");
+ Check(Food->Counts[0][ProductKind_Carrots].Shortage == 2, "the rest is a shortage");
 
  // Fractions carry: 1.5 units/round -> 3 units every 2 rounds.
  food_state *Frac = SimAllocFood();
  for(u64 Round = 1; Round <= 10; Round += 1)
  {
-  FoodIslandRound(Frac, 0, ProductKind_Seeds, 1.5f*(f32)Food_RoundsPerDay, 0.f, Round);
+  FoodIslandRound(Frac, 0, ProductKind_Wheat, 1.5f*(f32)Food_RoundsPerDay, 0.f, Round);
  }
- Check(Frac->Counts[0][ProductKind_Seeds].Produced == 15, "fractional production carries over");
+ Check(Frac->Counts[0][ProductKind_Wheat].Produced == 15, "fractional production carries over");
  Check(SimAllConserved(Food, 1) && SimAllConserved(Frac, 1), "conserved");
 }
 
@@ -179,16 +181,16 @@ TestTakeGive(void)
  Check(Soon <= FoodStockQty(Food, 0, ProductKind_Fish), "expiring-soon is part of the stock");
  Check(SimAllConserved(Food, 2), "conserved across take/give");
 
- // Lot cap: seeds keep for 20 days, one lot a round; merging must hold the count and never extend dates.
+ // Lot cap: wheat keeps for 30 days, one lot a round; merging must hold the count and never extend dates.
  food_state *Many = SimAllocFood();
- u64 Rounds = 3*FoodShelfLifeRounds(ProductKind_Seeds);
+ u64 Rounds = 3*FoodShelfLifeRounds(ProductKind_Wheat);
  b32 Ok = true;
  for(u64 Round = 1; Round <= Rounds; Round += 1)
  {
-  FoodIslandRound(Many, 0, ProductKind_Seeds, 3.f*(f32)Food_RoundsPerDay, 0.f, Round);
-  food_stock *Stock = &Many->Stock[0][ProductKind_Seeds];
-  Ok = Ok && Stock->LotCount <= Food_MaxLots && SimLotsSorted(Many, 0, ProductKind_Seeds);
-  Ok = Ok && (Stock->LotCount == 0 || Stock->Lots[Stock->LotCount - 1].ExpiresRound <= Round + FoodShelfLifeRounds(ProductKind_Seeds));
+  FoodIslandRound(Many, 0, ProductKind_Wheat, 3.f*(f32)Food_RoundsPerDay, 0.f, Round);
+  food_stock *Stock = &Many->Stock[0][ProductKind_Wheat];
+  Ok = Ok && Stock->LotCount <= Food_MaxLots && SimLotsSorted(Many, 0, ProductKind_Wheat);
+  Ok = Ok && (Stock->LotCount == 0 || Stock->Lots[Stock->LotCount - 1].ExpiresRound <= Round + FoodShelfLifeRounds(ProductKind_Wheat));
  }
  Check(Ok, "lot cap holds, lots sorted, merging never extends an expiry");
  Check(SimAllConserved(Many, 1), "conserved with merging");
@@ -304,7 +306,7 @@ RunTests(void)
 {
  struct { char *Name; s32 Kind; } Tests[] =
  {
-  {"catalog: food + seeds spoil, the rest does not", 1},
+  {"catalog: every product is food and spoils", 1},
   {"spoil after the shelf life", 2},
   {"eat soonest-expiring first, shortages, fractions", 3},
   {"routing API: FoodTake / FoodGive keep expiry, lot cap", 4},

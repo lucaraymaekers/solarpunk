@@ -523,7 +523,7 @@ PanelDrawSelected(panel_cursor *Cursor)
   v4 Colors[16];
   s32 LineCount = 0;
   FoodAppendLines(App, Island, Lines, Colors, &LineCount, (s32)ArrayCount(Lines),
-                  V4FromU32(Panel_ColorText), V4FromU32(Graph_ColorRequirement));
+                  V4FromU32(Panel_ColorText), V4FromU32(Panel_ColorShortage));
   if(LineCount == 0)
   {
    PanelNote(Cursor, S8("No food in store, and none needed."));
@@ -533,8 +533,8 @@ PanelDrawSelected(panel_cursor *Cursor)
    GraphDrawText(&App->FontAtlas, &App->Font, V2(Cursor->X, Cursor->Y), Lines[Idx], Colors[Idx]);
    PanelNewLine(Cursor);
   }
-  str8 Legend[3];
-  u32 LegendCount = FoodLegendShortLines(Legend, (u32)ArrayCount(Legend));
+  str8 Legend[8];
+  u32 LegendCount = FoodLegendShortLines(Legend, (u32)ArrayCount(Legend), "Red");
   for(u32 Idx = 0; Idx < LegendCount; Idx += 1)
   {
    PanelNote(Cursor, Legend[Idx]);

@@ -124,28 +124,44 @@ FoodLegendLine(void)
  return Result;
 }
 
-// NOTE(L4): The same rules in short lines, for the narrow islands panel.
+// NOTE(L4): The same rules in short lines, for the narrow islands panel. Foods are listed from
+// fastest to slowest spoiling, three per line. ColorName names the colour of the warning lines.
+#define Food_LegendPerLine 3
 internal u32
-FoodLegendShortLines(str8 *Lines, u32 Cap)
+FoodLegendShortLines(str8 *Lines, u32 Cap, char *ColorName)
 {
  u32 Result = 0;
- if(Cap >= 3)
+ 
+ //- Perishable kinds, sorted by shelf life (insertion sort, ties by kind)
+ product_kind Kinds[ProductKind_Count];
+ u32 KindCount = 0;
+ for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
  {
-  str8 Keeps = S8("Keeps:");
-  b32 First = true;
-  for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
+  if(FoodIsPerishable((product_kind)Kind))
   {
-   if(FoodIsPerishable((product_kind)Kind))
+   u32 At = KindCount++;
+   while(At > 0 && FoodShelfLifeRounds(Kinds[At - 1]) > FoodShelfLifeRounds((product_kind)Kind))
    {
-    str8 Name = ProductNames[Kind];
-    Keeps = Str8Fmt("%S%s %.*s %llu", Keeps, First ? "" : ",", (s32)Name.Size, Name.Data,
-                    FoodShelfLifeRounds((product_kind)Kind));
-    First = false;
+    Kinds[At] = Kinds[At - 1];
+    At -= 1;
    }
+   Kinds[At] = (product_kind)Kind;
   }
-  Lines[Result++] = Str8Fmt("%S rounds", Keeps);
-  Lines[Result++] = S8("Oldest food is eaten first.");
-  Lines[Result++] = Str8Fmt("Orange = goes bad within %d rounds.", Food_SoonRounds);
  }
+ 
+ if(Result < Cap) Lines[Result++] = S8("Goes bad after (rounds):");
+ for(u32 Start = 0; Start < KindCount && Result < Cap; Start += Food_LegendPerLine)
+ {
+  str8 Line = S8(" ");
+  for(u32 Idx = Start; Idx < Min(Start + Food_LegendPerLine, KindCount); Idx += 1)
+  {
+   str8 Name = ProductNames[Kinds[Idx]];
+   b32 Last = (Idx + 1 == KindCount);
+   Line = Str8Fmt("%S %.*s %llu%s", Line, (s32)Name.Size, Name.Data, FoodShelfLifeRounds(Kinds[Idx]), Last ? "" : ",");
+  }
+  Lines[Result++] = Line;
+ }
+ if(Result < Cap) Lines[Result++] = S8("Oldest food is eaten first.");
+ if(Result < Cap) Lines[Result++] = Str8Fmt("%s = goes bad within %d rounds.", ColorName, Food_SoonRounds);
  return Result;
 }
