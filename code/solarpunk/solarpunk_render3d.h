@@ -6,6 +6,7 @@
 //~ Constants
 #define R3_MaxIslands 64
 #define R3_MaxUIRects 20
+#define R3_MaxRails 256
 #define R3_SummaryProductBase 100
 #define R3_SummaryClusters    99   // the "All clusters" list
 
@@ -175,6 +176,15 @@ struct r3_state
  // there do not reach the 3D view).
  v4 UIRects[R3_MaxUIRects];
  u32 UIRectCount;
+
+ // Rails, one per link (From < To, island indices). Lift raises a whole rail so it
+ // clears the rails it crosses or runs beside and the islands it passes over; solved
+ // in W3SolveRails and only redone when the islands or links change (RailKey).
+ u32 RailCount;
+ u8 RailFrom[R3_MaxRails];
+ u8 RailTo[R3_MaxRails];
+ f32 RailLift[R3_MaxRails];
+ u64 RailKey;
 };
 
 #endif //SOLARPUNK_RENDER3D_H

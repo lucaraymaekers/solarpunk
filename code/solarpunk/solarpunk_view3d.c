@@ -326,8 +326,10 @@ V3DrawHoveredCableCosts(app_state *App)
      u32 ToIdx = BroadcastIslandIndex(App, Link->Dest);
      if(ToIdx < R3->IslandCount)
      {
-      v3 Mid = W3CablePoint(R3->IslandTop[FromIdx], R3->IslandRadius[FromIdx],
-                            R3->IslandTop[ToIdx], R3->IslandRadius[ToIdx], .5f);
+      u32 Rail = W3RailFind(R3, FromIdx, ToIdx);
+      v3 Mid = ((Rail < R3->RailCount) ? W3RailPoint(R3, Rail, .5f) :
+                W3CablePoint(R3->IslandTop[FromIdx], R3->IslandRadius[FromIdx],
+                             R3->IslandTop[ToIdx], R3->IslandRadius[ToIdx], 0.f, .5f));
       v2 Screen;
       if(R3ProjectToScreen(R3, Mid, &Screen))
       {

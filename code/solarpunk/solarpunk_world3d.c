@@ -13,6 +13,17 @@
 #define W3_RailArch         .045f  // upward arch as a fraction of the rail length
 #define W3_RailFrameSpacing 9.f    // world units between the portal frames that hold a rail
 #define W3_RailTrackOffset  .62f   // each link has two tracks, one per direction, this far from the middle
+// NOTE: Rails that cross or leave an island side by side are lifted apart (W3SolveRails).
+#define W3_RailClearance    2.6f   // height kept between two rails that cross or run side by side
+#define W3_RailClearWidth   2.f    // rails closer than this on the map count as side by side
+#define W3_RailIslandMargin 1.2f   // a rail this close to another island's edge passes over it ...
+#define W3_RailIslandClear  5.f    // ... this high above its top
+#define W3_RailPillarClear  1.4f   // portal frames are left out where a pillar would hit another rail
+#define W3_RailRamp         6.f    // a lifted rail climbs over this many world units from each station ...
+#define W3_RailRampMax      .45f   // ... but at most this fraction of its length
+#define W3_RailRampMinShape .5f    // the solver only lifts where the ramp is at least this far up
+#define W3_RailSolveSamples 32
+#define W3_RailSolvePasses  16
 
 #define W3_CrateHalf        .24f
 #define W3_CrateUnitsPerBox 70     // one stacked crate per this many units produced
@@ -90,10 +101,29 @@ W3IslandTopFromMap(v2 MapPos, u32 Index)
  return Result;
 }
 
+// NOTE: How far up its ramps a lifted rail is at t: 0 at both stations, 1 once it has
+// climbed W3_RailRamp along the rail (a smooth S-curve). A and B are the stations.
+internal f32
+W3CableRamp(v3 A, v3 B, f32 t)
+{
+ f32 DX = B.X - A.X;
+ f32 DZ = B.Z - A.Z;
+ f32 Length = R3Sqrt(DX*DX + DZ*DZ);
+ f32 Ramp = Min(W3_RailRamp, W3_RailRampMax*Length);
+ f32 Result = 1.f;
+ if(Ramp > 1e-4f)
+ {
+  f32 X = Clamp(0.f, Min(t, 1.f - t)*Length/Ramp, 1.f);
+  Result = X*X*(3.f - 2.f*X);
+ }
+ return Result;
+}
+
 // NOTE: Rail between two island tops. Point at t (0..1) going from A to B, gently arched
-// upwards like a bridge.
+// upwards like a bridge. Lift raises it between its stations (see W3SolveRails); the
+// stations stay at island height.
 internal v3
-W3CablePoint(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t)
+W3CablePoint(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Lift, f32 t)
 {
  v3 Flat = V3(TopB.X - TopA.X, 0.f, TopB.Z - TopA.Z);
  v3 Direction = R3Normalize(Flat);
@@ -103,7 +133,230 @@ W3CablePoint(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t)
 
  f32 Arch = W3_RailArch*R3Length(R3Sub(B, A));
  v3 Result = R3Lerp(A, B, t);
- Result.Y += 4.f*Arch*t*(1.f - t);
+ Result.Y += 4.f*Arch*t*(1.f - t) + Lift*W3CableRamp(A, B, t);
+ return Result;
+}
+
+//~ Rail layout
+// NOTE: A rail's ends: the two island tops.
+internal void
+W3RailEnds(r3_state *R3, u32 Rail, v3 *TopA, f32 *RadiusA, v3 *TopB, f32 *RadiusB)
+{
+ u32 From = R3->RailFrom[Rail];
+ u32 To = R3->RailTo[Rail];
+ *TopA = R3->IslandTop[From];
+ *TopB = R3->IslandTop[To];
+ *RadiusA = R3->IslandRadius[From];
+ *RadiusB = R3->IslandRadius[To];
+}
+
+internal v3
+W3RailPoint(r3_state *R3, u32 Rail, f32 t)
+{
+ v3 TopA, TopB;
+ f32 RadiusA, RadiusB;
+ W3RailEnds(R3, Rail, &TopA, &RadiusA, &TopB, &RadiusB);
+ f32 Lift = R3->RailLift[Rail];
+ v3 Result = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, t);
+ return Result;
+}
+
+// NOTE: How far up its ramps the rail is at t (see W3CableRamp).
+internal f32
+W3RailRamp(r3_state *R3, u32 Rail, f32 t)
+{
+ f32 Result = W3CableRamp(W3RailPoint(R3, Rail, 0.f), W3RailPoint(R3, Rail, 1.f), t);
+ return Result;
+}
+
+// NOTE: The rail between islands A and B (either order); RailCount if there is none.
+internal u32
+W3RailFind(r3_state *R3, u32 A, u32 B)
+{
+ u32 From = Min(A, B);
+ u32 To = Max(A, B);
+ u32 Result = R3->RailCount;
+ for(u32 Rail = 0; Rail < R3->RailCount && Result == R3->RailCount; Rail += 1)
+ {
+  if(R3->RailFrom[Rail] == From && R3->RailTo[Rail] == To)
+  {
+   Result = Rail;
+  }
+ }
+ return Result;
+}
+
+// NOTE: Distance on the map (ignoring height) from P to the segment A..B, and in *t where
+// along A..B the closest point is.
+internal f32
+W3PlanClosest(v3 A, v3 B, v3 P, f32 *t)
+{
+ f32 DX = B.X - A.X;
+ f32 DZ = B.Z - A.Z;
+ f32 LengthSq = DX*DX + DZ*DZ;
+ f32 T = 0.f;
+ if(LengthSq > 1e-6f)
+ {
+  T = Clamp(0.f, ((P.X - A.X)*DX + (P.Z - A.Z)*DZ)/LengthSq, 1.f);
+ }
+ f32 OffX = A.X + T*DX - P.X;
+ f32 OffZ = A.Z + T*DZ - P.Z;
+ *t = T;
+ f32 Result = R3Sqrt(OffX*OffX + OffZ*OffZ);
+ return Result;
+}
+
+// NOTE: Collects one rail per link and lifts rails until none runs into another rail or
+// an island it does not stop at. Where two rails meet, the one already higher goes up
+// (on a tie the later one), so most rails stay at island height. A lift bends the rail
+// up between its stations, so right at a station two rails can still touch. Lifts only
+// grow, so this settles; it is redone only when the islands or the links change.
+internal void
+W3SolveRails(app_state *App)
+{
+ r3_state *R3 = &App->R3;
+
+ //- One rail per link, from the lower island index
+ R3->RailCount = 0;
+ u64 Key = 1469598103934665603ull;
+#define W3RailMix(Value) Key = (Key ^ (u64)(Value))*1099511628211ull
+ u32 FromIdx = 0;
+ for(island *From = App->FirstIsland; From && FromIdx < R3->IslandCount; From = From->Next)
+ {
+  for(link *Link = From->FirstLink; Link; Link = Link->Next)
+  {
+   u32 ToIdx = BroadcastIslandIndex(App, Link->Dest);
+   if(FromIdx < ToIdx && ToIdx < R3->IslandCount && R3->RailCount < R3_MaxRails &&
+      W3RailFind(R3, FromIdx, ToIdx) == R3->RailCount)
+   {
+    R3->RailFrom[R3->RailCount] = (u8)FromIdx;
+    R3->RailTo[R3->RailCount] = (u8)ToIdx;
+    R3->RailCount += 1;
+    W3RailMix(FromIdx);
+    W3RailMix(ToIdx);
+   }
+  }
+  FromIdx += 1;
+ }
+ for(u32 Idx = 0; Idx < R3->IslandCount; Idx += 1)
+ {
+  u32 Bits[4];
+  MemoryCopy(&Bits[0], &R3->IslandTop[Idx].X, sizeof(u32));
+  MemoryCopy(&Bits[1], &R3->IslandTop[Idx].Y, sizeof(u32));
+  MemoryCopy(&Bits[2], &R3->IslandTop[Idx].Z, sizeof(u32));
+  MemoryCopy(&Bits[3], &R3->IslandRadius[Idx], sizeof(u32));
+  for(u32 B = 0; B < 4; B += 1) W3RailMix(Bits[B]);
+ }
+ W3RailMix(R3->RailCount);
+#undef W3RailMix
+
+ if(Key != R3->RailKey)
+ {
+  R3->RailKey = Key;
+  for(u32 Rail = 0; Rail < R3->RailCount; Rail += 1)
+  {
+   R3->RailLift[Rail] = 0.f;
+  }
+
+  for(u32 Pass = 0; Pass < W3_RailSolvePasses; Pass += 1)
+  {
+   b32 Changed = false;
+
+   //- Rail against rail: crossings, and rails leaving an island side by side
+   for(u32 R = 0; R < R3->RailCount; R += 1)
+   {
+    for(u32 S = R + 1; S < R3->RailCount; S += 1)
+    {
+     v3 R0 = W3RailPoint(R3, R, 0.f);
+     v3 R1 = W3RailPoint(R3, R, 1.f);
+     v3 S0 = W3RailPoint(R3, S, 0.f);
+     v3 S1 = W3RailPoint(R3, S, 1.f);
+     // The longer rail always goes over the shorter one (on a tie the later one). A fixed
+     // order keeps two rails from taking turns climbing over each other.
+     f32 LengthR = R3Length(V3(R1.X - R0.X, 0.f, R1.Z - R0.Z));
+     f32 LengthS = R3Length(V3(S1.X - S0.X, 0.f, S1.Z - S0.Z));
+     b32 ROver = (LengthR > LengthS);
+     f32 Deficit = 0.f;
+     for(u32 Sample = 0; Sample <= W3_RailSolveSamples; Sample += 1)
+     {
+      f32 T = (f32)Sample/(f32)W3_RailSolveSamples;
+      v3 P = W3RailPoint(R3, R, T);
+      f32 U = 0.f;
+      if(W3PlanClosest(S0, S1, P, &U) < W3_RailClearWidth)
+      {
+       v3 Q = W3RailPoint(R3, S, U);
+       f32 Above = ROver ? (P.Y - Q.Y) : (Q.Y - P.Y);
+       f32 Shape = ROver ? W3RailRamp(R3, R, T) : W3RailRamp(R3, S, U);
+       if(Shape >= W3_RailRampMinShape)
+       {
+        Deficit = Max(Deficit, (W3_RailClearance - Above)/Shape);
+       }
+      }
+     }
+     u32 Raise = ROver ? R : S;
+     if(Deficit > .001f)
+     {
+      R3->RailLift[Raise] += Deficit;
+      Changed = true;
+     }
+    }
+   }
+
+   //- Rail against the islands it passes on the way
+   for(u32 R = 0; R < R3->RailCount; R += 1)
+   {
+    v3 R0 = W3RailPoint(R3, R, 0.f);
+    v3 R1 = W3RailPoint(R3, R, 1.f);
+    for(u32 Idx = 0; Idx < R3->IslandCount; Idx += 1)
+    {
+     if(Idx != R3->RailFrom[R] && Idx != R3->RailTo[R])
+     {
+      f32 T = 0.f;
+      if(W3PlanClosest(R0, R1, R3->IslandTop[Idx], &T) < R3->IslandRadius[Idx] + W3_RailIslandMargin)
+      {
+       f32 Shape = W3RailRamp(R3, R, T);
+       // Right by a station the rail cannot climb, so lifting would not help there.
+       f32 Need = (R3->IslandTop[Idx].Y + W3_RailIslandClear - W3RailPoint(R3, R, T).Y)/Max(Shape, W3_RailRampMinShape);
+       if(Shape >= W3_RailRampMinShape && Need > .001f)
+       {
+        R3->RailLift[R] += Need;
+        Changed = true;
+       }
+      }
+     }
+    }
+   }
+
+   if(!Changed) break;
+  }
+ }
+}
+
+// NOTE: True when a portal frame at P (pillars PillarOut to each side, from FootY up to
+// TopY) would run into another rail or the trains hanging under it.
+internal b32
+W3RailFrameBlocked(r3_state *R3, u32 Rail, v3 P, v3 Side, f32 PillarOut, f32 FootY, f32 TopY)
+{
+ b32 Result = false;
+ for(u32 Other = 0; Other < R3->RailCount && !Result; Other += 1)
+ {
+  if(Other != Rail)
+  {
+   v3 O0 = W3RailPoint(R3, Other, 0.f);
+   v3 O1 = W3RailPoint(R3, Other, 1.f);
+   for(u32 Pillar = 0; Pillar < 2 && !Result; Pillar += 1)
+   {
+    v3 Base = R3Add(P, R3Scale(Side, ((Pillar == 0) ? -1.f : 1.f)*PillarOut));
+    f32 U = 0.f;
+    if(W3PlanClosest(O0, O1, Base, &U) < W3_RailPillarClear)
+    {
+     f32 Y = W3RailPoint(R3, Other, U).Y;
+     // The other rail's beam top down to the bottom of its trains.
+     Result = (Y + .4f > FootY - .3f && Y - 1.1f < TopY + .2f);
+    }
+   }
+  }
+ }
  return Result;
 }
 
@@ -122,11 +375,11 @@ W3Shade(v4 Color, random_series *Series)
 
 // NOTE: Frame along the rail at t: Dir = forward, Side = to the right, Up = the beam's top.
 internal void
-W3RailFrame(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, v3 *Dir, v3 *Side, v3 *Up)
+W3RailFrame(v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Lift, f32 t, v3 *Dir, v3 *Side, v3 *Up)
 {
  f32 Step = .01f;
- v3 P0 = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Max(0.f, t - Step));
- v3 P1 = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Min(1.f, t + Step));
+ v3 P0 = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, Max(0.f, t - Step));
+ v3 P1 = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, Min(1.f, t + Step));
  *Dir = R3Normalize(R3Sub(P1, P0));
  *Side = R3Normalize(R3Cross(*Dir, V3(0.f, 1.f, 0.f)));
  *Up = R3Cross(*Side, *Dir);
@@ -144,8 +397,12 @@ W3PushGlowQuad(r3_mesh *Mesh, v3 P0, v3 P1, v3 P2, v3 P3, v4 Color)
 // track per direction) held from above by portal frames (two pillars and a crossbeam),
 // with the trains hanging under the beams. The pillars float on anti-gravity pads.
 internal void
-W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b32 Highlight)
+W3PushRail(r3_state *R3, u32 Rail, v4 Glow, b32 Highlight)
 {
+ v3 TopA, TopB;
+ f32 RadiusA, RadiusB;
+ W3RailEnds(R3, Rail, &TopA, &RadiusA, &TopB, &RadiusB);
+ f32 Lift = R3->RailLift[Rail];
  f32 HalfWidth = .3f;
  f32 HalfHeight = .26f;
  v4 Beam = R3Color(Highlight ? W3_ColorRailBeamHover : W3_ColorRailBeam);
@@ -159,10 +416,10 @@ W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b3
  {
   f32 T0 = (f32)Segment/(f32)W3_RailSegments;
   f32 T1 = (f32)(Segment + 1)/(f32)W3_RailSegments;
-  v3 A = W3CablePoint(TopA, RadiusA, TopB, RadiusB, T0);
-  v3 B = W3CablePoint(TopA, RadiusA, TopB, RadiusB, T1);
+  v3 A = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, T0);
+  v3 B = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, T1);
   v3 Dir, Side, Up;
-  W3RailFrame(TopA, RadiusA, TopB, RadiusB, .5f*(T0 + T1), &Dir, &Side, &Up);
+  W3RailFrame(TopA, RadiusA, TopB, RadiusB, Lift, .5f*(T0 + T1), &Dir, &Side, &Up);
   v3 MidA = A, MidB = B;
   for(u32 Track = 0; Track < 2; Track += 1)
   {
@@ -188,18 +445,22 @@ W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b3
  }
  
  //- Portal frames along the rail
- f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, 0.f)));
+ f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, 0.f)));
  u32 FrameCount = (u32)Max(1.f, Length/W3_RailFrameSpacing);
  for(u32 Idx = 0; Idx < FrameCount; Idx += 1)
  {
   f32 t = ((f32)Idx + .5f)/(f32)FrameCount;
-  v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, t);
+  v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, t);
   v3 Dir, Side, Up;
-  W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+  W3RailFrame(TopA, RadiusA, TopB, RadiusB, Lift, t, &Dir, &Side, &Up);
   v3 Vertical = V3(0.f, 1.f, 0.f);
   f32 PillarOut = W3_RailTrackOffset + 1.f;
   f32 CrossY = P.Y + HalfHeight + .9f;
   f32 FootY = P.Y - 2.6f;
+  if(W3RailFrameBlocked(R3, Rail, P, Side, PillarOut, FootY, CrossY + .15f))
+  {
+   continue;
+  }
   
   for(u32 Pillar = 0; Pillar < 2; Pillar += 1)
   {
@@ -231,9 +492,9 @@ W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b3
  for(u32 End = 0; End < 2; End += 1)
  {
   f32 t = (End == 0) ? 0.f : 1.f;
-  v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, t);
+  v3 P = W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, t);
   v3 Dir, Side, Up;
-  W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+  W3RailFrame(TopA, RadiusA, TopB, RadiusB, Lift, t, &Dir, &Side, &Up);
   f32 StationHalf = W3_RailTrackOffset + .5f;
   R3PushOrientedBox(&R3->Opaque, R3Add(P, R3Scale(Up, .05f)), R3Scale(Dir, .4f), R3Scale(Up, .36f), R3Scale(Side, StationHalf), Frame);
   v3 Top = R3Add(P, R3Scale(Up, .42f));
@@ -246,13 +507,13 @@ W3PushRail(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, v4 Glow, b3
 // NOTE: One car hanging under the beam at t, held by an arm through the running slot.
 // Front adds the big windowed cab with headlights.
 internal void
-W3PushTrainCar(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, b32 Front, f32 NoseSign)
+W3PushTrainCar(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Lift, f32 t, b32 Front, f32 NoseSign)
 {
  v3 Dir, Side, Up;
- W3RailFrame(TopA, RadiusA, TopB, RadiusB, t, &Dir, &Side, &Up);
+ W3RailFrame(TopA, RadiusA, TopB, RadiusB, Lift, t, &Dir, &Side, &Up);
  // Trains running towards t = 1 use the +Side track, the others the -Side track,
  // so trains in opposite directions pass each other.
- v3 RailP = R3Add(W3CablePoint(TopA, RadiusA, TopB, RadiusB, t), R3Scale(Side, NoseSign*W3_RailTrackOffset));
+ v3 RailP = R3Add(W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, t), R3Scale(Side, NoseSign*W3_RailTrackOffset));
  Dir = R3Scale(Dir, NoseSign);
  Side = R3Scale(Side, NoseSign);
  f32 HalfLength = .62f, HalfWidth = .27f, HalfHeight = .3f;
@@ -298,15 +559,32 @@ W3PushTrainCar(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 t, 
 // NOTE: A two-car train going from island A (t = 0) to island B (t = 1); Progress is
 // where its front is. Direction = +1 when it runs A to B along t, -1 the other way.
 internal void
-W3PushTrain(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Progress, f32 Direction)
+W3PushTrain(r3_state *R3, v3 TopA, f32 RadiusA, v3 TopB, f32 RadiusB, f32 Lift, f32 Progress, f32 Direction)
 {
- f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, 0.f)));
+ f32 Length = R3Length(R3Sub(W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, 1.f), W3CablePoint(TopA, RadiusA, TopB, RadiusB, Lift, 0.f)));
  f32 CarStep = 1.36f/Max(Length, 1.f);
  f32 Lead = (Direction > 0.f) ? Progress : 1.f - Progress;
  f32 Second = Clamp(0.f, Lead - Direction*CarStep, 1.f);
  Lead = Clamp(0.f, Lead, 1.f);
- W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Lead, true, Direction);
- W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Second, false, Direction);
+ W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Lift, Lead, true, Direction);
+ W3PushTrainCar(R3, TopA, RadiusA, TopB, RadiusB, Lift, Second, false, Direction);
+}
+
+// NOTE: A train on the rail between islands From and To, running from From to To.
+internal void
+W3PushRailTrain(r3_state *R3, u32 From, u32 To, f32 Progress)
+{
+ u32 Rail = W3RailFind(R3, From, To);
+ if(Rail < R3->RailCount)
+ {
+  v3 TopA, TopB;
+  f32 RadiusA, RadiusB;
+  W3RailEnds(R3, Rail, &TopA, &RadiusA, &TopB, &RadiusB);
+  f32 Lift = R3->RailLift[Rail];
+  // The rail runs from the lower index; a train from the higher one runs backwards.
+  if(From < To) W3PushTrain(R3, TopA, RadiusA, TopB, RadiusB, Lift, Progress, 1.f);
+  else          W3PushTrain(R3, TopB, RadiusB, TopA, RadiusA, Lift, Progress, -1.f);
+ }
 }
 
 //~ Island status
@@ -1553,6 +1831,7 @@ W3BuildWorld(app_state *App)
  HeroReplayCommands(App);
 
  //- Maglev rails and news trains
+ W3SolveRails(App);
  u32 FromIdx = 0;
  for(island *From = App->FirstIsland; From && FromIdx < R3->IslandCount; From = From->Next)
  {
@@ -1561,11 +1840,6 @@ W3BuildWorld(app_state *App)
    u32 ToIdx = BroadcastIslandIndex(App, Link->Dest);
    if(ToIdx < R3->IslandCount)
    {
-    v3 TopA = R3->IslandTop[FromIdx];
-    v3 TopB = R3->IslandTop[ToIdx];
-    f32 RadiusA = R3->IslandRadius[FromIdx];
-    f32 RadiusB = R3->IslandRadius[ToIdx];
-
     // Every link exists in both directions; build the rail once, from the lower index
     // (t = 0 at the lower index's island).
     if(FromIdx < ToIdx)
@@ -1575,7 +1849,8 @@ W3BuildWorld(app_state *App)
      v4 Glow = R3LerpColor(R3Color(W3_ColorRailGlow), R3Color(W3_ColorRailLit), Flash);
      if(Highlight) Glow = R3Color(W3_ColorRailHover);
      if(RouteIsDown(App, FromIdx) || RouteIsDown(App, ToIdx)) Glow = R3Color(W3_ColorRailDown);
-     W3PushRail(R3, TopA, RadiusA, TopB, RadiusB, Glow, Highlight);
+     u32 Rail = W3RailFind(R3, FromIdx, ToIdx);
+     if(Rail < R3->RailCount) W3PushRail(R3, Rail, Glow, Highlight);
     }
 
     // A train rides from sender to receiver while this direction carries news.
@@ -1585,9 +1860,7 @@ W3BuildWorld(app_state *App)
      if(Flash > 0.f)
      {
       f32 Progress = Clamp(0.f, 1.f - Flash/Broadcast_FlashSeconds, 1.f);
-      // The rail runs from the lower index; a train from the higher one runs backwards.
-      if(FromIdx < ToIdx) W3PushTrain(R3, TopA, RadiusA, TopB, RadiusB, Progress, 1.f);
-      else                W3PushTrain(R3, TopB, RadiusB, TopA, RadiusA, Progress, -1.f);
+      W3PushRailTrain(R3, FromIdx, ToIdx, Progress);
      }
     }
    }
@@ -1606,9 +1879,7 @@ W3BuildWorld(app_state *App)
    u32 B = Shipment->MovedTo;
    if(Shipment->MovedRound == Broadcast->Round && A < R3->IslandCount && B < R3->IslandCount && A != B)
    {
-    // Same direction rule as the news trains: the rail runs from the lower index.
-    if(A < B) W3PushTrain(R3, R3->IslandTop[A], R3->IslandRadius[A], R3->IslandTop[B], R3->IslandRadius[B], Progress, 1.f);
-    else      W3PushTrain(R3, R3->IslandTop[B], R3->IslandRadius[B], R3->IslandTop[A], R3->IslandRadius[A], Progress, -1.f);
+    W3PushRailTrain(R3, A, B, Progress);
    }
   }
  }
