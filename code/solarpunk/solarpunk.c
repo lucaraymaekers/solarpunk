@@ -30,6 +30,7 @@
 
 #include "solarpunk/solarpunk_broadcast.h"
 #include "solarpunk/solarpunk_food.h"
+#include "solarpunk/solarpunk_routing.h"
 #include "solarpunk/solarpunk_render3d.h"
 #include "solarpunk/solarpunk_panel.h"
 #include "solarpunk/solarpunk.h"
@@ -38,6 +39,7 @@
 #include "solarpunk/solarpunk_supply.c"
 #include "solarpunk/solarpunk_world_gen.c"
 #include "solarpunk/solarpunk_food_app.c"
+#include "solarpunk/solarpunk_routing.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"
 #include "solarpunk/solarpunk_ui.c"

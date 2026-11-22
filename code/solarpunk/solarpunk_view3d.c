@@ -11,7 +11,7 @@
 #define V3D_LabelPadding 5.f
 #define V3D_ChipPadding  10.f
 
-#define V3D_ColorLabelBg     0xF0FFF9EF
+#define V3D_ColorLabelBg     0xF0F4EAD3
 
 //~ UI areas
 internal void
@@ -178,8 +178,7 @@ V3DrawClusterLabels(app_state *App, app_input *Input)
   b32 Focused = (R3->FocusedClusterPlusOne == (s32)Cluster + 1);
   b32 Hot = IsInsideRectV2(MousePos, Box) && !IsInsideRectV2(MousePos, R3->PopupRect);
   u32 Background = Focused ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorCard);
-  UiCard(Box, .5f*Height);
-  DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, .5f);
+  UiButtonFace(Box, Background);
   if(Hot)
   {
    UiSetHint(Focused ? "Click to see all clusters again" : "Click to fly here and show the island names",
@@ -300,7 +299,8 @@ V3DrawIslandLabels(app_state *App)
    {
     DrawRect(Box, V4FromU32(Hovered ? Ui_ColorAccent : Ui_ColorSelected), .5f*Height, 2.f, .5f);
    }
-   V3StatusDot(V2(Min.X + V3D_LabelPadding + 2.f, Min.Y + .5f*(Height - Dot)), Dot, W3StatusColor(R3->IslandStatus[Index]));
+   u32 DotColor = RouteIsDown(App, Index) ? W3_ColorStatusDown : W3StatusColor(R3->IslandStatus[Index]);
+   V3StatusDot(V2(Min.X + V3D_LabelPadding + 2.f, Min.Y + .5f*(Height - Dot)), Dot, DotColor);
    UiText(App, V2(Min.X + V3D_LabelPadding + Dot + 8.f, Min.Y + V3D_LabelPadding), Island->Name, Ui_ColorText);
   }
  }
@@ -367,7 +367,7 @@ V3Chip(app_state *App, app_input *Input, v2 *Cursor, str8 Text, u32 DotColor, b3
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  b32 Hot = IsInsideRectV2(MousePos, Box) && !UiMouseBlocked(App, MousePos);
  u32 Background = Open ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorButton);
- DrawRect(Box, V4FromU32(Background), .5f*Height, 0.f, .5f);
+ UiButtonFace(Box, Background);
 
  v2 DotPos = V2(Box.Min.X + V3D_ChipPadding, Box.Min.Y + .5f*(Height - Dot));
  if(Open) DrawRect(RectFromSize(V2(DotPos.X - 2.f, DotPos.Y - 2.f), V2(Dot + 4.f, Dot + 4.f)), V4FromU32(Ui_ColorCard), Square ? 4.f : .5f*Dot + 2.f, 0.f, .5f);
@@ -1172,7 +1172,7 @@ DrawHelpCard(app_state *App, app_input *Input, v2 BufferDim)
   f32 ButtonWidth = UiMeasure(App, Label) + 2.f*Ui_ButtonPadX + 20.f;
   v4 Button = RectFromSize(V2(Box.Max.X - Pad - ButtonWidth, Box.Max.Y - Pad - UiButtonHeight(App)), V2(ButtonWidth, UiButtonHeight(App)));
   b32 Hot = IsInsideRectV2(MousePos, Button);
-  DrawRect(Button, V4FromU32(Hot ? Ui_ColorAccentHot : Ui_ColorAccent), Ui_ButtonRadius, 0.f, .5f);
+  UiButtonFace(Button, Hot ? Ui_ColorAccentHot : Ui_ColorAccent);
   UiText(App, V2(FloorF32(Button.Min.X + .5f*(ButtonWidth - UiMeasure(App, Label))), Button.Min.Y + Ui_ButtonPadY), Label, Ui_ColorOnAccent);
   UiText(App, V2(X, Button.Min.Y + Ui_ButtonPadY), S8("Open this again with the ? button, top right."), Ui_ColorTextDim);
   if(Hot && Clicked)

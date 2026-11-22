@@ -1,5 +1,5 @@
 //-
-// SolarPunk UI theme and widgets: warm, light cards that match the golden-hour sky.
+// SolarPunk UI theme and widgets: parchment cards, beige buttons with a thin gold border.
 // Every overlay (top bar, panel, labels, tooltips, help) draws with these.
 //-
 
@@ -7,34 +7,37 @@
 #define Ui_Margin        10.f   // distance from the window edge
 #define Ui_Pad           8.f    // inside a card
 #define Ui_Gap           6.f    // between widgets
-#define Ui_CardRadius    10.f
-#define Ui_ButtonRadius  8.f
+#define Ui_CardRadius    6.f
+#define Ui_ButtonRadius  4.f
 #define Ui_ButtonPadX    10.f
 #define Ui_ButtonPadY    5.f
 
-#define Ui_ColorCard        0xFFFFF9EF   // warm cream
-#define Ui_ColorCardBorder  0xFFE6D2B0
-#define Ui_ColorShadow      0x50402810
-#define Ui_ColorText        0xFF3D3228   // dark warm brown
-#define Ui_ColorTextDim     0xFF8C7B67
-#define Ui_ColorTitle       0xFFB4552A   // terracotta
-#define Ui_ColorAccent      0xFFE07A3F
-#define Ui_ColorAccentHot   0xFFEA8D55
-#define Ui_ColorAccentDown  0xFFC9672F
-#define Ui_ColorOnAccent    0xFFFFFFFF
-#define Ui_ColorButton      0xFFF3E5CE
-#define Ui_ColorButtonHot   0xFFEBD6B2
-#define Ui_ColorButtonDown  0xFFE0C59A
-#define Ui_ColorRowAlt      0xFFF8EFE1
-#define Ui_ColorRowHover    0xFFF0DFC2
-#define Ui_ColorLine        0xFFE6D2B0
-#define Ui_ColorSelected    0xFF2C7DAE   // the opened island
+#define Ui_ColorCard        0xFFEFE3C8   // parchment
+#define Ui_ColorCardBorder  0xFFC9A55A   // gold
+#define Ui_ColorShadow      0x38402810
+#define Ui_ColorText        0xFF3B3024   // dark brown
+#define Ui_ColorTextDim     0xFF85745C
+#define Ui_ColorTitle       0xFF8C6A2E   // dark gold
+#define Ui_ColorAccent      0xFFD8C59D   // tan, like a selected row
+#define Ui_ColorAccentHot   0xFFD0BB8F
+#define Ui_ColorAccentDown  0xFFC4AD7E
+#define Ui_ColorOnAccent    0xFF3B3024
+#define Ui_ColorButton      0xFFE5D5B0   // beige
+#define Ui_ColorButtonHot   0xFFDDCBA2
+#define Ui_ColorButtonDown  0xFFD2BE91
+#define Ui_ColorRowAlt      0xFFF3E9D3
+#define Ui_ColorRowHover    0xFFE5D5B0
+#define Ui_ColorLine        0xFFC9A046   // gold divider
+#define Ui_ColorSelected    0xFFA8742A   // the opened island
+#define Ui_ColorButtonBorder 0xFFC9AC6A   // thin gold edge on buttons
+#define Ui_ColorField       0xFFF8F0DD   // light cream, like a text field
+#define Ui_ColorFieldBorder 0xFFC9A44C
 #define Ui_ColorDimBackdrop 0x66201810   // behind the help card
 
-// NOTE: Status colours for text on the cream cards (darker than the 3D rings).
-#define Ui_ColorOkText      0xFF2E8B4F
-#define Ui_ColorWaitingText 0xFFC46F15
-#define Ui_ColorShortText   0xFFC23B3B
+// NOTE: Status colours for text on the parchment cards (darker than the 3D rings).
+#define Ui_ColorOkText      0xFF4E7D3A
+#define Ui_ColorWaitingText 0xFFB06A12
+#define Ui_ColorShortText   0xFFB23A3A
 
 //~ Text size
 // NOTE: Big by default so it reads well on a projector; R3->TextSizeIdxPlusOne picks
@@ -157,6 +160,22 @@ UiMouseBlocked(app_state *App, v2 MousePos)
  return Result;
 }
 
+// NOTE: A button face: fill plus a 1px gold border, small rounded corners.
+internal void
+UiButtonFace(v4 Box, u32 Fill)
+{
+ DrawRect(Box, V4FromU32(Fill), Ui_ButtonRadius, 0.f, .5f);
+ DrawRect(Box, V4FromU32(Ui_ColorButtonBorder), Ui_ButtonRadius, 1.f, .5f);
+}
+
+// NOTE: A light field with a gold border (looks like a text input).
+internal void
+UiField(v4 Box)
+{
+ DrawRect(Box, V4FromU32(Ui_ColorField), Ui_ButtonRadius, 0.f, .5f);
+ DrawRect(Box, V4FromU32(Ui_ColorFieldBorder), Ui_ButtonRadius, 1.f, .5f);
+}
+
 internal void
 UiDot(v2 Pos, f32 Size, u32 Color)
 {
@@ -222,7 +241,7 @@ UiButtonEx(app_state *App, app_input *Input, v2 *Cursor, str8 Label, ui_button_k
  if(Hot) Color = MouseLeft.EndedDown ? (Accent ? Ui_ColorAccentDown : Ui_ColorButtonDown)
   : (Accent ? Ui_ColorAccentHot : Ui_ColorButtonHot);
 
- DrawRect(Dest, V4FromU32(Color), Ui_ButtonRadius, 0.f, .5f);
+ UiButtonFace(Dest, Color);
  f32 TextX = Dest.Min.X + .5f*(Width - UiMeasure(App, Label));
  UiText(App, V2(FloorF32(TextX), Dest.Min.Y + Ui_ButtonPadY), Label, Accent ? Ui_ColorOnAccent : Ui_ColorText);
 

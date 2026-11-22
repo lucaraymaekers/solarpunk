@@ -41,6 +41,7 @@
 #define W3_ColorRailGlow    0xFF45D4F0   // the glowing lines along a rail
 #define W3_ColorRailLit     0xFFD8FFFF   // ... while news rides it
 #define W3_ColorRailHover   0xFFFFC857   // ... on the hovered island's rails
+#define W3_ColorRailDown    0xFFE0403A   // ... when one of its islands is shut down (solarpunk_routing.c)
 #define W3_ColorTrainBody   0xFFF7F9FC
 #define W3_ColorTrainWindow 0xFF27344F
 #define W3_ColorTrainSkirt  0xFF2F4FA0   // blue lower body
@@ -56,6 +57,7 @@
 #define W3_ColorStatusOk      0xFF7BD389
 #define W3_ColorStatusWaiting 0xFFF5A65B
 #define W3_ColorStatusShort   0xFFE0606A
+#define W3_ColorStatusDown    0xFF8A8F99   // island shut down (label dot)
 #define W3_ColorCloud       0xFFFFE6D2
 
 // NOTE: One colour per product kind, used for crates and in the legend.
@@ -1433,6 +1435,7 @@ W3BuildWorld(app_state *App)
      f32 Flash = BroadcastLinkFlash(App, From, Link->Dest);
      v4 Glow = R3LerpColor(R3Color(W3_ColorRailGlow), R3Color(W3_ColorRailLit), Flash);
      if(Highlight) Glow = R3Color(W3_ColorRailHover);
+     if(RouteIsDown(App, FromIdx) || RouteIsDown(App, ToIdx)) Glow = R3Color(W3_ColorRailDown);
      W3PushRail(R3, TopA, RadiusA, TopB, RadiusB, Glow, Highlight);
     }
 
@@ -1451,6 +1454,24 @@ W3BuildWorld(app_state *App)
    }
   }
   FromIdx += 1;
+ }
+
+ //- Goods trains: every shipment that hopped one link this round (solarpunk_routing.c)
+ if(Broadcast->Round > 0)
+ {
+  f32 Progress = Clamp(0.f, Broadcast->Timer/Broadcast_RoundSeconds, 1.f);
+  for(u32 S = 0; S < Route_MaxShipments; S += 1)
+  {
+   route_shipment *Shipment = &App->Route.Shipments[S];
+   u32 A = Shipment->MovedFrom;
+   u32 B = Shipment->MovedTo;
+   if(Shipment->MovedRound == Broadcast->Round && A < R3->IslandCount && B < R3->IslandCount && A != B)
+   {
+    // Same direction rule as the news trains: the rail runs from the lower index.
+    if(A < B) W3PushTrain(R3, R3->IslandTop[A], R3->IslandRadius[A], R3->IslandTop[B], R3->IslandRadius[B], Progress, 1.f);
+    else      W3PushTrain(R3, R3->IslandTop[B], R3->IslandRadius[B], R3->IslandTop[A], R3->IslandRadius[A], Progress, -1.f);
+   }
+  }
  }
 
  //- Clouds below the islands

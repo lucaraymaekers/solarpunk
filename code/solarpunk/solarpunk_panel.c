@@ -3,8 +3,8 @@
 //   Shortages : products that are short overall, and islands that do not yet know
 //               a supplier for one of their needs
 //   Islands   : one table row per island (needs, knows N/M); click a row to open it
-//   Selected  : everything about one island (production, needs with the nearest
-//               known supplier, network)
+//   Selected  : everything about one island (router on/off, production, needs with the
+//               nearest known supplier, food, neighbours, routing table)
 // Select an island by clicking it in 3D or a row in a table.
 //-
 
@@ -450,6 +450,69 @@ PanelDrawSelected(panel_cursor *Cursor)
   PanelNewLine(Cursor);
  }
 
+ //- Router (link-state routing, solarpunk_routing.c)
+ PanelSection(Cursor, S8("Router"));
+ {
+  route_state *Route = &App->Route;
+  b32 Down = RouteIsDown(App, SelectedIdx);
+  v2 ButtonPos = V2(Cursor->X, Cursor->Y + 2.f);
+  v2 MousePos = V2V2S32(Cursor->Input->Mouse.Pos);
+  str8 Label = Down ? S8("Start island again") : S8("Shut island down");
+  b32 Clicked = UiButtonEx(App, Cursor->Input, &ButtonPos, Label, Down ? UiButton_Toggled : UiButton_Normal,
+                           Down ? "Bring it back: it says hello again and relearns the map"
+                                : "Simulate a failure: it stops sending hellos and forwarding goods", 0.f);
+  // The button can be scrolled under the tabs: only clicks inside the content count.
+  if(Clicked && IsInsideRectV2(MousePos, Cursor->Content))
+  {
+   RouteSetDown(App, SelectedIdx, !Down);
+   Down = !Down;
+  }
+  Cursor->Y += UiButtonHeight(App) + 6.f;
+
+  if(Down)
+  {
+   PanelText(Cursor, 0.f, S8("DOWN: no hellos, no forwarding."), Panel_ColorShortage);
+   PanelNewLine(Cursor);
+   PanelNote(Cursor, Str8Fmt("Neighbours notice after %d silent rounds.", Route_DeadRounds));
+  }
+  else
+  {
+   PanelText(Cursor, 0.f, Str8Fmt("Map: %u/%u islands (own LSA #%u)", RouteMapSize(App, SelectedIdx),
+                                  Route->IslandCount, Route->OwnSeq[SelectedIdx]), Panel_ColorText);
+   PanelNewLine(Cursor);
+   PanelText(Cursor, 0.f, Str8Fmt("Can reach %u other islands", RouteReachableCount(App, SelectedIdx)), Panel_ColorText);
+   PanelNewLine(Cursor);
+  }
+
+  //- Goods on the way to or from this island
+  u32 Listed = 0;
+  for(u32 S = 0; S < Route_MaxShipments; S += 1)
+  {
+   route_shipment *Shipment = &Route->Shipments[S];
+   if(Shipment->Active && (Shipment->Dest == SelectedIdx || Shipment->From == SelectedIdx))
+   {
+    if(Listed < 6)
+    {
+     b32 Incoming = (Shipment->Dest == SelectedIdx);
+     island *Other = PanelIslandAt(App, Incoming ? Shipment->From : Shipment->Dest);
+     island *At = PanelIslandAt(App, Shipment->At);
+     str8 Kind = ProductNames[Shipment->Kind < ProductKind_Count ? Shipment->Kind : 0];
+     str8 OtherName = Other ? Other->Name : S8("?");
+     str8 AtName = At ? At->Name : S8("?");
+     PanelText(Cursor, 0.f, Str8Fmt("%s %u %.*s %s %.*s, at %.*s", Incoming ? "<-" : "->", Shipment->Qty,
+                                    (s32)Kind.Size, Kind.Data, Incoming ? "from" : "to",
+                                    (s32)OtherName.Size, OtherName.Data, (s32)AtName.Size, AtName.Data),
+               Incoming ? Panel_ColorGood : Panel_ColorText);
+     PanelNewLine(Cursor);
+    }
+    Listed += 1;
+   }
+  }
+  if(Listed > 6) PanelNote(Cursor, Str8Fmt("... and %u more shipments", Listed - 6));
+  PanelNote(Cursor, Str8Fmt("Delivered here: %llu.  All islands: %llu, lost %llu.",
+                            Route->DeliveredTo[SelectedIdx], Route->DeliveredUnits, Route->LostUnits));
+ }
+
  //- Produces
  PanelSection(Cursor, S8("Produces"));
  {
@@ -545,10 +608,12 @@ PanelDrawSelected(panel_cursor *Cursor)
  //- Network
  PanelSection(Cursor, S8("Neighbours"));
  {
-  panel_column Columns[2];
+  panel_column Columns[3];
   Columns[0] = PanelColumn("Island", 0.f, false);
-  Columns[1] = PanelColumn("Cable cost", W, true);
+  Columns[1] = PanelColumn("Hello", .58f*W, false);
+  Columns[2] = PanelColumn("Cost", W, true);
   PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
+  b32 SelfDown = RouteIsDown(App, SelectedIdx);
   for(link *Link = Island->FirstLink; Link; Link = Link->Next)
   {
    u32 NeighbourIdx = BroadcastIslandIndex(App, Link->Dest);
@@ -557,9 +622,73 @@ PanelDrawSelected(panel_cursor *Cursor)
    PanelTintRow(Cursor, NeighbourStatus);
    PanelStatusDot(Cursor, 0.f, NeighbourStatus);
    PanelText(Cursor, PanelDotSpace(Cursor), Link->Dest->Name, Panel_ColorText);
+
+   // What this island's router thinks of the neighbour (solarpunk_routing.c).
+   u64 Silent = 0;
+   route_neighbour_state State = RouteNeighbourState(App, SelectedIdx, NeighbourIdx, &Silent);
+   str8 StateText = S8("no hello");
+   u32 StateColor = Panel_ColorDim;
+   if(SelfDown)                              { StateText = S8("-"); }
+   else if(State == RouteNeighbour_Up)       { StateText = (Silent > 0) ? Str8Fmt("up, quiet %llu", Silent) : S8("up");
+                                               StateColor = (Silent > 0) ? Ui_ColorWaitingText : Panel_ColorGood; }
+   else if(State == RouteNeighbour_OneWay)   { StateText = S8("one-way"); StateColor = Ui_ColorWaitingText; }
+   else if(State == RouteNeighbour_Dead)     { StateText = Str8Fmt("DOWN (%llu)", Silent); StateColor = Panel_ColorShortage; }
+   PanelText(Cursor, .58f*W, StateText, StateColor);
    PanelTextRight(Cursor, W, Str8Fmt("%d", Link->Cost), Ui_ColorTitle);
    PanelNewLine(Cursor);
   }
+  PanelNote(Cursor, Str8Fmt("DOWN = no hello for %d+ rounds.", Route_DeadRounds));
+ }
+
+ //- Routing table: Dijkstra on this island's own copy of the map
+ PanelSection(Cursor, S8("Routes (Dijkstra)"));
+ if(RouteIsDown(App, SelectedIdx))
+ {
+  PanelNote(Cursor, S8("Shut down: no routing table."));
+ }
+ else
+ {
+  route_state *Route = &App->Route;
+  u32 Order[Route_MaxIslands];
+  u32 OrderCount = 0;
+  for(u32 Dest = 0; Dest < Route->IslandCount; Dest += 1)
+  {
+   if(Dest == SelectedIdx || Route->Dist[SelectedIdx][Dest] == Route_Infinity) continue;
+   // Insertion sort by cost (then index), there are only a few dozen islands.
+   u32 At = OrderCount++;
+   while(At > 0 && Route->Dist[SelectedIdx][Order[At - 1]] > Route->Dist[SelectedIdx][Dest])
+   {
+    Order[At] = Order[At - 1];
+    At -= 1;
+   }
+   Order[At] = Dest;
+  }
+
+  if(OrderCount == 0)
+  {
+   PanelNote(Cursor, S8("No routes yet: waiting for hellos and LSAs."));
+  }
+  else
+  {
+   panel_column Columns[3];
+   Columns[0] = PanelColumn("To", 0.f, false);
+   Columns[1] = PanelColumn("Next hop", .5f*W, false);
+   Columns[2] = PanelColumn("Cost", W, true);
+   PanelTableHeader(Cursor, Columns, (u32)ArrayCount(Columns));
+   for(u32 Row = 0; Row < OrderCount; Row += 1)
+   {
+    u32 Dest = Order[Row];
+    island *DestIsland = PanelIslandAt(App, Dest);
+    island *Hop = PanelIslandAt(App, Route->NextHop[SelectedIdx][Dest]);
+    PanelIslandRow(Cursor, Dest);
+    PanelText(Cursor, 0.f, DestIsland ? DestIsland->Name : S8("?"), Panel_ColorText);
+    PanelText(Cursor, .5f*W, Hop ? Hop->Name : S8("?"), Panel_ColorDim);
+    PanelTextRight(Cursor, W, Str8Fmt("%u", Route->Dist[SelectedIdx][Dest]), Ui_ColorTitle);
+    PanelNewLine(Cursor);
+   }
+  }
+  u32 Unreachable = (Route->IslandCount > OrderCount + 1) ? Route->IslandCount - 1 - OrderCount : 0;
+  if(Unreachable > 0) PanelNote(Cursor, Str8Fmt("%u islands not reachable (yet).", Unreachable));
  }
 }
 
@@ -573,10 +702,9 @@ PanelTabButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label, f32 Wid
  v2 MousePos = V2V2S32(Input->Mouse.Pos);
  b32 Hot = IsInsideRectV2(MousePos, Dest) && !UiMouseBlocked(App, MousePos);
 
- if(Active || Hot)
- {
-  DrawRect(Dest, V4FromU32(Active ? Ui_ColorAccent : Ui_ColorButtonHot), Ui_ButtonRadius - 2.f, 0.f, .5f);
- }
+ // Small gap between neighbouring tabs so their borders do not touch.
+ v4 Face = V4(Dest.Min.X + 1.5f, Dest.Min.Y, Dest.Max.X - 1.5f, Dest.Max.Y);
+ UiButtonFace(Face, Active ? Ui_ColorAccent : (Hot ? Ui_ColorButtonHot : Ui_ColorButton));
  f32 TextWidth = PanelMeasure(App, Label);
  UiText(App, V2(FloorF32(Dest.Min.X + .5f*(Width - TextWidth)), Dest.Min.Y + Ui_ButtonPadY),
         Label, Active ? Ui_ColorOnAccent : Ui_ColorText);
@@ -649,7 +777,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
    char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected"};
    f32 TabsWidth = PanelWidth - 2.f*Panel_Pad;
    v4 Track = RectFromSize(V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap), V2(TabsWidth, ButtonHeight + 6.f));
-   DrawRect(Track, V4FromU32(Ui_ColorButton), Ui_ButtonRadius, 0.f, .5f);
+   UiField(Track);
    f32 TabWidth = (TabsWidth - 6.f)/(f32)PanelTab_Count;
    v2 TabCursor = V2(Track.Min.X + 3.f, Track.Min.Y + 3.f);
    for(u32 Tab = 0; Tab < PanelTab_Count; Tab += 1)
