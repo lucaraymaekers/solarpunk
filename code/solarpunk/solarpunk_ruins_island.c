@@ -12,7 +12,7 @@
 //-
 
 //~ Constants
-#define Ruins_Cluster 3   // Ember Archipelago, see WorldGenClusterFoods
+#define Ruins_Cluster 3   // Ember Archipelago, see SupplyClimateFoods
 #define Ruins_RowH    .11f
 
 global_variable u32 RuinsStoneColors[] = {0xFFA8A08C, 0xFFB8AE96, 0xFF9A9280, 0xFF8E8A78, 0xFFC2B79C, 0xFF8F947C};

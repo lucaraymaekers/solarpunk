@@ -70,6 +70,10 @@ global_variable u32 W3ProductColors[ProductKind_Count] =
  0xFF6FA8DC, // Fish
  0xFF9B3D33, // Meat
  0xFFB98A5E, // Eggs
+ 0xFF8E44AD, // Berries
+ 0xFF6B4F36, // Coconuts
+ 0xFFF2727F, // Crabs
+ 0xFF9E8A66, // Potatoes
 };
 
 //~ Helpers
@@ -508,12 +512,12 @@ global_variable w3_theme W3ClusterThemes[] =
  {{0xFFD5DCE0, 0xFFB4C0C8, 0xFF94A3AE, 0xFF76858F}, 0xFF7CC7A0, 0xFFE2E7EA, 0xFF3E8E6E, 0xFFF5F5F5, 1.15f, .12f, W3Extra_None},
  // Ember Archipelago: red rock, autumn trees
  {{0xFFE9A27C, 0xFFD5825C, 0xFFB8623F, 0xFF8F4A30}, 0xFFA8C060, 0xFFF0C3A6, 0xFFE0752E, 0xFFF2D04E, 1.05f, .07f, W3Extra_None},
- // Crystal Spires: lavender stone, crystals under the rock
+ // Mistral Heights: windswept grey-green highland rock, heather
+ {{0xFFDCE0D8, 0xFFC2C9BE, 0xFFA6AFA2, 0xFF87907F}, 0xFF9CCB7A, 0xFFE8EBE4, 0xFF4E8A5E, 0xFFB58CD8, 1.2f,  .08f, W3Extra_None},
+ // Crystal Spires: lavender stone, crystals under the rock (hand-built: solarpunk_crystal_island.c)
  {{0xFFE6DDF2, 0xFFCDBFE6, 0xFFB3A1D6, 0xFF937FC0}, 0xFF9FE0B8, 0xFFEFE8F8, 0xFF5AAE8A, 0xFFB58CF0, 1.f,   .03f, W3Extra_Crystals},
- // Mistral Keys: white chalk, tall cliffs
- {{0xFFFBFBF6, 0xFFECECE4, 0xFFD9D9CE, 0xFFBDBDB0}, 0xFF8ED67A, 0xFFFFFFFF, 0xFF4E9A7A, 0xFF7FB3E8, 1.45f, .05f, W3Extra_None},
- // Saltglass Atolls: coral pink stone, blossom trees
- {{0xFFF8D9D0, 0xFFEFBFB2, 0xFFE0A396, 0xFFC9867A}, 0xFF8CD3B5, 0xFFFBE7E1, 0xFFF29BB8, 0xFFFFFFFF, .85f,  .05f, W3Extra_Vines},
+ // Frostfall Isles: icy blue-white rock (hand-built: solarpunk_ice_island.c)
+ {{0xFFF4F8FC, 0xFFDCE6F0, 0xFFC0D0E0, 0xFF9DB0C6}, 0xFFE8F0F4, 0xFFFFFFFF, 0xFF3E6E5A, 0xFFBFE6FF, 1.1f,  .05f, W3Extra_None},
 };
 StaticAssert(ArrayCount(W3ClusterThemes) == WorldGen_ClusterCount, W3ClusterThemesMatch);
 
@@ -749,6 +753,85 @@ W3PushHut(r3_mesh *Mesh, v3 Base, v3 Half, u32 WallColor)
  R3PushTri(Mesh, A1, B1, R1, R3Add(Inside, V3(-1.f, 0.f, 0.f)), R3Color(WallColor));
 }
 
+//- New foods: berries, coconuts, crabs, potatoes (also used by the hand-built islands)
+internal void
+W3PushBerryBush(r3_mesh *Mesh, v3 Base, f32 Scale, random_series *Series)
+{
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .2f*Scale, 0.f)), V3(.28f*Scale, .22f*Scale, .28f*Scale), 4, 7, W3Shade(R3Color(0xFF2F6E3A), Series), false);
+ for(u32 Berry = 0; Berry < 7; Berry += 1)
+ {
+  f32 Angle = 2.f*Pi32*RandomUnilateral(Series);
+  f32 Height = (.14f + .16f*RandomUnilateral(Series))*Scale;
+  v3 P = R3Add(Base, V3(.26f*Scale*R3Cos(Angle), Height, .26f*Scale*R3Sin(Angle)));
+  R3PushEllipsoid(Mesh, P, V3(.045f*Scale, .045f*Scale, .045f*Scale), 2, 5, R3Color(W3ProductColors[ProductKind_Berries]), false);
+ }
+}
+
+// NOTE: A palm: a leaning trunk in segments, a crown of drooping fronds, coconuts.
+internal void
+W3PushPalm(r3_mesh *Mesh, v3 Base, f32 Scale, random_series *Series)
+{
+ f32 Lean = 2.f*Pi32*RandomUnilateral(Series);
+ v3 LeanDir = V3(R3Cos(Lean), 0.f, R3Sin(Lean));
+ v3 P = Base;
+ for(u32 Segment = 0; Segment < 4; Segment += 1)
+ {
+  f32 t = (f32)(Segment + 1)/4.f;
+  v3 Next = R3Add(Base, R3Add(V3(0.f, 1.4f*Scale*t, 0.f), R3Scale(LeanDir, .25f*Scale*t*t)));
+  R3PushCylinder(Mesh, P, Next, (.07f - .012f*(f32)Segment)*Scale, 6, R3Color((Segment & 1) ? 0xFF8A6A48 : 0xFF9C7A54));
+  P = Next;
+ }
+ for(u32 Frond = 0; Frond < 6; Frond += 1)
+ {
+  f32 Angle = 2.f*Pi32*(f32)Frond/6.f + .3f;
+  v3 Dir = V3(R3Cos(Angle), -.35f, R3Sin(Angle));
+  v3 Side = V3(-R3Sin(Angle), 0.f, R3Cos(Angle));
+  R3PushOrientedBox(Mesh, R3Add(P, R3Scale(Dir, .32f*Scale)), R3Scale(Dir, .32f*Scale), V3(0.f, .015f*Scale, 0.f),
+                    R3Scale(Side, .08f*Scale), W3Shade(R3Color(0xFF4E9A3A), Series));
+ }
+ for(u32 Nut = 0; Nut < 3; Nut += 1)
+ {
+  f32 Angle = 2.1f*(f32)Nut;
+  R3PushEllipsoid(Mesh, R3Add(P, V3(.07f*Scale*R3Cos(Angle), -.07f*Scale, .07f*Scale*R3Sin(Angle))), V3(.06f*Scale, .06f*Scale, .06f*Scale), 3, 5,
+                  R3Color(W3ProductColors[ProductKind_Coconuts]), false);
+ }
+}
+
+// NOTE: A crab pot: a wooden cage with a net top and an orange float.
+internal void
+W3PushCrabPot(r3_mesh *Mesh, v3 Base, f32 Scale)
+{
+ R3PushBox(Mesh, R3Add(Base, V3(0.f, .1f*Scale, 0.f)), V3(.16f*Scale, .1f*Scale, .13f*Scale), R3Color(W3_ColorDarkWood));
+ R3PushBox(Mesh, R3Add(Base, V3(0.f, .205f*Scale, 0.f)), V3(.14f*Scale, .01f*Scale, .11f*Scale), R3Color(0xFF3E6B66));
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(.1f*Scale, .3f*Scale, 0.f)), V3(.05f*Scale, .05f*Scale, .05f*Scale), 3, 5, R3Color(0xFFF07A2E), false);
+}
+
+internal void
+W3PushCrab(r3_mesh *Mesh, v3 Base, f32 Scale, f32 Facing)
+{
+ v4 Shell = R3Color(W3ProductColors[ProductKind_Crabs]);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .05f*Scale, 0.f)), V3(.12f*Scale, .05f*Scale, .09f*Scale), 3, 6, Shell, false);
+ for(u32 Claw = 0; Claw < 2; Claw += 1)
+ {
+  f32 S = (Claw == 0) ? -1.f : 1.f;
+  R3PushEllipsoid(Mesh, R3Add(Base, V3(.14f*Scale*Facing, .05f*Scale, .07f*Scale*S)), V3(.045f*Scale, .035f*Scale, .035f*Scale), 2, 5, Shell, false);
+ }
+ for(u32 Leg = 0; Leg < 6; Leg += 1)
+ {
+  f32 S = (Leg & 1) ? -1.f : 1.f;
+  f32 X = (-.06f + .06f*(f32)(Leg/2))*Scale;
+  R3PushBox(Mesh, R3Add(Base, V3(X, .025f*Scale, .1f*Scale*S)), V3(.01f*Scale, .025f*Scale, .035f*Scale), Shell);
+ }
+}
+
+internal void
+W3PushPotatoPlant(r3_mesh *Mesh, v3 Base, f32 Scale, random_series *Series)
+{
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(0.f, .1f*Scale, 0.f)), V3(.13f*Scale, .1f*Scale, .13f*Scale), 3, 6, W3Shade(R3Color(0xFF5E9A3E), Series), false);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(.12f*Scale, .03f*Scale, .04f*Scale)), V3(.06f*Scale, .045f*Scale, .05f*Scale), 3, 5, R3Color(W3ProductColors[ProductKind_Potatoes]), false);
+ R3PushEllipsoid(Mesh, R3Add(Base, V3(-.1f*Scale, .03f*Scale, -.06f*Scale)), V3(.05f*Scale, .04f*Scale, .045f*Scale), 3, 5, R3Color(W3ProductColors[ProductKind_Potatoes]), false);
+}
+
 // NOTE: The middle terrace, filled for the island's main food. T is the centre of the
 // terrace's top.
 internal void
@@ -829,6 +912,46 @@ W3PushMainProduct(r3_mesh *Opaque, w3_theme *Theme, product_kind Kind, v3 T, ran
    }
   } break;
 
+  case ProductKind_Berries:
+  {
+   // Berry bushes.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(Theme->Lawn), WallColor);
+   for(u32 Bush = 0; Bush < 9; Bush += 1)
+   {
+    W3PushBerryBush(Opaque, W3TerracePoint(T, -20.f + 28.f*(f32)Bush, (Bush & 1) ? .75f : 1.1f), .9f, Series);
+   }
+  } break;
+  
+  case ProductKind_Coconuts:
+  {
+   // A sandy grove of coconut palms.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(0xFFEED9A6), WallColor);
+   for(u32 Palm = 0; Palm < 4; Palm += 1)
+   {
+    W3PushPalm(Opaque, W3TerracePoint(T, -10.f + 62.f*(f32)Palm, 1.f), .9f + .2f*RandomUnilateral(Series), Series);
+   }
+  } break;
+  
+  case ProductKind_Crabs:
+  {
+   // A tidal pool with crab pots and crabs.
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorWater), WallColor);
+   for(u32 Pot = 0; Pot < 4; Pot += 1) W3PushCrabPot(Opaque, W3TerracePoint(T, -15.f + 65.f*(f32)Pot, 1.05f), 1.f);
+   for(u32 Crab = 0; Crab < 3; Crab += 1) W3PushCrab(Opaque, W3TerracePoint(T, 20.f + 60.f*(f32)Crab, .7f), 1.f, (Crab & 1) ? 1.f : -1.f);
+  } break;
+  
+  case ProductKind_Potatoes:
+  {
+   W3PushTerrace(Opaque, T, R, Wall, 16, R3Color(W3_ColorFarmSoil), WallColor);
+   for(u32 Ring = 0; Ring < 2; Ring += 1)
+   {
+    for(u32 Plant = 0; Plant < 8; Plant += 1)
+    {
+     W3PushPotatoPlant(Opaque, W3TerracePoint(T, -20.f + 31.f*(f32)Plant + 15.f*(f32)Ring, Ring ? .75f : 1.1f), 1.f, Series);
+    }
+   }
+  } break;
+  
   case ProductKind_Wheat:
   default:
   {
@@ -888,6 +1011,22 @@ W3PushSmallProduct(r3_mesh *Opaque, w3_theme *Theme, product_kind Kind, v3 Base,
    }
   } break;
   case ProductKind_Meat:  W3PushCow(Opaque, Base, 1.f); break;
+  case ProductKind_Berries:
+  {
+   W3PushBerryBush(Opaque, R3Add(Base, V3(-.2f, 0.f, 0.f)), .8f, Series);
+   W3PushBerryBush(Opaque, R3Add(Base, V3(.22f, 0.f, .08f)), .7f, Series);
+  } break;
+  case ProductKind_Coconuts: W3PushPalm(Opaque, Base, .9f, Series); break;
+  case ProductKind_Crabs:
+  {
+   W3PushCrabPot(Opaque, R3Add(Base, V3(-.2f, 0.f, 0.f)), 1.f);
+   W3PushCrabPot(Opaque, R3Add(Base, V3(.15f, 0.f, -.12f)), .9f);
+   W3PushCrab(Opaque, R3Add(Base, V3(.15f, 0.f, .2f)), 1.f, 1.f);
+  } break;
+  case ProductKind_Potatoes:
+  {
+   for(u32 Plant = 0; Plant < 4; Plant += 1) W3PushPotatoPlant(Opaque, R3Add(Base, V3(-.3f + .2f*(f32)Plant, 0.f, (Plant & 1) ? .1f : -.1f)), .8f, Series);
+  } break;
   case ProductKind_Eggs:
   {
    W3PushHen(Opaque, R3Add(Base, V3(-.15f, 0.f, 0.f)), 1.f);
@@ -1094,9 +1233,9 @@ W3PushClouds(r3_mesh *Mesh)
 #define W3_BeachCluster 1
 #define W3Style_Ruins 6     // Ember Archipelago (solarpunk_ruins_island.c)
 #define W3_RuinsCluster 3
-#define W3Style_Ice 7       // Saltglass Atolls (solarpunk_ice_island.c)
+#define W3Style_Ice 7       // Frostfall Isles (solarpunk_ice_island.c)
 #define W3_IceCluster 6
-#define W3Style_Crystal 8   // Mistral Keys (solarpunk_crystal_island.c)
+#define W3Style_Crystal 8   // Crystal Spires (solarpunk_crystal_island.c)
 #define W3_CrystalCluster 5
 internal void W3PushCrystalIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
 internal void W3PushIceIsland(app_state *App, island *Island, v3 Top, u32 Index, u32 StatusColor, b32 Highlight, u32 HighlightColor, f32 KnownFraction);
@@ -1229,12 +1368,12 @@ W3PrepareIslands(app_state *App, app_input *Input)
    {
     R3->IslandStyle[Idx] = W3Style_Ruins;
    }
-   // Saltglass Atolls is frozen: an icy working yard
+   // Frostfall Isles is frozen: an icy working yard
    if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_IceCluster)
    {
     R3->IslandStyle[Idx] = W3Style_Ice;
    }
-   // Mistral Keys: crystals and shimmering water
+   // Crystal Spires: crystals and shimmering water
    if(R3->IslandStyle[Idx] == W3Style_Normal && WorldGenClusterOf(Idx, Count) == W3_CrystalCluster)
    {
     R3->IslandStyle[Idx] = W3Style_Crystal;

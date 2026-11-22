@@ -37,13 +37,13 @@
 // as the clusters in solarpunk_world_gen.c. Together they must cover every food.
 global_variable product_kind SupplyClimateFoods[Supply_ClusterCount][Supply_MaxClimateFoods] =
 {
- {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Cabbage}, // Verdant Reach: mild and wet, orchards
- {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_None},    // Sunward Isles: sunny fields and hens
- {ProductKind_Fish,    ProductKind_None,    ProductKind_None},    // Driftwood Shoals: open sea
- {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},    // Ember Archipelago: warm grassland, herds
- {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},    // Crystal Spires: cool highlands, vegetables
- {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},    // Mistral Keys: windy coast
- {ProductKind_Fish,    ProductKind_Carrots, ProductKind_Wheat},   // Saltglass Atolls: dry atolls
+ {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Berries},  // Verdant Reach: mild and wet forest, orchards and berries
+ {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_Coconuts}, // Sunward Isles: sunny beaches, fields, hens and palms
+ {ProductKind_Fish,    ProductKind_Crabs,   ProductKind_None},     // Driftwood Shoals: open sea, fish and crab pots
+ {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},     // Ember Archipelago: warm grassland, herds
+ {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},     // Mistral Heights: cool windy highlands, vegetables
+ {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},     // Crystal Spires: shimmering coast, fish and hens
+ {ProductKind_Fish,    ProductKind_Potatoes, ProductKind_Wheat},   // Frostfall Isles: frozen, ice fishing, potatoes and grain
 };
 
 //~ Types

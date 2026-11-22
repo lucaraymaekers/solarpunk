@@ -1047,6 +1047,7 @@ global_variable char *V3HelpProductLooks[ProductKind_Count] =
 {
  "", "apple orchard", "pear orchard", "cabbage patch", "carrot rows",
  "wheat field, windmill", "fish pond, dock", "cows, barn", "hens, hen house",
+ "berry bushes", "coconut palms", "crab pots", "potato field",
 };
 
 #define V3D_HelpWidth   760.f

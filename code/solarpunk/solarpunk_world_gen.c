@@ -42,8 +42,8 @@ global_variable u32 WorldGenClusterWeights[WorldGen_ClusterCount] =
 global_variable char *WorldGenClusterNames[WorldGen_ClusterCount] =
 {
  "Verdant Reach", "Sunward Isles", "Driftwood Shoals",
- "Ember Archipelago", "Crystal Spires", "Mistral Keys",
- "Saltglass Atolls",
+ "Ember Archipelago", "Mistral Heights", "Crystal Spires",
+ "Frostfall Isles",
 };
 
 // NOTE: Bridges between clusters, as pairs of cluster indices.
