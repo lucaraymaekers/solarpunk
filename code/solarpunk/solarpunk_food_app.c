@@ -21,7 +21,7 @@ FoodRoundFromApp(app_state *App, u64 Round)
   f32 Harvest = WorldGenHarvestFactor(App, Idx, IslandCount, Round);
   for(product *Product = Island->FirstProduct; Product; Product = Product->Next)
   {
-   Produce[Product->Kind] += Harvest*(f32)Product->Amount;
+   Produce[Product->Kind] += Harvest*AdaptBoost(App, Product->Kind)*(f32)Product->Amount;
   }
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next)
   {

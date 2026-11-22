@@ -11,6 +11,10 @@ ProductsTable:
  { Fish        "Fish"         }
  { Meat        "Meat"         }
  { Eggs        "Eggs"         }
+ { Berries     "Berries"      }
+ { Coconuts    "Coconuts"     }
+ { Crabs       "Crabs"        }
+ { Potatoes    "Potatoes"     }
 }
 
 @data_enum("product_kind")

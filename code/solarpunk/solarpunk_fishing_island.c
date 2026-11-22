@@ -12,7 +12,7 @@
 
 //~ Constants
 #define Fishing_Radius   2.3f
-#define Fishing_Cluster  2      // Driftwood Shoals, see WorldGenClusterFoods
+#define Fishing_Cluster  2      // Driftwood Shoals, see SupplyClimateFoods
 #define Fishing_ShoreY   -.4f   // the low shore round the lagoon
 #define Fishing_RimPoints 64
 

@@ -1,7 +1,8 @@
 //-
 // SolarPunk supply: what each island makes and needs, per day.
 //   - Every cluster has a climate: the foods that grow best there. Its islands make those in
-//     large amounts and 1 or 2 other foods in small amounts.
+//     large amounts and 1 or 2 other foods in small amounts, picked from the foods that
+//     climate allows (SupplyOtherFoods).
 //   - Islands eat a mixed diet (any food, also their own), covered partly at home.
 //   - Per food, the whole world makes Supply_BufferPercent more than it needs, and every food
 //     is made by at least one island.
@@ -37,13 +38,28 @@
 // as the clusters in solarpunk_world_gen.c. Together they must cover every food.
 global_variable product_kind SupplyClimateFoods[Supply_ClusterCount][Supply_MaxClimateFoods] =
 {
- {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Cabbage}, // Verdant Reach: mild and wet, orchards
- {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_None},    // Sunward Isles: sunny fields and hens
- {ProductKind_Fish,    ProductKind_None,    ProductKind_None},    // Driftwood Shoals: open sea
- {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},    // Ember Archipelago: warm grassland, herds
- {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},    // Crystal Spires: cool highlands, vegetables
- {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},    // Mistral Keys: windy coast
- {ProductKind_Fish,    ProductKind_Carrots, ProductKind_Wheat},   // Saltglass Atolls: dry atolls
+ {ProductKind_Apples,  ProductKind_Pears,   ProductKind_Berries},  // Verdant Reach: mild and wet forest, orchards and berries
+ {ProductKind_Wheat,   ProductKind_Eggs,    ProductKind_Coconuts}, // Sunward Isles: sunny beaches, fields, hens and palms
+ {ProductKind_Fish,    ProductKind_Crabs,   ProductKind_None},     // Driftwood Shoals: open sea, fish and crab pots
+ {ProductKind_Meat,    ProductKind_Pears,   ProductKind_None},     // Ember Archipelago: warm grassland, herds
+ {ProductKind_Carrots, ProductKind_Cabbage, ProductKind_None},     // Mistral Heights: cool windy highlands, vegetables
+ {ProductKind_Fish,    ProductKind_Eggs,    ProductKind_None},     // Crystal Spires: shimmering coast, fish and hens
+ {ProductKind_Fish,    ProductKind_Potatoes, ProductKind_Wheat},   // Frostfall Isles: frozen, ice fishing, potatoes and grain
+};
+
+// NOTE: The other foods each cluster's climate allows, made in small amounts next to the
+// climate foods (in the same order as the clusters). Only foods that make sense for the
+// biome: no coconuts on the frozen islands, no crabs in the forest.
+#define Supply_MaxOtherKinds 4
+global_variable product_kind SupplyOtherFoods[Supply_ClusterCount][Supply_MaxOtherKinds] =
+{
+ {ProductKind_Cabbage, ProductKind_Carrots,  ProductKind_Potatoes, ProductKind_Eggs},    // Verdant Reach: forest gardens
+ {ProductKind_Carrots, ProductKind_Cabbage,  ProductKind_Meat,     ProductKind_None},    // Sunward Isles: beach gardens, goats
+ {ProductKind_Potatoes, ProductKind_Cabbage, ProductKind_Eggs,     ProductKind_None},    // Driftwood Shoals: small gardens by the harbour
+ {ProductKind_Apples,  ProductKind_Wheat,    ProductKind_Eggs,     ProductKind_Cabbage}, // Ember Archipelago: warm grassland
+ {ProductKind_Potatoes, ProductKind_Meat,    ProductKind_Eggs,     ProductKind_Berries}, // Mistral Heights: highland farms, sheep
+ {ProductKind_Crabs,   ProductKind_Carrots,  ProductKind_Cabbage,  ProductKind_Potatoes},// Crystal Spires: coast and gardens
+ {ProductKind_Cabbage, ProductKind_Carrots,  ProductKind_Meat,     ProductKind_Eggs},    // Frostfall Isles: greenhouses and hardy herds
 };
 
 //~ Types
@@ -137,11 +153,13 @@ SupplyMakePlan(supply_plan *Plan, u32 IslandCount, u32 *ClusterOf)
    }
   }
 
-  //- Makes: 1 or 2 other foods, in small amounts
-  u32 OtherCount = SupplyRandomInt(&Series, Supply_MinOtherFoods, Supply_MaxOtherFoods);
+  //- Makes: 1 or 2 other foods its climate allows, in small amounts
+  u32 OtherKinds = 0;
+  while(OtherKinds < Supply_MaxOtherKinds && SupplyOtherFoods[Cluster][OtherKinds] != ProductKind_None) OtherKinds += 1;
+  u32 OtherCount = Min(SupplyRandomInt(&Series, Supply_MinOtherFoods, Supply_MaxOtherFoods), OtherKinds);
   for(u32 Made = 0, Tries = 0; Made < OtherCount && Tries < Supply_PickTries; Tries += 1)
   {
-   product_kind Kind = SupplyRandomKind(&Series);
+   product_kind Kind = SupplyOtherFoods[Cluster][SupplyRandomInt(&Series, 0, OtherKinds - 1)];
    if(!SupplyIsClimateFood(Cluster, Kind) && Weight[I][Kind] == 0)
    {
     Weight[I][Kind] = SupplyRandomInt(&Series, Supply_ShareMin, Supply_ShareMax);

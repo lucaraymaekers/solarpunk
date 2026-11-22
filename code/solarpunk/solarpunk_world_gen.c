@@ -42,8 +42,8 @@ global_variable u32 WorldGenClusterWeights[WorldGen_ClusterCount] =
 global_variable char *WorldGenClusterNames[WorldGen_ClusterCount] =
 {
  "Verdant Reach", "Sunward Isles", "Driftwood Shoals",
- "Ember Archipelago", "Crystal Spires", "Mistral Keys",
- "Saltglass Atolls",
+ "Ember Archipelago", "Mistral Heights", "Crystal Spires",
+ "Frostfall Isles",
 };
 
 // NOTE: Bridges between clusters, as pairs of cluster indices.
@@ -175,13 +175,66 @@ WorldGenProductsAndNeeds(app_state *App, supply_plan *Plan, island *Island, u32 
 }
 
 // NOTE: This round's harvest wave for an island (solarpunk_supply.c); 1 without the map layout.
+//~ Storms
+// NOTE: Every WorldGen_StormEvery rounds a storm hits one cluster and its harvest drops to
+// WorldGen_StormHarvest for WorldGen_StormRounds rounds. The clusters take turns, so every
+// storm hits different foods. Pure function of the round: replays give the same storms.
+#define WorldGen_StormFirstRound 6
+#define WorldGen_StormEvery      8
+#define WorldGen_StormRounds     4
+#define WorldGen_StormHarvest    .5f
+
+// NOTE: True while a storm rages in some cluster this round; gives the cluster and the
+// round the storm started.
+internal b32
+WorldGenStormAt(u64 Round, u32 *Cluster, u64 *StartRound)
+{
+ b32 Result = false;
+ if(Round >= WorldGen_StormFirstRound)
+ {
+  u64 Since = Round - WorldGen_StormFirstRound;
+  u64 Storm = Since/WorldGen_StormEvery;
+  if(Since % WorldGen_StormEvery < WorldGen_StormRounds)
+  {
+   Result = true;
+   *Cluster = (u32)((Storm*3 + 1) % WorldGen_ClusterCount);
+   *StartRound = WorldGen_StormFirstRound + Storm*WorldGen_StormEvery;
+  }
+ }
+ return Result;
+}
+
+internal f32
+WorldGenStormFactor(u32 Cluster, u64 Round)
+{
+ f32 Result = 1.f;
+ u32 StormCluster = 0;
+ u64 Start = 0;
+ if(WorldGenStormAt(Round, &StormCluster, &Start) && StormCluster == Cluster)
+ {
+  Result = WorldGen_StormHarvest;
+ }
+ return Result;
+}
+
+// NOTE: True in the first round of a storm over this cluster (nobody saw it coming).
+internal b32
+WorldGenStormIsNew(u32 Cluster, u64 Round)
+{
+ u32 StormCluster = 0;
+ u64 Start = 0;
+ b32 Result = (WorldGenStormAt(Round, &StormCluster, &Start) && StormCluster == Cluster && Start == Round);
+ return Result;
+}
+
 internal f32
 WorldGenHarvestFactor(app_state *App, u32 IslandIdx, u32 IslandCount, u64 Round)
 {
  f32 Result = 1.f;
  if(App->HasMapLayout)
  {
-  Result = SupplyHarvestFactor(WorldGenClusterOf(IslandIdx, IslandCount), IslandIdx, Round);
+  u32 Cluster = WorldGenClusterOf(IslandIdx, IslandCount);
+  Result = SupplyHarvestFactor(Cluster, IslandIdx, Round)*WorldGenStormFactor(Cluster, Round);
  }
  return Result;
 }

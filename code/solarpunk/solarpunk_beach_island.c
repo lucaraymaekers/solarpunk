@@ -12,7 +12,7 @@
 //-
 
 //~ Constants
-#define Beach_Cluster 1   // Sunward Isles, see WorldGenClusterFoods
+#define Beach_Cluster 1   // Sunward Isles, see SupplyClimateFoods
 
 global_variable u32 BeachBrightColors[] = {0xFFE86A7A, 0xFF4FC1C9, 0xFFF2C94C, 0xFF7BC86C, 0xFF5B8DEF, 0xFFF29E4C};
 

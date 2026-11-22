@@ -12,7 +12,7 @@
 //~ Constants
 #define Forest_Radius     2.3f
 #define Forest_RimPoints  64
-#define Forest_Cluster    0      // Verdant Reach, see WorldGenClusterFoods
+#define Forest_Cluster    0      // Verdant Reach, see SupplyClimateFoods
 
 #define Forest_ColorBark      0xFF6B4A32
 #define Forest_ColorBarkDark  0xFF4E3524

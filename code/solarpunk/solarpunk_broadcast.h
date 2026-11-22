@@ -33,6 +33,16 @@ struct island_ad
  u64 FoodExpiringSoon[ProductKind_Count];
 };
 
+// NOTE: Producers reacting to shortages (solarpunk_adapt.c). Zeroed = no reaction yet.
+#define Adapt_HistoryRounds 64
+typedef struct supply_adapt supply_adapt;
+struct supply_adapt
+{
+ f32 BoostDelta[ProductKind_Count];   // extra output per food: boost = 1 + delta
+ // World balance per round (ring, by round): made/needed - 1; [ProductKind_None] = all foods.
+ f32 Balance[Adapt_HistoryRounds][ProductKind_Count];
+};
+
 typedef struct broadcast_state broadcast_state;
 struct broadcast_state
 {
@@ -53,6 +63,9 @@ struct broadcast_state
 
  // Flash[From][To] > 0 while a link just delivered news, for the graph view.
  f32 Flash[Broadcast_MaxIslands][Broadcast_MaxIslands];
+
+ // Producers growing more or less of each food (solarpunk_adapt.c).
+ supply_adapt Adapt;
 };
 
 #endif //SOLARPUNK_BROADCAST_H

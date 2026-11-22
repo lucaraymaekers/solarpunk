@@ -1,10 +1,12 @@
 //-
-// SolarPunk islands panel (right side), with three tabs:
+// SolarPunk islands panel (right side), with four tabs:
 //   Shortages : products that are short overall, and islands that do not yet know
 //               a supplier for one of their needs
 //   Islands   : one table row per island (needs, knows N/M); click a row to open it
 //   Selected  : everything about one island (router on/off, production, needs with the
 //               nearest known supplier, food, neighbours, routing table)
+//   Trend     : the world balance of a food over the last rounds: storms make it dip,
+//               producers react and it climbs back to a small surplus
 // Select an island by clicking it in 3D or a row in a table.
 //-
 
@@ -693,6 +695,155 @@ PanelDrawSelected(panel_cursor *Cursor)
 }
 
 //~ Tabs
+//~ Tab: Trend
+// NOTE: The world balance of one food (or all foods) over the last rounds: made / needed - 1.
+// Storms push it below zero; producers react and it climbs back to a small surplus.
+#define Panel_TrendRounds   30
+#define Panel_TrendTop      .25f    // chart range, as a balance fraction
+#define Panel_TrendBottom   -.5f
+
+internal void
+PanelDrawTrend(panel_cursor *Cursor)
+{
+ app_state *App = Cursor->App;
+ broadcast_state *Broadcast = &App->Broadcast;
+ island_panel_state *Panel = &App->Panel;
+ f32 W = Cursor->Width;
+ f32 LineHeight = Cursor->LineHeight;
+ product_kind Kind = (product_kind)((Panel->TrendKind < ProductKind_Count) ? Panel->TrendKind : 0);
+ u64 Round = Broadcast->Round;
+ 
+ //- Title
+ str8 KindName = (Kind == ProductKind_None) ? S8("All foods") : ProductNames[Kind];
+ PanelSection(Cursor, Str8Fmt("%.*s: made vs needed, per round", (s32)KindName.Size, KindName.Data));
+ PanelNote(Cursor, S8("Storms cut harvests; producers react."));
+ 
+ //- Chart
+ f32 LabelWidth = PanelMeasure(App, S8("-40%")) + 8.f;
+ f32 ChartHeight = 8.f*LineHeight;
+ v4 Chart = RectFromSize(V2(Cursor->X + LabelWidth, Cursor->Y + .5f*LineHeight), V2(W - LabelWidth, ChartHeight));
+ f32 Range = Panel_TrendTop - Panel_TrendBottom;
+ f32 ZeroY = Chart.Min.Y + (Panel_TrendTop/Range)*ChartHeight;
+ DrawRect(Chart, V4FromU32(Ui_ColorRowAlt), 4.f, 0.f, 0.f);
+ 
+ // Grid lines with labels: +20%, 0, -20%, -40%.
+ for(s32 Percent = 20; Percent >= -40; Percent -= 20)
+ {
+  f32 Y = Chart.Min.Y + ((Panel_TrendTop - (f32)Percent/100.f)/Range)*ChartHeight;
+  u32 Color = (Percent == 0) ? Ui_ColorText : Ui_ColorLine;
+  DrawRect(RectFromSize(V2(Chart.Min.X, Y), V2(Chart.Max.X - Chart.Min.X, (Percent == 0) ? 2.f : 1.f)), V4FromU32(Color), 0.f, 0.f, 0.f);
+  str8 Label = (Percent == 0) ? S8("0") : Str8Fmt("%+d%%", Percent);
+  GraphDrawText(&App->FontAtlas, &App->Font, V2(Chart.Min.X - 6.f - PanelMeasure(App, Label), Y - .5f*LineHeight), Label, V4FromU32(Panel_ColorDim));
+ }
+ // The target: a small surplus, dashed.
+ {
+  f32 Y = Chart.Min.Y + ((Panel_TrendTop - Adapt_Target + 1.f)/Range)*ChartHeight;
+  for(f32 X = Chart.Min.X; X < Chart.Max.X; X += 12.f)
+  {
+   DrawRect(RectFromSize(V2(X, Y - 1.f), V2(Min(6.f, Chart.Max.X - X), 2.f)), V4FromU32(Ui_ColorOkText), 0.f, 0.f, 0.f);
+  }
+ }
+ 
+ if(Round == 0)
+ {
+  Cursor->Y = Chart.Max.Y + .5f*LineHeight;
+  PanelNote(Cursor, S8("No rounds yet."));
+  return;
+ }
+ 
+ u64 First = (Round > Panel_TrendRounds) ? Round - Panel_TrendRounds + 1 : 1;
+ u32 Count = (u32)(Round - First + 1);
+ f32 Step = (Chart.Max.X - Chart.Min.X)/(f32)Panel_TrendRounds;
+ v2 Last = V2(0.f, 0.f);
+ for(u32 Idx = 0; Idx < Count; Idx += 1)
+ {
+  u64 R = First + Idx;
+  f32 Value = Clamp(Panel_TrendBottom, AdaptBalance(App, R, Kind), Panel_TrendTop);
+  f32 X = Chart.Min.X + Step*((f32)Idx + .5f);
+  f32 Y = Chart.Min.Y + ((Panel_TrendTop - Value)/Range)*ChartHeight;
+  b32 Short = (Value < 0.f);
+  
+  // Area between the line and zero: red below, green above.
+  f32 Top = Min(Y, ZeroY), Bottom = Max(Y, ZeroY);
+  u32 Fill = Short ? 0x55E0606A : 0x447BD389;
+  DrawRect(V4(X - .5f*Step, Top, X + .5f*Step, Max(Bottom, Top + 1.f)), V4FromU32(Fill), 0.f, 0.f, 0.f);
+  
+  // A storm starts here: a grey marker at the top.
+  u32 StormCluster = 0;
+  u64 StormStart = 0;
+  if(WorldGenStormAt(R, &StormCluster, &StormStart) && StormStart == R)
+  {
+   DrawRect(RectFromSize(V2(X - 1.f, Chart.Min.Y), V2(2.f, ChartHeight)), V4FromU32(0x55808080), 0.f, 0.f, 0.f);
+   DrawRect(RectFromSize(V2(X - 7.f, Chart.Min.Y + 3.f), V2(14.f, 8.f)), V4FromU32(0xFF8892A0), 4.f, 0.f, 0.f);
+  }
+  
+  v2 P = V2(X, Y);
+  if(Idx > 0) GraphDrawLine(Last, P, 3.f, V4FromU32(Ui_ColorText));
+  DrawRect(RectFromSize(V2(X - 4.f, Y - 4.f), V2(8.f, 8.f)), V4FromU32(Short ? Ui_ColorShortText : Ui_ColorOkText), 4.f, 0.f, 0.f);
+  Last = P;
+ }
+ Cursor->Y = Chart.Max.Y + 4.f;
+ PanelText(Cursor, LabelWidth, Str8Fmt("round %llu", First), Panel_ColorDim);
+ PanelTextRight(Cursor, W, Str8Fmt("round %llu", Round), Panel_ColorDim);
+ PanelNewLine(Cursor);
+ 
+ //- Now
+ {
+  f32 Now = AdaptBalance(App, Round, Kind);
+  s32 Percent = (s32)(100.f*Now + ((Now < 0.f) ? -.5f : .5f));
+  b32 Short = (Now < 0.f);
+  PanelText(Cursor, 0.f, Str8Fmt("Now: %+d%% %s", Percent, Short ? "short" : "surplus"), Short ? Panel_ColorShortage : Panel_ColorGood);
+  PanelNewLine(Cursor);
+  u32 StormCluster = 0;
+  u64 StormStart = 0;
+  if(WorldGenStormAt(Round, &StormCluster, &StormStart))
+  {
+   PanelText(Cursor, 0.f, Str8Fmt("Storm: %s, harvest halved", WorldGenClusterNames[StormCluster]), Panel_ColorShortage);
+   PanelNewLine(Cursor);
+   PanelNote(Cursor, S8("Its food's other makers grow more."));
+  }
+ }
+ 
+ //- Per food: balance now and how much more (or less) its makers grow. Click to chart it.
+ PanelSection(Cursor, S8("Pick a food to chart"));
+ panel_column Columns[3];
+ Columns[0] = PanelColumn("Food", 0.f, false);
+ Columns[1] = PanelColumn("Now", .62f*W, true);
+ Columns[2] = PanelColumn("Grown", W, true);
+ PanelTableHeader(Cursor, Columns, ArrayCount(Columns));
+ for(u32 Row = 0; Row < ProductKind_Count; Row += 1)
+ {
+  product_kind RowKind = (product_kind)Row;
+  b32 Hovered = false;
+  b32 Selected = (RowKind == Kind);
+  if(Selected)
+  {
+   DrawRect(RectFromSize(V2(Cursor->X - 4.f, Cursor->Y), V2(W + 8.f, LineHeight)), V4FromU32(Ui_ColorButtonHot), 3.f, 0.f, 0.f);
+  }
+  if(PanelBeginRow(Cursor, true, &Hovered))
+  {
+   Panel->TrendKind = Row;
+  }
+  f32 Now = AdaptBalance(App, Round, RowKind);
+  s32 Percent = (s32)(100.f*Now + ((Now < 0.f) ? -.5f : .5f));
+  if(RowKind == ProductKind_None)
+  {
+   PanelText(Cursor, 0.f, S8("All foods"), Panel_ColorText);
+  }
+  else
+  {
+   PanelSwatch(Cursor, 0.f, RowKind);
+   PanelText(Cursor, LineHeight, ProductNames[RowKind], Panel_ColorText);
+   f32 Boost = AdaptBoost(App, RowKind);
+   s32 Extra = (s32)(100.f*(Boost - 1.f) + ((Boost < 1.f) ? -.5f : .5f));
+   PanelTextRight(Cursor, W, Str8Fmt("%+d%%", Extra), (Extra > 0) ? Ui_ColorWaitingText : Panel_ColorDim);
+  }
+  PanelTextRight(Cursor, .62f*W, Str8Fmt("%+d%%", Percent), (Now < 0.f) ? Panel_ColorShortage : Panel_ColorGood);
+  PanelNewLine(Cursor);
+ }
+ PanelNote(Cursor, S8("Grown: output vs the usual plan."));
+}
+
 // NOTE: One segment of the tab bar; the active tab is filled. Returns true when clicked.
 internal b32
 PanelTabButton(app_state *App, app_input *Input, v2 *Cursor, str8 Label, f32 Width, b32 Active)
@@ -774,14 +925,18 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
 
   //- Tabs
   {
-   char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected"};
+   char *TabNames[PanelTab_Count] = {"Shortages", "Islands", "Selected", "Trend"};
    f32 TabsWidth = PanelWidth - 2.f*Panel_Pad;
    v4 Track = RectFromSize(V2(Box.Min.X + Panel_Pad, HeaderPos.Y + ButtonHeight + BroadcastView_ButtonGap), V2(TabsWidth, ButtonHeight + 6.f));
    UiField(Track);
-   f32 TabWidth = (TabsWidth - 6.f)/(f32)PanelTab_Count;
+   // Each tab as wide as its label, the spare room shared out evenly.
+   f32 LabelsWidth = 0.f;
+   for(u32 Tab = 0; Tab < PanelTab_Count; Tab += 1) LabelsWidth += PanelMeasure(App, S8FromCString(TabNames[Tab]));
+   f32 Spare = Max(0.f, (TabsWidth - 6.f - LabelsWidth)/(f32)PanelTab_Count);
    v2 TabCursor = V2(Track.Min.X + 3.f, Track.Min.Y + 3.f);
    for(u32 Tab = 0; Tab < PanelTab_Count; Tab += 1)
    {
+    f32 TabWidth = PanelMeasure(App, S8FromCString(TabNames[Tab])) + Spare;
     if(PanelTabButton(App, Input, &TabCursor, S8FromCString(TabNames[Tab]), TabWidth, (Panel->Tab == (panel_tab)Tab)))
     {
      Panel->Tab = (panel_tab)Tab;
@@ -810,6 +965,7 @@ DrawIslandPanel(app_state *App, app_input *Input, v2 BufferDim)
    case PanelTab_Shortages: PanelDrawShortages(&Cursor); break;
    case PanelTab_Islands:   PanelDrawIslands(&Cursor); break;
    case PanelTab_Selected:  PanelDrawSelected(&Cursor); break;
+   case PanelTab_Trend:     PanelDrawTrend(&Cursor); break;
    default: break;
   }
   RenderPopClip();

@@ -117,8 +117,8 @@ struct hero_layout
  f32 ChannelX;
  f32 ChannelHalf;
  b32 SandyShore;    // the shore is a sand beach, sloping down to the water
- b32 Snowy;         // snow on the ground, ice on the water (Saltglass Atolls)
- b32 Glowing;       // shimmering cyan water (Mistral Keys)
+ b32 Snowy;         // snow on the ground, ice on the water (Frostfall Isles)
+ b32 Glowing;       // shimmering cyan water (Crystal Spires)
  b32 PlateauRight;
  b32 PlateauLeft;
  u32 StreamCount;
@@ -1570,8 +1570,9 @@ HeroPushVegField(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, product_kind Kind)
  R3PushBox(O, R3Add(C, V3(0.f, .024f, 0.f)), V3(HX - .025f, .022f, HZ - .025f), R3Color(Hero_ColorSoil));
 
  b32 Cabbage = (Kind == ProductKind_Cabbage);
- f32 RowGap = Cabbage ? .14f : .12f;
- f32 PlantGap = Cabbage ? .11f : .075f;
+ b32 Potato = (Kind == ProductKind_Potatoes);
+ f32 RowGap = (Cabbage || Potato) ? .14f : .12f;
+ f32 PlantGap = Cabbage ? .11f : (Potato ? .1f : .075f);
  u32 Rows = Max(1, (u32)((2.f*HZ - .06f)/RowGap));
  u32 Plants = Max(1, (u32)((2.f*HX - .08f)/PlantGap));
  f32 RowStart = -.5f*RowGap*(f32)(Rows - 1);
@@ -1585,7 +1586,11 @@ HeroPushVegField(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, product_kind Kind)
    f32 DX = PlantStart + PlantGap*(f32)Plant + ((Row & 1) ? .25f*PlantGap : 0.f);
    if(DX > HX - .04f) continue;
    v3 P = R3Add(C, V3(DX, .06f, DZ));
-   if(Cabbage)
+   if(Potato)
+   {
+    W3PushPotatoPlant(O, P, .32f, &H->Series);
+   }
+   else if(Cabbage)
    {
     R3PushEllipsoid(O, R3Add(P, V3(0.f, .025f, 0.f)), V3(.045f, .032f, .045f), 3, 6, HeroShade(H, 0xFF4E9A48), false);
     R3PushEllipsoid(O, R3Add(P, V3(0.f, .04f, 0.f)), V3(.028f, .026f, .028f), 3, 6, R3Color(0xFFA8DC7E), false);
@@ -1611,8 +1616,9 @@ HeroPushVegField(hero_ctx *H, f32 X, f32 Z, f32 HX, f32 HZ, product_kind Kind)
  for(u32 Item = 0; Item < 4; Item += 1)
  {
   v3 P = R3Add(Crate, V3(-.03f + .02f*(f32)Item, .07f, ((Item & 1) ? .012f : -.012f)));
-  if(Cabbage) R3PushEllipsoid(O, P, V3(.022f, .02f, .022f), 3, 5, R3Color(W3ProductColors[ProductKind_Cabbage]), false);
-  else        R3PushEllipsoid(O, P, V3(.03f, .01f, .01f), 2, 5, R3Color(W3ProductColors[ProductKind_Carrots]), false);
+  if(Cabbage)     R3PushEllipsoid(O, P, V3(.022f, .02f, .022f), 3, 5, R3Color(W3ProductColors[ProductKind_Cabbage]), false);
+  else if(Potato) R3PushEllipsoid(O, P, V3(.02f, .015f, .017f), 3, 5, R3Color(W3ProductColors[ProductKind_Potatoes]), false);
+  else            R3PushEllipsoid(O, P, V3(.03f, .01f, .01f), 2, 5, R3Color(W3ProductColors[ProductKind_Carrots]), false);
  }
 }
 internal void
@@ -1738,6 +1744,10 @@ HeroPushSails(hero_ctx *H, v3 Hub, f32 Phase)
 //   Fish             : drying racks (boats are added in the harbour, see the caller)
 //   Meat             : cows in a fenced pasture, about one per 10 units, a barn for a herd
 //   Eggs             : hens in fenced yards, about one per 12 units, with coops
+//   Potatoes         : vegetable fields, like cabbage and carrots
+//   Berries          : berry bushes, about one per 8 units, and a basket
+//   Coconuts         : coconut palms, about one per 15 units
+//   Crabs            : crab pots with crabs, a group per 50 units
 // Spot (optional) is a preferred place for the first block.
 internal void
 HeroPushProduct(hero_ctx *H, product_kind Kind, u64 Amount, hero_spot *Spot)
@@ -1747,6 +1757,7 @@ HeroPushProduct(hero_ctx *H, product_kind Kind, u64 Amount, hero_spot *Spot)
  {
   case ProductKind_Cabbage:
   case ProductKind_Carrots:
+  case ProductKind_Potatoes:
   {
    f32 Area = .0045f*(f32)Amount;
    u32 Fields = (Amount >= 110) ? 2 : 1;
@@ -1872,6 +1883,55 @@ HeroPushProduct(hero_ctx *H, product_kind Kind, u64 Amount, hero_spot *Spot)
       f32 PZ = Z + .2f*HZ + (.7f*HZ)*RandomBilateral(&H->Series);
       HeroPushHen(H, HeroOn(H, PX, PZ), (Hen & 1) ? 1.f : -1.f);
      }
+    }
+   }
+  } break;
+
+  case ProductKind_Berries:
+  {
+   u32 Bushes = Max(2, (u32)(Amount/8));
+   u32 Columns = Min(Bushes, 5);
+   u32 Rows = (Bushes + Columns - 1)/Columns;
+   f32 HX = .1f*(f32)Columns + .06f;
+   f32 HZ = .1f*(f32)Rows + .06f;
+   if(HeroFindSpot(H, Spot, &HX, &HZ, -1.9f, 1.9f, &X, &Z))
+   {
+    for(u32 Bush = 0; Bush < Bushes; Bush += 1)
+    {
+     f32 DX = -HX + .16f + .2f*(f32)(Bush % Columns);
+     f32 DZ = -HZ + .16f + .2f*(f32)(Bush/Columns);
+     W3PushBerryBush(H->Opaque, HeroOn(H, X + DX, Z + DZ), .35f + .08f*RandomUnilateral(&H->Series), &H->Series);
+    }
+    v3 Basket = HeroOn(H, X + HX - .06f, Z + HZ - .02f);
+    R3PushBox(H->Opaque, R3Add(Basket, V3(0.f, .03f, 0.f)), V3(.045f, .03f, .035f), R3Color(Hero_ColorWoodLight));
+    R3PushEllipsoid(H->Opaque, R3Add(Basket, V3(0.f, .065f, 0.f)), V3(.035f, .018f, .027f), 3, 5, R3Color(W3ProductColors[ProductKind_Berries]), false);
+   }
+  } break;
+
+  case ProductKind_Coconuts:
+  {
+   u32 Palms = Max(1, (u32)(Amount/15));
+   for(u32 Palm = 0; Palm < Palms; Palm += 1)
+   {
+    f32 HX = .16f, HZ = .16f;
+    if(HeroFindSpot(H, (Palm == 0) ? Spot : 0, &HX, &HZ, -1.9f, 1.9f, &X, &Z))
+    {
+     W3PushPalm(H->Opaque, HeroOn(H, X, Z), .42f + .1f*RandomUnilateral(&H->Series), &H->Series);
+    }
+   }
+  } break;
+
+  case ProductKind_Crabs:
+  {
+   u32 Groups = 1 + (u32)(Amount/50);
+   for(u32 Group = 0; Group < Groups; Group += 1)
+   {
+    f32 HX = .22f, HZ = .12f;
+    if(HeroFindSpot(H, (Group == 0) ? Spot : 0, &HX, &HZ, -1.5f, 2.f, &X, &Z))
+    {
+     W3PushCrabPot(H->Opaque, HeroOn(H, X - .12f, Z), .4f);
+     W3PushCrabPot(H->Opaque, HeroOn(H, X + .02f, Z - .03f), .38f);
+     W3PushCrab(H->Opaque, HeroOn(H, X + .14f, Z + .05f), .4f, -1.f);
     }
    }
   } break;

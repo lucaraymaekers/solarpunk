@@ -1,18 +1,18 @@
 //-
-// SolarPunk 3D frozen islands (Saltglass Atolls): a square slab locked in snow and ice,
+// SolarPunk 3D frozen islands (Frostfall Isles): a square slab locked in snow and ice,
 // wrapped in wooden scaffolding with deck ledges and hanging chains, icicles everywhere
 // and a frozen waterfall spilling from an iced-over pool at the front. A working yard:
 // cranes on the edges lifting cargo over the drop, tracked crane vehicles and trucks on
 // a snowy plaza, a boiler with a gear wheel and a smoking chimney, pipes, grain silos and
 // a docked airship; snow-roofed cabins with solar panels, snowy pines, windmills.
 // What the island makes, sized by the amounts: fish -> ice-fishing holes and a crane
-// hoisting a boat; carrots -> fields and greenhouses; wheat -> fields and grain silos.
+// hoisting a boat; potatoes -> fields and greenhouses; wheat -> fields and grain silos.
 //
 // Built on the hand-built island toolkit in solarpunk_hero_island.c.
 //-
 
 //~ Constants
-#define Ice_Cluster 6   // Saltglass Atolls, see WorldGenClusterFoods
+#define Ice_Cluster 6   // Frostfall Isles, see SupplyClimateFoods
 
 #define Ice_ColorSnow      0xFFF2F6FA
 #define Ice_ColorIce       0xFFD8F0FA
@@ -258,8 +258,8 @@ IcePushAirship(hero_ctx *H, v3 Mast, v3 Out)
 }
 
 //~ Scaffolding, chains and the frozen waterfall round the slab
-// NOTE: Icy = snow, icicles and the frozen waterfall (Saltglass Atolls); without, just the
-// wooden scaffolding, ledges and chains (Mistral Keys).
+// NOTE: Icy = snow, icicles and the frozen waterfall (Frostfall Isles); without, just the
+// wooden scaffolding, ledges and chains (Crystal Spires).
 internal void
 IcePushSlabDressing(hero_ctx *H, hero_layout *L, b32 Icy)
 {

@@ -24,12 +24,16 @@
 global_variable const u32 FoodShelfLife[ProductKind_Count] =
 {
  [ProductKind_Fish]    =  6,
+ [ProductKind_Crabs]   =  6,
  [ProductKind_Meat]    =  8,
+ [ProductKind_Berries] =  9,
  [ProductKind_Eggs]    = 10,
  [ProductKind_Pears]   = 12,
  [ProductKind_Cabbage] = 14,
  [ProductKind_Apples]  = 16,
  [ProductKind_Carrots] = 18,
+ [ProductKind_Coconuts] = 20,
+ [ProductKind_Potatoes] = 22,
  [ProductKind_Wheat]   = 24,
 };
 

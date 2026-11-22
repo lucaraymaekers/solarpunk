@@ -1,5 +1,5 @@
 //-
-// SolarPunk 3D crystal islands (Mistral Keys): a square slab of warm stone in wooden
+// SolarPunk 3D crystal islands (Crystal Spires): a square slab of warm stone in wooden
 // scaffolding, with lavender and teal crystals bursting out of the ground and the
 // underside. A shimmering stream runs down through the middle and spills off the front
 // edge; the houses wear iridescent glass roofs; cranes, crystal carts, a boiler and
@@ -12,7 +12,7 @@
 //-
 
 //~ Constants
-#define Crystal_Cluster 5   // Mistral Keys, see WorldGenClusterFoods
+#define Crystal_Cluster 5   // Crystal Spires, see SupplyClimateFoods
 
 global_variable u32 CrystalColors[] = {0xFFC58AF0, 0xFF6FF0D8, 0xFFF2A0E0, 0xFF9FB8FF};
 
