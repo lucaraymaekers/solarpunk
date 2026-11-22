@@ -93,6 +93,9 @@ BroadcastRound(app_state *App)
  SupplyAdaptRound(App, Broadcast->Round);
  FoodRoundFromApp(App, Broadcast->Round);
 
+ //- Routing: hellos, LSAs, Dijkstra, and goods moving one link (solarpunk_routing.c).
+ RouteRound(App, Broadcast->Round);
+
  //- Every island refreshes its own announcement.
  {
   u32 Idx = 0;
@@ -113,10 +116,11 @@ BroadcastRound(app_state *App)
  u32 FromIdx = 0;
  for(island *From = App->FirstIsland; From && FromIdx < IslandCount && !IsFirstRound; From = From->Next)
  {
-  for(link *Link = From->FirstLink; Link; Link = Link->Next)
+  // A shut-down island (solarpunk_routing.c) neither sends nor receives news.
+  for(link *Link = From->FirstLink; Link && !RouteIsDown(App, FromIdx); Link = Link->Next)
   {
    u32 ToIdx = BroadcastIslandIndex(App, Link->Dest);
-   if(ToIdx < IslandCount)
+   if(ToIdx < IslandCount && !RouteIsDown(App, ToIdx))
    {
     for(u32 OriginIdx = 0; OriginIdx < IslandCount; OriginIdx += 1)
     {
@@ -170,6 +174,7 @@ BroadcastRestart(app_state *App)
  MemorySet(Broadcast->Flash, 0, sizeof(Broadcast->Flash));
  MemorySet(&Broadcast->Adapt, 0, sizeof(Broadcast->Adapt));
  FoodReset(&App->Food);
+ RouteReset(App);
 }
 
 // NOTE: Rounds are deterministic (same world, same rules), so going back in time is

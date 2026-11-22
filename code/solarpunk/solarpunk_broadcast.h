@@ -9,9 +9,9 @@
 #define Broadcast_FlashSeconds  1.0f
 #define Broadcast_TimelineRounds 30   // length of the timeline slider
 #define Broadcast_MaxJumpRound  1000  // jumps further than this are clamped
-// NOTE: Visual-only clock for the sky (L14): one round is one hour, round 1 starts at 06:00.
+// NOTE: Visual-only clock for the sky (L14): one round is one hour, round 1 starts at 12:00 (noon, full day).
 #define Broadcast_SkyRoundsPerDay 24
-#define Broadcast_SkyStartHour    6
+#define Broadcast_SkyStartHour    12
 
 // NOTE: Simulation speeds, chosen with the Up/Down arrow keys. 0 = paused.
 global_variable f32 BroadcastSpeeds[] = {0.f, .25f, .5f, 1.f, 2.f, 4.f, 8.f};

@@ -75,6 +75,9 @@ struct app_state
  
  // Food lots and their expiry rounds, per island and product (solarpunk_food.h)
  food_state Food;
+ 
+ // Link-state routing: hellos, LSAs, Dijkstra, goods moving hop by hop (solarpunk_routing.h)
+ route_state Route;
 };
 
 global_variable product *AllProducts;
