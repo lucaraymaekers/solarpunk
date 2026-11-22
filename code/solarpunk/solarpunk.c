@@ -37,6 +37,7 @@
 #include "solarpunk/solarpunk_world.c"
 #include "solarpunk/solarpunk_supply.c"
 #include "solarpunk/solarpunk_world_gen.c"
+#include "solarpunk/solarpunk_adapt.c"
 #include "solarpunk/solarpunk_food_app.c"
 #include "solarpunk/solarpunk_broadcast.c"
 #include "solarpunk/solarpunk_graph.c"

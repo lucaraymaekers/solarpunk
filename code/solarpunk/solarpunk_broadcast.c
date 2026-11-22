@@ -88,7 +88,9 @@ BroadcastRound(app_state *App)
  Broadcast->IslandCount = IslandCount;
  Broadcast->Round += 1;
 
- //- Food: spoil, produce, eat (solarpunk_food.c). Before the ads, so they carry this round's food.
+ //- Producers react to last round's shortages (solarpunk_adapt.c), then the food:
+ // spoil, produce, eat (solarpunk_food.c). Before the ads, so they carry this round's food.
+ SupplyAdaptRound(App, Broadcast->Round);
  FoodRoundFromApp(App, Broadcast->Round);
 
  //- Every island refreshes its own announcement.
@@ -166,6 +168,7 @@ BroadcastRestart(app_state *App)
  MemorySet(Broadcast->Known, 0, sizeof(Broadcast->Known));
  MemorySet(Broadcast->Snapshot, 0, sizeof(Broadcast->Snapshot));
  MemorySet(Broadcast->Flash, 0, sizeof(Broadcast->Flash));
+ MemorySet(&Broadcast->Adapt, 0, sizeof(Broadcast->Adapt));
  FoodReset(&App->Food);
 }
 

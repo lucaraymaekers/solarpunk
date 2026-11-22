@@ -389,7 +389,7 @@ W3ComputeStatus(app_state *App)
  for(island *Island = App->FirstIsland; Island; Island = Island->Next, IslandIdx += 1)
  {
   f32 Harvest = WorldGenHarvestFactor(App, IslandIdx, App->Broadcast.IslandCount, App->Broadcast.Round);
-  for(product *Product = Island->FirstProduct; Product; Product = Product->Next) Made[Product->Kind] += Harvest*(f32)Product->Amount;
+  for(product *Product = Island->FirstProduct; Product; Product = Product->Next) Made[Product->Kind] += Harvest*AdaptBoost(App, Product->Kind)*(f32)Product->Amount;
   for(product *Req = Island->FirstRequirement; Req; Req = Req->Next) R3->TotalNeeded[Req->Kind] += Req->Amount;
  }
  for(u32 Kind = 0; Kind < ProductKind_Count; Kind += 1)
