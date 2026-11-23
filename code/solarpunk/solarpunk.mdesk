@@ -1,0 +1,42 @@
+//~ Products
+// Icon: codepoint in data/solarpunk_icons.ttf (0 = none), see Icon_* in solarpunk_ui.c
+@table(Kind, Name, Icon)
+ProductsTable:
+{
+ { None        "None"         0    }
+ { Apples      "Apples"       0x3C }
+ { Pears       "Pears"        0x3D }
+ { Cabbage     "Cabbage"      0x3E }
+ { Carrots     "Carrots"      0x3F }
+ { Wheat       "Wheat"        0x40 }
+ { Fish        "Fish"         0x41 }
+ { Meat        "Meat"         0x42 }
+ { Eggs        "Eggs"         0x43 }
+ { Berries     "Berries"      0x44 }
+ { Coconuts    "Coconuts"     0x45 }
+ { Crabs       "Crabs"        0x46 }
+ { Potatoes    "Potatoes"     0x47 }
+}
+
+@data_enum("product_kind")
+{
+ @expand(ProductsTable)
+  ```ProductKind_$(Kind),
+ ```;
+ `ProductKind_Count`;
+}
+
+@data_table("str8")
+ProductNames:
+{
+ @expand(ProductsTable) @strings
+  ```{$(Name)},
+ ```;
+}
+
+@data_table("u32")
+ProductIcons:
+{
+ @expand(ProductsTable)
+  `$(Icon),`;
+}
